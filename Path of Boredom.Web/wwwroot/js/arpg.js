@@ -2,6 +2,13 @@ import { WIDTH, HEIGHT, createState, startRun, startEndlessRun, step, togglePaus
 import { captureSnapshot, restoreSnapshot } from "./arpg-save.js";
 import { MAPS, LAST_WAVE, UPGRADES, POWER_UPS, threatForWave, mapForWave, mapIndexForWave, firePhase } from "./arpg-campaign.js";
 import { LEVEL_CARDS } from "./arpg-cards.js";
+import { DIFFICULTIES } from "./arpg-difficulty.js";
+import { MASTERY, MAX_FLASKS, forgeComplete, masteryCost, buyMastery, chargeLaneEnd } from "./arpg-engine.js";
+import { movementSpeed, criticalChance, criticalDamage, skillReach } from "./arpg-engine.js";
+import { HERO_CLASSES, classFor } from "./arpg-classes.js";
+import { drawHero, drawOrb, decorateFloor, drawAtmosphere, drawLootIcon } from "./arpg-graphics.js";
+
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const BEST_KEY = "path-of-boredom.best.v1";
 const movementKeys = { KeyW: "up", ArrowUp: "up", KeyS: "down", ArrowDown: "down", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right" };
@@ -9,9 +16,11 @@ const skillKeys = { KeyJ: "attack", KeyQ: "nova", Space: "dodge", KeyE: "potion"
 
 function makeFloor(map) {
     const floor = document.createElement("canvas");
-    floor.width = WIDTH;
-    floor.height = HEIGHT;
+    const scale = Math.min(window.devicePixelRatio || 1, 1.5);
+    floor.width = Math.round(WIDTH * scale);
+    floor.height = Math.round(HEIGHT * scale);
     const ctx = floor.getContext("2d");
+    ctx.setTransform(floor.width / WIDTH, 0, 0, floor.height / HEIGHT, 0, 0);
     ctx.fillStyle = `rgb(${map.tint.join(",")})`;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
     let seed = 72;
@@ -23,6 +32,10 @@ function makeFloor(map) {
             const shade = Math.floor(random() * 12);
             ctx.fillStyle = `rgb(${map.tint.map(channel => channel + shade).join(",")})`;
             ctx.fillRect(x + 2, y + 2, 74, 58);
+            ctx.strokeStyle = "#dbd9b71b"; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(x + 3, y + 59); ctx.lineTo(x + 3, y + 3); ctx.lineTo(x + 75, y + 3); ctx.stroke();
+            ctx.strokeStyle = "#050c1266";
+            ctx.beginPath(); ctx.moveTo(x + 76, y + 3); ctx.lineTo(x + 76, y + 60); ctx.lineTo(x + 3, y + 60); ctx.stroke();
             ctx.strokeStyle = "#aeb3a408";
             ctx.strokeRect(x + 4, y + 4, 69, 53);
             if (random() < 0.3) {
@@ -126,6 +139,7 @@ function makeFloor(map) {
         ctx.fillStyle = "#5b5545";
         ctx.fillRect(x - 17, y - 12, 34, 11);
     }
+    decorateFloor(ctx, map, random, WIDTH, HEIGHT);
     return floor;
 }
 
@@ -136,8 +150,9 @@ function circle(ctx, x, y, radius, color) {
     ctx.fill();
 }
 
-function drawActor(ctx, actor, player, time, map) {
+function drawActor(ctx, actor, player, time, map, heroClass) {
     const hero = actor === player;
+    if (reducedMotion.matches) time = 0;
     const boss = actor.kind === "boss";
     const r = actor.radius;
     ctx.save();
@@ -146,48 +161,28 @@ function drawActor(ctx, actor, player, time, map) {
     ctx.beginPath();
     ctx.ellipse(3, r * 0.55, r * 1.35, r * 0.65, 0, 0, Math.PI * 2);
     ctx.fill();
+    const walking = hero ? Math.min(1, Math.hypot(actor.vx || 0, actor.vy || 0) / 180) : actor.moving ? 1 : 0;
+    const stride = reducedMotion.matches ? 0 : Math.sin(actor.stridePhase ?? 0) * walking;
+    const strike = Math.sin(Math.PI * Math.min(1, (actor.swing ?? 0) / (hero ? 0.26 : 0.3)));
+    if (!reducedMotion.matches) {
+        ctx.translate(0, -Math.abs(stride) * (hero ? 2 : 3));
+        if (!hero) {
+            const angle = Math.atan2(player.y - actor.y, player.x - actor.x);
+            ctx.translate(Math.cos(angle) * strike * 7, Math.sin(angle) * strike * 7);
+            if (actor.winding > 0) ctx.scale(1.06, 0.94);
+        }
+    }
     if (hero) {
-        ctx.strokeStyle = "#a0d5db55";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.ellipse(0, 7, 23, 13, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        if (actor.invulnerable > 0) ctx.globalAlpha = 0.5 + Math.sin(time * 45) * 0.2;
-        ctx.rotate(actor.facing + Math.PI / 2);
-        ctx.fillStyle = "#984b37";
-        ctx.beginPath();
-        ctx.moveTo(-11, 0);
-        ctx.lineTo(-17, 29);
-        ctx.lineTo(2, 23 + Math.sin(time * 8) * 4);
-        ctx.lineTo(14, 28);
-        ctx.lineTo(11, 0);
-        ctx.fill();
-        circle(ctx, -8, 10, 6, "#333d40");
-        circle(ctx, 8, 10, 6, "#333d40");
-        ctx.fillStyle = "#8eaaa8";
-        ctx.fillRect(-12, -8, 24, 19);
-        ctx.fillStyle = "#c2c4aa";
-        ctx.fillRect(-15, -7, 7, 10);
-        ctx.fillRect(8, -7, 7, 10);
-        circle(ctx, 0, -9, 9, "#d1c5a5");
-        ctx.fillStyle = "#405459";
-        ctx.fillRect(-7, -12, 14, 5);
-        ctx.fillStyle = "#c9dcd7";
-        ctx.beginPath();
-        ctx.moveTo(20, -35);
-        ctx.lineTo(24, -6);
-        ctx.lineTo(19, -1);
-        ctx.lineTo(16, -6);
-        ctx.fill();
-        ctx.fillStyle = "#d1ab61";
-        ctx.fillRect(12, -2, 16, 4);
-        ctx.fillStyle = "#644631";
-        ctx.fillRect(18, 2, 4, 8);
+        drawHero(ctx, actor, HERO_CLASSES[heroClass], stride, strike, time, reducedMotion.matches);
     } else if (["summoner", "cantor", "hexer"].includes(actor.kind)) {
         const color = actor.kind === "cantor" ? "#a4e9bb" : actor.kind === "hexer" ? "#ef96cf" : "#b994e1";
-        ctx.fillStyle = actor.flash > 0 ? "#fff4d6" : color;
+        const cloth = ctx.createLinearGradient(-20, -25, 20, 20);
+        cloth.addColorStop(0, color); cloth.addColorStop(1, "#252437");
+        ctx.fillStyle = actor.flash > 0 ? "#fff4d6" : cloth;
         ctx.beginPath(); ctx.moveTo(0, -25); ctx.lineTo(20, 20); ctx.lineTo(0, 12); ctx.lineTo(-20, 20); ctx.closePath(); ctx.fill();
-        circle(ctx, 0, -8, 8, "#292033");
+        ctx.strokeStyle = color + "88"; ctx.lineWidth = 1; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-7, -5); ctx.lineTo(-12, 13); ctx.moveTo(7, -5); ctx.lineTo(12, 13); ctx.stroke();
+        drawOrb(ctx, 0, -8, 8, "#292033");
         circle(ctx, -3, -8, 2, "#fff0ba"); circle(ctx, 3, -8, 2, "#fff0ba");
         ctx.strokeStyle = color; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(0, 0, actor.kind === "cantor" ? 40 : 27, time, time + Math.PI * 1.6); ctx.stroke();
@@ -196,31 +191,36 @@ function drawActor(ctx, actor, player, time, map) {
             for (let i = 0; i < 4; i++) circle(ctx, Math.cos(time + i * Math.PI / 2) * 30, Math.sin(time + i * Math.PI / 2) * 30, 4, color);
         }
     } else if (actor.kind === "bomber") {
-        circle(ctx, 0, 0, 18, actor.flash > 0 ? "#fff4d6" : "#9d6646");
-        circle(ctx, 0, -3, 12, actor.winding > 0 ? "#ffe3a0" : "#db9a43");
+        drawOrb(ctx, 0, 0, 18, actor.flash > 0 ? "#fff4d6" : "#9d6646");
+        drawOrb(ctx, 0, -3, 12, actor.winding > 0 ? "#ffe3a0" : "#db9a43");
         ctx.strokeStyle = "#4d3737"; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(16, 0); ctx.moveTo(0, -17); ctx.lineTo(0, 17); ctx.stroke();
         circle(ctx, 0, -22, 4 + Math.sin(time * 15), "#ffb65d");
-    } else if (actor.kind === "reaver") {
-        ctx.rotate(Math.atan2(player.y - actor.y, player.x - actor.x));
-        ctx.fillStyle = actor.flash > 0 ? "#fff4d6" : "#83b9cb";
+    } else if (["reaver", "lancer"].includes(actor.kind)) {
+        ctx.rotate(actor.winding > 0 || actor.charging > 0 ? Math.atan2(actor.chargeY, actor.chargeX) : Math.atan2(player.y - actor.y, player.x - actor.x));
+        ctx.fillStyle = actor.flash > 0 ? "#fff4d6" : actor.kind === "lancer" ? "#e9ac63" : "#83b9cb";
+        if (actor.charging > 0 && !reducedMotion.matches) ctx.scale(1.3, 0.8);
         ctx.beginPath(); ctx.moveTo(25, 0); ctx.lineTo(-18, -18); ctx.lineTo(-9, 0); ctx.lineTo(-18, 18); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = "#142734"; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = "#f2e9c566";
+        ctx.beginPath(); ctx.moveTo(23, 0); ctx.lineTo(-16, -16); ctx.lineTo(-5, -2); ctx.closePath(); ctx.fill();
         ctx.strokeStyle = "#d3f5ff"; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(30, -14); ctx.lineTo(-2, -14); ctx.moveTo(30, 14); ctx.lineTo(-2, 14); ctx.stroke();
     } else if (actor.kind === "runner") {
         ctx.rotate(Math.atan2(player.y - actor.y, player.x - actor.x));
-        ctx.fillStyle = actor.flash > 0 ? "#fff0cc" : "#c29068";
-        ctx.beginPath(); ctx.ellipse(0, 0, 19, 9, 0, 0, Math.PI * 2); ctx.fill();
-        circle(ctx, 15, 0, 8, "#d8b383");
+        ctx.save(); ctx.scale(1, 0.5);
+        drawOrb(ctx, 0, 0, 19, actor.flash > 0 ? "#fff0cc" : "#c29068");
+        ctx.restore();
+        drawOrb(ctx, 15, 0, 8, "#d8b383");
         ctx.strokeStyle = "#ac7854"; ctx.lineWidth = 3;
         for (const side of [-1, 1]) {
-            ctx.beginPath(); ctx.moveTo(-12, side * 5); ctx.lineTo(-18, side * 15); ctx.moveTo(6, side * 5); ctx.lineTo(12, side * 15); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(-12, side * 5); ctx.lineTo(-18 + stride * side * 7, side * 15); ctx.moveTo(6, side * 5); ctx.lineTo(12 - stride * side * 7, side * 15); ctx.stroke();
         }
         circle(ctx, 17, -4, 2, "#ff725a");
     } else if (actor.kind === "spitter") {
-        circle(ctx, 0, 0, 19, actor.flash > 0 ? "#fff0cc" : "#6b9764");
-        circle(ctx, -8, -7, 7, "#a0b56b");
-        circle(ctx, 8, -7, 7, "#a0b56b");
+        drawOrb(ctx, 0, 0, 19, actor.flash > 0 ? "#fff0cc" : "#6b9764");
+        drawOrb(ctx, -8, -7, 7, "#a0b56b");
+        drawOrb(ctx, 8, -7, 7, "#a0b56b");
         circle(ctx, 0, 6, 8, "#253e36");
         circle(ctx, 0, 7, 4 + Math.sin(time * 3), "#bde498");
     } else if (actor.kind === "wisp") {
@@ -241,12 +241,12 @@ function drawActor(ctx, actor, player, time, map) {
     } else {
         const base = actor.flash > 0 ? "#fce5bf" : boss ? map.accent : actor.kind === "sentinel" ? "#8b6576" : actor.kind === "brute" ? "#787469" : "#747d6c";
         ctx.fillStyle = boss ? "#403845" : "#43453e";
-        ctx.fillRect(-r * 0.6, 2, r * 0.45, r);
-        ctx.fillRect(r * 0.2, 2, r * 0.45, r);
-        circle(ctx, 0, -3, r * 0.88, base);
-        circle(ctx, -r * 0.9, -3, r * 0.38, base);
-        circle(ctx, r * 0.9, -3, r * 0.38, base);
-        circle(ctx, 0, -r * 0.75, r * 0.55, boss ? "#b5aaa2" : "#aea58b");
+        ctx.fillRect(-r * 0.6, 2 + stride * 5, r * 0.45, r);
+        ctx.fillRect(r * 0.2, 2 - stride * 5, r * 0.45, r);
+        drawOrb(ctx, 0, -3, r * 0.88, base);
+        drawOrb(ctx, -r * 0.9, -3, r * 0.38, base);
+        drawOrb(ctx, r * 0.9, -3, r * 0.38, base);
+        drawOrb(ctx, 0, -r * 0.75, r * 0.55, boss ? "#b5aaa2" : "#aea58b");
         circle(ctx, -r * 0.2, -r * 0.85, 2.5, "#ec795c");
         circle(ctx, r * 0.2, -r * 0.85, 2.5, "#ec795c");
         if (actor.kind === "sentinel") {
@@ -291,7 +291,8 @@ function drawActor(ctx, actor, player, time, map) {
 function render(ctx, floor, state) {
     const map = mapForWave(state.wave);
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
-    ctx.drawImage(floor, 0, 0);
+    ctx.drawImage(floor, 0, 0, WIDTH, HEIGHT);
+    drawAtmosphere(ctx, map, state.time, reducedMotion.matches, WIDTH, HEIGHT);
     for (const hazard of map.hazards) {
         const phase = firePhase(state.time);
         const burning = map.hazard !== "slow" && phase >= 4 && state.enemies.length > 0;
@@ -319,6 +320,19 @@ function render(ctx, floor, state) {
     }
     for (const enemy of state.enemies) {
         if (enemy.winding <= 0) continue;
+        if (enemy.kind === "lancer") {
+            const end = chargeLaneEnd(enemy);
+            ctx.save();
+            ctx.strokeStyle = "#ffae4444"; ctx.lineWidth = enemy.radius * 2;
+            ctx.beginPath(); ctx.moveTo(enemy.x, enemy.y); ctx.lineTo(end.x, end.y); ctx.stroke();
+            ctx.strokeStyle = "#ffe2a0"; ctx.lineWidth = 2;
+            ctx.setLineDash([14, 9]); ctx.lineDashOffset = reducedMotion.matches ? 0 : -state.time * 50;
+            ctx.stroke();
+            ctx.font = "bold 12px 'Segoe UI', sans-serif"; ctx.fillStyle = "#ffe2a0"; ctx.textAlign = "center";
+            ctx.fillText("LANCER — STEP ASIDE", (enemy.x + end.x) / 2, (enemy.y + end.y) / 2 - 24);
+            ctx.restore();
+            continue;
+        }
         if (enemy.kind === "reaver") {
             ctx.strokeStyle = "#9ce5ee66"; ctx.lineWidth = 36;
             ctx.beginPath(); ctx.moveTo(enemy.x, enemy.y); ctx.lineTo(enemy.x + enemy.chargeX * 252, enemy.y + enemy.chargeY * 252); ctx.stroke();
@@ -335,27 +349,38 @@ function render(ctx, floor, state) {
     }
     for (const drop of state.loot) {
         const color = drop.kind === "power" ? POWER_UPS[drop.value].color : drop.kind === "upgrade" ? "#efd1ff" : drop.kind === "gold" ? "#dab769" : drop.kind === "weapon" ? "#8fcbc6" : drop.kind === "armor" ? "#b5b9f2" : "#cf7164";
-        ctx.save();
-        ctx.translate(drop.x, drop.y);
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 14;
-        ctx.fillStyle = color;
-        ctx.rotate(Math.PI / 4);
-        const size = drop.kind === "power" || drop.kind === "upgrade" ? 7 : 4;
-        ctx.fillRect(-size, -size, size * 2, size * 2);
-        ctx.restore();
-        if (["weapon", "armor", "power", "upgrade"].includes(drop.kind)) {
+        drawLootIcon(ctx, drop, color, classFor(state).weaponType, state.time, reducedMotion.matches);
+        if (["weapon", "armor", "power", "upgrade", "flask"].includes(drop.kind)) {
             ctx.fillStyle = color;
             ctx.font = "10px 'Segoe UI', sans-serif";
             ctx.textAlign = "center";
-            const label = drop.kind === "power" ? POWER_UPS[drop.value].name
+            const label = drop.kind === "flask" ? "Life flask" : drop.kind === "power" ? POWER_UPS[drop.value].name
                 : drop.kind === "upgrade" ? `${UPGRADES[Object.keys(UPGRADES)[drop.value]].name} +1`
-                : `${drop.kind === "weapon" ? "Blade" : "Armor"} +${drop.value}`;
-            ctx.fillText(label, drop.x, drop.y - 16);
+                : `${drop.kind === "weapon" ? classFor(state).weaponType : "Armor"} +${drop.value}`;
+            ctx.lineWidth = 3; ctx.strokeStyle = "#091218";
+            ctx.strokeText(label, drop.x, drop.y - 18);
+            ctx.fillText(label, drop.x, drop.y - 18);
         }
     }
     const actors = [...state.enemies.filter(enemy => enemy.health > 0), state.player].sort((a, b) => a.y - b.y);
-    for (const actor of actors) drawActor(ctx, actor, state.player, state.time, map);
+    if (!reducedMotion.matches) {
+        for (const actor of actors) {
+            const hero = actor === state.player;
+            if (hero ? actor.rolling <= 0 : actor.charging <= 0) continue;
+            const dx = hero ? actor.rollX : actor.chargeX, dy = hero ? actor.rollY : actor.chargeY;
+            for (let i = 3; i > 0; i--) {
+                circle(ctx, actor.x - dx * i * 18, actor.y - dy * i * 18, actor.radius * (1 - i * 0.16), hero ? "#bce7ec22" : "#e9ac6333");
+            }
+        }
+    }
+    for (const actor of actors) drawActor(ctx, actor, state.player, state.time, map, state.heroClass);
+    for (const shot of state.playerShots) {
+        ctx.save();
+        ctx.translate(shot.x, shot.y); ctx.rotate(Math.atan2(shot.vy, shot.vx));
+        ctx.strokeStyle = shot.piercing ? "#ffe7a5" : "#b8edc5"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(5, 0); ctx.moveTo(0, -4); ctx.lineTo(5, 0); ctx.lineTo(0, 4); ctx.stroke();
+        ctx.restore();
+    }
     for (const [index, power] of POWER_UPS.entries()) {
         if (state.buffs[power.key] <= 0) continue;
         ctx.strokeStyle = power.color; ctx.lineWidth = 2;
@@ -363,9 +388,10 @@ function render(ctx, floor, state) {
     }
     for (const bolt of state.projectiles) {
         ctx.save();
-        ctx.shadowColor = "#95dfd7";
-        ctx.shadowBlur = 18;
-        circle(ctx, bolt.x, bolt.y, 5, "#b5e4dc");
+        const speed = Math.hypot(bolt.vx, bolt.vy) || 1;
+        ctx.strokeStyle = "#df886a88"; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(bolt.x - bolt.vx / speed * 17, bolt.y - bolt.vy / speed * 17); ctx.lineTo(bolt.x, bolt.y); ctx.stroke();
+        drawOrb(ctx, bolt.x, bolt.y, 5, "#ffa578");
         ctx.restore();
     }
     for (const item of state.effects) {
@@ -380,13 +406,26 @@ function render(ctx, floor, state) {
             ctx.textAlign = "center";
             ctx.shadowBlur = 3;
             ctx.shadowColor = "#000";
+            ctx.strokeStyle = "#111921"; ctx.lineWidth = 3;
+            ctx.strokeText(item.text, item.x, item.y - progress * 35);
             ctx.fillText(item.text, item.x, item.y - progress * 35);
         } else if (item.kind === "slash") {
+            ctx.save();
+            ctx.globalAlpha *= 0.16;
+            ctx.beginPath(); ctx.moveTo(item.x, item.y);
+            ctx.arc(item.x, item.y, item.radius * (0.6 + progress * 0.4), item.angle - 1.3, item.angle + 1.3); ctx.closePath(); ctx.fill();
+            ctx.restore();
             ctx.lineWidth = 15 * (1 - progress);
             ctx.beginPath();
             ctx.arc(item.x, item.y, item.radius * (0.6 + progress * 0.4), item.angle - 1.3, item.angle + 1.3);
             ctx.stroke();
+            ctx.strokeStyle = "#fff1c9"; ctx.lineWidth = Math.max(1, 3 * (1 - progress)); ctx.stroke();
         } else {
+            ctx.save();
+            ctx.globalAlpha *= 0.2;
+            ctx.lineWidth = 16 * (1 - progress) + 2;
+            ctx.beginPath(); ctx.arc(item.x, item.y, Math.max(1, item.radius * progress), 0, Math.PI * 2); ctx.stroke();
+            ctx.restore();
             ctx.beginPath();
             ctx.arc(item.x, item.y, Math.max(1, item.radius * progress), 0, Math.PI * 2);
             ctx.stroke();
@@ -399,7 +438,7 @@ function render(ctx, floor, state) {
     }
     const vignette = ctx.createRadialGradient(WIDTH / 2, HEIGHT / 2, 160, WIDTH / 2, HEIGHT / 2, 630);
     vignette.addColorStop(0, "#03090d00");
-    vignette.addColorStop(1, "#03090d9c");
+    vignette.addColorStop(1, "#03090d70");
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
     const boss = state.enemies.find(enemy => enemy.kind === "boss" && enemy.health > 0);
@@ -412,6 +451,12 @@ function render(ctx, floor, state) {
         ctx.fillRect(WIDTH / 2 - 180, 61, 360, 8);
         ctx.fillStyle = "#ae6656";
         ctx.fillRect(WIDTH / 2 - 180, 61, 360 * boss.health / boss.maxHealth, 8);
+        ctx.fillStyle = "#f0c08b88"; ctx.fillRect(WIDTH / 2 - 180, 61, 360 * boss.health / boss.maxHealth, 2);
+        ctx.strokeStyle = map.accent; ctx.lineWidth = 1; ctx.strokeRect(WIDTH / 2 - 184, 57, 368, 16);
+        for (const side of [-1, 1]) {
+            ctx.save(); ctx.translate(WIDTH / 2 + side * 190, 65); ctx.rotate(Math.PI / 4);
+            ctx.fillStyle = map.accent; ctx.fillRect(-3, -3, 6, 6); ctx.restore();
+        }
     }
 }
 
@@ -464,6 +509,126 @@ export function createGame(root, saveBridge = null) {
     let shownDraft = "";
     let cardPickReadyAt = 0;
     let draftVisible = false;
+    const difficultySelect = root.querySelector("[data-difficulty]");
+    const classSelect = root.querySelector("[data-hero-class]");
+    const classPreview = root.querySelector("[data-class-preview]");
+    const setup = root.querySelector("[data-setup]");
+    const setupNext = root.querySelector("[data-setup-next]");
+    const setupSkip = root.querySelector("[data-setup-skip]");
+    const setupCancel = root.querySelector("[data-setup-cancel]");
+    const masteryPanel = root.querySelector("[data-mastery]");
+    const masteryButtons = [...root.querySelectorAll("[data-mastery-stat]")];
+    const forgeNudge = root.querySelector("[data-forge-nudge]");
+    let setupAction = null;
+    let setupStep = 0;
+    const combatView = root.querySelector("[data-combat-view]");
+    const viewport = root.querySelector(".arena-viewport");
+    const focusViewButton = root.querySelector("[data-focus-view]");
+    const recenterButton = root.querySelector("[data-recenter]");
+    const combatPause = root.querySelector("[data-combat-pause]");
+    const healthWarning = root.querySelector("[data-health-warning]");
+    const skillButtons = [...root.querySelectorAll("[data-skill]")];
+    const viewPreference = "path-of-boredom.focus-view";
+    let focusView = true;
+    let layoutFrame = 0;
+    let alignArena = false;
+    try { focusView = localStorage.getItem(viewPreference) !== "off"; } catch { /* View preferences are optional. */ }
+    function updateCanvasResolution() {
+        const scale = Math.max(1, Math.min(2, canvas.getBoundingClientRect().width / WIDTH * (window.devicePixelRatio || 1)));
+        const width = Math.round(WIDTH * scale), height = Math.round(HEIGHT * scale);
+        if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+        }
+        ctx.setTransform(canvas.width / WIDTH, 0, 0, canvas.height / HEIGHT, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+    }
+    function fitArena() {
+        root.classList.toggle("focus-view", focusView);
+        focusViewButton.setAttribute("aria-pressed", String(focusView));
+        focusViewButton.textContent = focusView ? "Focus view: On" : "Focus view: Off";
+        if (!focusView) { viewport.style.maxWidth = ""; updateCanvasResolution(); return; }
+        const screenHeight = window.visualViewport?.height ?? document.documentElement.clientHeight;
+        const controlsHeight = combatView.getBoundingClientRect().height - viewport.getBoundingClientRect().height;
+        const availableHeight = Math.max(180, screenHeight - controlsHeight - 16);
+        const width = `${Math.floor(Math.min(combatView.clientWidth, availableHeight * WIDTH / HEIGHT))}px`;
+        if (viewport.style.maxWidth !== width) viewport.style.maxWidth = width;
+        updateCanvasResolution();
+    }
+    function reveal(element, smooth = false) {
+        const box = element.getBoundingClientRect();
+        const height = window.visualViewport?.height ?? document.documentElement.clientHeight;
+        const top = (window.visualViewport?.offsetTop ?? 0) + 8;
+        const bottom = top + height - 16;
+        const delta = box.height > height - 16 || box.top < top ? box.top - top : box.bottom > bottom ? box.bottom - bottom : 0;
+        if (Math.abs(delta) > 1) window.scrollBy({ top: delta, behavior: smooth && !reducedMotion.matches ? "smooth" : "instant" });
+    }
+    function scheduleArenaLayout(align = false) {
+        alignArena ||= align;
+        if (layoutFrame || disposed) return;
+        layoutFrame = requestAnimationFrame(() => {
+            layoutFrame = 0;
+            if (disposed) return;
+            fitArena();
+            if (alignArena) reveal(focusView && !setupAction ? combatView : viewport);
+            alignArena = false;
+        });
+    }
+    on(focusViewButton, "click", () => {
+        focusView = !focusView;
+        try { localStorage.setItem(viewPreference, focusView ? "on" : "off"); } catch { /* View preferences are optional. */ }
+        scheduleArenaLayout(true);
+        if (state.status === "playing") canvas.focus({ preventScroll: true });
+    });
+    on(recenterButton, "click", () => {
+        scheduleArenaLayout(true);
+        if (state.status === "playing") canvas.focus({ preventScroll: true });
+    });
+    on(combatPause, "click", pause);
+    on(combatView, "wheel", event => {
+        if (state.status === "playing" && !setupAction && document.activeElement === canvas && !event.ctrlKey && !event.metaKey) event.preventDefault();
+    }, { passive: false });
+    on(window, "resize", () => scheduleArenaLayout());
+    if (window.visualViewport) on(window.visualViewport, "resize", () => scheduleArenaLayout());
+    const tutorial = [
+        { title: "Move, aim, strike", text: "Move with WASD or arrows. Aim with the mouse and hold J or left click to cleave. On touch screens, use the movement pad and skill buttons. Q unleashes a nova around you." },
+        { title: "Read danger before it strikes", text: "Space dodges in your facing direction. Step sideways out of amber Lancer lanes before their screen-crossing dash. E drinks a flask; carry up to 5. At 5, a flask pickup heals immediately. Level-ups no longer heal or refill flasks." },
+        { title: "Spend gold to survive", text: "Select Forge to pause and buy weapon, armor, or skill ranks. Scrolls are rare: do not wait for drops. Max every forge item to unlock uncapped stat training from 1,000 gold. Level-ups offer a card; checkpoints autosave. Your difficulty stays locked through all campaign stages." }
+    ];
+    const rankingStatus = root.querySelector("[data-ranking-status]");
+    const pendingScores = new Map();
+    const reportedScores = new Map();
+    let reporting = false;
+    let lastScoreAttempt = 0;
+    async function reportScore() {
+        if (!saveBridge || disposed) return;
+        if (state.status !== "ready" && state.rankingMode !== "legacy" && Object.hasOwn(DIFFICULTIES, state.difficulty)) {
+            const key = `${state.difficulty}:${state.rankingMode}`;
+            const score = state.kills - state.scoreBaseline;
+            if (score > (reportedScores.get(key) ?? -1)) {
+                const previous = pendingScores.get(key);
+                if (!previous || score > previous.score) {
+                    pendingScores.set(key, { difficulty: state.difficulty, mode: state.rankingMode, score, heroClass: state.heroClass });
+                }
+            }
+        }
+        if (reporting || !pendingScores.size) return;
+        reporting = true;
+        lastScoreAttempt = performance.now();
+        try {
+            for (const [key, submission] of pendingScores) {
+                const success = await saveBridge.invokeMethodAsync("SubmitScore", submission);
+                if (disposed) return;
+                if (!success) throw new Error("Rankings unavailable");
+                reportedScores.set(key, Math.max(submission.score, reportedScores.get(key) ?? 0));
+                if (pendingScores.get(key) === submission) pendingScores.delete(key);
+            }
+            rankingStatus.textContent = "Best score synced. Rankings are separated by difficulty and starting mode.";
+        } catch {
+            if (!disposed) rankingStatus.textContent = "Score sync failed. Keep this page open; it will retry automatically.";
+        } finally { reporting = false; }
+    }
     try {
         const stored = Number(localStorage.getItem(bestKey));
         if (Number.isFinite(stored) && stored >= 0) best = Math.floor(stored);
@@ -473,15 +638,127 @@ export function createGame(root, saveBridge = null) {
     const text = (name, value) => {
         const next = String(value);
         if (stats[name] && stats[name].textContent !== next) stats[name].textContent = next;
+        if (stats[name] && (name === "objective" || name === "buffs") && stats[name].title !== next) stats[name].title = next;
     };
     function clearInput() {
         keys.clear();
         pointers.clear();
         aim = null;
     }
+    function updateClassPreview() {
+        const hero = HERO_CLASSES[classSelect.value];
+        classPreview.querySelector("[data-class-title]").textContent = hero.name;
+        classPreview.querySelector("[data-class-description]").textContent = hero.description;
+        classPreview.querySelector("[data-class-stats]").textContent = `${hero.health} health · ${hero.damage} damage · ${hero.speed} speed · ${hero.armor}% innate armor`;
+        classPreview.querySelector("[data-class-skills]").textContent = `${hero.attackName}: ${hero.attackCooldown}s, ${hero.attackReach} range · ${hero.specialName}: ${hero.specialCooldown}s · Dodge: ${hero.dodgeCooldown}s`;
+    }
+    on(classSelect, "change", updateClassPreview);
+    function showSetupStep() {
+        const choosingDifficulty = setupStep === 0;
+        root.querySelector("[data-class-picker]").hidden = !choosingDifficulty || setupAction === "continue";
+        classPreview.hidden = !choosingDifficulty;
+        classSelect.disabled = !choosingDifficulty || setupAction === "continue";
+        updateClassPreview();
+        root.querySelector("[data-setup-step]").textContent = choosingDifficulty ? "PREPARE YOUR JOURNEY" : `QUICK GUIDE ${setupStep} / ${tutorial.length}`;
+        root.querySelector("[data-setup-title]").textContent = choosingDifficulty ? "Choose your challenge" : tutorial[setupStep - 1].title;
+        root.querySelector("[data-setup-description]").textContent = choosingDifficulty
+            ? setupAction === "continue" ? "Keep your character and choose your Endless difficulty. Endless kills start a new score on the campaign-equipped board. Your campaign record is kept."
+                : "Choose once for this new run. Stage transitions never change your difficulty. Starting replaces the current character; Cancel keeps it. Higher tiers strengthen enemies and reduce healing."
+            : tutorial[setupStep - 1].text;
+        if (setupStep === 1) {
+            const hero = HERO_CLASSES[classSelect.value];
+            root.querySelector("[data-setup-description]").textContent = `Move with WASD or arrows. Aim with the mouse; hold J or left click for ${hero.attackName}. Q uses ${hero.specialName}. On touch screens, use the movement pad and skill buttons; attacks face your movement direction. ${hero.description}`;
+        }
+        root.querySelector("[data-setup-difficulty]").hidden = !choosingDifficulty;
+        difficultySelect.disabled = !choosingDifficulty;
+        setupSkip.hidden = choosingDifficulty;
+        setupNext.textContent = setupAction === "continue" ? "Enter Endless" : setupStep === tutorial.length ? "Begin the journey" : "Next";
+        (choosingDifficulty ? difficultySelect : setupNext).focus({ preventScroll: true });
+    }
+    function openSetup(action) {
+        if (saving || setupAction || state.status === "choosing") return;
+        if (state.status === "playing") togglePause(state);
+        clearInput();
+        setupAction = action;
+        setupStep = 0;
+        difficultySelect.value = Object.hasOwn(DIFFICULTIES, state.difficulty) ? state.difficulty : "hard";
+        classSelect.value = state.heroClass;
+        setup.hidden = false;
+        updateHud();
+        showSetupStep();
+        scheduleArenaLayout(true);
+    }
+    function finishSetup() {
+        if (!setupAction || saving) return;
+        void reportScore();
+        if (setupAction === "continue") {
+            if (!enterEndless(state, difficultySelect.value)) return;
+        } else state = setupAction === "endless" ? startEndlessRun(Math.random, difficultySelect.value, classSelect.value) : startRun(Math.random, difficultySelect.value, classSelect.value);
+        setupAction = null;
+        setup.hidden = true;
+        checkpointHandled = null;
+        clearInput();
+        last = performance.now();
+        updateHud();
+        canvas.focus({ preventScroll: true });
+    }
+    function cancelSetup() {
+        setupAction = null;
+        setup.hidden = true;
+        updateHud();
+        (state.status === "won" ? endlessButton : startButton).focus({ preventScroll: true });
+    }
+    on(setupNext, "click", () => {
+        if (setupAction === "continue" || setupStep === tutorial.length) finishSetup();
+        else { setupStep++; showSetupStep(); }
+    });
+    on(setupSkip, "click", finishSetup);
+    on(setupCancel, "click", cancelSetup);
+    on(setup, "keydown", event => {
+        if (event.key === "Escape") { event.preventDefault(); cancelSetup(); }
+        if (event.key !== "Tab") return;
+        const controls = [...setup.querySelectorAll("button, select")].filter(element => !element.disabled && element.getClientRects().length);
+        const first = controls[0], last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    });
     function updateHud() {
         const p = state.player;
         const map = mapForWave(state.wave);
+        const hero = classFor(state);
+        const ranged = state.heroClass === "ranger";
+        text("hero-class", hero.name);
+        text("hero-role", hero.role);
+        text("class-speed", Math.round(movementSpeed(state)));
+        text("critical-chance", `${(criticalChance(state) * 100).toFixed(1)}%`);
+        text("critical-damage", `${Math.round(criticalDamage(state) * 100)}%`);
+        text("attack-reach", Math.round(skillReach(state, "attack")));
+        text("special-reach", Math.round(skillReach(state, "nova")));
+        text("class-armor", `${hero.armor}%`);
+        text("class-attack", `${hero.attackCooldown}s`);
+        text("class-dodge", `${hero.dodgeCooldown}s`);
+        text("attack-name", hero.attackName);
+        text("special-name", hero.specialName);
+        text("class-icon", ranged ? "➶" : state.heroClass === "warden" ? "⬟" : "⚔");
+        text("forge-attack", `${hero.attackName}: damage, ${ranged ? "range" : "reach"}, speed`);
+        text("forge-special", `${hero.specialName}: damage, ${ranged ? "range" : "radius"}, recovery`);
+        classSelect.disabled = saving || !setupAction || setupStep !== 0 || setupAction === "continue";
+        const critical = state.status === "playing" && p.health > 0 && p.health <= p.maxHealth * 0.25;
+        viewport.classList.toggle("low-health", critical);
+        const warning = critical ? p.potions > 0 ? "LOW HEALTH — E or Life flask to heal" : "LOW HEALTH — no flasks left; dodge and seek a pickup" : "";
+        if (healthWarning.textContent !== warning) healthWarning.textContent = warning;
+        for (const button of skillButtons) {
+            const skill = button.dataset.skill;
+            const unavailable = state.status !== "playing" || !!setupAction || saving;
+            const cannotHeal = skill === "potion" && (p.potions === 0 || p.health >= p.maxHealth);
+            button.disabled = unavailable || cannotHeal;
+            button.classList.toggle("skill-cooling", p[skill] > 0);
+            button.title = unavailable ? "Resume combat to use skills" : cannotHeal ? p.potions === 0 ? "No flask charges left" : "Health is already full"
+                : p[skill] > 0 ? `Recovering: ${p[skill].toFixed(1)}s` : "Ready";
+        }
+        text("score", state.kills - state.scoreBaseline);
+        text("difficulty", state.rankingMode === "legacy" ? "LEGACY · UNRANKED" : DIFFICULTIES[state.difficulty].name.toUpperCase());
+        difficultySelect.disabled = saving || !setupAction || setupStep !== 0;
         text("map", map.name);
         text("chapter", `CHAPTER ${map.chapter}`);
         text("map-description", map.description);
@@ -520,7 +797,7 @@ export function createGame(root, saveBridge = null) {
         text("buffs", activePowers.length ? activePowers.map(power => `${power.name}: ${Math.ceil(state.buffs[power.key])}s`).join(" / ") : "No active power-ups");
         text("journal", state.journal);
         for (const skill of ["attack", "nova", "dodge"]) text(skill, p[skill] > 0 ? `${p[skill].toFixed(1)}s` : "Ready");
-        text("potion", `${p.potions} charge${p.potions === 1 ? "" : "s"}`);
+        text("potion", `${p.potions} / ${MAX_FLASKS} flasks`);
         text("objective", state.status === "ready" ? `Survive ${LAST_WAVE} waves across ${MAPS.length} lands.`
             : state.status === "won" ? "Dawn restored. The Endless Watch is unlocked."
             : state.status === "camp" ? "Checkpoint reached. Rest and forge before continuing."
@@ -534,17 +811,37 @@ export function createGame(root, saveBridge = null) {
         xpMeter.max = p.nextLevel;
         xpMeter.value = p.xp;
         const choosing = state.status === "choosing";
-        const draftClosing = draftVisible && !choosing;
-        overlay.hidden = state.status === "playing" && !draftClosing;
+        const draftClosing = (draftVisible || draft.classList.contains("level-draft-exit")) && !choosing;
+        overlay.hidden = !!setupAction || state.status === "playing" && !draftClosing;
         const active = ["playing", "paused", "camp", "won", "choosing"].includes(state.status);
-        const canForge = ["paused", "camp", "won"].includes(state.status);
-        pauseButton.disabled = saving || !["playing", "paused"].includes(state.status);
-        startButton.disabled = saving || choosing;
-        restartButton.disabled = saving || choosing;
-        endlessButton.disabled = saving || checkingUnlock || choosing;
+        const canForge = !setupAction && ["paused", "camp", "won"].includes(state.status);
+        pauseButton.disabled = saving || !!setupAction || !["playing", "paused"].includes(state.status);
+        combatPause.disabled = pauseButton.disabled;
+        combatPause.textContent = state.status === "paused" ? "Resume" : "Pause";
+        focusViewButton.disabled = !!setupAction;
+        recenterButton.disabled = !!setupAction;
+        startButton.disabled = saving || choosing || !!setupAction;
+        restartButton.disabled = saving || choosing || !!setupAction;
+        endlessButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
         endlessButton.hidden = choosing || !(endlessUnlocked || state.status === "won") || (state.mode === "endless" && state.status !== "dead") || state.status === "playing";
         endlessButton.textContent = state.status === "won" ? "Continue into the Endless Watch" : "New Endless Watch run";
-        forgeButton.disabled = saving || !active || choosing;
+        forgeButton.disabled = saving || !active || choosing || !!setupAction;
+        const completedForge = forgeComplete(state);
+        const cheapestTraining = Math.min(...Object.keys(MASTERY).map(key => masteryCost(state, key)));
+        const affordable = completedForge ? state.gold >= cheapestTraining
+            : Object.entries(UPGRADES).some(([key, upgrade]) => state.upgrades[key] < upgrade.max && state.gold >= upgradeCost(state, key));
+        forgeNudge.hidden = state.status !== "playing" || draftClosing || !!setupAction || !affordable;
+        forgeButton.classList.toggle("forge-available", active && !choosing && !setupAction && affordable);
+        root.querySelector("[data-open-forge]").disabled = forgeButton.disabled;
+        text("forge-hint", completedForge ? `Stat training from ${cheapestTraining.toLocaleString()} gold.` : "Forge upgrade available!");
+        masteryPanel.hidden = !completedForge;
+        for (const button of masteryButtons) {
+            const key = button.dataset.masteryStat;
+            const cost = masteryCost(state, key);
+            button.querySelector("[data-mastery-label]").textContent = `Rank ${state.mastery[key]} / ${cost.toLocaleString()} gold`;
+            button.disabled = saving || !canForge || !completedForge || state.gold < cost || !Number.isFinite(cost);
+            button.title = MASTERY[key].detail;
+        }
         if (choosing !== draftVisible) {
             draftVisible = choosing;
             if (choosing) {
@@ -566,7 +863,7 @@ export function createGame(root, saveBridge = null) {
                 }, 320);
             }
         }
-        runMenu.hidden = choosing || draftClosing;
+        runMenu.hidden = choosing || draftClosing || !!setupAction;
         for (const button of cardButtons) button.disabled = saving || !choosing;
         if (choosing) {
             text("draft-level", `LEVEL ${state.player.level - state.pendingChoices + 1} / AN OATH FOR THE JOURNEY`);
@@ -579,7 +876,9 @@ export function createGame(root, saveBridge = null) {
                     button.dataset.cardId = key;
                     button.querySelector("[data-card-category]").textContent = card.category;
                     button.querySelector("[data-card-name]").textContent = card.name;
-                    button.querySelector("[data-card-description]").textContent = card.description;
+                    button.querySelector("[data-card-description]").textContent = key === "cleave"
+                        ? `+6 ${hero.attackName} ${ranged ? "arrow range" : "reach"} per rank, up to +60.`
+                        : key === "nova" ? `+10 ${hero.specialName} ${ranged ? "arrow range" : "radius"} per rank, up to +100.` : card.description;
                     button.querySelector("[data-card-rank]").textContent = `Rank ${state.boons[key]} to ${state.boons[key] + 1}${card.max < Number.MAX_SAFE_INTEGER ? ` / Max ${card.max}` : " / Stacking"}`;
                 });
                 if (!saving) { shownDraft = signature; cardButtons[0].focus({ preventScroll: true }); }
@@ -593,15 +892,18 @@ export function createGame(root, saveBridge = null) {
             const label = `Rank ${rank}/${max} / ${rank >= max ? "Mastered" : `${cost} gold`}`;
             const element = button.querySelector("[data-upgrade-label]");
             if (element.textContent !== label) element.textContent = label;
-            button.title = UPGRADES[key].detail;
+            button.title = key === "cleave" ? `Improves ${hero.attackName}: damage, range and attack speed.`
+                : key === "nova" ? `Improves ${hero.specialName}: damage, range and recovery.` : UPGRADES[key].detail;
             button.disabled = saving || !canForge || rank >= max || state.gold < cost;
         }
-        if (saveButton) saveButton.disabled = saving || checkingUnlock || !saveBridge || !active;
-        if (loadButton) loadButton.disabled = saving || checkingUnlock || !saveBridge;
+        if (saveButton) saveButton.disabled = saving || checkingUnlock || !saveBridge || !active || !!setupAction;
+        if (loadButton) loadButton.disabled = saving || checkingUnlock || !saveBridge || !!setupAction;
         pauseButton.firstChild.textContent = state.status === "paused" ? "Resume " : "Pause ";
         if (state.status !== shownStatus) {
+            if (state.status === "playing" && shownStatus !== "choosing") scheduleArenaLayout(true);
+            if (["paused", "camp", "won", "dead"].includes(state.status)) void reportScore();
             shownStatus = state.status;
-            overlay.hidden = state.status === "playing" && !draftClosing;
+            overlay.hidden = !!setupAction || state.status === "playing" && !draftClosing;
             restartButton.hidden = !["paused", "camp"].includes(state.status);
             if (state.status !== "playing") {
                 clearInput();
@@ -617,25 +919,24 @@ export function createGame(root, saveBridge = null) {
                     : camp || won ? (watch ? `Echo ${state.wave - LAST_WAVE} cleared. Vitality and flasks restored. Your checkpoint saves automatically. The next watch will be harder.` : map.ending)
                     : `${state.kills} enemies slain / ${state.gold} gold / Level ${p.level}. ${watch ? "Load your last checkpoint, or begin a fresh watch." : "Forge your equipment, dodge warning zones, and seek fallen upgrade scrolls."}`;
                 startButton.textContent = paused ? "Return to battle" : camp ? (watch ? "Continue the watch" : `Travel to ${mapForWave(state.wave + 1).name}`) : "Begin a new campaign";
-                (won ? endlessButton : startButton).focus({ preventScroll: true });
+                if (!setupAction) (won ? endlessButton : startButton).focus({ preventScroll: true });
             }
         }
     }
     function pause() {
-        if (saving) return;
+        if (saving || setupAction) return;
         togglePause(state);
         clearInput();
         updateHud();
         if (state.status === "playing") canvas.focus({ preventScroll: true });
     }
     function begin() {
-        if (saving || state.status === "choosing") return;
+        if (saving || setupAction || state.status === "choosing") return;
         if (state.status === "paused") togglePause(state);
         else if (state.status === "camp") continueJourney(state);
         else {
-            if (state.status === "won" && !window.confirm("Begin a new campaign? Your saved Endless unlock is kept, but this character will be replaced.")) return;
-            state = startRun();
-            checkpointHandled = null;
+            openSetup("campaign");
+            return;
         }
         clearInput();
         last = performance.now();
@@ -645,19 +946,22 @@ export function createGame(root, saveBridge = null) {
     on(startButton, "click", begin);
     on(pauseButton, "click", pause);
     on(endlessButton, "click", () => {
-        if (saving || checkingUnlock || state.status === "choosing" || !(endlessUnlocked || state.status === "won")) return;
-        if (state.status === "won") enterEndless(state);
-        else {
-            if (["paused", "camp"].includes(state.status) && !window.confirm("Start a fresh Endless Watch with a veteran kit? This replaces your current character.")) return;
-            state = startEndlessRun();
-        }
-        checkpointHandled = null;
-        clearInput(); last = performance.now(); updateHud(); canvas.focus({ preventScroll: true });
+        if (saving || checkingUnlock || setupAction || state.status === "choosing" || !(endlessUnlocked || state.status === "won")) return;
+        openSetup(state.status === "won" ? "continue" : "endless");
     });
     on(forgeButton, "click", () => {
-        if (saving || state.status === "choosing") return;
+        if (saving || setupAction || state.status === "choosing") return;
         if (state.status === "playing") pause();
-        root.querySelector("[data-forge]").scrollIntoView({ behavior: "smooth", block: "nearest" });
+        alignArena = false;
+        reveal(root.querySelector("[data-forge]"), true);
+    });
+    on(root.querySelector("[data-open-forge]"), "click", () => forgeButton.click());
+    for (const button of masteryButtons) on(button, "click", () => {
+        if (saving || setupAction || !buyMastery(state, button.dataset.masteryStat)) return;
+        forgeFeedback.textContent = state.journal;
+        saveStatus.textContent = "Stat trained. Save to keep your progress.";
+        updateHud();
+        if (["camp", "won"].includes(state.status)) void persist(false, true);
     });
     for (const button of upgradeButtons) on(button, "click", () => {
         if (saving || !buyUpgrade(state, button.dataset.upgrade)) return;
@@ -674,9 +978,9 @@ export function createGame(root, saveBridge = null) {
         updateHud();
         if (state.status === "playing") canvas.focus({ preventScroll: true });
     });
-    on(restartButton, "click", () => { if (saving || state.status === "choosing" || !window.confirm("Abandon this run? Unsaved progress will be lost.")) return; state = startRun(); checkpointHandled = null; clearInput(); updateHud(); canvas.focus({ preventScroll: true }); });
+    on(restartButton, "click", () => openSetup("campaign"));
     async function persist(loadingSave, automatic = false) {
-        if (saving || checkingUnlock) return;
+        if (saving || checkingUnlock || setupAction) return;
         if (!saveBridge) {
             saveStatus.textContent = "Checkpoint autosave unavailable. Reconnect to Blazor and select Save before leaving.";
             return;
@@ -696,7 +1000,9 @@ export function createGame(root, saveBridge = null) {
             if (result.success) endlessUnlocked = endlessUnlocked || result.endlessUnlocked || result.save?.endlessUnlocked || result.save?.state?.campaignComplete === 1;
             if (result.success && loadingSave) {
                 const restored = restoreSnapshot(result.save);
+                void reportScore();
                 state = restored;
+                difficultySelect.value = Object.hasOwn(DIFFICULTIES, state.difficulty) ? state.difficulty : "hard";
                 checkpointHandled = ["camp", "won"].includes(state.status) ? `${state.mode}:${state.wave}` : null;
                 shownStatus = "";
                 shownDraft = "";
@@ -731,7 +1037,12 @@ export function createGame(root, saveBridge = null) {
         }
     }
     on(window, "keydown", event => {
+        if (setupAction || setup.contains(event.target)) return;
         if (!root.contains(document.activeElement) || event.ctrlKey || event.altKey || event.metaKey) return;
+        if (state.status === "playing" && document.activeElement === canvas && ["PageUp", "PageDown", "Home", "End"].includes(event.code)) {
+            event.preventDefault();
+            return;
+        }
         if (["KeyP", "Escape"].includes(event.code)) {
             event.preventDefault();
             if (!event.repeat) pause();
@@ -797,7 +1108,11 @@ export function createGame(root, saveBridge = null) {
         if (!root.isConnected) { dispose(); return; }
         step(state, input(), last ? (now - last) / 1000 : 0);
         last = now;
-        if (["camp", "won"].includes(state.status) && !saving && !checkingUnlock && checkpointHandled !== `${state.mode}:${state.wave}`) {
+        if (now - lastScoreAttempt >= 15000) {
+            lastScoreAttempt = now;
+            void reportScore();
+        }
+        if (["camp", "won"].includes(state.status) && !saving && !checkingUnlock && !setupAction && checkpointHandled !== `${state.mode}:${state.wave}`) {
             checkpointHandled = `${state.mode}:${state.wave}`;
             void persist(false, true);
         }
@@ -809,12 +1124,17 @@ export function createGame(root, saveBridge = null) {
         if (disposed) return;
         disposed = true;
         cancelAnimationFrame(frame);
+        cancelAnimationFrame(layoutFrame);
+        resizeObserver.disconnect();
         controller.abort();
         observer.disconnect();
         clearInput();
     }
     const observer = new MutationObserver(() => { if (!root.isConnected) dispose(); });
     observer.observe(document.body, { childList: true, subtree: true });
+    const resizeObserver = new ResizeObserver(() => scheduleArenaLayout());
+    resizeObserver.observe(combatView);
+    fitArena();
     loading.hidden = true;
     startButton.disabled = false;
     updateHud();

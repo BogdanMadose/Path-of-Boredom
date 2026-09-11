@@ -49,7 +49,7 @@ export const MAPS = [
     }
 ];
 export const LAST_WAVE = MAPS.length * WAVES_PER_MAP;
-export const ENEMY_KINDS = ["husk", "brute", "wisp", "runner", "spitter", "sentinel", "reaver", "bomber", "summoner", "cantor", "hexer", "boss"];
+export const ENEMY_KINDS = ["husk", "brute", "wisp", "runner", "spitter", "sentinel", "reaver", "lancer", "bomber", "summoner", "cantor", "hexer", "boss"];
 export const mapIndexForWave = wave => Math.max(0, Math.floor((wave - 1) / WAVES_PER_MAP)) % MAPS.length;
 export const mapForWave = wave => MAPS[mapIndexForWave(wave)];
 export const firePhase = time => time % 6;
@@ -67,10 +67,13 @@ export const UPGRADES = {
     cleave: { name: "Wide awakening", max: 8, base: 55, detail: "Wider, faster cleaves with improved damage" },
     nova: { name: "Solar heart", max: 8, base: 65, detail: "Larger, stronger novas with shorter cooldowns" },
     dodge: { name: "Ghoststep", max: 8, base: 40, detail: "Faster dodge recovery and longer invulnerability" },
-    flask: { name: "Living ember", max: 5, base: 35, detail: "Stronger healing; refill all flask charges on purchase" }
+    flask: { name: "Living ember", max: 5, base: 35, detail: "Stronger healing; refill all flask charges on purchase" },
+    critChance: { name: "Keen ember", max: 8, base: 60, detail: "+2 percentage points critical chance per rank; total chance capped at 75%" },
+    critDamage: { name: "Ruin's edge", max: 8, base: 65, detail: "+10 percentage points critical damage per rank" }
 };
 
 export function threatForWave(wave) {
+    if (wave >= 8 && wave < 11) return "Lancers mark a long amber lane, then dash across the arena. Step sideways during the warning!";
     if (wave > LAST_WAVE) return "Endless echoes: mixed armies, more elites, escalating strength. Every fifth echo has a boss.";
     if (wave >= 26) return "Hexers cast radial volleys. Dodge between bolts; take them down before the gate opens.";
     if (wave >= 24) return "Cantors heal nearby enemies. Their violet aura marks a priority target.";
@@ -84,6 +87,7 @@ export function threatForWave(wave) {
 }
 
 export function enemyKindForWave(wave, index) {
+    if (wave >= 8 && index % 8 === 3) return "lancer";
     if (wave >= 26 && index % 7 === 2) return "hexer";
     if (wave >= 24 && index % 11 === 4) return "cantor";
     if (wave >= 21 && index % 9 === 3) return "summoner";

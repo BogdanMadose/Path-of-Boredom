@@ -1,0 +1,46 @@
+.patch-notes { min-height: 100vh; padding: 28px max(20px, calc((100% - 1200px) / 2)); color: #e5dfd3; background: radial-gradient(ellipse at top, #332a20, #121719 55%, #0d1113); font-family: 'Segoe UI', sans-serif; }
+a { color: #e9c78b; text-underline-offset: 4px; }
+a:hover { color: #ffe4b6; }
+a:focus-visible, .table-scroll:focus-visible { outline: 2px solid #f4c989; outline-offset: 4px; }
+.page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; padding-bottom: 24px; border-bottom: 1px solid #c7a56b40; }
+.brand { text-decoration: none; font: 18px Georgia, serif; letter-spacing: 2px; }
+.page-header nav { display: flex; flex-wrap: wrap; gap: 18px; font-size: 12px; }
+[aria-current="page"] { color: #fff0cc; text-decoration-color: #e9ac63; }
+.page-heading { max-width: 780px; padding: 45px 0 30px; }
+.eyebrow { color: #c7a56b; font-size: 10px; letter-spacing: 2px; margin-bottom: 10px; }
+h1 { font: clamp(32px, 5vw, 48px)/1.2 Georgia, serif; color: #f3dfb9; margin: 12px 0 18px; }
+.page-heading > p:last-child { color: #a8b1af; line-height: 1.8; }
+article { border: 1px solid #c7a56b40; border-radius: 8px; background: #131d22; overflow: hidden; box-shadow: 0 18px 60px #0003; }
+.patch-heading { padding: 32px; background: linear-gradient(135deg, #47332266, #19252b); }
+.patch-meta, .tags { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.patch-meta > a { margin-left: auto; font-size: 12px; }
+.badge { padding: 6px 10px; font-size: 10px; letter-spacing: 1.4px; color: #e9c78b; border: 1px solid #c7a56b66; border-radius: 3px; }
+.latest { background: #c7a56b20; color: #ffe4b6; }
+h2 { font: clamp(27px, 4vw, 38px) Georgia, serif; color: #f3dfb9; margin: 22px 0 14px; }
+.patch-heading > p { max-width: 850px; color: #bfc6bd; line-height: 1.8; }
+.tags span { border: 1px solid #ffffff15; border-radius: 20px; padding: 5px 12px; color: #b6c5c3; font-size: 11px; }
+.contents { display: flex; flex-wrap: wrap; gap: 12px 22px; padding: 20px 32px; background: #0e171b; border-block: 1px solid #c7a56b25; font-size: 12px; }
+.patch-section { padding: 30px 32px; border-bottom: 1px solid #ffffff0c; scroll-margin-top: 20px; }
+.patch-section:last-child { border-bottom: 0; }
+h3 { font: 25px/1.3 Georgia, serif; color: #f3dfb9; margin: 0 0 18px; }
+.patch-section > p:not(.eyebrow), li { color: #bfc6bd; font-size: 14px; line-height: 1.85; }
+ul { padding-left: 22px; margin-bottom: 0; }
+li { padding-left: 4px; margin-bottom: 10px; }
+li::marker { color: #c7a56b; }
+strong { color: #e7d3af; font-weight: 600; }
+.callout { padding: 16px 20px; margin: 22px 0 0; border-left: 3px solid #c7a56b; background: #c7a56b0b; }
+.table-scroll { overflow-x: auto; margin: 22px 0; border: 1px solid #c7a56b30; border-radius: 5px; }
+table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+caption { caption-side: top; text-align: left; padding: 14px 18px; color: #a7b5b2; font-size: 12px; line-height: 1.6; }
+th, td { padding: 14px 18px; border-bottom: 1px solid #ffffff0c; vertical-align: top; min-width: 105px; }
+thead { background: #26302d; color: #e9c78b; }
+tbody th { font-weight: 500; color: #d8c7ab; }
+tbody td { color: #b6c5c3; }
+tbody tr:nth-child(even) { background: #ffffff03; }
+tbody tr:last-child > * { border-bottom: 0; }
+.stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+.stat-grid section { padding: 20px; border: 1px solid #c7a56b40; border-radius: 5px; background: linear-gradient(135deg, #302d24, #17232a); }
+h4 { font: 20px Georgia, serif; color: #f3dfb9; margin: 0 0 12px; }
+.stat-grid p { font-size: 13px; color: #bfc6bd; line-height: 1.8; margin: 0; }
+footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; padding-top: 28px; color: #99958d; font-size: 11px; }
+@media (max-width: 650px) { .page-heading { padding-top: 28px; } .patch-heading, .patch-section { padding: 24px 18px; } .contents { padding: 18px; } .stat-grid { grid-template-columns: 1fr; } th, td { padding: 12px; } .patch-meta > a { margin-left: 0; } }

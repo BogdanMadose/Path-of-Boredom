@@ -73,12 +73,51 @@ public sealed class GameSaveClient(HttpClient client, IOptions<SaveServiceOption
         }
     }
 
-    private HttpRequestMessage? CreateRequest(HttpMethod method, ClaimsPrincipal user)
+    public async Task<bool> RegisterPlayerAsync(ClaimsPrincipal user) =>
+        await SendRankingAsync(user, null);
+
+    public async Task<bool> SubmitScoreAsync(ClaimsPrincipal user, ScoreSubmission submission) =>
+        RankingRules.IsValid(submission) && await SendRankingAsync(user, submission);
+
+    private async Task<bool> SendRankingAsync(ClaimsPrincipal user, ScoreSubmission? submission)
+    {
+        using var request = CreateRequest(submission is null ? HttpMethod.Post : HttpMethod.Put, user,
+            submission is null ? "/game/rankings/profile" : "/game/rankings/");
+        if (request is null) return false;
+        if (submission is not null) request.Content = JsonContent.Create(submission);
+        try
+        {
+            using var response = await client.SendAsync(request);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
+    public async Task<IReadOnlyList<RankingRow>?> GetRankingsAsync(ClaimsPrincipal user, string difficulty, string mode)
+    {
+        if (!RankingRules.IsDifficulty(difficulty) || !RankingRules.IsMode(mode)) return null;
+        using var request = CreateRequest(HttpMethod.Get, user, $"/game/rankings/?difficulty={difficulty}&mode={mode}");
+        if (request is null) return null;
+        try
+        {
+            using var response = await client.SendAsync(request);
+            return response.IsSuccessStatusCode ? await response.Content.ReadFromJsonAsync<List<RankingRow>>() : null;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or OperationCanceledException or JsonException)
+        {
+            return null;
+        }
+    }
+
+    private HttpRequestMessage? CreateRequest(HttpMethod method, ClaimsPrincipal user, string path = "/game/save")
     {
         var identity = user.Identities.FirstOrDefault(identity => identity.IsAuthenticated && !string.IsNullOrWhiteSpace(identity.Name));
         if (identity?.Name is not { Length: > 0 and <= 256 } name || name.Any(char.IsControl)) return null;
 
-        var request = new HttpRequestMessage(method, "/game/save");
+        var request = new HttpRequestMessage(method, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", serviceOptions.Value.ApiKey);
         request.Headers.Add(SaveServiceOptions.UserNameHeader, Uri.EscapeDataString(name));
         var sid = identity.FindFirst(ClaimTypes.PrimarySid)?.Value;

@@ -1,0 +1,104 @@
+@page "/rankings"
+@layout Path_of_Boredom.Web.Components.Layout.GameLayout
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using Path_of_Boredom.ServiceDefaults
+@inject GameSaveClient Saves
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationState
+
+<PageTitle>Hall of Embers · Path of Boredom</PageTitle>
+
+<main class="rankings">
+    <header>
+        <a href="/">◇ PATH OF BOREDOM</a>
+        <a href="/patch-notes">Patch notes</a>
+        <span>THE WATCH REMEMBERS</span>
+    </header>
+    <section class="heading">
+        <p class="eyebrow">HALL OF EMBERS</p>
+        <h1>Those who held the dawn</h1>
+        <p>Every fallen enemy counts. Your highest kill score is kept for each difficulty and starting mode, even after death.</p>
+    </section>
+    <div class="filters">
+        <label>Difficulty
+            <select @bind="difficulty" @bind:after="RefreshAsync" disabled="@busy">
+                <option value="hard">Hard</option>
+                <option value="nightmare">Nightmare</option>
+                <option value="inferno">Inferno</option>
+            </select>
+        </label>
+        <label>Starting mode
+            <select @bind="mode" @bind:after="RefreshAsync" disabled="@busy">
+                <option value="campaign">Campaign journey</option>
+                <option value="endless">Veteran Endless start</option>
+                <option value="ascended">Endless after campaign</option>
+            </select>
+        </label>
+        <button type="button" @onclick="RefreshAsync" disabled="@busy">Refresh rankings</button>
+    </div>
+    <p class="notice">Entering Endless starts a new score on the selected difficulty. Campaign-equipped characters and veteran starts have separate boards. Legacy saves are unranked. Equal scores share a rank.</p>
+    @if (busy)
+    {
+        <p role="status">Gathering the names of the watch...</p>
+    }
+    else if (error is not null)
+    {
+        <p class="error" role="alert">@error</p>
+    }
+    else if (rows.Count == 0)
+    {
+        <p>No players yet. Begin your journey to leave a mark.</p>
+    }
+    else
+    {
+        <div class="table-scroll" role="region" aria-label="Player rankings" tabindex="0">
+            <table>
+                <caption>@difficulty.ToUpperInvariant() · @(mode == "campaign" ? "CAMPAIGN JOURNEY" : mode == "ascended" ? "ENDLESS AFTER CAMPAIGN" : "VETERAN ENDLESS") · @rows.Count players</caption>
+                <thead><tr><th scope="col">Rank</th><th scope="col">Ashbound</th><th scope="col">Class used</th><th scope="col">Best score</th><th scope="col">Record set (UTC)</th></tr></thead>
+                <tbody>
+                    @foreach (var row in rows)
+                    {
+                        <tr class="@(row.IsCurrentUser ? "current" : null)">
+                            <td><span class="rank">#@row.Rank</span></td>
+                            <th scope="row">@row.Player @if (row.IsCurrentUser) { <small>YOU</small> }</th>
+                            <td><span class="class-badge">@RankingRules.ClassName(row.HeroClass)</span></td>
+                            <td class="score">@row.Score.ToString("N0")</td>
+                            <td>@(row.AchievedAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "Not played yet")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    <footer>Developed by MadBone | LIT MES TSR <span>Community rankings · browser-reported scores, not cheat-proof</span></footer>
+</main>
+
+@code {
+    private string difficulty = "hard";
+    private string mode = "campaign";
+    private bool busy;
+    private string? error;
+    private IReadOnlyList<RankingRow> rows = [];
+
+    protected override Task OnInitializedAsync() => RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        if (busy) return;
+        busy = true;
+        error = null;
+        try
+        {
+            var user = (await AuthenticationState.GetAuthenticationStateAsync()).User;
+            if (!await Saves.RegisterPlayerAsync(user))
+            {
+                error = "Rankings are unavailable. Please try Refresh again shortly.";
+                return;
+            }
+            var result = await Saves.GetRankingsAsync(user, difficulty, mode);
+            if (result is null) error = "Could not load rankings. Please try again shortly.";
+            else rows = result;
+        }
+        finally { busy = false; }
+    }
+}

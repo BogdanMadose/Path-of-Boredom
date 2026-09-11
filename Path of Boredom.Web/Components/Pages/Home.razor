@@ -15,6 +15,8 @@
         <span class="edition"><span data-stat="mode">THE EMBER CAMPAIGN</span> <span>&middot;</span> <span data-stat="campaign">MAP 1 / 6</span></span>
         <div class="signed-in-user" title="@windowsUserName"><small>WINDOWS SIGN-IN</small><strong>@windowsUserName</strong></div>
         <div class="game-actions">
+            <a class="quiet-button" href="/rankings" target="_blank" rel="noopener">Rankings ↗</a>
+            <a class="quiet-button" href="/patch-notes" target="_blank" rel="noopener">Patch notes ↗</a>
             <button type="button" class="quiet-button" data-action="forge" disabled>Forge</button>
             <button type="button" class="quiet-button" data-action="save" disabled>Save</button>
             <button type="button" class="quiet-button" data-action="load" disabled>Load</button>
@@ -23,18 +25,29 @@
     </header>
 
     <p class="save-status" data-save-status role="status" aria-live="polite">Saves belong to your signed-in Windows account. Checkpoints save automatically; manual Save/Load is also available.</p>
+    <p class="save-status" data-ranking-status role="status">@rankingStatus</p>
 
     <main class="game-shell">
         <section class="chapter-heading" aria-labelledby="chapter-title">
             <div><p class="eyebrow" data-stat="chapter">CHAPTER I / THE LAST EMBER</p><h1 id="chapter-title" data-stat="map">The Ashen Hollow</h1><p data-stat="map-description">The dead are restless. Give them a reason to stay buried.</p></div>
-            <div class="run-record"><span>LOCAL BEST</span><strong data-stat="best">0</strong><span>ENEMIES SLAIN</span></div>
+            <div class="run-record"><span data-stat="difficulty">HARD</span><strong data-stat="score">0</strong><span>RUN SCORE · ENEMIES SLAIN</span></div>
         </section>
 
         <div class="game-grid">
             <section class="arena-section" aria-label="Game arena">
+                <div class="combat-view" data-combat-view>
+                <div class="arena-toolbar" aria-label="Arena view controls">
+                    <span>Scroll protected during combat · Pause to browse</span>
+                    <div>
+                        <button type="button" class="quiet-button" data-focus-view aria-pressed="false">Focus view</button>
+                        <button type="button" class="quiet-button" data-recenter>Recenter</button>
+                        <button type="button" class="quiet-button" data-combat-pause disabled>Pause</button>
+                    </div>
+                </div>
                 <div class="arena-topline"><span><i class="live-dot"></i> <span data-stat="objective">Recover six dawns across 30 waves.</span></span><span>WAVE <strong data-stat="wave">&mdash;</strong> / <strong data-stat="last-wave">30</strong></span></div>
                 <div class="arena-viewport">
-                    <canvas width="1100" height="650" tabindex="0" aria-label="Action RPG arena. Use WASD or arrow keys to move, J or left mouse to attack, Q for nova, Space to dodge, and P to pause." aria-describedby="game-controls"></canvas>
+                    <p class="health-warning" data-health-warning role="status" aria-live="polite"></p>
+                    <canvas width="1100" height="650" tabindex="0" aria-label="Action RPG arena. Use WASD or arrow keys to move, J or left mouse for your class attack, Q for your class special, Space to dodge, and P to pause." aria-describedby="game-controls"></canvas>
                     <div class="arena-overlay" data-overlay>
                         <section class="level-draft" data-level-draft hidden aria-labelledby="level-draft-title">
                             <p class="eyebrow" data-stat="draft-level">LEVEL UP</p>
@@ -68,17 +81,49 @@
                             <small data-loading role="status">Preparing the hollow...</small>
                         </div>
                     </div>
+                    <div class="arena-overlay setup-overlay" data-setup hidden role="dialog" aria-modal="true" aria-labelledby="setup-title">
+                        <section class="overlay-card">
+                            <p class="eyebrow" data-setup-step>PREPARE YOUR JOURNEY</p>
+                            <h2 id="setup-title" data-setup-title>Choose your challenge</h2>
+                            <p data-setup-description></p>
+                            <label class="difficulty-picker" data-setup-difficulty>Difficulty
+                                <select data-difficulty>
+                                    <option value="hard">Hard — relentless</option>
+                                    <option value="nightmare">Nightmare — brutal</option>
+                                    <option value="inferno">Inferno — unforgiving</option>
+                                </select>
+                            </label>
+                            <label class="difficulty-picker" data-class-picker>Character class
+                                <select data-hero-class aria-describedby="class-preview-description">
+                                    <option value="knight">Ember Knight — balanced melee</option>
+                                    <option value="ranger">Dawn Ranger — ranged skirmisher</option>
+                                    <option value="warden">Iron Warden — armored bruiser</option>
+                                </select>
+                            </label>
+                            <section class="class-preview" data-class-preview aria-live="polite">
+                                <h3 data-class-title>Ember Knight</h3>
+                                <p id="class-preview-description" data-class-description></p>
+                                <p data-class-stats></p>
+                                <p data-class-skills></p>
+                                <small>Base stats before equipment and upgrades. Class stays with the character, including continuation into Endless.</small>
+                            </section>
+                            <button type="button" class="ember-button" data-setup-next>Continue</button>
+                            <button type="button" class="quiet-button restart-button" data-setup-skip hidden>Skip tips &amp; start</button>
+                            <button type="button" class="quiet-button restart-button" data-setup-cancel>Cancel</button>
+                        </section>
+                    </div>
                     <div class="arena-caption" data-stat="map-caption" aria-hidden="true">THE ASHEN HOLLOW / ASHBOUND SANCTUM</div>
+                    <div class="forge-nudge" data-forge-nudge hidden><span data-stat="forge-hint" role="status"></span><button type="button" class="quiet-button" data-open-forge>Open forge</button></div>
                 </div>
                 <div class="power-strip" aria-label="Active timed power-ups"><span>EMBER BLESSINGS</span><strong data-stat="buffs">No active power-ups</strong></div>
                 <div class="vitals">
                     <div class="vital"><div><span>VITALITY</span><strong data-stat="health">100 / 100</strong></div><meter data-meter="health" min="0" max="100" value="100" aria-label="Health"></meter></div>
                     <div class="level-medallion"><small>LVL</small><strong data-stat="level">1</strong></div>
-                    <div class="vital experience"><div><span>EXPERIENCE</span><strong data-stat="xp">0 / 35</strong></div><meter data-meter="xp" min="0" max="35" value="0" aria-label="Experience"></meter></div>
+                    <div class="vital experience"><div><span>EXPERIENCE</span><strong data-stat="xp">0 / 60</strong></div><meter data-meter="xp" min="0" max="60" value="0" aria-label="Experience"></meter></div>
                 </div>
                 <div class="skill-bar">
-                    <button type="button" data-skill="attack"><kbd>J / LMB</kbd><span class="skill-icon">&#9876;</span><span>Cleave<small data-stat="attack">Ready</small></span></button>
-                    <button type="button" data-skill="nova"><kbd>Q</kbd><span class="skill-icon nova-icon">&#10023;</span><span>Ember nova<small data-stat="nova">Ready</small></span></button>
+                    <button type="button" data-skill="attack"><kbd>J / LMB</kbd><span class="skill-icon" data-stat="class-icon">&#9876;</span><span><span data-stat="attack-name">Cleave</span><small data-stat="attack">Ready</small></span></button>
+                    <button type="button" data-skill="nova"><kbd>Q</kbd><span class="skill-icon nova-icon">&#10023;</span><span><span data-stat="special-name">Ember nova</span><small data-stat="nova">Ready</small></span></button>
                     <button type="button" data-skill="dodge"><kbd>SPACE</kbd><span class="skill-icon dodge-icon">&raquo;</span><span>Dodge<small data-stat="dodge">Ready</small></span></button>
                     <button type="button" data-skill="potion"><kbd>E</kbd><span class="skill-icon potion-icon">+</span><span>Life flask<small data-stat="potion">3 charges</small></span></button>
                 </div>
@@ -86,30 +131,52 @@
                     <button type="button" data-move="up" aria-label="Move up">&uarr;</button>
                     <div><button type="button" data-move="left" aria-label="Move left">&larr;</button><button type="button" data-move="down" aria-label="Move down">&darr;</button><button type="button" data-move="right" aria-label="Move right">&rarr;</button></div>
                 </div>
+                </div>
                 <section class="forge-panel" data-forge aria-labelledby="forge-title">
-                    <div class="forge-heading"><div><p class="eyebrow">THE TRAVELING FORGE</p><h2 id="forge-title">Build your own dawn</h2></div><span data-stat="forge-gold">0 gold</span></div>
-                    <p class="forge-hint">Pause or select Forge to spend gold. Upgrade scrolls also drop from bosses and enemies. Forge purchases at checkpoints autosave; elsewhere, use Save.</p>
+                    <div class="forge-heading">
+                        <div>
+                            <p class="eyebrow">THE TRAVELING FORGE</p>
+                            <h2 id="forge-title">Build your own dawn</h2>
+                        </div>
+                        <span data-stat="forge-gold">0 gold</span>
+                    </div>
+                    <p class="forge-hint">Gold is your main upgrade source: select Forge to pause and buy ranks. Scrolls are rare elite/boss drops. Max every forge item to unlock unlimited stat training. Purchases at checkpoints autosave; elsewhere, use Save.</p>
                     <div class="forge-grid">
                         <button type="button" data-upgrade="weapon" disabled><strong>Sunsteel edge</strong><span>Weapon damage</span><small data-upgrade-label="weapon">Rank 0 / 50</small></button>
                         <button type="button" data-upgrade="armor" disabled><strong>Dawnplate</strong><span>Armor + max health</span><small data-upgrade-label="armor">Rank 0 / 12</small></button>
-                        <button type="button" data-upgrade="cleave" disabled><strong>Wide awakening</strong><span>Cleave power, reach, speed</span><small data-upgrade-label="cleave">Rank 0 / 8</small></button>
-                        <button type="button" data-upgrade="nova" disabled><strong>Solar heart</strong><span>Nova power, radius, recovery</span><small data-upgrade-label="nova">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="cleave" disabled><strong>Wide awakening</strong><span data-stat="forge-attack">Cleave power, reach, speed</span><small data-upgrade-label="cleave">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="nova" disabled><strong>Solar heart</strong><span data-stat="forge-special">Nova power, radius, recovery</span><small data-upgrade-label="nova">Rank 0 / 8</small></button>
                         <button type="button" data-upgrade="dodge" disabled><strong>Ghoststep</strong><span>Dodge recovery + immunity</span><small data-upgrade-label="dodge">Rank 0 / 8</small></button>
                         <button type="button" data-upgrade="flask" disabled><strong>Living ember</strong><span>Healing power + flask refill</span><small data-upgrade-label="flask">Rank 0 / 5</small></button>
+                        <button type="button" data-upgrade="critChance" disabled><strong>Keen ember</strong><span>+2 percentage points critical chance; 75% total cap</span><small data-upgrade-label="critChance">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="critDamage" disabled><strong>Ruin's edge</strong><span>+10 percentage points critical damage</span><small data-upgrade-label="critDamage">Rank 0 / 8</small></button>
                     </div>
                     <p class="forge-feedback" data-forge-feedback role="status" aria-live="polite">Every coin is a choice. Damage, survival, or skills?</p>
+                    <section class="mastery-panel" data-mastery hidden aria-labelledby="mastery-title">
+                        <h3 id="mastery-title">Beyond the forge</h3>
+                        <p>Each stat starts at 1,000 gold. Buying a rank adds only 100 gold to that stat's next price; other stats are unaffected. Ranks have no fixed limit, but critical chance caps at 75% and reach at the arena diagonal. Saved with this character.</p>
+                        <div class="forge-grid">
+                            <button type="button" data-mastery-stat="might" disabled><strong>Ember might</strong><span>+2 base weapon damage</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="vitality" disabled><strong>Enduring heart</strong><span>+5 max health; heal 5</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="recovery" disabled><strong>Battle rhythm</strong><span>+0.5% cooldown recovery</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="area" disabled><strong>Widening ember</strong><span>+1% attack reach and special radius/range</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="speed" disabled><strong>Endless stride</strong><span>+1% movement speed; dodge distance unchanged</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="critChance" disabled><strong>Unerring spark</strong><span>+0.5 percentage points critical chance; 75% total cap</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="critDamage" disabled><strong>Endless ruin</strong><span>+2 percentage points critical damage</span><small data-mastery-label></small></button>
+                        </div>
+                    </section>
                 </section>
             </section>
 
             <aside class="journey-panel">
-                <section class="hero-card"><div class="hero-emblem" aria-hidden="true">&#9876;</div><p class="eyebrow">YOUR EXILE</p><h2>The Ashbound</h2><p>Ember knight &middot; Melee</p><div class="hero-stats"><div><span>Damage</span><strong data-stat="damage">18</strong></div><div><span>Gold</span><strong class="gold" data-stat="gold">0</strong></div><div><span>Slain</span><strong data-stat="kills">0</strong></div></div></section>
+                <section class="hero-card"><div class="hero-emblem" aria-hidden="true">&#9876;</div><p class="eyebrow">YOUR EXILE</p><h2 data-stat="hero-class">Ember Knight</h2><p data-stat="hero-role">Balanced melee</p><div class="hero-stats"><div><span>Damage</span><strong data-stat="damage">18</strong></div><div><span>Gold</span><strong class="gold" data-stat="gold">0</strong></div><div><span>Slain</span><strong data-stat="kills">0</strong></div></div><dl class="class-stat-grid"><dt>Movement speed</dt><dd data-stat="class-speed">220</dd><dt>Innate armor</dt><dd data-stat="class-armor">0%</dd><dt>Base attack interval</dt><dd data-stat="class-attack">0.38s</dd><dt>Base dodge recovery</dt><dd data-stat="class-dodge">1.8s</dd><dt>Critical chance</dt><dd data-stat="critical-chance">5%</dd><dt>Critical damage</dt><dd data-stat="critical-damage">150%</dd><dt>Attack reach</dt><dd data-stat="attack-reach">100</dd><dt>Special radius/range</dt><dd data-stat="special-reach">190</dd></dl></section>
                 <section class="story-card"><p class="eyebrow" data-stat="story-title">THE FIRST DAWN</p><p data-stat="story">The sun vanished when the king rang the Mourning Bell. Your sister's voice whispers from the lantern: find the six stolen dawns.</p><small data-stat="dawns">0 / 6 dawns recovered</small></section>
                 <section class="equipment-card"><p class="eyebrow">ARMS &amp; ARMOR</p><div class="weapon-icon" aria-hidden="true">&#8224;</div><h3 data-stat="weapon">Worn iron blade</h3><p data-stat="weapon-detail">Starter weapon &middot; +0 damage</p><h3 data-stat="armor-name">Traveler's coat</h3><p data-stat="armor-detail">0% damage reduction</p><small>Walk over loot. Better weapons and armor equip automatically; forge bonuses are retained.</small></section>
                 <section class="boons-card"><p class="eyebrow">CHOSEN OATHS <span data-stat="boon-count">0</span></p><p data-stat="boons">Level up to choose your first lasting boon.</p><small>Stacking, run-long bonuses. A fresh campaign or fresh endless character starts with none.</small></section>
                 <section class="journal-card"><p class="eyebrow">FIELD JOURNAL</p><p data-stat="journal" role="status" aria-live="polite">A faint warmth lingers beneath the ashes.</p></section>
                 <section class="controls-card"><p class="eyebrow">PICKUP BLESSINGS</p><dl><dt>Bloodsun / 15s</dt><dd>+50% damage</dd><dt>Windwake / 12s</dt><dd>Speed + recovery</dd><dt>Dawn aegis / 10s</dt><dd>Half damage</dd><dt>Gravetide / 20s</dt><dd>Loot magnet</dd></dl><p>Glowing pickups grant temporary powers. Picking up the same blessing refreshes its timer. Pale scrolls permanently add one upgrade rank to this run.</p></section>
                 <section class="controls-card"><p class="eyebrow">THE ROAD AHEAD</p><dl><dt>1-5</dt><dd>Ashen Hollow</dd><dt>6-10</dt><dd>Drowned Wilds</dd><dt>11-15</dt><dd>Cinder Citadel</dd><dt>16-20</dt><dd>Glass Expanse</dd><dt>21-25</dt><dd>Storm Archive</dd><dt>26-30</dt><dd>Starless Gate</dd><dt>After 30</dt><dd>Endless Watch</dd></dl><p data-stat="threat">Husks swarm, brutes strike hard, and wisps attack at range.</p></section>
-                <section class="controls-card" id="game-controls"><p class="eyebrow">HOW TO SURVIVE</p><dl><dt>WASD / arrows</dt><dd>Move</dd><dt>Mouse</dt><dd>Aim</dd><dt>J / left click</dt><dd>Cleave</dd><dt>Q / Space / E</dt><dd>Nova / dodge / heal</dd><dt>P / Escape</dt><dd>Pause</dd></dl><p>Without mouse aim, attacks face your movement direction. Dodge through danger; nova strikes all nearby enemies.</p></section>
+                <section class="controls-card" id="game-controls"><p class="eyebrow">HOW TO SURVIVE</p><dl><dt>WASD / arrows</dt><dd>Move</dd><dt>Mouse</dt><dd>Aim</dd><dt>J / left click</dt><dd>Cleave</dd><dt>Q / Space / E</dt><dd>Nova / dodge / heal</dd><dt>P / Escape</dt><dd>Pause</dd><dt>Flask pickups</dt><dd>Carry up to 5</dd></dl><p>At 5 flasks, another pickup heals for one flask's amount. Step sideways out of amber Lancer lanes before they dash. Spend gold at the forge rather than waiting for scrolls.</p></section>
             </aside>
         </div>
         <footer class="game-footer"><span>SIX DAWNS. ONE LAST PROMISE.</span><span>Windows account saves &middot; Checkpoint autosaves &middot; Permanent Endless unlock</span><span class="credit">Developed by MadBone | LIT MES TSR</span></footer>
@@ -123,8 +190,20 @@
     private DotNetObjectReference<Home>? saveBridge;
     private bool disposed;
     private string windowsUserName = string.Empty;
+    private string rankingStatus = "Connecting to the rankings...";
 
-    protected override async Task OnInitializedAsync() => windowsUserName = (await AuthenticationState.GetAuthenticationStateAsync()).User.Identity?.Name?.Split('\\').Last() ?? string.Empty;
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await AuthenticationState.GetAuthenticationStateAsync()).User;
+        windowsUserName = user.Identity?.Name?.Split('\\').Last() ?? string.Empty;
+        rankingStatus = await Saves.RegisterPlayerAsync(user)
+            ? "Rankings connected. Best kill scores are kept separately by difficulty and starting mode."
+            : "Rankings unavailable. Scores will retry during play.";
+    }
+
+    [JSInvokable]
+    public async Task<bool> SubmitScore(Path_of_Boredom.ServiceDefaults.ScoreSubmission submission) =>
+        await Saves.SubmitScoreAsync((await AuthenticationState.GetAuthenticationStateAsync()).User, submission);
 
     [JSInvokable]
     public async Task<GameSaveResult> SaveRun(System.Text.Json.JsonElement snapshot) =>

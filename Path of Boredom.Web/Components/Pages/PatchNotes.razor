@@ -1,0 +1,289 @@
+@page "/patch-notes"
+@layout Path_of_Boredom.Web.Components.Layout.GameLayout
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<PageTitle>Patch Notes · Path of Boredom</PageTitle>
+
+<main class="patch-notes">
+    <header class="page-header">
+        <a class="brand" href="/">◇ PATH OF BOREDOM</a>
+        <nav aria-label="Game navigation"><a href="/">Game</a><a href="/rankings">Rankings</a><a href="/patch-notes" aria-current="page">Patch notes</a></nav>
+    </header>
+    <section class="page-heading">
+        <p class="eyebrow">CHRONICLES OF THE FORGE</p>
+        <h1>Every ember leaves a mark.</h1>
+        <p>New threats, balance changes, buffs, nerfs, and fixes. Follow how the watch evolves.</p>
+    </section>
+
+    <article id="patch-003" aria-labelledby="patch-003-title">
+        <header class="patch-heading">
+            <div class="patch-meta"><span class="badge">PATCH 003</span><span class="badge latest">LATEST</span><a href="/patch-notes#patch-003" target="_self" aria-label="Link to patch 003">Permalink ↗</a></div>
+            <h2 id="patch-003-title">Fortune and the Critical Spark</h2>
+            <p>More rewarding battles, independent post-forge prices, and new ways to build critical hits.</p>
+            <div class="tags"><span>Reward buffs</span><span>Forge</span><span>New cards</span><span>Critical hits</span></div>
+        </header>
+        <section class="patch-section">
+            <p class="eyebrow">REWARD BUFFS</p><h3>A little more from every battle</h3>
+            <ul>
+                <li>Enemy XP rewards increased by <strong>10%</strong> on Hard, Nightmare, and Inferno, in both Campaign and Endless. Applies to ordinary enemies, elites, and bosses; rewards round to whole points.</li>
+                <li>Gold rewards increased by <strong>10%</strong>, including gold pickups, equipment salvage, and overflow loot conversion. Fortune cards still multiply gold pickups; starting gold and existing balances are unchanged.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">POST-FORGE TRAINING</p><h3>Your stats, your prices</h3>
+            <ul>
+                <li>Replaced the shared <strong>+250 gold</strong> increase with <strong>+100 gold per rank of the selected stat</strong>. Each stat's next price is 1,000 + 100 × its own rank. Buying damage no longer raises health, recovery, or any other stat's price.</li>
+                <li>Existing ranks are retained and use the cheaper independent prices. Past purchases are not refunded.</li>
+                <li>Added <strong>Widening ember</strong>: +1% attack reach and special radius/range per rank, including Ranger arrows. Reach is limited to the arena diagonal.</li>
+                <li>Added <strong>Endless stride</strong>: +1% movement speed per rank, additive with movement-card bonuses and multiplied by Windwake. Dodge distance is unchanged.</li>
+                <li>Added <strong>Unerring spark</strong>: +0.5 percentage points critical chance per rank, and <strong>Endless ruin</strong>: +2 percentage points critical damage per rank.</li>
+                <li>The forge reminder now checks independently priced training options. These options join damage, health, and recovery after all regular forge upgrades are complete.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">CRITICAL HITS · CARDS · FORGE</p><h3>Make the next strike count</h3>
+            <ul>
+                <li>All classes now start with <strong>5% critical chance</strong> and <strong>150% critical damage</strong>. Each successful attack or special hit rolls independently, including each Ranger arrow hit. Critical damage numbers are highlighted and labeled CRIT.</li>
+                <li>Added <strong>The surest spark</strong> card: +2 percentage points critical chance per rank, up to 10 ranks. Added <strong>A shattering dawn</strong>: +10 percentage points critical damage per rank, up to 10 ranks.</li>
+                <li>Added regular forge upgrades <strong>Keen ember</strong> (+2 percentage points critical chance per rank; 60 gold starting price) and <strong>Ruin's edge</strong> (+10 percentage points critical damage per rank; 65 gold starting price). Both have eight ranks and use the existing regular-forge price curve.</li>
+                <li>Cards, regular forge upgrades, and post-forge training stack. Total critical chance caps at <strong>75%</strong>; critical damage starts at 150%, so a +10-point upgrade makes a critical hit deal 160% of normal damage.</li>
+                <li>Critical hits preserve Sentinel resistance for basic attacks and the existing resistance bypass for specials. Hero stats now show critical chance, critical damage, attack reach, and special radius/range.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">SAVE COMPATIBILITY</p><h3>Keep your existing character</h3>
+            <ul>
+                <li>Save format 8 stores the new cards, regular upgrades, and training ranks. Earlier saves load with zero ranks in new cards and training stats, without rerolling pending card offers.</li>
+                <li>Characters that had completed all six old regular forge upgrades receive both new regular critical upgrades at maximum rank, preserving access to post-forge training. Other older characters start those two upgrades at rank zero.</li>
+                <li>Existing upgrade-scroll indices are preserved, and new scrolls can award critical upgrades. Both browser and server validation support the expanded progression.</li>
+            </ul>
+        </section>
+    </article>
+
+    <article id="patch-002" aria-labelledby="patch-002-title">
+        <header class="patch-heading">
+            <div class="patch-meta"><span class="badge">PATCH 002</span><a href="/patch-notes#patch-002" target="_self" aria-label="Link to patch 002">Permalink ↗</a></div>
+            <h2 id="patch-002-title">A Steadier Arena</h2>
+            <p>A focused fix for canvas resizing and page movement during cards, notifications, and menu transitions.</p>
+            <div class="tags"><span>Bug fixes</span><span>Arena view</span><span>UI stability</span></div>
+        </header>
+        <section class="patch-section">
+            <p class="eyebrow">BUG FIXES</p><h3>Keep the battlefield in place</h3>
+            <ul>
+                <li>Pinned an Open forge reminder to the bottom of the canvas during combat whenever at least one unfinished upgrade is affordable (or stat training after completing the forge). It overlays the arena without resizing it, stays out of card and setup screens, and pauses combat when opened.</li>
+                <li>Repaired malformed forge-heading markup that displayed stray text and misplaced the reminder inside the heading.</li>
+                <li>Stabilized objective, power-up, and Pause / Resume rows so changing text does not shift the arena. Long power-up lists scroll horizontally; objective and power-up text also have full-text tooltips.</li>
+                <li>Gave the arena its own fixed aspect ratio, independent of canvas rendering resolution. Overlays keep their scrolling and animation inside the arena, with reserved scrollbar space to prevent card-width jumps.</li>
+                <li>Selecting a level-up card no longer triggers automatic arena recentering. Disabled browser scroll anchoring within the game to prevent dynamic panels from pulling the page.</li>
+                <li>Kept window resizing, Focus view toggling, explicit Recenter, and start/resume alignment available. Gameplay, balance, and saves are unchanged.</li>
+            </ul>
+        </section>
+    </article>
+
+    <article id="patch-001" aria-labelledby="patch-title">
+        <header class="patch-heading">
+            <div class="patch-meta"><span class="badge">PATCH 001</span><a href="/patch-notes#patch-001" target="_self" aria-label="Link to patch 001">Permalink ↗</a></div>
+            <h2 id="patch-title">The Relentless Watch</h2>
+            <p>A harder journey, a place in the rankings, and more reasons to visit the forge. This entry covers the ranking-system release and all subsequent changes in this session.</p>
+            <div class="tags"><span>Rankings</span><span>Difficulty</span><span>Balance</span><span>New enemy</span><span>Quality of life</span><span>Graphics overhaul</span></div>
+        </header>
+        <nav class="contents" aria-label="Patch sections">
+            <a href="/patch-notes#classes" target="_self">Character classes</a>
+            <a href="/patch-notes#rankings" target="_self">Rankings</a><a href="/patch-notes#difficulty" target="_self">Difficulty</a><a href="/patch-notes#survival" target="_self">Survival</a><a href="/patch-notes#cards" target="_self">Cards</a><a href="/patch-notes#progression" target="_self">Progression &amp; forge</a><a href="/patch-notes#combat" target="_self">Combat &amp; tutorial</a><a href="/patch-notes#arena-view" target="_self">Arena view &amp; controls</a><a href="/patch-notes#fixes" target="_self">Fixes &amp; saves</a>
+            <a href="/patch-notes#graphics" target="_self">Graphics finale</a>
+        </nav>
+
+        <section id="rankings" class="patch-section">
+            <p class="eyebrow">NEW FEATURE</p><h3>Hall of Embers: player rankings</h3>
+            <ul>
+                <li>Added a dedicated <a href="/rankings">rankings page</a>. Signed-in Windows users are registered automatically and appear with zero points before submitting a score.</li>
+                <li>Score is enemies slain. Each player's highest score is kept on the server for each difficulty and starting mode; a lower score never replaces a personal best.</li>
+                <li>Separate boards for <strong>Campaign journey</strong>, <strong>Veteran Endless start</strong>, and <strong>Endless after campaign</strong>.</li>
+                <li>Entering Endless after a campaign preserves the campaign record and starts a new score counter. Campaign-equipped characters do not compete on the veteran-start board.</li>
+                <li>Added difficulty/mode filters, shared ranks for tied scores, record timestamps in UTC, a highlighted current-player row, and manual refresh.</li>
+                <li>Scores sync every 15 seconds and on pauses, checkpoints, death, and run replacement. Failed submissions retry while the page remains open.</li>
+                <li>The game links to rankings in a new tab so checking the table does not discard a run.</li>
+            </ul>
+            <p class="callout">Community rankings use browser-reported scores. Player identity is authenticated, but the game is not a cheat-proof competitive system. Saves from before the difficulty system remain playable and unranked.</p>
+        </section>
+
+        <section id="classes" class="patch-section">
+            <p class="eyebrow">TWO NEW CLASSES · CLASS STATS · RANKINGS</p><h3>Three ways to carry the dawn</h3>
+            <p>Choose a character class alongside difficulty when starting a new campaign or veteran Endless run. Each class has its own base stats, weapon, primary attack, and special. Continuing a campaign character into Endless keeps its class and equipment.</p>
+            <div class="table-scroll" role="region" aria-label="Starting class statistics" tabindex="0">
+                <table>
+                    <caption>Fresh-character stats before equipment, boons, or forge upgrades. Damage is base weapon damage; cooldowns are before recovery bonuses.</caption>
+                    <thead><tr><th scope="col">Class</th><th scope="col">Health</th><th scope="col">Damage</th><th scope="col">Speed</th><th scope="col">Innate armor</th><th scope="col">Attack interval</th><th scope="col">Special cooldown</th><th scope="col">Dodge cooldown</th></tr></thead>
+                    <tbody>
+                        <tr><th scope="row">Ember Knight</th><td>100</td><td>18</td><td>220</td><td>0%</td><td>0.38s</td><td>5s</td><td>1.8s</td></tr>
+                        <tr><th scope="row">Dawn Ranger — new</th><td>80</td><td>15</td><td>245</td><td>0%</td><td>0.48s</td><td>6s</td><td>1.6s</td></tr>
+                        <tr><th scope="row">Iron Warden — new</th><td>150</td><td>24</td><td>180</td><td>15%</td><td>0.65s</td><td>7s</td><td>2.4s</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <ul>
+                <li><strong>Ember Knight:</strong> the existing balanced melee class. Cleave has 100 base reach; Ember nova hits nearby enemies within 190 base radius for 2.2× weapon damage.</li>
+                <li><strong>Dawn Ranger:</strong> a mobile ranged skirmisher with lower health and damage. Dawn shot fires an aimed arrow up to 680 arena units. Sunburst volley fires five arrows in a fan, each dealing 0.9× weapon damage before upgrades. Each arrow hits one enemy; volley arrows bypass Sentinel resistance, while basic arrows do not.</li>
+                <li><strong>Iron Warden:</strong> an armored bruiser with slower movement and attack recovery. Hammer sweep has 90 base reach. Iron quake hits nearby enemies within 170 base radius for 2.8× weapon damage. Innate armor shares the existing 65% damage-reduction cap.</li>
+                <li>Added distinct bow, hammer/shield, outfit colors, and friendly-arrow visuals. Arrow collision checks cover the full travel segment to avoid skipping enemies at speed.</li>
+                <li>The class selector shows a stat preview. The hero panel shows the current class, role, movement speed, innate armor, and base attack/dodge timings. Skill names, tutorial guidance, equipment names, and forge hints adapt to the class.</li>
+                <li>Shared Cleave/Nova forge upgrades and cards improve the equivalent class attack and special. Ranger reach/radius bonuses extend arrow range; its volley damage grows by 0.1× weapon damage per special-forge rank, rather than the melee specials' 0.25×.</li>
+                <li>Veteran Endless kits preserve class differences: each class gains 201 health and 44 base damage over its fresh-character values, plus the existing veteran equipment and forge kit. Existing Ember Knight veteran stats are unchanged.</li>
+                <li>Added <strong>Class used</strong> to rankings. The class is stored with the highest score for each player, difficulty, and starting mode. A lower or tied score from another class does not relabel the earlier record.</li>
+                <li>Save format 7 preserves class identity and arrows in flight. Earlier saves and pre-class records default to Ember Knight without resetting accumulated progress. Class cannot be switched on a loaded character.</li>
+            </ul>
+        </section>
+
+        <section id="difficulty" class="patch-section">
+            <p class="eyebrow">NEW FEATURE · ENEMY BUFFS</p><h3>Choose your challenge</h3>
+            <p>Added Hard, Nightmare, and Inferno. Difficulty is selected when starting a new campaign or entering Endless, then stays locked throughout the run. Campaign stage transitions never ask you to choose again.</p>
+            <div class="table-scroll" role="region" aria-label="Difficulty multipliers" tabindex="0">
+                <table>
+                    <caption>Multipliers applied to the enemy baseline; healing penalties apply to flasks, health pickups, and Ashdrinker.</caption>
+                    <thead><tr><th scope="col">Difficulty</th><th scope="col">Enemy health</th><th scope="col">Damage</th><th scope="col">Speed</th><th scope="col">Healing retained</th><th scope="col">Extra enemies</th></tr></thead>
+                    <tbody>
+                        <tr><th scope="row">Hard</th><td>×1.30</td><td>×1.20</td><td>×1.08</td><td>80%</td><td>+2</td></tr>
+                        <tr><th scope="row">Nightmare</th><td>×1.70</td><td>×1.50</td><td>×1.16</td><td>60%</td><td>+4</td></tr>
+                        <tr><th scope="row">Inferno</th><td>×2.20</td><td>×1.90</td><td>×1.24</td><td>40%</td><td>+6</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <ul>
+                <li>Maximum initial wave population increased from <strong>36 to 40</strong>, including difficulty additions.</li>
+                <li>Elites begin appearing at <strong>wave 6 instead of wave 12</strong>.</li>
+                <li>Added chapter-based enemy scaling and strengthened Endless scaling as the watch continues.</li>
+                <li>A dedicated setup panel now explains difficulty and confirms a new run. Cancel keeps the current character.</li>
+            </ul>
+        </section>
+
+        <section id="survival" class="patch-section">
+            <p class="eyebrow">SURVIVAL NERFS · FLASK BUFFS</p><h3>Healing must be earned</h3>
+            <div class="table-scroll" role="region" aria-label="Survival balance changes" tabindex="0">
+                <table>
+                    <caption>Before this session → final values</caption>
+                    <thead><tr><th scope="col">Stat</th><th scope="col">Before</th><th scope="col">Now</th></tr></thead>
+                    <tbody>
+                        <tr><th scope="row">Invulnerability after taking damage</th><td>0.4 seconds</td><td>0.3 seconds</td></tr>
+                        <tr><th scope="row">Automatic level-up healing</th><td>15 health</td><td>None</td></tr>
+                        <tr><th scope="row">Automatic level-up flask refill</th><td>+1 charge</td><td>None</td></tr>
+                        <tr><th scope="row">Health-drop chance on eligible loot rolls</th><td>23%</td><td>8%</td></tr>
+                        <tr><th scope="row">Health pickup base healing</th><td>22</td><td>12, then difficulty penalty</td></tr>
+                        <tr><th scope="row">Flask carrying capacity</th><td>3</td><td>5</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <ul>
+                <li>Ordinary kills no longer trigger Ashdrinker healing. Only elite and boss kills qualify.</li>
+                <li>Added <strong>Life flask pickups</strong>: a 7% drop chance on kills, with a guaranteed flask from bosses.</li>
+                <li>Picking up a flask below capacity adds one charge. At five charges, the pickup immediately heals for the same amount as drinking one flask, without consuming a charge.</li>
+                <li>Flask healing uses the existing formula: the greater of 30 health or 22% of maximum health plus 6 percentage points per flask-forge rank, followed by the difficulty multiplier.</li>
+                <li>Checkpoints still fully restore health. Checkpoints and flask-forge purchases now refill to five charges; fresh characters still begin with three.</li>
+                <li>Updated flask pickup labels, charge displays, card descriptions, and control hints.</li>
+            </ul>
+        </section>
+
+        <section id="cards" class="patch-section">
+            <p class="eyebrow">CARD NERFS</p><h3>Oaths remain powerful—not overwhelming</h3>
+            <p>Bonuses below are per rank. Existing rank limits are unchanged. Ashdrinker values are shown before difficulty penalties.</p>
+            <div class="table-scroll" role="region" aria-label="Card balance changes" tabindex="0">
+                <table>
+                    <caption>Before this session → final values</caption>
+                    <thead><tr><th scope="col">Card</th><th scope="col">Before</th><th scope="col">Now</th></tr></thead>
+                    <tbody>
+                        <tr><th scope="row">Sunforged oath</th><td>+6% weapon damage</td><td>+5%</td></tr>
+                        <tr><th scope="row">Heart of the dawn</th><td>+20 maximum health; heal 20</td><td>+16 maximum health; heal 16</td></tr>
+                        <tr><th scope="row">Unbroken vow</th><td>+3 armor</td><td>+2.5 armor; 65% reduction cap unchanged</td></tr>
+                        <tr><th scope="row">Wayfarer's instinct</th><td>+5% movement speed</td><td>+4%</td></tr>
+                        <tr><th scope="row">Quiet flame</th><td>+6% cooldown recovery</td><td>+5%</td></tr>
+                        <tr><th scope="row">Widening sunrise</th><td>+12 nova radius</td><td>+10</td></tr>
+                        <tr><th scope="row">Horizon cutter</th><td>+8 cleave reach</td><td>+6</td></tr>
+                        <tr><th scope="row">Call of the fallen</th><td>+20 loot attraction range</td><td>+16</td></tr>
+                        <tr><th scope="row">Ashdrinker</th><td>0.35 health per kill</td><td>0.8 per elite/boss kill only, then difficulty penalty</td></tr>
+                        <tr><th scope="row">The ferryman's due</th><td>+10% pickup gold</td><td>+8%; salvage unchanged</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="progression" class="patch-section">
+            <p class="eyebrow">PROGRESSION · FORGE</p><h3>Gold has a purpose beyond the last upgrade</h3>
+            <ul>
+                <li>First level-up requirement increased from <strong>40 to 60 XP</strong>. Subsequent requirements grow by <strong>35% instead of 30%</strong>, with the per-level XP requirement ceiling raised from <strong>5,000 to 25,000</strong>. This is not a character-level cap.</li>
+                <li>Normal enemy XP reduced from <strong>14 + 6 per chapter index</strong> to <strong>10 + 4 per chapter index</strong>. Boss XP reduced from <strong>100 + 50 per chapter index</strong> to <strong>70 + 35 per chapter index</strong>. Chapter indices start at zero; elite XP remains doubled.</li>
+                <li>Veteran Endless characters start with a next-level requirement of <strong>1,600 XP instead of 700</strong>.</li>
+                <li>Removed guaranteed periodic upgrade scrolls. Scrolls now have a <strong>30% boss chance</strong> or <strong>4% elite chance</strong>; ordinary enemies no longer drop them. Earlier in this session, the periodic interval had first been reduced from every 13 kills to every 25.</li>
+                <li>Added an actionable forge banner when an upgrade is affordable and a highlighted Forge button. Opening the forge pauses combat.</li>
+                <li>Completing <strong>every regular forge item</strong> unlocks <strong>Beyond the forge</strong>, an uncapped stat-training shop.</li>
+            </ul>
+            <div class="stat-grid">
+                <section><h4>Ember might</h4><p>+2 base weapon damage per purchase.</p></section>
+                <section><h4>Enduring heart</h4><p>+5 maximum health and restore 5 health per purchase.</p></section>
+                <section><h4>Battle rhythm</h4><p>+0.5% skill cooldown recovery per purchase.</p></section>
+            </div>
+            <p class="callout">Training starts at <strong>1,000 gold</strong>. Every purchase adds <strong>250 gold</strong> to the next price across all three stats. Training is saved with the character; checkpoint purchases autosave, while purchases elsewhere require a manual save or the next checkpoint.</p>
+        </section>
+
+        <section id="combat" class="patch-section">
+            <p class="eyebrow">NEW ENEMY · ANIMATIONS · TUTORIAL</p><h3>Watch the lane. Dodge the charge.</h3>
+            <ul>
+                <li>Added <strong>Lancers from wave 8</strong>. They mark a long amber lane, wait <strong>1.1 seconds</strong>, then dash toward the far arena edge at <strong>1,200 arena units per second</strong>.</li>
+                <li>The warning direction stays fixed during wind-up. Step sideways before the charge; Lancer dash hits deal <strong>1.5× their normal damage</strong>.</li>
+                <li>Added player footstep cycles, sword-swing motion, and a nova casting pulse.</li>
+                <li>Added mob walking cycles, attack/casting lunges, wind-up poses, and dash trails for the player and charging enemies.</li>
+                <li>Reduced-motion preferences suppress the new cosmetic bobbing, swings, and trails while keeping danger warnings visible.</li>
+                <li>Added a skippable three-part walkthrough for fresh campaign and veteran Endless runs: movement/combat, dodging/flasks, and forge/progression. Gameplay waits until setup is complete.</li>
+                <li>Updated journal threats, control hints, and forge explanations to introduce the new mechanics.</li>
+            </ul>
+        </section>
+
+        <section id="arena-view" class="patch-section">
+            <p class="eyebrow">ARENA VIEW · CONTROL POLISH</p><h3>Keep your eyes on the fight</h3>
+            <ul>
+                <li>Added <strong>Focus view</strong>, enabled by default and remembered on this browser. It places character information below the arena in separate, readable cards: four columns on wide screens, two on tablets, and one on phones, with larger text and compact hero stats. It sizes the canvas to the available window height, including room for combat controls. Turn it off for the wider page layout.</li>
+                <li>Added an arena toolbar with <strong>Focus view</strong>, <strong>Recenter</strong>, and <strong>Pause / Resume</strong>, so these controls remain near the game rather than only in the page header.</li>
+                <li>Starting, resuming, and opening setup now reveal the arena with only the scroll adjustment needed. A fully visible arena is left in place; no continuous scroll snapping fights manual browsing.</li>
+                <li>Mouse-wheel and trackpad scrolling over the combat area is blocked while the canvas has keyboard focus and combat is active. Page Up, Page Down, Home, and End cannot accidentally move the page in that state. Pause to scroll normally; browser zoom shortcuts and scrolling elsewhere remain available.</li>
+                <li>Card and tutorial overlays contain their own scrolling, preventing a scroll at the end of a menu from moving the page underneath.</li>
+                <li>Focus view adapts to window resizing and mobile viewport changes. Canvas proportions are preserved on narrow screens instead of being stretched by a forced minimum height. Very short windows can still scroll to reach all controls.</li>
+                <li>Opening the forge scrolls only as far as necessary, and respects reduced-motion preferences. Resuming returns the view to combat.</li>
+                <li>Added a steady <strong>low-health warning at 25% health or below</strong>, with a subtle arena border and a hint based on whether any flasks remain. No flashing effect.</li>
+                <li>Skill buttons now distinguish recovering skills visually. Buttons are disabled outside combat; the flask button also explains when charges are empty or health is already full. Holding attack still works through cooldown recovery. Disabled buttons use a not-allowed cursor rather than a waiting spinner, and disabled game buttons no longer show enabled-style hover effects.</li>
+                <li>Corrected the initial XP display to show the current 60-XP first-level requirement.</li>
+            </ul>
+        </section>
+
+        <section id="fixes" class="patch-section">
+            <p class="eyebrow">BUG FIXES · QUALITY OF LIFE</p><h3>A smoother watch</h3>
+            <ul>
+                <li>Removed difficulty selection from stage checkpoints. New-run setup and Endless entry are the only places to change it.</li>
+                <li>Added keyboard focus handling to the setup walkthrough, including Tab navigation, Escape to cancel, and returning focus to the arena after starting.</li>
+                <li>Kept the card overlay visible while its exit animation completes instead of hiding it on the next HUD update.</li>
+                <li>Prevented checkpoint autosaves from being marked handled while the setup panel blocks saving.</li>
+                <li>Lancer collision checks cover the full movement segment so fast dashes do not skip through the player without registering a hit.</li>
+                <li>Reset player movement velocity on chapter relocation to prevent drift after arriving.</li>
+                <li>Added save-format versions 5 and 6 for difficulty, ranking mode, mastery ranks, Endless score baselines, Lancers, and flask pickups. Older save versions remain supported; pre-difficulty saves stay unranked.</li>
+                <li>Added matching API validation for the new save fields, five-flask capacity, and dash data.</li>
+                <li>Added this dedicated patch-notes page, with section links, stat comparison tables, and navigation from the game and rankings.</li>
+                <li>Fixed patch-note section links and “Back to patch summary” resolving to the home page. They now stay on the patch-notes route in the same tab.</li>
+            </ul>
+            <p class="callout">Existing accumulated character stats are not retroactively rebuilt. For a clean comparison of the new leveling and growth rules, start a fresh run. The current card formulas apply to existing boon ranks.</p>
+        </section>
+        <section id="graphics" class="patch-section">
+            <p class="eyebrow">FINAL ENTRY · GRAPHICS OVERHAUL</p><h3>BEAUTIFY THE GRAPHICS!</h3>
+            <p>The closing update to Patch 001 gives the watch a richer, illustrated 2D look without changing its combat rules.</p>
+            <ul>
+                <li><strong>Richer arenas:</strong> beveled stone tiles, chapter-tinted lighting, etched border details, and additional scenery—branch-like patterns in the Hollow, water pools in the marsh, furnace veins in the Citadel, faceted ice in the Expanse, and arcane markings in the Archive and Rift.</li>
+                <li><strong>Detailed heroes:</strong> shaded armor, layered cloaks, boots, shoulder plates, and class insignia. The Knight gains a crested helmet and highlighted blade; the Ranger gains a hood, quiver, and recurved bow; the Warden gains heavy plate, an ornate shield, and a forged hammer.</li>
+                <li><strong>More dimensional enemies:</strong> shaded bodies and heads, folded caster robes, brighter material edges on charging enemies, and clearer creature silhouettes.</li>
+                <li><strong>Distinct loot artwork:</strong> coins, glass flasks with red liquid, health crosses, shields, class-appropriate weapons, parchment upgrade scrolls, and faceted blessing gems replace generic pickup squares. Important pickups have subtle hover motion and outlined labels.</li>
+                <li><strong>Combat effects:</strong> filled slash trails with bright edges, layered expanding spell rings, and outlined damage numbers. Enemy bolts now have warm-colored trails to distinguish them from the Ranger's green/gold arrows.</li>
+                <li><strong>Atmosphere and framing:</strong> drifting chapter-colored motes, a less aggressive edge vignette, an ornamented boss-health frame, and a lightly gilded arena with richer toolbar and vitality-panel backgrounds.</li>
+                <li><strong>Sharper rendering:</strong> the active canvas adapts to display density, capped at twice the logical resolution. Floor artwork is generated at up to 1.5× resolution; aiming and movement still use the same 1100 × 650 game coordinates.</li>
+                <li><strong>Bounded visual resources:</strong> chapter backgrounds are cached, small shading/body sprites use a bounded cache, and ambient motes are limited to 28. All artwork is generated locally; no external art downloads or additional libraries.</li>
+                <li><strong>Readability first:</strong> environmental particles stay beneath hazard telegraphs. Reduced-motion preferences stop cosmetic drifting, bobbing, and weapon movement while retaining meaningful combat feedback.</li>
+            </ul>
+            <p class="callout">Visual changes only: no changes to class balance, hitboxes, damage, progression, rankings, or save format.</p>
+        </section>
+    </article>
+    <footer><span>Developed by MadBone | LIT MES TSR</span><a href="/patch-notes#patch-001" target="_self">Back to patch summary ↑</a></footer>
+</main>

@@ -1,0 +1,16 @@
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+    padding: 14px 42px 14px 20px;
+    background: #39281e;
+    color: #f1d9b1;
+    border-top: 1px solid #a67d4c;
+    box-shadow: 0 -4px 20px #0005;
+}
+
+#blazor-error-ui a { color: #f3c47a; margin-left: 12px; }
+#blazor-error-ui .dismiss { position: absolute; top: 12px; right: 16px; cursor: pointer; }

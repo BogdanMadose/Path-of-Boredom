@@ -1,0 +1,70 @@
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #0d1113;
+    color: #e5dfd3;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+}
+
+h1, h2, h3 {
+    margin: 0 0 0.5rem;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+p, dl {
+    margin: 0 0 1rem;
+}
+
+button {
+    margin: 0;
+    font: inherit;
+    text-transform: none;
+}
+
+small {
+    font-size: 0.875em;
+}
+
+strong {
+    font-weight: bolder;
+}
+
+a {
+    color: #f3c47a;
+}
+
+kbd, code {
+    font-family: Consolas, monospace;
+    font-size: 0.875em;
+}
+
+kbd {
+    border-radius: 4px;
+}
+
+h1:focus {
+    outline: none;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+.error-page {
+    max-width: 760px;
+    margin: auto;
+    padding: 64px 24px;
+}
+
+.error-page h1 {
+    color: #e6b370;
+    font-family: Georgia, serif;
+}
+

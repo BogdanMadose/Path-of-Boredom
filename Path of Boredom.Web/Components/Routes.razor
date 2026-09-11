@@ -1,0 +1,12 @@
+@using Microsoft.AspNetCore.Components.Authorization
+
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.GameLayout)">
+            <NotAuthorized>
+                <main class="error-page"><h1>Windows sign-in required</h1><p>Sign in with your Windows account to access your personal save.</p><a href="/account/login">Sign in with Windows</a></main>
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>

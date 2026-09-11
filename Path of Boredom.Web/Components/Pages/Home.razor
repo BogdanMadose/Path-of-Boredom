@@ -1,0 +1,188 @@
+@page "/"
+@layout Path_of_Boredom.Web.Components.Layout.GameLayout
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject GameSaveClient Saves
+@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationState
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<PageTitle>Path of Boredom - The Ember Campaign</PageTitle>
+
+<div class="arpg" data-player="@windowsUserName" @ref="gameRoot">
+    <header class="game-header">
+        <a class="brand" href="/" aria-label="Path of Boredom home"><span class="brand-mark">&#9671;</span> PATH <small>OF</small> BOREDOM</a>
+        <span class="edition"><span data-stat="mode">THE EMBER CAMPAIGN</span> <span>&middot;</span> <span data-stat="campaign">MAP 1 / 6</span></span>
+        <div class="signed-in-user" title="@windowsUserName"><small>WINDOWS SIGN-IN</small><strong>@windowsUserName</strong></div>
+        <div class="game-actions">
+            <button type="button" class="quiet-button" data-action="forge" disabled>Forge</button>
+            <button type="button" class="quiet-button" data-action="save" disabled>Save</button>
+            <button type="button" class="quiet-button" data-action="load" disabled>Load</button>
+            <button type="button" class="quiet-button" data-action="pause" disabled>Pause <kbd>P</kbd></button>
+        </div>
+    </header>
+
+    <p class="save-status" data-save-status role="status" aria-live="polite">Saves belong to your signed-in Windows account. Checkpoints save automatically; manual Save/Load is also available.</p>
+
+    <main class="game-shell">
+        <section class="chapter-heading" aria-labelledby="chapter-title">
+            <div><p class="eyebrow" data-stat="chapter">CHAPTER I / THE LAST EMBER</p><h1 id="chapter-title" data-stat="map">The Ashen Hollow</h1><p data-stat="map-description">The dead are restless. Give them a reason to stay buried.</p></div>
+            <div class="run-record"><span>LOCAL BEST</span><strong data-stat="best">0</strong><span>ENEMIES SLAIN</span></div>
+        </section>
+
+        <div class="game-grid">
+            <section class="arena-section" aria-label="Game arena">
+                <div class="arena-topline"><span><i class="live-dot"></i> <span data-stat="objective">Recover six dawns across 30 waves.</span></span><span>WAVE <strong data-stat="wave">&mdash;</strong> / <strong data-stat="last-wave">30</strong></span></div>
+                <div class="arena-viewport">
+                    <canvas width="1100" height="650" tabindex="0" aria-label="Action RPG arena. Use WASD or arrow keys to move, J or left mouse to attack, Q for nova, Space to dodge, and P to pause." aria-describedby="game-controls"></canvas>
+                    <div class="arena-overlay" data-overlay>
+                        <section class="level-draft" data-level-draft hidden aria-labelledby="level-draft-title">
+                            <p class="eyebrow" data-stat="draft-level">LEVEL UP</p>
+                            <h2 id="level-draft-title">Choose your next oath</h2>
+                            <p class="draft-description">Choose one of three. Your boon lasts for this entire run and its save, including the journey into endless mode.</p>
+                            <div class="level-card-grid">
+                                @for (var index = 0; index < 3; index++)
+                                {
+                                    <button type="button" class="level-card" data-level-card="@index" disabled>
+                                        <span class="card-category" data-card-category></span>
+                                        <strong data-card-name></strong>
+                                        <span class="card-description" data-card-description></span>
+                                        <small data-card-rank></small>
+                                        <span class="card-pick">Choose this boon &rarr;</span>
+                                    </button>
+                                }
+                            </div>
+                            <p class="draft-footer" data-stat="draft-pending" role="status" aria-live="polite"></p>
+                            <small>Combat and timers are paused. Save retains these exact offers; loading will not reroll them.</small>
+                        </section>
+                        <div class="overlay-card" data-run-menu>
+                            <div class="sigil" aria-hidden="true">&#10023;</div>
+                            <p class="eyebrow" data-overlay-kicker>SIX DAWNS / ONE LAST PROMISE</p>
+                            <h2 data-overlay-title>One blade.<br />One last ember.</h2>
+                            <p data-overlay-description>The king rang the Mourning Bell and the sun disappeared. Carry its last spark through six lands. Find your sister. Recover the dawn. Thirty waves, six bosses, then the Endless Watch.</p>
+                            <button type="button" class="ember-button" data-action="start" disabled>Begin the journey <span>&rarr;</span></button>
+                            <button type="button" class="ember-button endless-button" data-action="endless" hidden>Enter the Endless Watch &rarr;</button>
+                            <button type="button" class="quiet-button restart-button" data-action="restart" hidden>Abandon run &amp; restart</button>
+                            <small class="unlock-note" data-stat="unlock">Complete the campaign to permanently unlock Endless Watch.</small>
+                            <small class="checkpoint-note" data-stat="checkpoint-save"></small>
+                            <small data-loading role="status">Preparing the hollow...</small>
+                        </div>
+                    </div>
+                    <div class="arena-caption" data-stat="map-caption" aria-hidden="true">THE ASHEN HOLLOW / ASHBOUND SANCTUM</div>
+                </div>
+                <div class="power-strip" aria-label="Active timed power-ups"><span>EMBER BLESSINGS</span><strong data-stat="buffs">No active power-ups</strong></div>
+                <div class="vitals">
+                    <div class="vital"><div><span>VITALITY</span><strong data-stat="health">100 / 100</strong></div><meter data-meter="health" min="0" max="100" value="100" aria-label="Health"></meter></div>
+                    <div class="level-medallion"><small>LVL</small><strong data-stat="level">1</strong></div>
+                    <div class="vital experience"><div><span>EXPERIENCE</span><strong data-stat="xp">0 / 35</strong></div><meter data-meter="xp" min="0" max="35" value="0" aria-label="Experience"></meter></div>
+                </div>
+                <div class="skill-bar">
+                    <button type="button" data-skill="attack"><kbd>J / LMB</kbd><span class="skill-icon">&#9876;</span><span>Cleave<small data-stat="attack">Ready</small></span></button>
+                    <button type="button" data-skill="nova"><kbd>Q</kbd><span class="skill-icon nova-icon">&#10023;</span><span>Ember nova<small data-stat="nova">Ready</small></span></button>
+                    <button type="button" data-skill="dodge"><kbd>SPACE</kbd><span class="skill-icon dodge-icon">&raquo;</span><span>Dodge<small data-stat="dodge">Ready</small></span></button>
+                    <button type="button" data-skill="potion"><kbd>E</kbd><span class="skill-icon potion-icon">+</span><span>Life flask<small data-stat="potion">3 charges</small></span></button>
+                </div>
+                <div class="touch-movement" aria-label="Touch movement controls">
+                    <button type="button" data-move="up" aria-label="Move up">&uarr;</button>
+                    <div><button type="button" data-move="left" aria-label="Move left">&larr;</button><button type="button" data-move="down" aria-label="Move down">&darr;</button><button type="button" data-move="right" aria-label="Move right">&rarr;</button></div>
+                </div>
+                <section class="forge-panel" data-forge aria-labelledby="forge-title">
+                    <div class="forge-heading"><div><p class="eyebrow">THE TRAVELING FORGE</p><h2 id="forge-title">Build your own dawn</h2></div><span data-stat="forge-gold">0 gold</span></div>
+                    <p class="forge-hint">Pause or select Forge to spend gold. Upgrade scrolls also drop from bosses and enemies. Forge purchases at checkpoints autosave; elsewhere, use Save.</p>
+                    <div class="forge-grid">
+                        <button type="button" data-upgrade="weapon" disabled><strong>Sunsteel edge</strong><span>Weapon damage</span><small data-upgrade-label="weapon">Rank 0 / 50</small></button>
+                        <button type="button" data-upgrade="armor" disabled><strong>Dawnplate</strong><span>Armor + max health</span><small data-upgrade-label="armor">Rank 0 / 12</small></button>
+                        <button type="button" data-upgrade="cleave" disabled><strong>Wide awakening</strong><span>Cleave power, reach, speed</span><small data-upgrade-label="cleave">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="nova" disabled><strong>Solar heart</strong><span>Nova power, radius, recovery</span><small data-upgrade-label="nova">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="dodge" disabled><strong>Ghoststep</strong><span>Dodge recovery + immunity</span><small data-upgrade-label="dodge">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="flask" disabled><strong>Living ember</strong><span>Healing power + flask refill</span><small data-upgrade-label="flask">Rank 0 / 5</small></button>
+                    </div>
+                    <p class="forge-feedback" data-forge-feedback role="status" aria-live="polite">Every coin is a choice. Damage, survival, or skills?</p>
+                </section>
+            </section>
+
+            <aside class="journey-panel">
+                <section class="hero-card"><div class="hero-emblem" aria-hidden="true">&#9876;</div><p class="eyebrow">YOUR EXILE</p><h2>The Ashbound</h2><p>Ember knight &middot; Melee</p><div class="hero-stats"><div><span>Damage</span><strong data-stat="damage">18</strong></div><div><span>Gold</span><strong class="gold" data-stat="gold">0</strong></div><div><span>Slain</span><strong data-stat="kills">0</strong></div></div></section>
+                <section class="story-card"><p class="eyebrow" data-stat="story-title">THE FIRST DAWN</p><p data-stat="story">The sun vanished when the king rang the Mourning Bell. Your sister's voice whispers from the lantern: find the six stolen dawns.</p><small data-stat="dawns">0 / 6 dawns recovered</small></section>
+                <section class="equipment-card"><p class="eyebrow">ARMS &amp; ARMOR</p><div class="weapon-icon" aria-hidden="true">&#8224;</div><h3 data-stat="weapon">Worn iron blade</h3><p data-stat="weapon-detail">Starter weapon &middot; +0 damage</p><h3 data-stat="armor-name">Traveler's coat</h3><p data-stat="armor-detail">0% damage reduction</p><small>Walk over loot. Better weapons and armor equip automatically; forge bonuses are retained.</small></section>
+                <section class="boons-card"><p class="eyebrow">CHOSEN OATHS <span data-stat="boon-count">0</span></p><p data-stat="boons">Level up to choose your first lasting boon.</p><small>Stacking, run-long bonuses. A fresh campaign or fresh endless character starts with none.</small></section>
+                <section class="journal-card"><p class="eyebrow">FIELD JOURNAL</p><p data-stat="journal" role="status" aria-live="polite">A faint warmth lingers beneath the ashes.</p></section>
+                <section class="controls-card"><p class="eyebrow">PICKUP BLESSINGS</p><dl><dt>Bloodsun / 15s</dt><dd>+50% damage</dd><dt>Windwake / 12s</dt><dd>Speed + recovery</dd><dt>Dawn aegis / 10s</dt><dd>Half damage</dd><dt>Gravetide / 20s</dt><dd>Loot magnet</dd></dl><p>Glowing pickups grant temporary powers. Picking up the same blessing refreshes its timer. Pale scrolls permanently add one upgrade rank to this run.</p></section>
+                <section class="controls-card"><p class="eyebrow">THE ROAD AHEAD</p><dl><dt>1-5</dt><dd>Ashen Hollow</dd><dt>6-10</dt><dd>Drowned Wilds</dd><dt>11-15</dt><dd>Cinder Citadel</dd><dt>16-20</dt><dd>Glass Expanse</dd><dt>21-25</dt><dd>Storm Archive</dd><dt>26-30</dt><dd>Starless Gate</dd><dt>After 30</dt><dd>Endless Watch</dd></dl><p data-stat="threat">Husks swarm, brutes strike hard, and wisps attack at range.</p></section>
+                <section class="controls-card" id="game-controls"><p class="eyebrow">HOW TO SURVIVE</p><dl><dt>WASD / arrows</dt><dd>Move</dd><dt>Mouse</dt><dd>Aim</dd><dt>J / left click</dt><dd>Cleave</dd><dt>Q / Space / E</dt><dd>Nova / dodge / heal</dd><dt>P / Escape</dt><dd>Pause</dd></dl><p>Without mouse aim, attacks face your movement direction. Dodge through danger; nova strikes all nearby enemies.</p></section>
+            </aside>
+        </div>
+        <footer class="game-footer"><span>SIX DAWNS. ONE LAST PROMISE.</span><span>Windows account saves &middot; Checkpoint autosaves &middot; Permanent Endless unlock</span><span class="credit">Developed by MadBone | LIT MES TSR</span></footer>
+    </main>
+</div>
+
+@code {
+    private ElementReference gameRoot;
+    private IJSObjectReference? module;
+    private IJSObjectReference? game;
+    private DotNetObjectReference<Home>? saveBridge;
+    private bool disposed;
+    private string windowsUserName = string.Empty;
+
+    protected override async Task OnInitializedAsync() => windowsUserName = (await AuthenticationState.GetAuthenticationStateAsync()).User.Identity?.Name?.Split('\\').Last() ?? string.Empty;
+
+    [JSInvokable]
+    public async Task<GameSaveResult> SaveRun(System.Text.Json.JsonElement snapshot) =>
+        await Saves.SaveAsync((await AuthenticationState.GetAuthenticationStateAsync()).User, snapshot);
+
+    [JSInvokable]
+    public async Task<GameSaveResult> LoadRun() =>
+        await Saves.LoadAsync((await AuthenticationState.GetAuthenticationStateAsync()).User);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || disposed) return;
+
+        try
+        {
+            var importedModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/arpg.js");
+
+            if (disposed)
+            {
+                await importedModule.DisposeAsync();
+                return;
+            }
+
+            module = importedModule;
+            saveBridge = DotNetObjectReference.Create(this);
+            var instance = await module.InvokeAsync<IJSObjectReference>("createGame", gameRoot, saveBridge);
+
+            if (disposed)
+            {
+                await instance.InvokeVoidAsync("dispose");
+                await instance.DisposeAsync();
+                return;
+            }
+
+            game = instance;
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        saveBridge?.Dispose();
+
+        try
+        {
+            if (game is not null)
+            {
+                await game.InvokeVoidAsync("dispose");
+                await game.DisposeAsync();
+            }
+
+            if (module is not null) await module.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+}

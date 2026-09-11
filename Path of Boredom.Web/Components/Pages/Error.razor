@@ -1,0 +1,28 @@
+@page "/Error"
+@using System.Diagnostics
+
+<PageTitle>Error</PageTitle>
+
+<main class="error-page">
+    <h1>The hollow is temporarily unreachable.</h1>
+    <p>Something went wrong. Return to the game and use Load to restore your last server save.</p>
+    <p>Unsaved progress may be lost.</p>
+    @if (ShowRequestId)
+    {
+        <p><strong>Request ID:</strong> <code>@requestId</code></p>
+    }
+    <a href="/">Return to the game</a>
+</main>
+
+@code{
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+
+    private string? requestId;
+    private bool ShowRequestId => !string.IsNullOrEmpty(requestId);
+
+    protected override void OnInitialized()
+    {
+        requestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+    }
+}

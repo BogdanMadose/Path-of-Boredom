@@ -8,6 +8,7 @@ builder.AddServiceDefaults();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton<GameSaveStore>();
+builder.Services.AddSingleton<RankingStore>();
 builder.Services.AddOptions<SaveServiceOptions>()
     .BindConfiguration(SaveServiceOptions.SectionName)
     .Validate(options => SaveServiceOptions.IsValidApiKey(options.ApiKey), "Configure SaveService:ApiKey with the same 64-character hexadecimal secret in Web and ApiService, or start AppHost.")
@@ -23,6 +24,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGameSaves();
+app.MapRankings();
 app.MapDefaultEndpoints();
 
 app.Run();

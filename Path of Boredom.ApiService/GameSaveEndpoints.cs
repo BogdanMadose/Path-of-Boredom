@@ -46,7 +46,7 @@ public static class GameSaveEndpoints
                 var root = document.RootElement;
                 if (root.ValueKind != JsonValueKind.Object
                     || !root.TryGetProperty("version", out var version) || version.ValueKind != JsonValueKind.Number
-                    || !version.TryGetInt32(out var number) || number is not (1 or 2 or 3 or 4)
+                    || !version.TryGetInt32(out var number) || number is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8)
                     || !root.TryGetProperty("state", out var state) || !IsValidState(state, number))
                 {
                     return Results.BadRequest(new { message = "Invalid or unsupported save." });
@@ -64,6 +64,19 @@ public static class GameSaveEndpoints
 
     private static bool IsValidState(JsonElement state, int version)
     {
+        string[] upgradeKeys = version >= 8
+            ? ["weapon", "armor", "cleave", "nova", "dodge", "flask", "critChance", "critDamage"]
+            : ["weapon", "armor", "cleave", "nova", "dodge", "flask"];
+        string[] masteryKeys = version >= 8
+            ? ["might", "vitality", "recovery", "area", "speed", "critChance", "critDamage"]
+            : ["might", "vitality", "recovery"];
+        if (version >= 5 && (state.ValueKind != JsonValueKind.Object
+            || !state.TryGetProperty("difficulty", out var difficulty) || difficulty.ValueKind != JsonValueKind.String
+            || !state.TryGetProperty("rankingMode", out var rankingMode) || rankingMode.ValueKind != JsonValueKind.String
+            || !(difficulty.GetString() == "legacy" && rankingMode.GetString() == "legacy"
+                || Path_of_Boredom.ServiceDefaults.RankingRules.IsDifficulty(difficulty.GetString())
+                    && (Path_of_Boredom.ServiceDefaults.RankingRules.IsMode(rankingMode.GetString())
+                        || version >= 6 && rankingMode.GetString() == "legacy")))) return false;
         if (!IsBounded(state)
             || !Numbers(state, "time", "wave", "intermission", "kills", "gold")
             || !state.TryGetProperty("status", out var status) || status.ValueKind != JsonValueKind.String
@@ -73,6 +86,7 @@ public static class GameSaveEndpoints
             || !player.TryGetProperty("weapon", out var weapon) || weapon.ValueKind != JsonValueKind.String
             || player.GetProperty("health").GetDouble() <= 0
             || player.GetProperty("health").GetDouble() > player.GetProperty("maxHealth").GetDouble()
+            || !player.GetProperty("potions").TryGetInt32(out var potions) || potions is < 0 or > 5
             || state.GetProperty("wave").GetDouble() < 0
             || state.GetProperty("wave").GetDouble() % 1 != 0)
         {
@@ -80,6 +94,34 @@ public static class GameSaveEndpoints
         }
 
         var wave = state.GetProperty("wave").GetDouble();
+        if (version >= 7)
+        {
+            if (!state.TryGetProperty("heroClass", out var heroClass) || heroClass.ValueKind != JsonValueKind.String
+                || !Path_of_Boredom.ServiceDefaults.RankingRules.IsClass(heroClass.GetString())
+                || !ValidArray(state, "playerShots", shot => Numbers(shot, "x", "y", "vx", "vy", "life", "damage", "piercing")
+                    && shot.GetProperty("life").GetDouble() is > 0 and <= 2
+                    && shot.GetProperty("damage").GetDouble() > 0
+                    && shot.GetProperty("piercing").TryGetInt32(out var piercing) && piercing is 0 or 1)) return false;
+            var count = state.GetProperty("playerShots").GetArrayLength();
+            if (count > 48 || heroClass.GetString() != "ranger" && count != 0) return false;
+        }
+        if (version >= 6)
+        {
+            if (!state.TryGetProperty("scoreBaseline", out var baseline) || baseline.ValueKind != JsonValueKind.Number || !baseline.TryGetInt64(out var startScore)
+                || !state.GetProperty("kills").TryGetInt64(out var kills) || startScore < 0 || startScore > kills
+                || !state.TryGetProperty("mastery", out var mastery) || !Numbers(mastery, masteryKeys)
+                || mastery.EnumerateObject().Count() != masteryKeys.Length) return false;
+            long total = 0;
+            foreach (var stat in mastery.EnumerateObject())
+            {
+                if (!stat.Value.TryGetInt64(out var rank) || rank < 0) return false;
+                total += rank;
+            }
+            if (total > 9_007_199_254_740_991L) return false;
+            if (total > 0 && (!state.TryGetProperty("upgrades", out var forge) || !Numbers(forge, upgradeKeys)
+                || forge.EnumerateObject().Count() != upgradeKeys.Length
+                || forge.EnumerateObject().Any(item => item.Value.GetDouble() != (item.Name switch { "weapon" => 50, "armor" => 12, "flask" => 5, _ => 8 })))) return false;
+        }
         var mode = "campaign";
         var completed = 0d;
         if (version >= 2)
@@ -88,7 +130,7 @@ public static class GameSaveEndpoints
                 || modeValue.GetString() is not ("campaign" or "endless")
                 || !Numbers(state, "campaignComplete")
                 || !state.TryGetProperty("upgrades", out var upgrades)
-                || !Numbers(upgrades, "weapon", "armor", "cleave", "nova", "dodge", "flask")
+                || !Numbers(upgrades, upgradeKeys) || upgrades.EnumerateObject().Count() != upgradeKeys.Length
                 || !Numbers(player, "armorBonus") || player.GetProperty("armorBonus").GetDouble() is < 0 or > 40
                 || !player.TryGetProperty("armor", out var armor) || armor.ValueKind != JsonValueKind.String)
             {
@@ -106,6 +148,7 @@ public static class GameSaveEndpoints
         }
 
         if ((mode == "campaign" && wave > 30) || (mode == "endless" && (wave < 30 || completed != 1))) return false;
+        if (version >= 6 && state.GetProperty("rankingMode").GetString() is ("ascended" or "endless") && mode != "endless") return false;
         if (status.GetString() == "camp" && (wave <= 0 || wave % 5 != 0 || (mode == "campaign" ? wave >= 30 : wave <= 30))) return false;
         if (status.GetString() == "won" && (mode != "campaign" || wave != 30 || completed != 1)) return false;
         if (status.GetString() is "camp" or "won"
@@ -123,23 +166,30 @@ public static class GameSaveEndpoints
 
         if (version >= 4)
         {
-            if (!ValidCardProgress(state, player, status.GetString()!)) return false;
+            if (!ValidCardProgress(state, player, status.GetString()!, version)) return false;
         }
         else if (status.GetString() == "choosing") return false;
 
         return ValidArray(state, "enemies", item =>
                 Numbers(item, "x", "y", "health", "maxHealth", "radius", "speed", "damage", "cooldown", "flash", "slam", "winding")
-                && Kind(item, "husk", "wisp", "brute", "runner", "spitter", "sentinel", "reaver", "bomber", "summoner", "cantor", "hexer", "boss"))
+                && (version < 6 || Numbers(item, "charging", "chargeX", "chargeY")
+                    && item.GetProperty("charging").GetDouble() >= 0
+                    && item.GetProperty("charging").GetDouble() <= (Kind(item, "lancer") ? 1.2 : 0.45)
+                    && Math.Abs(item.GetProperty("chargeX").GetDouble()) <= 1
+                    && Math.Abs(item.GetProperty("chargeY").GetDouble()) <= 1)
+                && Kind(item, "husk", "wisp", "brute", "runner", "spitter", "sentinel", "reaver", "lancer", "bomber", "summoner", "cantor", "hexer", "boss"))
             && ValidArray(state, "projectiles", item => Numbers(item, "x", "y", "vx", "vy", "life", "damage"))
             && ValidArray(state, "loot", item => Numbers(item, "x", "y", "value", "life")
-                && Kind(item, "gold", "weapon", "armor", "health", "power", "upgrade")
+                && Kind(item, "gold", "weapon", "armor", "health", "power", "upgrade", "flask")
                 && (!Kind(item, "power", "upgrade") || (item.GetProperty("value").TryGetInt32(out var index)
-                    && index >= 0 && index < (Kind(item, "power") ? 4 : 6))));
+                    && index >= 0 && index < (Kind(item, "power") ? 4 : upgradeKeys.Length))));
     }
 
-    private static bool ValidCardProgress(JsonElement state, JsonElement player, string status)
+    private static bool ValidCardProgress(JsonElement state, JsonElement player, string status, int version)
     {
-        string[] keys = ["edge", "vitality", "bulwark", "stride", "focus", "nova", "cleave", "harvest", "siphon", "fortune"];
+        string[] keys = version >= 8
+            ? ["edge", "vitality", "bulwark", "stride", "focus", "nova", "cleave", "harvest", "siphon", "fortune", "critChance", "critDamage"]
+            : ["edge", "vitality", "bulwark", "stride", "focus", "nova", "cleave", "harvest", "siphon", "fortune"];
         if (!state.TryGetProperty("boons", out var boons) || !Numbers(boons, keys)
             || boons.EnumerateObject().Count() != keys.Length
             || !state.TryGetProperty("pendingChoices", out var pendingValue) || pendingValue.ValueKind != JsonValueKind.Number

@@ -1,12 +1,15 @@
 namespace Path_of_Boredom.ServiceDefaults;
 
-public sealed record ScoreSubmission(string Difficulty, string Mode, long Score, string HeroClass = "knight", RankingBuild? Build = null);
+public sealed record ScoreSubmission(string Difficulty, string Mode, long Score, string HeroClass = "knight", RankingBuild? Build = null, string Patch = "pre004");
 public sealed record RankingRow(int Rank, string Player, long Score, DateTimeOffset? AchievedAt, bool IsCurrentUser, string? HeroClass = null, RankingBuild? Build = null);
 public sealed record RankingBuild(long Level, IReadOnlyList<RankingUpgrade> Upgrades, string ManualSkill, IReadOnlyList<string> AutoSkills);
 public sealed record RankingUpgrade(string Category, string Name, long Rank);
 
 public static class RankingRules
 {
+    public const string CurrentPatch = "004";
+    public static bool IsPatch(string? value) => value is "004" or "pre004";
+    public static string PatchName(string value) => value == CurrentPatch ? "Patch 004 — fresh runs" : "Pre-004 / inherited runs";
     public static bool IsDifficulty(string? value) => value is "hard" or "nightmare" or "inferno";
     public static bool IsMode(string? value) => value is "campaign" or "endless" or "ascended";
     public static bool IsClass(string? value) => value is "knight" or "ranger" or "warden";
@@ -17,7 +20,7 @@ public static class RankingRules
         "warden" => "Iron Warden",
         _ => "—"
     };
-    public static bool IsValid(ScoreSubmission value) => IsDifficulty(value.Difficulty)
+    public static bool IsValid(ScoreSubmission value) => IsPatch(value.Patch) && IsDifficulty(value.Difficulty)
         && IsMode(value.Mode) && IsClass(value.HeroClass) && value.Score is >= 0 and <= 9_007_199_254_740_991L
         && (value.Build is null || IsValidBuild(value.Build));
 

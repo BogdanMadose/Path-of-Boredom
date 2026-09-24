@@ -96,11 +96,11 @@ public sealed class GameSaveClient(HttpClient client, IOptions<SaveServiceOption
         }
     }
 
-    public async Task<IReadOnlyList<RankingRow>?> GetRankingsAsync(ClaimsPrincipal user, string difficulty, string mode, string heroClass = "all")
+    public async Task<IReadOnlyList<RankingRow>?> GetRankingsAsync(ClaimsPrincipal user, string difficulty, string mode, string heroClass = "all", string patch = RankingRules.CurrentPatch)
     {
         if (!RankingRules.IsDifficulty(difficulty) || !RankingRules.IsMode(mode)
-            || heroClass != "all" && !RankingRules.IsClass(heroClass)) return null;
-        using var request = CreateRequest(HttpMethod.Get, user, $"/game/rankings/?difficulty={difficulty}&mode={mode}&heroClass={heroClass}");
+            || !RankingRules.IsPatch(patch) || heroClass != "all" && !RankingRules.IsClass(heroClass)) return null;
+        using var request = CreateRequest(HttpMethod.Get, user, $"/game/rankings/?difficulty={difficulty}&mode={mode}&heroClass={heroClass}&patch={patch}");
         if (request is null) return null;
         try
         {

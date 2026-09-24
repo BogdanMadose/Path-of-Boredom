@@ -46,7 +46,7 @@ public static class GameSaveEndpoints
                 var root = document.RootElement;
                 if (root.ValueKind != JsonValueKind.Object
                     || !root.TryGetProperty("version", out var version) || version.ValueKind != JsonValueKind.Number
-                    || !version.TryGetInt32(out var number) || number is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 11 or 12)
+                    || !version.TryGetInt32(out var number) || number is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 11 or 12 or 13 or 14)
                     || !root.TryGetProperty("state", out var state) || !IsValidState(state, number))
                 {
                     return Results.BadRequest(new { message = "Invalid or unsupported save." });
@@ -96,6 +96,11 @@ public static class GameSaveEndpoints
         }
 
         var wave = state.GetProperty("wave").GetDouble();
+        long volleySequence = 2;
+        if (version >= 14 && (!Numbers(state, "volleySequence") || !state.GetProperty("volleySequence").TryGetInt64(out volleySequence) || volleySequence < 2)) return false;
+        if (version >= 13 && (!state.TryGetProperty("rankingPatch", out var rankingPatch)
+            || rankingPatch.ValueKind != JsonValueKind.String
+            || !Path_of_Boredom.ServiceDefaults.RankingRules.IsPatch(rankingPatch.GetString()))) return false;
         if (version >= 7)
         {
             if (!state.TryGetProperty("heroClass", out var heroClass) || heroClass.ValueKind != JsonValueKind.String
@@ -104,6 +109,8 @@ public static class GameSaveEndpoints
                     && shot.GetProperty("life").GetDouble() is > 0 and <= 2
                     && shot.GetProperty("damage").GetDouble() > 0
                     && (version < 9 || shot.TryGetProperty("skill", out var shotSkill) && shotSkill.ValueKind == JsonValueKind.String && shotSkill.GetString() is ("attack" or "nova" or "burst"))
+                    && (version < 14 || Numbers(shot, "volley") && shot.GetProperty("volley").TryGetInt64(out var volley)
+                        && (shot.GetProperty("skill").GetString() == "attack" ? volley == 0 : volley >= 1 && volley <= volleySequence))
                     && shot.GetProperty("piercing").TryGetInt32(out var piercing) && piercing is 0 or 1)) return false;
             var count = state.GetProperty("playerShots").GetArrayLength();
             if (count > 48 || heroClass.GetString() != "ranger" && count != 0) return false;
@@ -177,6 +184,8 @@ public static class GameSaveEndpoints
 
         return ValidArray(state, "enemies", item =>
                 Numbers(item, "x", "y", "health", "maxHealth", "radius", "speed", "damage", "cooldown", "flash", "slam", "winding")
+                && (version < 13 || ValidEliteModifier(item, wave))
+                && (version < 14 || ValidEnemyCombat(item, volleySequence))
                 && (version < 12 || Numbers(item, "chilled", "chillStrength")
                     && item.GetProperty("chilled").GetDouble() is >= 0 and <= 1.5
                     && item.GetProperty("chillStrength").GetDouble() is >= 0 and <= 0.3
@@ -191,7 +200,9 @@ public static class GameSaveEndpoints
                     && Math.Abs(item.GetProperty("chargeX").GetDouble()) <= 1
                     && Math.Abs(item.GetProperty("chargeY").GetDouble()) <= 1)
                 && Kind(item, "husk", "wisp", "brute", "runner", "spitter", "sentinel", "reaver", "lancer", "bomber", "summoner", "cantor", "hexer", "boss", "duelist", "artillerist"))
-            && ValidArray(state, "projectiles", item => Numbers(item, "x", "y", "vx", "vy", "life", "damage"))
+            && ValidArray(state, "projectiles", item => Numbers(item, "x", "y", "vx", "vy", "life", "damage")
+                && (version < 13 || item.TryGetProperty("source", out var source) && source.ValueKind == JsonValueKind.String
+                    && source.GetString() is { Length: > 0 and <= 100 } label && !string.IsNullOrWhiteSpace(label) && !label.Any(char.IsControl)))
             && ValidArray(state, "loot", item => Numbers(item, "x", "y", "value", "life")
                 && Kind(item, "gold", "weapon", "armor", "health", "power", "upgrade", "flask")
                 && (!Kind(item, "power", "upgrade") || (item.GetProperty("value").TryGetInt32(out var index)
@@ -299,6 +310,30 @@ public static class GameSaveEndpoints
             || state.GetProperty("mode").GetString() == "campaign" && state.GetProperty("wave").GetDouble() >= 30)) return false;
         return true;
     }
+
+    private static bool ValidEnemyCombat(JsonElement item, long sequence)
+    {
+        if (!item.TryGetProperty("combat", out var combat) || !Numbers(combat, "phase", "rest", "pattern")
+            || !combat.GetProperty("phase").TryGetInt32(out var phase) || phase < 1 || phase > (Kind(item, "boss") ? 3 : 1)
+            || !combat.GetProperty("pattern").TryGetInt32(out var pattern) || pattern < 1 || pattern > phase
+            || combat.GetProperty("rest").GetDouble() < 0 || combat.GetProperty("rest").GetDouble() > (Kind(item, "boss") ? 2 : 0)
+            || combat.GetProperty("rest").GetDouble() > 0 && (!Numbers(item, "attackWindup", "winding")
+                || item.GetProperty("attackWindup").GetDouble() != 0 || item.GetProperty("winding").GetDouble() != 0)
+            || !combat.TryGetProperty("volleys", out var volleys) || volleys.ValueKind != JsonValueKind.Array || volleys.GetArrayLength() > 48) return false;
+        var seen = new HashSet<long>();
+        foreach (var hit in volleys.EnumerateArray())
+        {
+            if (!Numbers(hit, "volley", "hits") || !hit.GetProperty("volley").TryGetInt64(out var volley) || volley < 1 || volley > sequence || !seen.Add(volley)
+                || !hit.GetProperty("hits").TryGetInt32(out var count) || count is < 1 or > 3) return false;
+        }
+        return true;
+    }
+
+    private static bool ValidEliteModifier(JsonElement item, double wave) =>
+        item.TryGetProperty("modifier", out var modifier) && modifier.ValueKind == JsonValueKind.String
+        && modifier.GetString() is ("none" or "armored" or "swift" or "mending")
+        && Numbers(item, "elite") && item.GetProperty("elite").TryGetInt32(out var elite) && elite is 0 or 1
+        && (modifier.GetString() == "none" || elite == 1 && wave >= 11 && !Kind(item, "boss"));
 
     private static bool Numbers(JsonElement item, params string[] names) =>
         item.ValueKind == JsonValueKind.Object && names.All(name =>

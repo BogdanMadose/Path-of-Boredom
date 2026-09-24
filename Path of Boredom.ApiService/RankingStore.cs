@@ -33,7 +33,7 @@ public sealed class RankingStore(IWebHostEnvironment environment, IConfiguration
             profile = profile with { Player = name };
             if (submission is not null)
             {
-                var board = $"{submission.Difficulty}:{submission.Mode}:{submission.HeroClass}";
+                var board = $"{submission.Patch}:{submission.Difficulty}:{submission.Mode}:{submission.HeroClass}";
                 if (!profile.Bests.TryGetValue(board, out var best) || submission.Score > best.Score)
                 {
                     profile.Bests[board] = new(submission.Score, DateTimeOffset.UtcNow, submission.HeroClass, submission.Build);
@@ -52,7 +52,7 @@ public sealed class RankingStore(IWebHostEnvironment environment, IConfiguration
         }
     }
 
-    public async Task<IReadOnlyList<RankingRow>> ReadAsync(string owner, string difficulty, string mode, string? heroClass, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<RankingRow>> ReadAsync(string owner, string difficulty, string mode, string? heroClass, string patch, CancellationToken cancellationToken)
     {
         await gate.WaitAsync(cancellationToken);
         try
@@ -72,7 +72,7 @@ public sealed class RankingStore(IWebHostEnvironment environment, IConfiguration
             foreach (var classKey in classes)
             {
                 var entries = profiles.Select(entry => (entry.Key, entry.Profile.Player,
-                    Best: entry.Profile.Bests.GetValueOrDefault($"{difficulty}:{mode}:{classKey}")))
+                    Best: entry.Profile.Bests.GetValueOrDefault($"{patch}:{difficulty}:{mode}:{classKey}")))
                     .OrderByDescending(entry => entry.Best?.Score ?? 0)
                     .ThenBy(entry => entry.Best?.AchievedAt ?? DateTimeOffset.MaxValue)
                     .ThenBy(entry => entry.Key, StringComparer.Ordinal);
@@ -99,9 +99,10 @@ public sealed class RankingStore(IWebHostEnvironment environment, IConfiguration
         foreach (var (key, best) in profile.Bests.ToArray())
         {
             var parts = key.Split(':');
-            if (parts.Length != 2 || !RankingRules.IsDifficulty(parts[0]) || !RankingRules.IsMode(parts[1])) continue;
-            var heroClass = RankingRules.IsClass(best.HeroClass) ? best.HeroClass : "knight";
-            var classKey = $"{key}:{heroClass}";
+            if (parts.Length is not (2 or 3) || !RankingRules.IsDifficulty(parts[0]) || !RankingRules.IsMode(parts[1])) continue;
+            var heroClass = parts.Length == 3 && RankingRules.IsClass(parts[2]) ? parts[2]
+                : RankingRules.IsClass(best.HeroClass) ? best.HeroClass : "knight";
+            var classKey = $"pre004:{parts[0]}:{parts[1]}:{heroClass}";
             if (!profile.Bests.TryGetValue(classKey, out var existing) || best.Score > existing.Score)
                 profile.Bests[classKey] = best with { HeroClass = heroClass };
             profile.Bests.Remove(key);

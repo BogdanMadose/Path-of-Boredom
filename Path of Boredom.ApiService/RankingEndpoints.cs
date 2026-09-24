@@ -15,12 +15,13 @@ public static class RankingEndpoints
                 context.User.Identity!.Name!, context.RequestAborted);
             return Results.NoContent();
         });
-        group.MapGet("/", async (string difficulty, string mode, HttpContext context, RankingStore store) =>
+        group.MapGet("/", async (string difficulty, string mode, string? heroClass, HttpContext context, RankingStore store) =>
         {
             context.Response.Headers.CacheControl = "no-store";
-            if (!RankingRules.IsDifficulty(difficulty) || !RankingRules.IsMode(mode)) return Results.BadRequest();
+            if (!RankingRules.IsDifficulty(difficulty) || !RankingRules.IsMode(mode)
+                || heroClass is not (null or "all") && !RankingRules.IsClass(heroClass)) return Results.BadRequest();
             return Results.Ok(await store.ReadAsync(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-                difficulty, mode, context.RequestAborted));
+                difficulty, mode, heroClass, context.RequestAborted));
         });
         group.MapPut("/", async (ScoreSubmission submission, HttpContext context, RankingStore store) =>
         {
@@ -29,6 +30,6 @@ public static class RankingEndpoints
             await store.UpdateAsync(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!,
                 context.User.Identity!.Name!, submission, context.RequestAborted);
             return Results.NoContent();
-        }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(2048));
+        }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(16 * 1024));
     }
 }

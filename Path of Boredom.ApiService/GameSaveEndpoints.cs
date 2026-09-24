@@ -46,7 +46,7 @@ public static class GameSaveEndpoints
                 var root = document.RootElement;
                 if (root.ValueKind != JsonValueKind.Object
                     || !root.TryGetProperty("version", out var version) || version.ValueKind != JsonValueKind.Number
-                    || !version.TryGetInt32(out var number) || number is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8)
+                    || !version.TryGetInt32(out var number) || number is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 11 or 12)
                     || !root.TryGetProperty("state", out var state) || !IsValidState(state, number))
                 {
                     return Results.BadRequest(new { message = "Invalid or unsupported save." });
@@ -64,7 +64,9 @@ public static class GameSaveEndpoints
 
     private static bool IsValidState(JsonElement state, int version)
     {
-        string[] upgradeKeys = version >= 8
+        string[] upgradeKeys = version >= 9
+            ? ["weapon", "armor", "cleave", "nova", "dodge", "flask", "critChance", "critDamage", "burst", "guard"]
+            : version >= 8
             ? ["weapon", "armor", "cleave", "nova", "dodge", "flask", "critChance", "critDamage"]
             : ["weapon", "armor", "cleave", "nova", "dodge", "flask"];
         string[] masteryKeys = version >= 8
@@ -101,6 +103,7 @@ public static class GameSaveEndpoints
                 || !ValidArray(state, "playerShots", shot => Numbers(shot, "x", "y", "vx", "vy", "life", "damage", "piercing")
                     && shot.GetProperty("life").GetDouble() is > 0 and <= 2
                     && shot.GetProperty("damage").GetDouble() > 0
+                    && (version < 9 || shot.TryGetProperty("skill", out var shotSkill) && shotSkill.ValueKind == JsonValueKind.String && shotSkill.GetString() is ("attack" or "nova" or "burst"))
                     && shot.GetProperty("piercing").TryGetInt32(out var piercing) && piercing is 0 or 1)) return false;
             var count = state.GetProperty("playerShots").GetArrayLength();
             if (count > 48 || heroClass.GetString() != "ranger" && count != 0) return false;
@@ -170,14 +173,24 @@ public static class GameSaveEndpoints
         }
         else if (status.GetString() == "choosing") return false;
 
+        if (version >= 9 && !ValidSkillProgress(state, player, version)) return false;
+
         return ValidArray(state, "enemies", item =>
                 Numbers(item, "x", "y", "health", "maxHealth", "radius", "speed", "damage", "cooldown", "flash", "slam", "winding")
+                && (version < 12 || Numbers(item, "chilled", "chillStrength")
+                    && item.GetProperty("chilled").GetDouble() is >= 0 and <= 1.5
+                    && item.GetProperty("chillStrength").GetDouble() is >= 0 and <= 0.3
+                    && (item.GetProperty("chilled").GetDouble() > 0 || item.GetProperty("chillStrength").GetDouble() == 0))
+                && (version < 9 || Numbers(item, "attackWindup", "attackX", "attackY")
+                    && item.GetProperty("attackWindup").GetDouble() is >= 0 and <= 1.1
+                    && item.GetProperty("attackX").GetDouble() is >= 0 and <= 1100
+                    && item.GetProperty("attackY").GetDouble() is >= 0 and <= 650)
                 && (version < 6 || Numbers(item, "charging", "chargeX", "chargeY")
                     && item.GetProperty("charging").GetDouble() >= 0
                     && item.GetProperty("charging").GetDouble() <= (Kind(item, "lancer") ? 1.2 : 0.45)
                     && Math.Abs(item.GetProperty("chargeX").GetDouble()) <= 1
                     && Math.Abs(item.GetProperty("chargeY").GetDouble()) <= 1)
-                && Kind(item, "husk", "wisp", "brute", "runner", "spitter", "sentinel", "reaver", "lancer", "bomber", "summoner", "cantor", "hexer", "boss"))
+                && Kind(item, "husk", "wisp", "brute", "runner", "spitter", "sentinel", "reaver", "lancer", "bomber", "summoner", "cantor", "hexer", "boss", "duelist", "artillerist"))
             && ValidArray(state, "projectiles", item => Numbers(item, "x", "y", "vx", "vy", "life", "damage"))
             && ValidArray(state, "loot", item => Numbers(item, "x", "y", "value", "life")
                 && Kind(item, "gold", "weapon", "armor", "health", "power", "upgrade", "flask")
@@ -187,7 +200,9 @@ public static class GameSaveEndpoints
 
     private static bool ValidCardProgress(JsonElement state, JsonElement player, string status, int version)
     {
-        string[] keys = version >= 8
+        string[] keys = version >= 9
+            ? ["edge", "vitality", "bulwark", "stride", "focus", "nova", "cleave", "harvest", "siphon", "fortune", "critChance", "critDamage", "burst", "guard"]
+            : version >= 8
             ? ["edge", "vitality", "bulwark", "stride", "focus", "nova", "cleave", "harvest", "siphon", "fortune", "critChance", "critDamage"]
             : ["edge", "vitality", "bulwark", "stride", "focus", "nova", "cleave", "harvest", "siphon", "fortune"];
         if (!state.TryGetProperty("boons", out var boons) || !Numbers(boons, keys)
@@ -216,6 +231,72 @@ public static class GameSaveEndpoints
             var maximum = key is "edge" or "vitality" or "fortune" ? 9_007_199_254_740_991L : 10;
             if (boons.GetProperty(key).GetInt64() >= maximum) return false;
         }
+        return true;
+    }
+
+    private static bool ValidSkillProgress(JsonElement state, JsonElement player, int version)
+    {
+        string[] skills = ["attack", "nova", "burst", "guard", "dodge", "potion"];
+        string[] slotSkills = version >= 10 ? ["nova", "burst", "guard"] : skills;
+        string[] nodes = ["potency", "reach", "ember", "recovery"];
+        if (!Numbers(player, "burst", "guard", "guarding") || !Numbers(state, "resumeDelay", "travelPending")
+            || state.GetProperty("resumeDelay").GetDouble() is < 0 or > 3
+            || !state.GetProperty("travelPending").TryGetInt32(out var travel) || travel is < 0 or > 1
+            || player.GetProperty("guarding").GetDouble() is < 0 or > 8
+            || skills.Any(key => player.GetProperty(key).GetDouble() is < 0 or > 30)
+            || !player.GetProperty("level").TryGetInt64(out var level) || level < 1
+            || !state.TryGetProperty("loadout", out var loadout) || loadout.ValueKind != JsonValueKind.Object
+            || !loadout.TryGetProperty("manual", out var manual) || manual.ValueKind != JsonValueKind.String || !slotSkills.Contains(manual.GetString())
+            || !loadout.TryGetProperty("auto", out var auto) || auto.ValueKind != JsonValueKind.Array || auto.GetArrayLength() != (version >= 10 ? 2 : 3)
+            || !state.TryGetProperty("skillTree", out var tree) || tree.ValueKind != JsonValueKind.Object || tree.EnumerateObject().Count() != skills.Length) return false;
+        var slotted = new HashSet<string>(StringComparer.Ordinal) { manual.GetString()! };
+        foreach (var item in auto.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String || item.GetString() is not { } key) return false;
+            if (key != "none" && (!slotSkills.Contains(key) || !slotted.Add(key))) return false;
+        }
+        if (version >= 11)
+        {
+            if (!Numbers(state, "wardUnlockSeen") || !state.GetProperty("wardUnlockSeen").TryGetInt32(out var seen) || seen is < 0 or > 1) return false;
+            var unlockWave = state.GetProperty("rankingMode").GetString() == "endless" ? 41 : 11;
+            if (state.GetProperty("wave").GetDouble() < unlockWave && (slotted.Contains("guard") || player.GetProperty("guarding").GetDouble() != 0)) return false;
+        }
+        var spent = 0;
+        foreach (var skill in skills)
+        {
+            string[] branchKeys = version < 12 ? nodes : skill switch
+            {
+                "attack" => ["edge", "sweep", "execution", "rhythm"],
+                "nova" => ["amplitude", "resonance", "ignition", "chill"],
+                "burst" => ["focus", "aperture", "shatter", "overdrive"],
+                "guard" => ["barrier", "duration", "repulse", "refuge"],
+                "dodge" => ["agility", "distance", "afterstep", "recovery"],
+                _ => ["concentration", "triage", "tonic", "renewal"]
+            };
+            if (!tree.TryGetProperty(skill, out var branch) || !Numbers(branch, branchKeys) || branch.EnumerateObject().Count() != branchKeys.Length) return false;
+            for (var index = 0; index < branchKeys.Length; index++)
+            {
+                var maximum = index == 0 ? 3 : index == 2 ? 1 : 2;
+                if (!branch.GetProperty(branchKeys[index]).TryGetInt32(out var rank) || rank < 0 || rank > maximum) return false;
+                spent += rank;
+            }
+            if ((branch.GetProperty(branchKeys[1]).GetInt32() > 0 || branch.GetProperty(branchKeys[2]).GetInt32() > 0) && branch.GetProperty(branchKeys[0]).GetInt32() == 0) return false;
+            if (branch.GetProperty(branchKeys[3]).GetInt32() > 0 && branch.GetProperty(branchKeys[1]).GetInt32() == 0 && branch.GetProperty(branchKeys[2]).GetInt32() == 0) return false;
+        }
+        if (version >= 12 && (!Numbers(player, "afterstep", "flaskWard", "renewal")
+            || player.GetProperty("afterstep").GetDouble() is < 0 or > 1.2
+            || player.GetProperty("flaskWard").GetDouble() is < 0 or > 2
+            || player.GetProperty("renewal").GetDouble() is < 0 or > 2
+            || player.GetProperty("afterstep").GetDouble() > 0 && tree.GetProperty("dodge").GetProperty("afterstep").GetInt32() == 0
+            || player.GetProperty("flaskWard").GetDouble() > 0 && tree.GetProperty("potion").GetProperty("tonic").GetInt32() == 0
+            || player.GetProperty("renewal").GetDouble() > 0 && tree.GetProperty("potion").GetProperty("renewal").GetInt32() == 0)) return false;
+        var pointBudget = version >= 12 ? Math.Min(32, level / 2) : Math.Min(12, level / 5);
+        if (spent > pointBudget) return false;
+        if (travel == 1 && (state.GetProperty("resumeDelay").GetDouble() <= 0
+            || state.GetProperty("wave").GetDouble() <= 0 || state.GetProperty("wave").GetDouble() % 5 != 0
+            || state.GetProperty("status").GetString() is not ("playing" or "paused")
+            || !state.TryGetProperty("enemies", out var enemies) || enemies.ValueKind != JsonValueKind.Array || enemies.GetArrayLength() != 0
+            || state.GetProperty("mode").GetString() == "campaign" && state.GetProperty("wave").GetDouble() >= 30)) return false;
         return true;
     }
 

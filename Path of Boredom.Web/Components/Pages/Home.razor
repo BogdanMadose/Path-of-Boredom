@@ -24,8 +24,8 @@
         </div>
     </header>
     <aside class="patch-notice" data-patch-notice role="status">
-        <span><strong>Patch 003 is live — Paths of Power</strong> · New skills and upgrades, independent regular attacks, Q for your manual skill, Space to dodge, E to heal, and clearer enemy projectiles.</span>
-        <a href="/patch-notes#patch-003" target="_blank" rel="noopener">Read patch notes ↗</a>
+        <span><strong>Patch 004 is live — Power Under Pressure</strong> · Growing enemy threats, class-specific trees, Ranger ricochets and piercing, faster loot, and automatic Endless checkpoints. Flasks matter: stage rests are now partial.</span>
+        <a href="/patch-notes#patch-004" target="_blank" rel="noopener">Read patch notes ↗</a>
         <button type="button" class="quiet-button" data-dismiss-patch aria-label="Dismiss patch announcement">Dismiss</button>
     </aside>
     <p class="save-status" data-save-status role="status" aria-live="polite">Saves belong to your signed-in Windows account. Checkpoints save automatically; manual Save/Load is also available.</p>
@@ -51,6 +51,7 @@
                     </div>
                 </div>
                 <div class="arena-topline"><span><i class="live-dot"></i> <span data-stat="objective">Recover six dawns across 30 waves.</span></span><span>WAVE <strong data-stat="wave">&mdash;</strong> / <strong data-stat="last-wave">30</strong></span></div>
+                <div class="combat-pressure" data-stat="pressure" aria-label="Current combat pressure">Threat: awaiting a run</div>
                 <div class="arena-viewport">
                     <p class="health-warning" data-health-warning role="status" aria-live="polite"></p>
                     <canvas width="1100" height="650" tabindex="0" aria-label="Action RPG arena. WASD or arrows move. J or left click attacks. Q uses your manual skill. Space dodges, E drinks a flask, and P pauses. Up to two combat skills can cast automatically." aria-describedby="game-controls"></canvas>
@@ -79,11 +80,19 @@
                             <p class="eyebrow" data-overlay-kicker>SIX DAWNS / ONE LAST PROMISE</p>
                             <h2 data-overlay-title>One blade.<br />One last ember.</h2>
                             <p data-overlay-description>The king rang the Mourning Bell and the sun disappeared. Carry its last spark through six lands. Find your sister. Recover the dawn. Thirty waves, six bosses, then the Endless Watch.</p>
+                            <section class="death-report" data-death-report hidden aria-labelledby="death-report-title">
+                                <h3 id="death-report-title">What ended this run?</h3>
+                                <p data-killing-blow></p>
+                                <p>Recent health lost after armor and protection. Up to 12 hits from the last eight seconds of combat; healing is not subtracted.</p>
+                                <ol data-damage-history></ol>
+                                <small>Invulnerable hits are omitted. This report is session-only and clears when loading or starting a run.</small>
+                            </section>
                             <button type="button" class="ember-button" data-action="start" disabled>Begin the journey <span>&rarr;</span></button>
                             <button type="button" class="ember-button endless-button" data-action="endless" hidden>Enter the Endless Watch &rarr;</button>
                             <button type="button" class="quiet-button restart-button" data-action="restart" hidden>Abandon run &amp; restart</button>
                             <small class="unlock-note" data-stat="unlock">Complete the campaign to permanently unlock Endless Watch.</small>
                             <small class="checkpoint-note" data-stat="checkpoint-save"></small>
+                            <button type="button" class="ember-button checkpoint-retry" data-retry-save hidden>Retry checkpoint save</button>
                             <small data-loading role="status">Preparing the hollow...</small>
                         </div>
                     </div>
@@ -181,6 +190,12 @@
                     </div>
                     <p class="forge-feedback" data-skill-feedback role="status">Only special, burst, and ward skills use slots; no skill can occupy two slots. Regular attacks, dodge, and flasks are always manual. Unsaved changes require Save or the next checkpoint.</p>
                     <p class="skill-unlock-status" data-stat="ward-unlock-status"></p>
+                    <p>Reset one tree while paused for 100 gold + 50 per spent point. All points from that tree return; gold is spent permanently. Cooldowns stay unchanged and refunded effects end. Save to keep changes outside checkpoints.</p>
+                    <details class="elite-guide">
+                        <summary>Elite traits — appearing from wave 11</summary>
+                        <p>Some elites carry one trait, shown above their head with a colored symbol.</p>
+                        <ul><li>⬡ Armored: takes 20% less damage; no reflection.</li><li>» Swift: walks 18% faster; charges and attack warnings stay unchanged.</li><li>+ Mending: heals 1.5% maximum health per second; focus it down.</li></ul>
+                    </details>
                     <button type="button" class="ember-button" data-resume-combat disabled>Return to battle</button>
                     <div class="skill-tree-grid">
                         @foreach (var skill in new[] { "attack", "nova", "burst", "guard", "dodge", "potion" })
@@ -189,6 +204,7 @@
                                 <h3 data-skill-name="@skill">@skill</h3>
                                 <p data-skill-description="@skill"></p>
                                 <p class="tree-path">Hover or focus for details. On touch, tap to inspect, then tap again to learn. Each rank costs 1 point.</p>
+                                <button type="button" class="quiet-button tree-respec" data-respec-tree="@skill" disabled>Reset tree</button>
                                 <div class="skill-tree-map" role="group" aria-label="Upgrade branches">
                                     <svg class="tree-connections" viewBox="0 0 300 300" preserveAspectRatio="none" aria-hidden="true">
                                         <path data-tree-link="root-left" d="M150 40 L75 150" />
@@ -223,6 +239,7 @@
                     </div>
                     <button type="button" class="ember-button" data-resume-combat disabled>Return to battle</button>
                     <p class="forge-hint">Gold is your main upgrade source: select Forge to pause and buy ranks. Scrolls are rare elite/boss drops. Max every forge item to unlock unlimited stat training. Purchases at checkpoints autosave; elsewhere, use Save.</p>
+                    <p class="forge-hint">Previews show effective current → next values with your present buffs and loadout. Damage is a normal hit before enemy defenses or conditional bonuses; arrow repeats and critical hits are separate. CAPPED means further ranks cannot improve that stat. A capped forge purchase may still be needed to unlock training.</p>
                     <div class="forge-grid">
                         <button type="button" data-upgrade="weapon" disabled><strong>Sunsteel edge</strong><span>Weapon damage</span><small data-upgrade-label="weapon">Rank 0 / 50</small></button>
                         <button type="button" data-upgrade="armor" disabled><strong>Dawnplate</strong><span>Armor + max health</span><small data-upgrade-label="armor">Rank 0 / 12</small></button>

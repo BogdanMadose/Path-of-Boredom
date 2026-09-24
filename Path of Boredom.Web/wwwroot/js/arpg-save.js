@@ -4,6 +4,7 @@ import { LEVEL_CARDS } from "./arpg-cards.js";
 import { DIFFICULTIES } from "./arpg-difficulty.js";
 import { MASTERY, MAX_FLASKS } from "./arpg-engine.js";
 import { HERO_CLASSES } from "./arpg-classes.js";
+import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
 import { SKILL_KEYS, SLOTTABLE_SKILLS, TREE_NODES, skillPointsLeft, skillUnlocked, validLoadout } from "./arpg-skills.js";
 
 const playerNumbers = "x y radius facing health maxHealth level xp nextLevel damage weaponBonus potions attack nova dodge potion invulnerable rolling rollX rollY vx vy".split(" ");
@@ -39,9 +40,13 @@ function integer(value, min, max) {
 }
 
 export function restoreSnapshot(snapshot, random = Math.random) {
-    require([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(snapshot?.version));
+    require([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].includes(snapshot?.version));
     const saved = snapshot.state;
     const state = createState(random);
+    state.rankingPatch = snapshot.version < 13 ? "pre004" : saved.rankingPatch;
+    require(["004", "pre004"].includes(state.rankingPatch));
+    state.volleySequence = snapshot.version < 14 ? 2 : saved.volleySequence;
+    integer(state.volleySequence, 2, Number.MAX_SAFE_INTEGER);
     state.heroClass = snapshot.version < 7 ? "knight" : saved.heroClass;
     require(Object.hasOwn(HERO_CLASSES, state.heroClass));
     if (snapshot.version >= 7) {
@@ -51,6 +56,8 @@ export function restoreSnapshot(snapshot, random = Math.random) {
             integer(shot.piercing, 0, 1);
             shot.skill = snapshot.version < 9 ? shot.piercing ? "nova" : "attack" : item.skill;
             require(["attack", "nova", "burst"].includes(shot.skill));
+            shot.volley = snapshot.version < 14 ? shot.skill === "attack" ? 0 : shot.skill === "nova" ? 1 : 2 : item.volley;
+            integer(shot.volley, shot.skill === "attack" ? 0 : 1, shot.skill === "attack" ? 0 : state.volleySequence);
             return shot;
         });
         require(state.playerShots.length <= 48 && (state.heroClass === "ranger" || state.playerShots.length === 0));
@@ -182,6 +189,22 @@ export function restoreSnapshot(snapshot, random = Math.random) {
         require(enemy.chilled > 0 || enemy.chillStrength === 0);
         require(enemy.attackWindup >= 0 && enemy.attackWindup <= 1.1 && enemy.attackX >= 0 && enemy.attackX <= WIDTH && enemy.attackY >= 0 && enemy.attackY <= HEIGHT);
         integer(enemy.elite, 0, 1);
+        enemy.modifier = snapshot.version < 13 ? "none" : item.modifier;
+        require(typeof enemy.modifier === "string" && Object.hasOwn(ELITE_MODIFIERS, enemy.modifier));
+        require(enemy.modifier === "none" || enemy.elite === 1 && item.kind !== "boss" && state.wave >= 11);
+        const combat = snapshot.version < 14 ? { phase: 1, rest: 0, pattern: 1, volleys: [] } : item.combat;
+        enemy.combat = numbers(combat, ["phase", "rest", "pattern"]);
+        integer(enemy.combat.phase, 1, item.kind === "boss" ? 3 : 1);
+        integer(enemy.combat.pattern, 1, enemy.combat.phase);
+        require(enemy.combat.rest >= 0 && enemy.combat.rest <= (item.kind === "boss" ? 2 : 0));
+        require(!enemy.combat.rest || enemy.winding === 0 && enemy.attackWindup === 0);
+        enemy.combat.volleys = array(combat.volleys, entry => {
+            const hit = numbers(entry, ["volley", "hits"]);
+            integer(hit.volley, 1, state.volleySequence);
+            integer(hit.hits, 1, 3);
+            return hit;
+        });
+        require(enemy.combat.volleys.length <= 48 && new Set(enemy.combat.volleys.map(hit => hit.volley)).size === enemy.combat.volleys.length);
         require(enemy.charging >= 0 && enemy.charging <= (item.kind === "lancer" ? 1.2 : 0.45) && Math.abs(enemy.chargeX) <= 1 && Math.abs(enemy.chargeY) <= 1);
         require(ENEMY_KINDS.includes(item.kind));
         require(enemy.health > 0 && enemy.health <= enemy.maxHealth && enemy.radius > 0 && enemy.radius <= 100);
@@ -192,6 +215,8 @@ export function restoreSnapshot(snapshot, random = Math.random) {
     state.projectiles = array(saved.projectiles, item => {
         const projectile = numbers(item, projectileNumbers);
         require(projectile.life > 0 && projectile.life <= 3 && projectile.damage >= 0);
+        projectile.source = snapshot.version < 13 ? "Enemy projectile (older save)" : text(item.source);
+        require(projectile.source.trim().length > 0 && projectile.source.length <= 100 && !/[\x00-\x1f\x7f-\x9f]/.test(projectile.source));
         return projectile;
     });
     state.loot = array(saved.loot, item => {
@@ -215,15 +240,15 @@ export function restoreSnapshot(snapshot, random = Math.random) {
 
 export function captureSnapshot(state) {
     require(["playing", "paused", "camp", "won", "choosing"].includes(state.status));
-    const restored = restoreSnapshot({ version: 12, state: {
+    const restored = restoreSnapshot({ version: 14, state: {
         ...state,
         playerShots: state.playerShots.filter(shot => shot.life > 0),
         enemies: state.enemies.filter(enemy => enemy.health > 0),
         projectiles: state.projectiles.filter(projectile => projectile.life > 0),
         loot: state.loot.filter(drop => drop.life > 0)
     } });
-    const { random, effects, ...saved } = restored;
-    const snapshot = { version: 12, state: saved };
+    const { random, effects, damageHistory, ...saved } = restored;
+    const snapshot = { version: 14, state: saved };
     require(new TextEncoder().encode(JSON.stringify(snapshot)).length <= 64 * 1024);
     return snapshot;
 }

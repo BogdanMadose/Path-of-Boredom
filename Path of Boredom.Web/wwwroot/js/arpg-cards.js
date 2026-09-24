@@ -1,11 +1,11 @@
 import { skillUnlocked } from "./arpg-skills.js";
 
 export const LEVEL_CARDS = {
-    edge: { name: "Sunforged oath", category: "OFFENSE", max: Number.MAX_SAFE_INTEGER, description: "+5% weapon damage per rank, affecting your class attack and special. Stacks with your forge and blessings." },
+    edge: { name: "Sunforged oath", category: "OFFENSE", max: Number.MAX_SAFE_INTEGER, description: "+4% weapon damage per rank, affecting all damaging actions. Adds to the forge damage bonus instead of multiplying it." },
     vitality: { name: "Heart of the dawn", category: "SURVIVAL", max: Number.MAX_SAFE_INTEGER, description: "+16 maximum health and restore 16 health immediately. Each rank adds another 16." },
-    bulwark: { name: "Unbroken vow", category: "DEFENSE", max: 10, description: "+2.5 armor per rank. Combines with equipment and forge armor, up to the normal 65% reduction cap." },
+    bulwark: { name: "Unbroken vow", category: "DEFENSE", max: 10, description: "+1.5 armor per rank. Combines with equipment and forge armor, up to the 60% reduction cap." },
     stride: { name: "Wayfarer's instinct", category: "MOBILITY", max: 10, description: "+4% movement speed per rank, up to +40%. Stacks with Windwake; does not change dodge distance." },
-    focus: { name: "Quiet flame", category: "SKILLS", max: 10, description: "+5% skill cooldown recovery per rank, up to +50%. Affects your class attack, special, dodge, and flasks." },
+    focus: { name: "Quiet flame", category: "SKILLS", max: 10, description: "+5% skill cooldown recovery per rank, up to +50%. Global recovery from cards, training, and Windwake caps at twice normal." },
     nova: { name: "Widening sunrise", category: "NOVA", max: 10, description: "+10 ember nova radius per rank, up to +100. Stacks with Solar heart forge upgrades." },
     cleave: { name: "Horizon cutter", category: "CLEAVE", max: 10, description: "+6 cleave reach per rank, up to +60. Strike the horde before it reaches you." },
     harvest: { name: "Call of the fallen", category: "UTILITY", max: 10, description: "+16 loot attraction range per rank, up to +160. Works with the Gravetide blessing." },

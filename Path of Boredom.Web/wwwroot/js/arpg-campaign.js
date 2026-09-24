@@ -62,8 +62,8 @@ export const POWER_UPS = [
 ];
 
 export const UPGRADES = {
-    weapon: { name: "Sunsteel edge", max: 50, base: 45, detail: "+6 base damage and +8% total damage per rank" },
-    armor: { name: "Dawnplate", max: 12, base: 40, detail: "+5 armor and +12 max health per rank" },
+    weapon: { name: "Sunsteel edge", max: 50, base: 45, detail: "+3 base damage and +2.5% damage per rank, additive with damage cards" },
+    armor: { name: "Dawnplate", max: 12, base: 40, detail: "+3 armor and +12 max health per rank; total armor reduction caps at 60%" },
     cleave: { name: "Wide awakening", max: 8, base: 55, detail: "Wider, faster cleaves with improved damage" },
     nova: { name: "Solar heart", max: 8, base: 65, detail: "Larger, stronger novas with shorter cooldowns" },
     dodge: { name: "Ghoststep", max: 8, base: 40, detail: "Faster dodge recovery and longer invulnerability" },

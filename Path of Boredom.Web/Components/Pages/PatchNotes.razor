@@ -15,9 +15,101 @@
         <p>New threats, balance changes, buffs, nerfs, and fixes. Follow how the watch evolves.</p>
     </section>
 
+    <article id="patch-004" aria-labelledby="patch-004-title">
+        <header class="patch-heading">
+            <div class="patch-meta"><span class="badge">PATCH 004</span><span class="badge latest">LATEST</span><a href="/patch-notes#patch-004" target="_self" aria-label="Link to patch 004">Permalink ↗</a></div>
+            <h2 id="patch-004-title">Power Under Pressure</h2>
+            <p>A balance pass to keep growing characters powerful without making later stages effortless. Enemy progression, class identities, survival resources, and Endless pacing have been reworked.</p>
+            <div class="tags"><span>Balance</span><span>Class identity</span><span>Ranger</span><span>Survival</span><span>Loot</span><span>Endless</span></div>
+        </header>
+        <section class="patch-section">
+            <p class="eyebrow">COMBAT CLARITY &amp; FAIR DAMAGE</p><h3>Stronger decisions, clearer limits</h3>
+            <ul>
+                <li>Ranger special and burst casts now have independent per-target hit budgets: the first arrow hit retains full damage, the next two retain 25% each, and further hits from that cast deal no damage. Piercing follow-through shares this budget. Other enemies retain their own full first hit, preserving crowd clearing without point-blank boss deletion. Regular attacks and their single ricochet are unchanged.</li>
+                <li>Bosses advance phases at two-thirds and one-third health. Phase one uses slams; phase two alternates slams and aimed five-projectile fans; phase three adds an eight-projectile radial pattern. Phases never reverse when a boss is healed.</li>
+                <li>Every boss special has a 1.1-second matching warning and locked aim. After it resolves, bosses stop moving and attacking for 1.5 seconds, or two seconds after a radial pattern. Phase transitions add a 1.5-second opening. Already-fired projectiles remain dangerous during recovery.</li>
+                <li>Forge and post-forge buttons preview effective current → next damage, cooldowns, armor, health, healing, speed, critical stats, and reach as appropriate. Current buffs and automatic-slot cooldown penalties are included. Capped stats and purchases with no current stat gain are labeled rather than hidden; some capped forge ranks may still be needed to unlock training.</li>
+                <li>At 25% health or lower, an available flask briefly highlights. Drinking remains manual. Empty or cooling-down flasks do not flash, and reduced-motion mode uses a static highlight.</li>
+                <li>A fixed-height combat-pressure row shows stage, remaining enemies, elites, active elite traits, level-scaling status, and boss phase/recovery. Full text is available on hover without adding a click-blocking canvas overlay.</li>
+                <li>Failed checkpoint saves now expose a prominent <strong>Retry checkpoint save</strong> button inside the overlay. Retry uses the existing save protection against duplicate requests, preserves the character on failure, and advances Endless only after a successful save.</li>
+                <li>Save format 14 retains boss phase, warning pattern, recovery, and per-cast arrow hit budgets. Earlier formats remain loadable; saved in-flight arrows are grouped conservatively by skill when no cast identity exists.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">PATCH BOARDS &amp; BUILD EXPERIMENTS</p><h3>A fresh competition, room to rebuild</h3>
+            <ul>
+                <li>Rankings now default to <strong>Patch 004 — fresh runs</strong>. A patch filter exposes the archive without mixing it with new records. Difficulty, starting mode, and class remain separate within each patch.</li>
+                <li>Older records migrate to the archive with their scores, dates, and build snapshots intact. Older clients submit to that archive by default. Saves created before patch tracking remain inherited runs—even after entering Endless—so accumulated old power cannot enter the fresh-run boards. Start a new campaign or veteran Endless run to qualify for Patch 004.</li>
+                <li>Added a reset button to each skill tree: <strong>100 gold + 50 per spent point</strong>, so a fully trained tree costs 500 gold. Confirm while paused or at a checkpoint to refund that tree's points. Other trees, equipment, forge ranks, cards, and loadout remain unchanged; spent gold is not refunded.</li>
+                <li>Respecs preserve cooldowns and remove refunded active protection, regeneration, mobility effects, or arrows. Resetting a ward imposes its normal protection gap. Empty trees cannot be reset. Checkpoint changes autosave; elsewhere use Save or reach the next checkpoint.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">ELITE TRAITS &amp; DEATH REPORTS</p><h3>Read the threat, learn from the hit</h3>
+            <ul>
+                <li>From wave 11, eligible non-boss elites have a <strong>35% chance</strong> to gain one trait. No trait stacking: labels, symbols, and colored rings identify the threat, and the skills panel explains each trait.</li>
+                <li><strong>Armored:</strong> takes 20% less damage, without reflecting attacks. <strong>Swift:</strong> walks 18% faster, without speeding up charges or shortening warning animations. <strong>Mending:</strong> regenerates 1.5% maximum health per second while alive; concentrate damage to defeat it.</li>
+                <li>Summoned ordinary enemies do not inherit elite traits. Saving and loading retains the same traits without rerolling them.</li>
+                <li>Death now shows the killing blow plus up to 12 hits from the last eight seconds of combat. Reports identify melee strikes, projectiles, charges, slams, explosions, mortars, and ground hazards—including elite traits where applicable.</li>
+                <li>Reported damage is actual health lost after armor and protection, capped at remaining health on the lethal hit. Invulnerable hits are omitted; healing is not subtracted. Pauses do not age the log. Death history is session-only and clears on load or a new run; projectile attribution survives saving.</li>
+                <li>Save format 13 stores patch eligibility, elite traits, and projectile sources. Formats 1–12 remain supported; old enemies gain no retroactive traits and old projectiles use an explicit older-save source label.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">PROGRESSION &amp; ENEMIES</p><h3>Power with a worthy opponent</h3>
+            <ul>
+                <li>Newly spawned enemies scale with stage, Endless depth, and character levels above eight. Health grows faster than damage; walking-speed growth is bounded and attack warnings are unchanged. Existing enemies are not healed or strengthened mid-fight when you level up.</li>
+                <li>Enemy health scaling uses (1 + map index × 0.22) × (1 + Endless depth × 0.055 + (depth / 60)<sup>1.4</sup>) × (1 + levels above eight × 0.055)<sup>1.15</sup>. Campaign depth is zero; Endless depth counts waves beyond 30. Equipment, cards, forge purchases, and tree choices are not inputs to enemy scaling.</li>
+                <li>Enemy damage grows more gradually with stage, depth, and level, instead of following the health multiplier. Boss base health grows by 380 per map index instead of 650 before the new scaling; elite damage amplification falls from 40% to 30%. Enemy counts remain capped at 40.</li>
+                <li>Weapon forge ranks now add <strong>3 base damage and 2.5% damage</strong>, instead of 6 and 8%. Sunforged oath adds <strong>4%</strong> per rank instead of 5%; the percentage adds to the forge bonus rather than multiplying it.</li>
+                <li>Equipment ratings are preserved, but their damage contribution now follows 60 × (√(1 + rating / 30) − 1), preventing early relic drops from overwhelming every other upgrade. The equipment panel shows effective damage. Level-up damage, health, XP pacing, gold rewards, forge prices, and the 32-point tree budget are unchanged.</li>
+                <li>Reach caps: arrows 1,000 units; melee attacks 220; special and ward pulses 340; melee bursts 500. Area upgrades remain useful until their cap rather than eventually covering the entire arena.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">CLASS PARITY</p><h3>Three different strengths</h3>
+            <ul>
+                <li><strong>Ember Knight:</strong> attack interval 0.38s → 0.42s. Ember nova cooldown 5s → 6s, radius 190 → 175, damage 2.2× → 1.85×. Flame lance damage 2.4× → 2.1×. Still excels at close-range groups, but no longer clears them as cheaply.</li>
+                <li><strong>Dawn Ranger:</strong> attack interval 0.48s → 0.34s. Sunburst volley cooldown 6s → 5.5s and arrow damage 0.9× → 1.05×. Piercing rain cooldown 9s → 8s, arrow damage 1.1× → 1.15×, and each arrow now penetrates a second target by default.</li>
+                <li><strong>Iron Warden:</strong> innate armor 15% → 12%, attack interval 0.65s → 0.72s, reach 90 → 85. Iron quake cooldown 7s → 8s, radius 170 → 160, damage 2.8× → 2.2×. Fault line cooldown 10s → 11s, reach 280 → 250, damage 3.2× → 2.6×. Iron bastion pulse damage 1.2× → 1×. High base health remains its strength.</li>
+                <li>Attack and special forge cooldown bonuses are 7% per rank instead of 12%. Melee special forge damage adds 0.12× per rank instead of 0.25×; Ranger retains 0.1×. Forge cleaves widen more slowly, preserving directional positioning.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">CLASS SKILL TREES</p><h3>Ember, briar, and iron</h3>
+            <ul>
+                <li>Every class has its own node names and visual theme: circular ember paths for Knight, angular jade paths for Ranger, and heavy steel-blue nodes for Warden. Offensive effects use the class palette; Ranger arrows no longer inherit generic fire effects.</li>
+                <li><strong>Knight:</strong> Backdraft replaces special-hit slowing with 16 units of knockback per rank, halved for bosses. Searing thrust adds 25% Flame lance damage against targets at or below half health. Cinder reprisal doubles the ward's opening damage instead of pushing enemies. Sunfire and regular-attack finishing remain.</li>
+                <li><strong>Ranger:</strong> Trickshot makes Dawn shot ricochet once to a different living enemy within 180 units for 60% damage. Bodkin volley makes each special arrow penetrate one extra target. Deep penetration lets each Piercing rain arrow penetrate two extra targets instead of one.</li>
+                <li>Piercing follow-through resolves along the arrow's remaining path at impact, retaining 70% damage per extra target. Ricochet and piercing tracers show the hit paths. One arrow cannot loop back into the same target. Briar snare combines ward knockback with a 15% walking slow for 1.5s; charges remain unaffected.</li>
+                <li><strong>Warden:</strong> Shieldbreaker bypasses Sentinel resistance and adds 25% regular-attack damage against Sentinels. Seismic core adds 25% Iron quake damage inside half its radius. Crushing force adds 12% Fault line damage per rank against slowed targets, replacing extra critical chance. Bulldozer pushes enemies 100 units, or bosses 50.</li>
+                <li>Existing node ranks and prerequisites are retained in the corresponding class branches. One point every two levels, 32 points maximum; all trees still cost eight points to complete. Defensive and recovery foundations remain shared where they serve the same purpose.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">HEALTH &amp; FLASKS</p><h3>Survival is part of the build</h3>
+            <ul>
+                <li>Armor reduction caps at <strong>60%</strong> instead of 65%. Equipment contributes 60% of its armor rating, forge ranks add 3 armor instead of 5, and Unbroken vow adds 1.5 instead of 2.5 per rank. Existing health investments are preserved.</li>
+                <li>Global cooldown recovery from cards, training, and Windwake caps at twice normal. Dodge recharge has a 0.9-second minimum at that cap, preventing permanent invulnerability. Class wards cannot refresh while active and leave at least two seconds without ward protection after expiry.</li>
+                <li>Every five-wave checkpoint restores <strong>20% maximum health before difficulty healing penalties</strong> and grants <strong>two flask charges</strong>, up to five. Removed the duplicate full heal/refill on entering a stage. Campaign victory uses the same recovery rule.</li>
+                <li>Random flask drops fall from 7% to 3%; bosses still guarantee a flask. Picking up a flask with full charges heals 8% maximum health before difficulty penalties instead of a full flask's worth. Flask healing upgrades, emergency-healing nodes, and regeneration remain valuable.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">LOOT &amp; ENDLESS FLOW</p><h3>Collect, save, keep fighting</h3>
+            <ul>
+                <li>Attracted loot moves at 1,200 + 6 × distance units/second instead of 230. Attraction range and its upgrades remain intact. Loot no longer expires while waiting to be collected.</li>
+                <li>All remaining drops are applied before every five-wave checkpoint save. The loot-count safety limit collects real rewards—including equipment and upgrade scrolls—instead of converting non-gold overflow into generic gold.</li>
+                <li>Endless saves at every completed five-wave stage, then automatically begins the three-second travel countdown. No Continue button is required. Pause and the forge remain available during play.</li>
+                <li>If a checkpoint save fails, progression stays safely stopped: use Save to retry. Loading an Endless checkpoint prepares travel but waits for Resume. Hidden or unfocused tabs stay paused after saving. Campaign travel still uses its normal confirmation.</li>
+                <li>Existing saves, inventory, learned ranks, and class ranking records are retained. Updated formulas apply to existing heroes immediately; newly spawned enemies use the new scaling. Historical leaderboard builds remain snapshots of their original submissions, not recalculated Patch 004 records.</li>
+            </ul>
+        </section>
+    </article>
+
     <article id="patch-003" aria-labelledby="patch-003-title">
         <header class="patch-heading">
-            <div class="patch-meta"><span class="badge">PATCH 003</span><span class="badge latest">LATEST</span><a href="/patch-notes#patch-003" target="_self" aria-label="Link to patch 003">Permalink ↗</a></div>
+            <div class="patch-meta"><span class="badge">PATCH 003</span><a href="/patch-notes#patch-003" target="_self" aria-label="Link to patch 003">Permalink ↗</a></div>
             <h2 id="patch-003-title">Paths of Power</h2>
             <p>New skills and branching trees, more rewarding battles, independent forge prices, and a more readable Endless Watch.</p>
             <div class="tags"><span>Skills &amp; trees</span><span>New enemies</span><span>Endless fixes</span><span>Reward buffs</span><span>Forge</span><span>Critical hits</span></div>

@@ -1,12 +1,15 @@
 import { WIDTH, HEIGHT, createState, startRun, startEndlessRun, step, togglePause, useSkill, weaponDamage, armorRating, upgradeCost, buyUpgrade, continueJourney, enterEndless, chooseLevelCard } from "./arpg-engine.js";
 import { captureSnapshot, restoreSnapshot } from "./arpg-save.js";
 import { captureRankingBuild } from "./arpg-ranking.js";
+import { upgradePreview } from "./arpg-upgrade-preview.js";
 import { MAPS, LAST_WAVE, UPGRADES, POWER_UPS, threatForWave, mapForWave, mapIndexForWave, firePhase } from "./arpg-campaign.js";
 import { LEVEL_CARDS } from "./arpg-cards.js";
 import { DIFFICULTIES } from "./arpg-difficulty.js";
 import { MASTERY, MAX_FLASKS, forgeComplete, masteryCost, buyMastery, chargeLaneEnd } from "./arpg-engine.js";
 import { movementSpeed, criticalChance, criticalDamage, skillReach } from "./arpg-engine.js";
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
+import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
+import { treePointsSpent, treeRespecCost, canRespecTree, respecTree } from "./arpg-skills.js";
 import { SKILL_KEYS, SLOTTABLE_SKILLS, EXTRA_SKILLS, MAX_SKILL_POINTS, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
 import { drawHero, drawOrb, decorateFloor, drawAtmosphere, drawLootIcon } from "./arpg-graphics.js";
 
@@ -302,10 +305,11 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
         ctx.restore();
     }
     if (actor.elite) {
-        ctx.strokeStyle = "#f1cd76"; ctx.lineWidth = 2;
+        const modifier = ELITE_MODIFIERS[actor.modifier ?? "none"];
+        ctx.strokeStyle = modifier.color; ctx.lineWidth = actor.modifier === "armored" ? 4 : 2;
         ctx.beginPath(); ctx.arc(actor.x, actor.y, r + 6, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = "#f1cd76"; ctx.font = "9px 'Segoe UI', sans-serif"; ctx.textAlign = "center";
-        ctx.fillText("ELITE", actor.x, actor.y - r - 26);
+        ctx.fillStyle = modifier.color; ctx.font = "bold 10px 'Segoe UI', sans-serif"; ctx.textAlign = "center";
+        ctx.fillText(`${modifier.icon} ${modifier.name.toUpperCase()}`, actor.x, actor.y - r - 26);
     }
     if (!hero && actor.health < actor.maxHealth) {
         ctx.fillStyle = "#070b0dc9";
@@ -366,7 +370,33 @@ function render(ctx, floor, state) {
             ctx.fillText(enemy.kind === "artillerist" ? "MORTAR — MOVE" : ranged ? "CASTING" : "STRIKE", enemy.kind === "artillerist" ? enemy.attackX : enemy.x, (enemy.kind === "artillerist" ? enemy.attackY - 100 : enemy.y - enemy.radius - 28));
             ctx.restore();
         }
+        if (enemy.kind === "boss" && enemy.combat.rest > 0) {
+            ctx.save(); ctx.fillStyle = "#9de8ad"; ctx.textAlign = "center"; ctx.font = "bold 11px 'Segoe UI', sans-serif";
+            ctx.fillText("RECOVERING — ATTACK", enemy.x, enemy.y - enemy.radius - 30); ctx.restore();
+        }
         if (enemy.winding <= 0) continue;
+        if (enemy.kind === "boss") {
+            ctx.save();
+            const pattern = enemy.combat.pattern;
+            const angle = Math.atan2(enemy.attackY - enemy.y, enemy.attackX - enemy.x);
+            const color = pattern === 1 ? "#ff956f" : pattern === 2 ? "#ffdc86" : "#d6adff";
+            ctx.strokeStyle = color; ctx.fillStyle = color + "33"; ctx.lineWidth = 3;
+            if (pattern === 1) {
+                ctx.beginPath(); ctx.arc(enemy.x, enemy.y, 135, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            } else if (pattern === 2) {
+                ctx.beginPath(); ctx.moveTo(enemy.x, enemy.y); ctx.arc(enemy.x, enemy.y, 210, angle - 0.65, angle + 0.65); ctx.closePath(); ctx.fill(); ctx.stroke();
+            } else {
+                for (let i = 0; i < 8; i++) {
+                    const ray = angle + i * Math.PI / 4;
+                    ctx.beginPath(); ctx.moveTo(enemy.x + Math.cos(ray) * 40, enemy.y + Math.sin(ray) * 40);
+                    ctx.lineTo(enemy.x + Math.cos(ray) * 150, enemy.y + Math.sin(ray) * 150); ctx.stroke();
+                }
+            }
+            ctx.fillStyle = color; ctx.textAlign = "center"; ctx.font = "bold 11px 'Segoe UI', sans-serif";
+            ctx.fillText(pattern === 1 ? "SLAM — MOVE OUT" : pattern === 2 ? "FAN — STEP ASIDE" : "RING — FIND A GAP", enemy.x, enemy.y - enemy.radius - 35);
+            ctx.restore();
+            continue;
+        }
         if (enemy.kind === "lancer") {
             const end = chargeLaneEnd(enemy);
             ctx.save();
@@ -425,10 +455,11 @@ function render(ctx, floor, state) {
         ctx.save();
         ctx.translate(shot.x, shot.y); ctx.rotate(Math.atan2(shot.vy, shot.vx));
         const nodes = state.skillTree[shot.skill || "attack"];
-        const ignited = shot.skill === "nova" && nodes.ignition > 0;
-        ctx.strokeStyle = ignited ? "#ff973c" : shot.skill === "burst" ? "#c8a6ff" : shot.piercing ? "#ffe7a5" : "#b8edc5";
+        const penetrating = shot.skill === "burst" || shot.skill === "nova" && nodes.ignition > 0;
+        ctx.strokeStyle = penetrating ? "#d1ff95" : "#8fefbd";
         ctx.lineWidth = 2 + (nodes.edge ?? nodes.amplitude ?? nodes.focus ?? 0) * 0.6;
-        if (ignited) { circle(ctx, -12, 0, 5, "#ff8b3277"); circle(ctx, -21, 0, 3, "#ffda78"); }
+        if (penetrating) { ctx.beginPath(); ctx.moveTo(-28, 0); ctx.lineTo(-18, 0); ctx.moveTo(-5, -6); ctx.lineTo(2, 0); ctx.lineTo(-5, 6); ctx.stroke(); }
+        if (shot.skill === "attack" && nodes.execution) { ctx.beginPath(); ctx.moveTo(-12, -8); ctx.lineTo(-5, -5); ctx.lineTo(-12, -2); ctx.stroke(); }
         ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(5, 0); ctx.moveTo(0, -4); ctx.lineTo(5, 0); ctx.lineTo(0, 4); ctx.stroke();
         if (nodes.sweep || nodes.resonance) { ctx.beginPath(); ctx.moveTo(-14, -5); ctx.lineTo(-4, -5); ctx.moveTo(-14, 5); ctx.lineTo(-4, 5); ctx.stroke(); }
         if (nodes.rhythm) { ctx.strokeStyle = "#deebf0"; ctx.beginPath(); ctx.moveTo(-25, -3); ctx.lineTo(-18, -3); ctx.moveTo(-25, 3); ctx.lineTo(-18, 3); ctx.stroke(); }
@@ -647,6 +678,8 @@ export function createGame(root, saveBridge = null) {
     let shownStatus = "ready";
     let disposed = false;
     let saving = false;
+    let checkpointSaveFailed = false;
+    const retrySave = root.querySelector("[data-retry-save]");
     let checkingUnlock = !!saveBridge;
     let endlessUnlocked = false;
     let checkpointHandled = null;
@@ -681,7 +714,7 @@ export function createGame(root, saveBridge = null) {
     const skillUnlockNotice = root.querySelector("[data-skill-unlock]");
     const skillFeedback = root.querySelector("[data-skill-feedback]");
     const patchNotice = root.querySelector("[data-patch-notice]");
-    const patchPreference = `path-of-boredom.patch-003:${root.dataset.player || "unknown"}`;
+    const patchPreference = `path-of-boredom.patch-004:${root.dataset.player || "unknown"}`;
     try { patchNotice.hidden = localStorage.getItem(patchPreference) === "seen"; } catch { /* Announcements work without storage. */ }
     on(root.querySelector("[data-dismiss-patch]"), "click", () => {
         patchNotice.hidden = true;
@@ -763,12 +796,12 @@ export function createGame(root, saveBridge = null) {
     async function reportScore() {
         if (!saveBridge || disposed) return;
         if (state.status !== "ready" && state.rankingMode !== "legacy" && Object.hasOwn(DIFFICULTIES, state.difficulty)) {
-            const key = `${state.difficulty}:${state.rankingMode}:${state.heroClass}`;
+            const key = `${state.rankingPatch}:${state.difficulty}:${state.rankingMode}:${state.heroClass}`;
             const score = state.kills - state.scoreBaseline;
             if (score > (reportedScores.get(key) ?? -1)) {
                 const previous = pendingScores.get(key);
                 if (!previous || score > previous.score) {
-                    pendingScores.set(key, { difficulty: state.difficulty, mode: state.rankingMode, score, heroClass: state.heroClass, build: captureRankingBuild(state) });
+                    pendingScores.set(key, { difficulty: state.difficulty, mode: state.rankingMode, score, heroClass: state.heroClass, build: captureRankingBuild(state), patch: state.rankingPatch });
                 }
             }
         }
@@ -783,7 +816,7 @@ export function createGame(root, saveBridge = null) {
                 reportedScores.set(key, Math.max(submission.score, reportedScores.get(key) ?? 0));
                 if (pendingScores.get(key) === submission) pendingScores.delete(key);
             }
-            rankingStatus.textContent = "Class best synced with its upgrades. Rankings are separated by class, difficulty, and starting mode.";
+            rankingStatus.textContent = `Class best synced with its upgrades. Board: ${state.rankingPatch === "004" ? "Patch 004" : "archive / inherited run"}. Rankings also separate class, difficulty, and starting mode.`;
         } catch {
             if (!disposed) rankingStatus.textContent = "Score sync failed. Keep this page open; it will retry automatically.";
         } finally { reporting = false; }
@@ -958,9 +991,9 @@ export function createGame(root, saveBridge = null) {
         const extra = EXTRA_SKILLS[state.heroClass];
         const descriptions = {
             attack: `${hero.attackCooldown}s base cooldown. Regular attack: always available on J / left click, no slot required. Upgrades remain active.`,
-            nova: `${hero.specialCooldown}s base cooldown. ${ranged ? "Five-arrow fan; each arrow hits once." : "A damaging pulse around you."}`,
-            burst: `${extra.burst.cooldown}s base cooldown. ${extra.burst.shape === "beam" ? "A narrow lance strikes every enemy along its line." : extra.burst.shape === "arrows" ? "Seven shield-piercing arrows; each hits once." : "A heavy cone crushes enemies ahead."}`,
-            guard: `${extra.guard.cooldown}s base cooldown. A damaging ward pulse grants 40% damage reduction for at least 3s.`,
+            nova: `${hero.specialCooldown}s base cooldown. ${ranged ? "Five-arrow fan. Bodkin volley adds a second target per arrow at 70% damage." : state.heroClass === "knight" ? "A fire pulse; Backdraft pushes survivors away." : "A seismic pulse; train its inner core and slow to set up Fault line."}`,
+            burst: `${extra.burst.cooldown}s base cooldown. ${extra.burst.shape === "beam" ? "A narrow lance strikes every enemy along its line." : extra.burst.shape === "arrows" ? "Seven arrows, each penetrating a second target at 70% damage. Deep penetration adds a third." : "A heavy cone; Crushing force rewards hitting slowed enemies."}`,
+            guard: `${extra.guard.cooldown}s base cooldown. Grants 40% damage reduction for at least 3s. Cannot refresh while active; at least 2s without protection after expiry.`,
             dodge: "Directional evasion on Space. Always available without a slot; manual-only.",
             potion: "Press E to consume one flask and heal. Always available without a slot; manual-only."
         };
@@ -985,6 +1018,7 @@ export function createGame(root, saveBridge = null) {
             const slotLabel = locked ? "STAGE 3" : skill === "attack" ? "J / CLICK" : skill === "dodge" ? "SPACE" : skill === "potion" ? "E" : manual ? "Q" : automatic ? "AUTO ×1.6" : "UNSLOTTED";
             if (button.querySelector("[data-slot-label]").textContent !== slotLabel) button.querySelector("[data-slot-label]").textContent = slotLabel;
             button.classList.toggle("skill-cooling", p[skill] > 0);
+            button.classList.toggle("flask-needed", skill === "potion" && critical && p.potions > 0 && p.potion === 0 && !setupAction && !saving);
             button.title = locked ? wardUnlockHint(state) : !manual ? automatic ? "Automatic casting: 60% longer cooldown" : "Assign a slot in Skills & loadout" : unavailable ? "Combat is paused or counting down" : cannotHeal ? p.potions === 0 ? "No flask charges left" : "Health is already full"
                 : p[skill] > 0 ? `Recovering: ${p[skill].toFixed(1)}s` : "Ready";
         }
@@ -1003,6 +1037,16 @@ export function createGame(root, saveBridge = null) {
         const dawns = state.campaignComplete ? 6 : Math.floor(Math.max(0, state.wave - (state.enemies.some(enemy => enemy.health > 0) ? 1 : 0)) / 5);
         text("dawns", `${dawns} / 6 dawns recovered`);
         text("threat", threatForWave(state.wave));
+        const living = state.enemies.filter(enemy => enemy.health > 0);
+        const boss = living.find(enemy => enemy.kind === "boss");
+        const traits = Object.entries(ELITE_MODIFIERS).filter(([key]) => key !== "none")
+            .map(([key, value]) => [value.name, living.filter(enemy => enemy.modifier === key).length]).filter(([, count]) => count > 0);
+        const pressure = state.wave === 0 ? "Threat: awaiting a run" : `Stage ${Math.ceil((state.mode === "endless" ? Math.max(1, state.wave - LAST_WAVE) : state.wave) / 5)} · ${living.length} enemies · ${living.filter(enemy => enemy.elite).length} elites`
+            + (boss ? ` · Boss phase ${boss.combat.phase}${boss.combat.rest > 0 ? " — recovery window" : ""}` : "")
+            + (traits.length ? ` · ${traits.map(([name, count]) => `${name} ×${count}`).join(" / ")}` : "")
+            + (state.player.level > 8 ? " · Level scaling active" : "");
+        text("pressure", pressure);
+        stats.pressure.title = pressure;
         const acquired = Object.entries(state.boons).filter(([, rank]) => rank > 0);
         text("boon-count", acquired.reduce((total, [, rank]) => total + rank, 0));
         text("boons", acquired.length ? acquired.map(([key, rank]) => `${LEVEL_CARDS[key].name} x${rank}`).join(" / ") : "Level up to choose your first lasting boon.");
@@ -1019,11 +1063,11 @@ export function createGame(root, saveBridge = null) {
         text("kills", state.kills);
         text("damage", weaponDamage(state));
         text("armor-name", p.armor);
-        text("armor-detail", `${armorRating(state)}% damage reduction (cap 65%)`);
+        text("armor-detail", `${armorRating(state).toFixed(1)}% damage reduction (cap 60%)`);
         text("forge-gold", `${state.gold} gold`);
         text("checkpoint-save", ["camp", "won"].includes(state.status) ? saveStatus.textContent : "");
         text("weapon", p.weapon);
-        text("weapon-detail", `Relic +${p.weaponBonus} / Forge rank ${state.upgrades.weapon}`);
+        text("weapon-detail", `Relic rating ${p.weaponBonus} (+${Math.round(60 * (Math.sqrt(1 + p.weaponBonus / 30) - 1))} damage) / Forge rank ${state.upgrades.weapon}`);
         text("unlock", checkingUnlock ? "Checking server unlock..." : endlessUnlocked ? "Endless Watch permanently unlocked on this server profile." : state.status === "won" ? (saving ? "Saving your permanent Endless unlock..." : "Endless is available now. Save successfully to keep the unlock permanently.") : "Complete the campaign to permanently unlock Endless Watch.");
         const activePowers = POWER_UPS.filter(power => state.buffs[power.key] > 0);
         text("buffs", activePowers.length ? activePowers.map(power => `${power.name}: ${Math.ceil(state.buffs[power.key])}s`).join(" / ") : "No active power-ups");
@@ -1031,7 +1075,7 @@ export function createGame(root, saveBridge = null) {
         for (const skill of SKILL_KEYS) text(skill, !skillUnlocked(state, skill) ? "Locked" : skill === "potion" ? `${p.potions}/${MAX_FLASKS} · ${p.potion > 0 ? `${p.potion.toFixed(1)}s` : "Ready"}` : p[skill] > 0 ? `${p[skill].toFixed(1)}s` : "Ready");
         text("objective", state.status === "ready" ? `Survive ${LAST_WAVE} waves across ${MAPS.length} lands.`
             : state.status === "won" ? "Dawn restored. The Endless Watch is unlocked."
-            : state.status === "camp" ? "Checkpoint reached. Rest and forge before continuing."
+            : state.status === "camp" ? state.mode === "endless" ? "Stage cleared — save checkpoint, then auto-advance. Save retries a failed checkpoint." : "Checkpoint reached. Loot collected, partial healing and two flask charges granted."
             : state.status === "choosing" ? `Level up! Choose a lasting boon (${state.pendingChoices} choice${state.pendingChoices === 1 ? "" : "s"} remaining).`
             : state.status === "dead" ? "Your ember has faded."
             : state.status === "paused" ? "Rest a moment, Ashbound."
@@ -1047,17 +1091,28 @@ export function createGame(root, saveBridge = null) {
         overlay.hidden = !!setupAction || state.status === "playing" && !draftClosing;
         const active = ["playing", "paused", "camp", "won", "choosing"].includes(state.status);
         const canForge = !setupAction && ["paused", "camp", "won"].includes(state.status);
+        retrySave.hidden = !checkpointSaveFailed || !["camp", "won"].includes(state.status) || !!setupAction;
+        retrySave.disabled = saving || checkingUnlock || !saveBridge;
+        retrySave.textContent = saving ? "Retrying checkpoint save…" : "Retry checkpoint save";
         const wardUnlocked = skillUnlocked(state, "guard");
         const remindWard = wardUnlocked && !state.wardUnlockSeen;
         text("ward-unlock-status", wardUnlocked ? `${skillName(state, "guard")} unlocked — choose Q or an auto slot to equip it.` : `${skillName(state, "guard")}: ${wardUnlockHint(state)}.`);
         text("skill-unlock-hint", `${skillName(state, "guard")} unlocked! Slot your new skill.`);
         skillUnlockNotice.hidden = !remindWard || state.status !== "playing" || state.resumeDelay > 0 || draftClosing || !!setupAction;
         for (const button of root.querySelectorAll("[data-resume-combat]")) {
+            button.hidden = state.mode === "endless" && state.status === "camp";
             button.disabled = saving || !!setupAction || !["paused", "camp"].includes(state.status);
             button.textContent = state.status === "camp" ? "Travel to next stage" : "Return to battle";
         }
         openSkills.disabled = saving || !!setupAction || !active || choosing;
         text("skill-points", `${skillPointsLeft(state)} points available · ${skillPointsEarned(state)}/${MAX_SKILL_POINTS} earned`);
+        for (const button of root.querySelectorAll("[data-respec-tree]")) {
+            const skill = button.dataset.respecTree;
+            const points = treePointsSpent(state, skill), cost = treeRespecCost(state, skill);
+            button.textContent = points ? `Reset tree · ${cost} gold · refund ${points} points` : "No points to refund";
+            button.disabled = saving || !!setupAction || !canRespecTree(state, skill);
+            button.title = points ? `Reset ${skillName(state, skill)} only. Requires ${cost} gold; ${state.gold} available. Cooldowns remain; refunded effects end.` : "Learn an upgrade before resetting this tree.";
+        }
         openSkills.classList.toggle("forge-available", active && (skillPointsLeft(state) > 0 || remindWard));
         for (const select of loadoutSelects) {
             const slot = Number(select.dataset.loadoutSlot);
@@ -1084,6 +1139,7 @@ export function createGame(root, saveBridge = null) {
             button.classList.toggle("available", available);
         }
         for (const tree of root.querySelectorAll("[data-tree-skill]")) {
+            tree.dataset.heroClass = state.heroClass;
             const skill = tree.dataset.treeSkill, nodes = state.skillTree[skill];
             tree.classList.toggle("tree-locked", !skillUnlocked(state, skill));
             for (const link of tree.querySelectorAll("[data-tree-link]")) {
@@ -1097,6 +1153,7 @@ export function createGame(root, saveBridge = null) {
         combatPause.textContent = state.status === "paused" ? "Resume" : "Pause";
         focusViewButton.disabled = !!setupAction;
         recenterButton.disabled = !!setupAction;
+        startButton.hidden = state.mode === "endless" && state.status === "camp";
         startButton.disabled = saving || choosing || !!setupAction;
         restartButton.disabled = saving || choosing || !!setupAction;
         endlessButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
@@ -1121,6 +1178,7 @@ export function createGame(root, saveBridge = null) {
             button.querySelector("[data-mastery-label]").textContent = `Rank ${state.mastery[key]} / ${cost.toLocaleString()} gold`;
             button.disabled = saving || !canForge || !completedForge || state.gold < cost || !Number.isFinite(cost);
             button.title = MASTERY[key].detail;
+            if (canForge && completedForge) showUpgradePreview(button, key, true);
         }
         if (choosing !== draftVisible) {
             draftVisible = choosing;
@@ -1176,11 +1234,28 @@ export function createGame(root, saveBridge = null) {
                 : key === "nova" ? `Improves ${hero.specialName}: damage, range and recovery.` : UPGRADES[key].detail;
             button.disabled = saving || !canForge || !skillUnlocked(state, key) || rank >= max || state.gold < cost;
             if (!skillUnlocked(state, key)) button.title = wardUnlockHint(state);
+            if (canForge && skillUnlocked(state, key) && rank < max) showUpgradePreview(button, key);
+            else if (button.querySelector("[data-upgrade-preview]")) button.querySelector("[data-upgrade-preview]").textContent = rank >= max ? "Fully forged" : "";
         }
         if (saveButton) saveButton.disabled = saving || checkingUnlock || !saveBridge || !active || !!setupAction;
         if (loadButton) loadButton.disabled = saving || checkingUnlock || !saveBridge || !!setupAction;
         pauseButton.firstChild.textContent = state.status === "paused" ? "Resume " : "Pause ";
         if (state.status !== shownStatus) {
+            const report = root.querySelector("[data-death-report]");
+            report.hidden = state.status !== "dead";
+            if (state.status === "dead") {
+                const fatal = state.damageHistory.findLast(hit => hit.lethal);
+                root.querySelector("[data-killing-blow]").textContent = fatal
+                    ? `Killing blow: ${fatal.source} — ${fatal.damage.toFixed(1)} health lost.` : "Damage source unavailable.";
+                const list = root.querySelector("[data-damage-history]");
+                list.replaceChildren();
+                for (const hit of [...state.damageHistory].reverse()) {
+                    const item = document.createElement("li");
+                    item.textContent = `${hit.lethal ? "FATAL" : `${hit.age.toFixed(1)}s earlier`} · ${hit.source} · ${hit.damage.toFixed(1)} health`;
+                    if (hit.lethal) item.classList.add("fatal-hit");
+                    list.append(item);
+                }
+            }
             if (state.status === "playing" && shownStatus !== "choosing") scheduleArenaLayout(true);
             if (["paused", "camp", "won", "dead"].includes(state.status)) void reportScore();
             shownStatus = state.status;
@@ -1197,12 +1272,25 @@ export function createGame(root, saveBridge = null) {
                 kicker.textContent = paused ? "A MOMENT OF RESPITE" : won ? "ALL SIX DAWNS RESTORED" : camp ? (watch ? "WATCH CHECKPOINT" : `DAWN ${dawns} RECOVERED`) : "THE WATCH REMEMBERS";
                 title.textContent = paused ? "The hollow can wait." : won ? "A dawn of our own." : camp ? (watch ? "The watch endures." : `${map.boss} has fallen.`) : "Your ember fades.";
                 description.textContent = paused ? "Your run is paused. Spend gold at the forge below, save your progress, or return to battle."
-                    : camp || won ? (watch ? `Echo ${state.wave - LAST_WAVE} cleared. Vitality and flasks restored. Your checkpoint saves automatically. The next watch will be harder.` : map.ending)
+                    : camp || won ? (watch ? `Echo ${state.wave - LAST_WAVE} cleared. All loot collected, partial healing and two flask charges granted. Saving this stage, then continuing automatically. If saving fails, use Save to retry.` : map.ending)
                     : `${state.kills} enemies slain / ${state.gold} gold / Level ${p.level}. ${watch ? "Load your last checkpoint, or begin a fresh watch." : "Forge your equipment, dodge warning zones, and seek fallen upgrade scrolls."}`;
                 startButton.textContent = paused ? "Return to battle" : camp ? (watch ? "Continue the watch" : `Travel to ${mapForWave(state.wave + 1).name}`) : "Begin a new campaign";
-                if (!setupAction) (won ? endlessButton : startButton).focus({ preventScroll: true });
+                if (!setupAction && !(camp && watch)) (won ? endlessButton : startButton).focus({ preventScroll: true });
             }
         }
+    }
+    function showUpgradePreview(button, key, mastery = false) {
+        const preview = upgradePreview(state, key, mastery);
+        let label = button.querySelector("[data-upgrade-preview]");
+        if (!label) {
+            label = document.createElement("span");
+            label.dataset.upgradePreview = "";
+            label.className = "upgrade-preview";
+            button.append(label);
+        }
+        if (label.textContent !== preview.text) label.textContent = preview.text;
+        button.classList.toggle("at-stat-cap", preview.capped);
+        button.title += ` ${preview.text}`;
     }
     function pause() {
         if (saving || setupAction) return;
@@ -1282,6 +1370,16 @@ export function createGame(root, saveBridge = null) {
             if (["camp", "won"].includes(state.status)) void persist(false, true);
         });
     }
+    for (const button of root.querySelectorAll("[data-respec-tree]")) on(button, "click", () => {
+        const skill = button.dataset.respecTree;
+        if (saving || setupAction || !canRespecTree(state, skill)) return;
+        if (!window.confirm(`Reset ${skillName(state, skill)} for ${treeRespecCost(state, skill)} gold and refund ${treePointsSpent(state, skill)} points? Other trees stay unchanged. Cooldowns remain and this tree's active effects end.`)) return;
+        if (!respecTree(state, skill)) return;
+        skillFeedback.textContent = `${state.journal} Save or reach a checkpoint to keep this change.`;
+        clearInput();
+        updateHud();
+        if (["camp", "won"].includes(state.status)) void persist(false, true);
+    });
     for (const button of root.querySelectorAll("[data-resume-combat]")) on(button, "click", begin);
     on(forgeButton, "click", () => {
         if (saving || setupAction || state.status === "choosing") return;
@@ -1316,7 +1414,9 @@ export function createGame(root, saveBridge = null) {
     async function persist(loadingSave, automatic = false) {
         if (saving || checkingUnlock || setupAction) return;
         if (!saveBridge) {
+            checkpointSaveFailed = ["camp", "won"].includes(state.status);
             saveStatus.textContent = "Checkpoint autosave unavailable. Reconnect to Blazor and select Save before leaving.";
+            updateHud();
             return;
         }
         if (loadingSave && ["playing", "paused", "camp", "won", "choosing"].includes(state.status)
@@ -1324,6 +1424,7 @@ export function createGame(root, saveBridge = null) {
         if (state.status === "playing") pause();
         clearInput();
         saving = true;
+        let advanceEndless = false;
         saveStatus.textContent = loadingSave ? "Loading from the server..." : automatic ? "Autosaving checkpoint to the server..." : "Saving to the server...";
         updateHud();
         try {
@@ -1332,29 +1433,45 @@ export function createGame(root, saveBridge = null) {
                 : await saveBridge.invokeMethodAsync("SaveRun", captureSnapshot(state));
             if (disposed) return;
             if (result.success) endlessUnlocked = endlessUnlocked || result.endlessUnlocked || result.save?.endlessUnlocked || result.save?.state?.campaignComplete === 1;
+            if (!loadingSave && ["camp", "won"].includes(state.status)) checkpointSaveFailed = !result.success;
             if (result.success && loadingSave) {
                 const restored = restoreSnapshot(result.save);
                 void reportScore();
                 state = restored;
+                checkpointSaveFailed = false;
+                if (state.mode === "endless" && state.status === "camp") {
+                    continueJourney(state);
+                    togglePause(state);
+                }
                 difficultySelect.value = Object.hasOwn(DIFFICULTIES, state.difficulty) ? state.difficulty : "hard";
                 checkpointHandled = ["camp", "won"].includes(state.status) ? `${state.mode}:${state.wave}` : null;
                 shownStatus = "";
                 shownDraft = "";
                 last = performance.now();
             }
+            advanceEndless = result.success && !loadingSave && state.mode === "endless" && state.status === "camp";
             saveStatus.textContent = automatic
                 ? result.success ? `Checkpoint ${state.wave} saved on the server.${endlessUnlocked ? " Endless Watch remains permanently unlocked." : ""}` : `Checkpoint autosave failed. ${result.message} Select Save to retry before leaving.`
                 : result.message;
         } catch {
+            if (!loadingSave && ["camp", "won"].includes(state.status)) checkpointSaveFailed = true;
             if (!disposed) saveStatus.textContent = automatic ? "Checkpoint autosave failed. Stay here, reconnect, then select Save to retry." : "Save/load failed: the connection was lost or the save was invalid. Your current run is unchanged; reconnect and try again.";
         } finally {
             if (!disposed) {
                 saving = false;
+                if (advanceEndless) {
+                    continueJourney(state);
+                    clearInput();
+                    last = performance.now();
+                    if (document.hidden || !document.hasFocus()) togglePause(state);
+                    else canvas.focus({ preventScroll: true });
+                }
                 updateHud();
             }
         }
     }
     if (saveButton && saveStatus) on(saveButton, "click", () => persist(false));
+    on(retrySave, "click", () => persist(false, true));
     if (loadButton && saveStatus) on(loadButton, "click", () => persist(true));
     async function readUnlock() {
         try {

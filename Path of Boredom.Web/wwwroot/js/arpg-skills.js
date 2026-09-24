@@ -48,9 +48,45 @@ export const TREE_NODES = {
     }
 };
 export const EXTRA_SKILLS = {
-    knight: { burst: { name: "Flame lance", cooldown: 8, reach: 380, damage: 2.4, shape: "beam" }, guard: { name: "Ember aegis", cooldown: 12, reach: 125, damage: 0.8 } },
-    ranger: { burst: { name: "Piercing rain", cooldown: 9, reach: 760, damage: 1.1, shape: "arrows" }, guard: { name: "Briar ward", cooldown: 11, reach: 180, damage: 0.65 } },
-    warden: { burst: { name: "Fault line", cooldown: 10, reach: 280, damage: 3.2, shape: "cone" }, guard: { name: "Iron bastion", cooldown: 14, reach: 150, damage: 1.2 } }
+    knight: { burst: { name: "Flame lance", cooldown: 8, reach: 380, damage: 2.1, shape: "beam" }, guard: { name: "Ember aegis", cooldown: 12, reach: 125, damage: 0.8 } },
+    ranger: { burst: { name: "Piercing rain", cooldown: 8, reach: 760, damage: 1.15, shape: "arrows" }, guard: { name: "Briar ward", cooldown: 11, reach: 180, damage: 0.65 } },
+    warden: { burst: { name: "Fault line", cooldown: 11, reach: 250, damage: 2.6, shape: "cone" }, guard: { name: "Iron bastion", cooldown: 14, reach: 150, damage: 1 } }
+};
+const CLASS_TREE_NAMES = {
+    knight: {
+        attack: ["Tempered blade", "Flame arc", "Finisher", "Duelist tempo"], nova: ["Furnace", "Heat wave", "Sunfire", "Backdraft"],
+        burst: ["Lance tip", "Broad lance", "Searing thrust", "Flashpoint"], guard: ["Ember shell", "Banked coals", "Cinder reprisal", "Hearth"],
+        dodge: ["Cinder step", "Flame stride", "Hot pursuit", "Light footing"], potion: ["Warm draught", "Last ember", "Tempered tonic", "Rekindle"]
+    },
+    ranger: {
+        attack: ["Keen fletching", "Longbow", "Trickshot", "Quickdraw"], nova: ["Draw strength", "Farflight", "Bodkin volley", "Briar barbs"],
+        burst: ["Rain of thorns", "Arrow storm", "Deep penetration", "Deadeye"], guard: ["Barkskin", "Evergreen", "Briar snare", "Herbal refuge"],
+        dodge: ["Foxstep", "Bounding stride", "Tailwind", "Trail runner"], potion: ["Herbal brew", "Field dressing", "Bark tonic", "Regrowth"]
+    },
+    warden: {
+        attack: ["Forged hammer", "Heavy sweep", "Shieldbreaker", "Hammer rhythm"], nova: ["Tectonic force", "Fault radius", "Seismic core", "Quaking ground"],
+        burst: ["Rift pressure", "Rift fan", "Giant slayer", "Crushing force"], guard: ["Iron wall", "Anchored stance", "Bulldozer", "Stone shelter"],
+        dodge: ["Iron resolve", "Heavy stride", "Unstoppable", "Sure footing"], potion: ["Mineral draught", "Emergency repair", "Iron tonic", "Reconstruction"]
+    }
+};
+const CLASS_TREE_EFFECTS = {
+    knight: {
+        "nova.chill": { icon: "↗", detail: "Ember nova pushes surviving enemies back 16 units per rank; bosses move half as far. Replaces slowing with a fiery outward shockwave." },
+        "burst.shatter": { icon: "♨", detail: "Flame lance deals 25% more damage to targets at or below 50% health. An ember mark identifies the finishing hit." },
+        "guard.repulse": { icon: "✹", detail: "Double Ember aegis opening-pulse damage. Releases a fiery blast instead of knocking enemies back." }
+    },
+    ranger: {
+        "attack.execution": { icon: "↝", detail: "Dawn shot ricochets once to a different living enemy within 180 units for 60% damage. A green tracer connects the targets. Cannot bounce back." },
+        "nova.ignition": { icon: "➶", detail: "Each Sunburst volley arrow penetrates one additional target in its remaining flight path for 70% damage. Green tracers show the piercing path; no added fire damage." },
+        "burst.shatter": { icon: "⋙", detail: "Piercing rain penetrates two additional targets instead of one. Each penetration retains 70% of the previous hit's damage; no target is hit twice by the same arrow." },
+        "guard.repulse": { icon: "♧", detail: "Briar ward pushes enemies back 60 units (bosses 30) and slows surviving targets' walking by 15% for 1.5 seconds. Charges are unaffected." }
+    },
+    warden: {
+        "attack.execution": { icon: "⬟", detail: "Hammer sweep bypasses Sentinel resistance and deals 25% extra damage to Sentinels. A steel impact mark identifies shield-breaking hits." },
+        "nova.ignition": { icon: "◆", detail: "Iron quake deals 25% extra damage inside half its radius. A steel inner ring marks the seismic core; no added fire damage." },
+        "burst.overdrive": { icon: "⬢", detail: "Fault line deals 12% more damage per rank against slowed targets. Combines with Quaking ground; replaces extra critical chance." },
+        "guard.repulse": { icon: "⬡", detail: "Iron bastion pushes living enemies back 100 units, or 50 for bosses. A broad steel shockwave clears breathing room." }
+    }
 };
 export const skillName = (state, key) => key === "attack" ? classFor(state).attackName : key === "nova" ? classFor(state).specialName
     : key === "dodge" ? "Dodge" : key === "potion" ? "Life flask" : EXTRA_SKILLS[state.heroClass][key].name;
@@ -58,6 +94,25 @@ export const treeNodeKey = (skill, slot) => Object.keys(TREE_NODES[skill])[TREE_
 export const newSkillTree = () => Object.fromEntries(SKILL_KEYS.map(key => [key, Object.fromEntries(Object.keys(TREE_NODES[key]).map(node => [node, 0]))]));
 export const skillPointsEarned = state => Math.min(MAX_SKILL_POINTS, Math.floor(state.player.level / SKILL_POINT_INTERVAL));
 export const skillPointsLeft = state => skillPointsEarned(state) - Object.values(state.skillTree).reduce((total, nodes) => total + Object.values(nodes).reduce((sum, rank) => sum + rank, 0), 0);
+export const treePointsSpent = (state, skill) => SKILL_KEYS.includes(skill) ? Object.values(state.skillTree[skill]).reduce((sum, rank) => sum + rank, 0) : 0;
+export const treeRespecCost = (state, skill) => treePointsSpent(state, skill) > 0 ? 100 + 50 * treePointsSpent(state, skill) : 0;
+export const canRespecTree = (state, skill) => SKILL_KEYS.includes(skill) && ["paused", "camp", "won"].includes(state.status)
+    && treePointsSpent(state, skill) > 0 && state.gold >= treeRespecCost(state, skill);
+export function respecTree(state, skill) {
+    if (!canRespecTree(state, skill)) return false;
+    const points = treePointsSpent(state, skill), cost = treeRespecCost(state, skill);
+    state.gold -= cost;
+    state.skillTree[skill] = newSkillTree()[skill];
+    state.playerShots = state.playerShots.filter(shot => shot.skill !== skill);
+    state.effects = [];
+    const p = state.player;
+    if (skill === "guard") { p.guarding = 0; p.guard = Math.max(p.guard, 4); }
+    if (skill === "dodge") { p.afterstep = 0; p.invulnerable = 0; p.rolling = 0; p.vx = 0; p.vy = 0; }
+    if (skill === "potion") { p.flaskWard = 0; p.renewal = 0; }
+    if (skill === "nova") for (const enemy of state.enemies) { enemy.chilled = 0; enemy.chillStrength = 0; }
+    state.journal = `${skillName(state, skill)} reset: ${points} points returned for ${cost} gold. Cooldowns and other upgrades are unchanged.`;
+    return true;
+}
 export const treePrerequisitesMet = (state, skill, node) => {
     const keys = Object.keys(TREE_NODES[skill]);
     return node === keys[0] || (node === keys[3] ? state.skillTree[skill][keys[1]] > 0 || state.skillTree[skill][keys[2]] > 0 : state.skillTree[skill][keys[0]] > 0);
@@ -83,7 +138,11 @@ export function setLoadout(state, manual, auto) {
 }
 
 export function treeNodeDefinition(state, skill, node) {
-    const definition = TREE_NODES[skill][node];
+    const index = Object.keys(TREE_NODES[skill]).indexOf(node);
+    const definition = { ...TREE_NODES[skill][node], name: CLASS_TREE_NAMES[state.heroClass][skill][index],
+        visual: state.heroClass, ...CLASS_TREE_EFFECTS[state.heroClass][`${skill}.${node}`] };
+    const tint = state.heroClass === "knight" ? "ember-colored" : state.heroClass === "ranger" ? "jade" : "steel-blue";
+    definition.detail = definition.detail.replace(/silver|golden|violet|crimson/gi, tint);
     if (skill !== "burst" || node !== "aperture") return definition;
     const shape = state.heroClass === "knight" ? { name: "Broad lance", detail: "+20% Flame lance beam width per rank. Widens the visible beam as well as its hit area." }
         : state.heroClass === "ranger" ? { name: "Arrow storm", detail: "+2 Piercing rain arrows per rank, from seven to eleven. Adds visible arrows within the same fan." }

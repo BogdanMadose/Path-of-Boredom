@@ -193,6 +193,22 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .arena-toolbar [data-launch-endless] { min-width: 135px; }
 .skills-panel { padding: 22px; border-top: 1px solid #bda36b33; background: #142127; }
 .skills-panel > p { color: #b8c8c3; font-size: 12px; line-height: 1.8; }
+.combat-pressure { height: 24px; line-height: 24px; padding: 0 12px; box-sizing: border-box; color: #d7c595; background: #142126; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none; }
+.forge-panel button .upgrade-preview { display: block; margin-top: 8px; color: #c3e4d6; font-size: 11px; line-height: 1.6; }
+.forge-panel button.at-stat-cap .upgrade-preview { color: #edc581; }
+.checkpoint-retry { display: block; width: 100%; margin-top: 14px; }
+.skill-bar button.flask-needed { border-color: #ffb5a3; box-shadow: 0 0 0 2px #ef8b6d; animation: flask-reminder 0.8s ease-in-out 3; }
+@keyframes flask-reminder { 50% { box-shadow: 0 0 18px 4px #ef8b6d99; } }
+@media (prefers-reduced-motion: reduce) { .skill-bar button.flask-needed { animation: none; } }
+.tree-respec { width: 100%; margin: 6px 0; font-size: 11px; }
+.elite-guide { margin: 14px 0; padding: 12px; border: 1px solid #c7a56b44; color: #c4d8cc; font-size: 12px; line-height: 1.8; }
+.elite-guide summary { cursor: pointer; color: #edc581; }
+.death-report { margin: 16px 0; padding: 14px; text-align: left; border: 1px solid #b66b5e; border-radius: 6px; background: #21191bea; }
+.death-report h3 { margin: 0 0 10px; color: #ffd0b8; font-size: 18px; }
+.death-report p, .death-report small { font-size: 12px; line-height: 1.6; color: #d0bbb3; }
+.death-report ol { max-height: 160px; overflow-y: auto; overscroll-behavior: contain; padding-left: 24px; font-size: 12px; line-height: 1.7; }
+.death-report li { margin-bottom: 6px; overflow-wrap: anywhere; }
+.death-report .fatal-hit { color: #ffad97; font-weight: 700; }
 .loadout-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .loadout-grid label { min-width: 0; display: grid; gap: 8px; color: #dbc18e; font-size: 12px; }
 .loadout-grid select { min-width: 0; width: 100%; padding: 10px; background: #0e181e; border: 1px solid #bda36b55; border-radius: 4px; color: #e8ddc3; font: inherit; }
@@ -200,6 +216,17 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .skill-tree-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 18px; }
 .skill-tree { position: relative; min-width: 0; padding: 15px; border: 1px solid #c7a56b44; border-radius: 6px; background: radial-gradient(ellipse at 50% 60%, #33433466, #17252b); }
 .skill-tree:hover, .skill-tree:focus-within { z-index: 2; }
+.skill-tree[data-hero-class="knight"] { --tree-accent: #f5ab62; --tree-tint: #522b1c; }
+.skill-tree[data-hero-class="ranger"] { --tree-accent: #8fefbd; --tree-tint: #163d2b; }
+.skill-tree[data-hero-class="warden"] { --tree-accent: #a7cfff; --tree-tint: #26364e; }
+.skill-tree[data-hero-class] { border-color: var(--tree-accent); background: radial-gradient(ellipse at 50% 60%, var(--tree-tint), #101c23); }
+.skill-tree[data-hero-class] .tree-node-icon, .skill-tree[data-hero-class] h3 { color: var(--tree-accent); }
+.skill-tree[data-hero-class] .tree-node button.learned { border-color: var(--tree-accent); background: var(--tree-tint); }
+.skill-tree[data-hero-class] .tree-tooltip { border-color: var(--tree-accent); }
+.skill-tree[data-hero-class] .tree-connections .learned { stroke: var(--tree-accent); }
+.skill-tree[data-hero-class="ranger"] .tree-node button { border-radius: 10px 30px; }
+.skill-tree[data-hero-class="ranger"] .tree-connections { stroke-dasharray: 5 3; }
+.skill-tree[data-hero-class="warden"] .tree-node button { border-radius: 8px; border-width: 3px; }
 .skill-tree h3 { margin: 0; font: 20px Georgia, serif; color: #f0d49e; }
 .skill-tree > p { margin: 10px 0; font-size: 11px; line-height: 1.7; color: #b2c4c1; }
 .skill-tree .tree-path { color: #e7bd79; font-size: 10px; }

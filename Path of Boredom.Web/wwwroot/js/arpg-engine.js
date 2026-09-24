@@ -3,6 +3,7 @@ export { LAST_WAVE } from "./arpg-campaign.js";
 import { LEVEL_CARDS, drawLevelCards } from "./arpg-cards.js";
 import { DIFFICULTIES, difficultyFor } from "./arpg-difficulty.js";
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
+import { ELITE_MODIFIERS, enemyDamageSource } from "./arpg-modifiers.js";
 import { SKILL_KEYS, SLOTTABLE_SKILLS, AUTO_COOLDOWN, EXTRA_SKILLS, newSkillTree, skillUnlocked } from "./arpg-skills.js";
 export const WIDTH = 1100;
 export const HEIGHT = 650;
@@ -11,7 +12,7 @@ export const MASTERY = {
     might: { name: "Ember might", detail: "+2 base weapon damage" },
     vitality: { name: "Enduring heart", detail: "+5 maximum health and restore 5 health" },
     recovery: { name: "Battle rhythm", detail: "+0.5% skill cooldown recovery" },
-    area: { name: "Widening ember", detail: "+1% attack reach and special radius/range; limited to the arena diagonal" },
+    area: { name: "Widening ember", detail: "+1% reach: caps at 1,000 for arrows, 220 for melee attacks, 340 for pulses and 500 for melee bursts" },
     speed: { name: "Endless stride", detail: "+1% movement speed; does not change dodge distance" },
     critChance: { name: "Unerring spark", detail: "+0.5 percentage points critical chance; total chance capped at 75%" },
     critDamage: { name: "Endless ruin", detail: "+2 percentage points critical damage" }
@@ -37,6 +38,7 @@ export function createState(random = Math.random) {
     return {
         random, status: "ready", time: 0, wave: 0, intermission: 0.8,
         mode: "campaign", campaignComplete: 0, difficulty: "hard", rankingMode: "campaign", scoreBaseline: 0,
+        rankingPatch: "004", damageHistory: [], volleySequence: 2,
         mastery: Object.fromEntries(Object.keys(MASTERY).map(key => [key, 0])),
         upgrades: Object.fromEntries(Object.keys(UPGRADES).map(key => [key, 0])),
         buffs: Object.fromEntries(POWER_UPS.map(power => [power.key, 0])),
@@ -59,12 +61,14 @@ export function createState(random = Math.random) {
     };
 }
 
-export const weaponDamage = state => Math.round((state.player.damage + state.mastery.might * 2 + state.player.weaponBonus + state.upgrades.weapon * 6) * (1 + state.upgrades.weapon * 0.08) * (1 + state.boons.edge * 0.05) * (state.buffs.fury > 0 ? 1.5 : 1));
-export const armorRating = state => Math.min(65, classFor(state).armor + state.player.armorBonus + state.upgrades.armor * 5 + state.boons.bulwark * 2.5);
+export const weaponDamage = state => Math.round((state.player.damage + state.mastery.might * 2
+    + 60 * (Math.sqrt(1 + state.player.weaponBonus / 30) - 1) + state.upgrades.weapon * 3)
+    * (1 + state.upgrades.weapon * 0.025 + state.boons.edge * 0.04) * (state.buffs.fury > 0 ? 1.5 : 1));
+export const armorRating = state => Math.min(60, classFor(state).armor + state.player.armorBonus * 0.6 + state.upgrades.armor * 3 + state.boons.bulwark * 1.5);
 export const movementSpeed = state => classFor(state).speed * (state.buffs.haste > 0 ? 1.35 : 1) * (1 + state.boons.stride * 0.04 + state.mastery.speed * 0.01) * (state.player.afterstep > 0 ? 1.2 : 1);
 export const criticalChance = state => Math.min(0.75, 0.05 + state.boons.critChance * 0.02 + state.upgrades.critChance * 0.02 + state.mastery.critChance * 0.005);
 export const criticalDamage = state => 1.5 + state.boons.critDamage * 0.1 + state.upgrades.critDamage * 0.1 + state.mastery.critDamage * 0.02;
-export const skillReach = (state, skill) => Math.min(Math.hypot(WIDTH, HEIGHT), (skill === "attack"
+export const skillReach = (state, skill) => Math.min(state.heroClass === "ranger" ? 1000 : skill === "attack" ? 220 : skill === "burst" ? 500 : 340, (skill === "attack"
     ? classFor(state).attackReach + state.upgrades.cleave * 6 + state.boons.cleave * 6
     : skill === "nova" ? classFor(state).specialReach + state.upgrades.nova * 10 + state.boons.nova * 10
     : EXTRA_SKILLS[state.heroClass][skill].reach + state.upgrades[skill] * 8) * (1 + state.mastery.area * 0.01)
@@ -78,6 +82,7 @@ export const masteryCost = (state, key) => {
     return Number.isSafeInteger(cost) ? cost : Infinity;
 };
 export const flaskHealing = state => Math.max(30, Math.round(state.player.maxHealth * (0.22 + state.upgrades.flask * 0.06))) * difficultyFor(state).healing;
+export const cooldownRecovery = state => Math.min(2, (state.buffs.haste > 0 ? 1.4 : 1) * (1 + state.boons.focus * 0.05 + state.mastery.recovery * 0.005));
 
 export function buyMastery(state, key) {
     if (!Object.hasOwn(MASTERY, key) || !forgeComplete(state) || !["paused", "camp", "won"].includes(state.status)) return false;
@@ -203,17 +208,20 @@ function effect(state, kind, x, y, color, text = "", radius = 0, angle = 0) {
     return item;
 }
 
-function hurtPlayer(state, damage) {
+function hurtPlayer(state, damage, source = "Unknown attack") {
     const player = state.player;
     if (player.invulnerable > 0 || state.status !== "playing") return;
     damage = Math.max(1, Math.round(damage * (1 - armorRating(state) / 100) * (state.buffs.ward > 0 ? 0.5 : 1)
         * (player.guarding > 0 ? 0.6 - state.skillTree.guard.barrier * 0.05 : 1) * (player.flaskWard > 0 ? 0.75 : 1)));
+    const taken = Math.min(player.health, damage);
     player.health = Math.max(0, player.health - damage);
+    state.damageHistory.push({ source, damage: taken, age: 0, lethal: player.health === 0 });
+    if (state.damageHistory.length > 12) state.damageHistory.shift();
     player.invulnerable = 0.3;
-    effect(state, "text", player.x, player.y - 35, "#ff9384", `-${damage}`);
+    effect(state, "text", player.x, player.y - 35, "#ff9384", `-${Math.ceil(taken)}`);
     if (player.health === 0) {
         state.status = "dead";
-        state.journal = "The ember fades. Every new run is another chance.";
+        state.journal = `Defeated by ${source}. The death report shows recent health lost after mitigation.`;
     }
 }
 
@@ -256,7 +264,7 @@ function killEnemy(state, enemy) {
     if (state.kills % 6 === 0) {
         state.loot.push({ kind: "power", x: enemy.x + 20, y: enemy.y - 10, value: Math.floor(state.random() * POWER_UPS.length), life: 30 });
     }
-    if (state.random() < 0.07 || enemy.kind === "boss") {
+    if (state.random() < 0.03 || enemy.kind === "boss") {
         state.loot.push({ kind: "flask", x: enemy.x + 10, y: enemy.y + 18, value: 1, life: 30 });
     }
     if ((enemy.kind === "boss" && state.random() < 0.3) || (enemy.elite && state.random() < 0.04)) {
@@ -267,31 +275,47 @@ function killEnemy(state, enemy) {
     }
     effect(state, "burst", enemy.x, enemy.y, enemy.kind === "boss" ? "#edac60" : "#ac796d", "", enemy.radius * 2);
     if (state.loot.length > 64) {
-        const overflow = state.loot.splice(0, state.loot.length - 64);
-        for (const drop of overflow) state.gold += drop.kind === "gold" ? goldReward(drop.value, state.boons.fortune) : goldReward(10);
+        collectLoot(state, 0, true);
     }
 }
 
 function hitEnemy(state, enemy, damage, piercing = false, skill = "attack") {
     if (enemy.health <= 0) return;
-    const finishing = skill === "attack" && state.skillTree.attack.execution > 0 && enemy.health <= enemy.maxHealth * 0.35;
-    const shattering = skill === "burst" && state.skillTree.burst.shatter > 0 && (enemy.elite || enemy.kind === "boss");
+    if (enemy.modifier === "armored") damage = Math.max(1, Math.round(damage * 0.8));
+    const finishing = skill === "attack" && state.skillTree.attack.execution > 0
+        && (state.heroClass === "knight" ? enemy.health <= enemy.maxHealth * 0.35 : state.heroClass === "warden" && enemy.kind === "sentinel");
+    const shattering = skill === "burst" && state.skillTree.burst.shatter > 0
+        && (state.heroClass === "knight" ? enemy.health <= enemy.maxHealth * 0.5 : state.heroClass === "warden" && (enemy.elite || enemy.kind === "boss"));
     if (finishing || shattering) {
         damage = Math.round(damage * 1.25);
-        effect(state, "execute", enemy.x, enemy.y, "#f77e92", "", enemy.radius + 12);
+        effect(state, "execute", enemy.x, enemy.y, classFor(state).color, "", enemy.radius + 12);
     }
-    const critical = state.random() < Math.min(0.75, criticalChance(state) + (skill === "burst" ? state.skillTree.burst.overdrive * 0.1 : 0));
+    if (skill === "burst" && state.heroClass === "warden" && enemy.chilled > 0) damage = Math.round(damage * (1 + state.skillTree.burst.overdrive * 0.12));
+    const critical = state.random() < Math.min(0.75, criticalChance(state) + (skill === "burst" && state.heroClass !== "warden" ? state.skillTree.burst.overdrive * 0.1 : 0));
     if (critical) damage = Math.round(damage * criticalDamage(state));
-    if (enemy.kind === "sentinel" && !piercing) damage = Math.round(damage * 0.55);
+    if (enemy.kind === "sentinel" && !piercing && !(state.heroClass === "warden" && skill === "attack" && state.skillTree.attack.execution)) damage = Math.round(damage * 0.55);
     enemy.health -= damage;
     enemy.flash = 0.15;
     effect(state, "text", enemy.x, enemy.y - enemy.radius - 10, critical ? "#ffd16a" : "#eee0ba", critical ? `CRIT ${damage}` : `${damage}`);
     if (enemy.health <= 0) killEnemy(state, enemy);
     else if (skill === "nova" && state.skillTree.nova.chill > 0) {
-        enemy.chilled = 1.5;
-        enemy.chillStrength = Math.max(enemy.chillStrength ?? 0, state.skillTree.nova.chill * 0.15);
-        effect(state, "frost", enemy.x, enemy.y, "#9be5ff", "", enemy.radius + 10);
+        if (state.heroClass === "knight") {
+            pushEnemy(state, enemy, state.skillTree.nova.chill * 16);
+            effect(state, "repulse", enemy.x, enemy.y, classFor(state).color, "", enemy.radius + 16);
+        } else {
+            enemy.chilled = 1.5;
+            enemy.chillStrength = Math.max(enemy.chillStrength ?? 0, state.skillTree.nova.chill * 0.15);
+            effect(state, "frost", enemy.x, enemy.y, classFor(state).color, "", enemy.radius + 10);
+        }
     }
+}
+
+function pushEnemy(state, enemy, amount) {
+    const p = state.player;
+    const d = distance(p, enemy);
+    const push = enemy.kind === "boss" ? amount / 2 : amount;
+    enemy.x = clamp(enemy.x + (d ? (enemy.x - p.x) / d : Math.cos(p.facing)) * push, MARGIN, WIDTH - MARGIN);
+    enemy.y = clamp(enemy.y + (d ? (enemy.y - p.y) / d : Math.sin(p.facing)) * push, MARGIN, HEIGHT - MARGIN);
 }
 
 export function useSkill(state, skill, automatic = false) {
@@ -300,15 +324,15 @@ export function useSkill(state, skill, automatic = false) {
             : SLOTTABLE_SKILLS.includes(skill) && state.loadout.manual !== skill)) return false;
     const p = state.player;
     const hero = classFor(state);
-    if (p[skill] > 0) return false;
+    if (p[skill] > 0 || skill === "guard" && p.guarding > 0) return false;
     const nodes = state.skillTree[skill];
-    const power = skill === "attack" ? 1 + nodes.edge * 0.08 : skill === "nova" ? (1 + nodes.amplitude * 0.1) * (1 + nodes.ignition * 0.15)
+    const power = skill === "attack" ? 1 + nodes.edge * 0.08 : skill === "nova" ? (1 + nodes.amplitude * 0.1) * (1 + (state.heroClass === "knight" ? nodes.ignition * 0.15 : 0))
         : skill === "burst" ? 1 + nodes.focus * 0.12 : 1;
     const damage = multiplier => Math.round(weaponDamage(state) * multiplier * power);
-    const color = skill === "nova" && nodes.ignition ? "#ff8b32" : hero.color;
+    const color = skill === "nova" && nodes.ignition && state.heroClass === "knight" ? "#ff8b32" : hero.color;
     if (skill === "attack") {
         p.swing = 0.26;
-        p.attack = hero.attackCooldown / (1 + state.upgrades.cleave * 0.12) / (1 + nodes.rhythm * 0.06);
+        p.attack = hero.attackCooldown / (1 + state.upgrades.cleave * 0.07) / (1 + nodes.rhythm * 0.06);
         const reach = skillReach(state, "attack");
         if (state.heroClass === "ranger") {
             firePlayerArrows(state, [0], damage(1 + state.upgrades.cleave * 0.08), reach, 0, skill);
@@ -316,22 +340,24 @@ export function useSkill(state, skill, automatic = false) {
             effect(state, "slash", p.x, p.y, color, "", reach, p.facing);
             for (const enemy of state.enemies) {
                 const angle = Math.atan2(enemy.y - p.y, enemy.x - p.x) - p.facing;
-                if (distance(p, enemy) < reach + enemy.radius && Math.cos(angle) > 0.2 - state.upgrades.cleave * 0.04) {
+                if (distance(p, enemy) < reach + enemy.radius && Math.cos(angle) > 0.25 - state.upgrades.cleave * 0.02) {
                     hitEnemy(state, enemy, damage(1 + state.upgrades.cleave * 0.08));
                 }
             }
         }
     } else if (skill === "nova") {
         p.casting = 0.4;
-        p.nova = hero.specialCooldown / (1 + state.upgrades.nova * 0.12);
+        p.nova = hero.specialCooldown / (1 + state.upgrades.nova * 0.07);
         const reach = skillReach(state, "nova");
         if (state.heroClass === "ranger") {
             firePlayerArrows(state, [-0.36, -0.18, 0, 0.18, 0.36], damage(hero.specialDamage + state.upgrades.nova * 0.1), reach, 1, skill);
         } else {
             effect(state, "ring", p.x, p.y, color, "", reach);
+            if (state.heroClass === "warden" && nodes.ignition) effect(state, "ring", p.x, p.y, color, "", reach / 2);
             for (const enemy of state.enemies) {
                 if (distance(p, enemy) < reach + enemy.radius) {
-                    hitEnemy(state, enemy, damage(hero.specialDamage + state.upgrades.nova * 0.25), true, skill);
+                    const core = state.heroClass === "warden" && nodes.ignition && distance(p, enemy) <= reach / 2 ? 1.25 : 1;
+                    hitEnemy(state, enemy, damage((hero.specialDamage + state.upgrades.nova * 0.12) * core), true, skill);
                 }
             }
         }
@@ -364,18 +390,20 @@ export function useSkill(state, skill, automatic = false) {
         effect(state, "shield", p.x, p.y, color, "", reach);
         for (const enemy of state.enemies) {
             if (distance(p, enemy) < reach + enemy.radius) {
-                hitEnemy(state, enemy, Math.round(weaponDamage(state) * extra.damage * (1 + state.upgrades.guard * 0.08)), true, skill);
+                hitEnemy(state, enemy, Math.round(weaponDamage(state) * extra.damage * (1 + state.upgrades.guard * 0.08)
+                    * (state.heroClass === "knight" && nodes.repulse ? 2 : 1)), true, skill);
                 if (nodes.repulse && enemy.health > 0) {
-                    const d = distance(p, enemy);
-                    const push = enemy.kind === "boss" ? 30 : 60;
-                    enemy.x = clamp(enemy.x + (d ? (enemy.x - p.x) / d : Math.cos(p.facing)) * push, MARGIN, WIDTH - MARGIN);
-                    enemy.y = clamp(enemy.y + (d ? (enemy.y - p.y) / d : Math.sin(p.facing)) * push, MARGIN, HEIGHT - MARGIN);
+                    if (state.heroClass !== "knight") pushEnemy(state, enemy, state.heroClass === "warden" ? 100 : 60);
+                    if (state.heroClass === "ranger") {
+                        enemy.chilled = 1.5;
+                        enemy.chillStrength = Math.max(enemy.chillStrength, 0.15);
+                    }
                 }
             }
         }
-        if (nodes.repulse) effect(state, "repulse", p.x, p.y, "#9cdff4", "", reach + 60);
+        if (nodes.repulse) effect(state, state.heroClass === "knight" ? "fire" : "repulse", p.x, p.y, hero.color, "", reach + 60);
     } else if (skill === "dodge") {
-        p.dodge = hero.dodgeCooldown / (1 + state.upgrades.dodge * 0.15) / (1 + nodes.recovery * 0.1);
+        p.dodge = Math.max(1.8, hero.dodgeCooldown / (1 + state.upgrades.dodge * 0.15) / (1 + nodes.recovery * 0.1));
         p.rolling = 0.23 + nodes.distance * 0.025;
         p.invulnerable = Math.max(p.invulnerable, 0.32 + state.upgrades.dodge * 0.025 + nodes.agility * 0.04);
         if (nodes.afterstep) p.afterstep = 1.2;
@@ -394,23 +422,29 @@ export function useSkill(state, skill, automatic = false) {
         state.journal = "A moment of warmth. Refill flasks at checkpoints or the forge, not on level-up.";
     }
     p[skill] *= automatic ? AUTO_COOLDOWN : 1;
-    if (skill === "attack" && nodes.edge) effect(state, "empower", p.x, p.y, "#deebf0", "", 35 + nodes.edge * 9, nodes.edge);
-    if (skill === "attack" && nodes.sweep) effect(state, "expand", p.x, p.y, "#deebf0", "", 55 + nodes.sweep * 15);
-    if (skill === "attack" && nodes.rhythm) effect(state, "wind", p.x, p.y, "#deebf0", "", 40 + nodes.rhythm * 8, p.facing);
-    if (skill === "nova" && nodes.amplitude) effect(state, "empower", p.x, p.y, "#ffe3a1", "", 45 + nodes.amplitude * 12, nodes.amplitude);
+    if (skill === "attack" && nodes.edge) effect(state, "empower", p.x, p.y, hero.color, "", 35 + nodes.edge * 9, nodes.edge);
+    if (skill === "attack" && nodes.sweep) effect(state, "expand", p.x, p.y, hero.color, "", 55 + nodes.sweep * 15);
+    if (skill === "attack" && nodes.rhythm) effect(state, "wind", p.x, p.y, hero.color, "", 40 + nodes.rhythm * 8, p.facing);
+    if (skill === "nova" && nodes.amplitude) effect(state, "empower", p.x, p.y, hero.color, "", 45 + nodes.amplitude * 12, nodes.amplitude);
     if (skill === "nova" && nodes.resonance) effect(state, "expand", p.x, p.y, color, "", 65 + nodes.resonance * 20);
-    if (skill === "nova" && nodes.ignition) effect(state, "fire", p.x, p.y, "#ff8b32", "", 90);
-    if (skill === "burst" && nodes.focus) effect(state, "empower", p.x, p.y, "#d4b3ff", "", 45 + nodes.focus * 12, nodes.focus);
-    if (skill === "burst" && nodes.overdrive) effect(state, "sparks", p.x, p.y, "#c8a6ff", "", 45 + nodes.overdrive * 8);
+    if (skill === "nova" && nodes.ignition && state.heroClass === "knight") effect(state, "fire", p.x, p.y, "#ff8b32", "", 90);
+    if (skill === "burst" && nodes.focus) effect(state, "empower", p.x, p.y, hero.color, "", 45 + nodes.focus * 12, nodes.focus);
+    if (skill === "burst" && nodes.overdrive) effect(state, "sparks", p.x, p.y, hero.color, "", 45 + nodes.overdrive * 8);
     return true;
 }
 
 function firePlayerArrows(state, offsets, damage, reach, piercing, skill) {
     const p = state.player;
+    if (state.volleySequence >= Number.MAX_SAFE_INTEGER) {
+        if (state.playerShots.length) return;
+        state.volleySequence = 2;
+        for (const enemy of state.enemies) enemy.combat.volleys = [];
+    }
+    const volley = skill === "attack" ? 0 : ++state.volleySequence;
     for (const offset of offsets) {
         if (state.playerShots.length >= 48) break;
         const angle = p.facing + offset;
-        state.playerShots.push({ x: p.x, y: p.y, vx: Math.cos(angle) * 780, vy: Math.sin(angle) * 780, damage, life: reach / 780, piercing, skill });
+        state.playerShots.push({ x: p.x, y: p.y, vx: Math.cos(angle) * 780, vy: Math.sin(angle) * 780, damage, life: reach / 780, piercing, skill, volley });
     }
 }
 
@@ -430,6 +464,8 @@ function autoCast(state) {
 }
 
 function stepPlayerShots(state, dt) {
+    const activeVolleys = new Set(state.playerShots.map(shot => shot.volley));
+    for (const enemy of state.enemies) enemy.combat.volleys = enemy.combat.volleys.filter(entry => activeVolleys.has(entry.volley));
     for (const shot of state.playerShots) {
         if (state.status !== "playing") break;
         const start = { x: shot.x, y: shot.y };
@@ -440,12 +476,54 @@ function stepPlayerShots(state, dt) {
         const enemy = state.enemies.filter(target => target.health > 0 && distanceToSegment(target, start, shot) <= target.radius + 4)
             .sort((a, b) => distance(start, a) - distance(start, b))[0];
         if (enemy) {
+            const remainingRange = Math.hypot(shot.vx, shot.vy) * shot.life;
             shot.life = 0;
-            hitEnemy(state, enemy, shot.damage, shot.piercing === 1, shot.skill);
+            hitArrowTarget(state, shot, enemy, shot.damage, shot.piercing === 1);
+            const penetrations = shot.skill === "burst" ? 1 + state.skillTree.burst.shatter
+                : shot.skill === "nova" ? state.skillTree.nova.ignition : 0;
+            const speed = Math.hypot(shot.vx, shot.vy) || 1;
+            const direction = { x: shot.vx / speed, y: shot.vy / speed };
+            const end = { x: enemy.x + direction.x * remainingRange, y: enemy.y + direction.y * remainingRange };
+            const targets = state.enemies.filter(target => target !== enemy && target.health > 0
+                && (target.x - enemy.x) * direction.x + (target.y - enemy.y) * direction.y > 0
+                && distanceToSegment(target, enemy, end) <= target.radius + 4)
+                .sort((a, b) => distance(enemy, a) - distance(enemy, b)).slice(0, penetrations);
+            let previous = enemy;
+            let damage = shot.damage;
+            for (const target of targets) {
+                damage = Math.max(1, Math.round(damage * 0.7));
+                arrowLink(state, previous, target);
+                hitArrowTarget(state, shot, target, damage, true);
+                previous = target;
+            }
+            if (shot.skill === "attack" && state.skillTree.attack.execution) {
+                const target = state.enemies.filter(target => target !== enemy && target.health > 0 && distance(enemy, target) <= 180)
+                    .sort((a, b) => distance(enemy, a) - distance(enemy, b))[0];
+                if (target) {
+                    arrowLink(state, enemy, target);
+                    hitEnemy(state, target, Math.max(1, Math.round(shot.damage * 0.6)), false, "attack");
+                }
+            }
         }
         if (shot.x < 0 || shot.x > WIDTH || shot.y < 0 || shot.y > HEIGHT) shot.life = 0;
     }
     state.playerShots = state.playerShots.filter(shot => shot.life > 0);
+}
+
+function arrowLink(state, from, to) {
+    const link = effect(state, "beam", from.x, from.y, classFor(state).color, "", distance(from, to), Math.atan2(to.y - from.y, to.x - from.x));
+    link.width = 3;
+}
+
+function hitArrowTarget(state, shot, enemy, damage, piercing) {
+    if (shot.volley > 0) {
+        let entry = enemy.combat.volleys.find(entry => entry.volley === shot.volley);
+        if (!entry) { entry = { volley: shot.volley, hits: 0 }; enemy.combat.volleys.push(entry); }
+        if (entry.hits >= 3) return;
+        if (entry.hits > 0) damage *= 0.25;
+        entry.hits++;
+    }
+    hitEnemy(state, enemy, Math.max(1, Math.round(damage)), piercing, shot.skill);
 }
 
 function spawnWave(state) {
@@ -455,16 +533,17 @@ function spawnWave(state) {
     const localWave = (state.wave - 1) % WAVES_PER_MAP + 1;
     const bossWave = localWave === WAVES_PER_MAP;
     if (localWave === 1 && state.wave > 1) {
-        for (const drop of state.loot) { drop.x = state.player.x; drop.y = state.player.y; }
-        collectLoot(state, 0);
+        collectLoot(state, 0, true);
         state.projectiles = [];
         state.playerShots = [];
         state.effects = [];
-        Object.assign(state.player, { x: WIDTH / 2, y: HEIGHT / 2, vx: 0, vy: 0, health: state.player.maxHealth, potions: MAX_FLASKS, invulnerable: 1 });
+        Object.assign(state.player, { x: WIDTH / 2, y: HEIGHT / 2, vx: 0, vy: 0, invulnerable: 1 });
     }
     const depth = Math.max(0, state.wave - LAST_WAVE);
     const difficulty = difficultyFor(state);
-    const scaling = 1 + Math.log2(1 + depth / 5) * 0.9 + act * 0.15;
+    const levelPressure = Math.max(0, state.player.level - 8);
+    const scaling = (1 + act * 0.22) * (1 + depth * 0.055 + (depth / 60) ** 1.4)
+        * (1 + levelPressure * 0.055) ** 1.15;
     const count = Math.min(40, (bossWave ? 10 + act * 3 : 5 + localWave * 3 + act * 3) + Math.floor(depth / 4) + difficulty.extra);
     for (let i = 0; i < count; i++) {
         const boss = bossWave && i === 0;
@@ -474,21 +553,26 @@ function spawnWave(state) {
         const x = side === 0 ? MARGIN : side === 1 ? WIDTH - MARGIN : WIDTH * t;
         const y = side === 2 ? MARGIN : side === 3 ? HEIGHT - MARGIN : HEIGHT * t;
         const elite = !boss && state.wave >= 6 && i % (depth ? 3 : 5) === 0 ? 1 : 0;
-        const health = Math.round((boss ? 680 + act * 650 : (kind === "brute" || kind === "sentinel" ? 75 : kind === "runner" ? 20 : 32) + Math.min(state.wave, LAST_WAVE) * 10) * scaling * (elite ? 1.7 : 1));
+        const health = Math.round((boss ? 680 + act * 380 : (kind === "brute" || kind === "sentinel" ? 75 : kind === "runner" ? 20 : 32) + Math.min(state.wave, LAST_WAVE) * 10) * scaling * (elite ? 1.7 : 1));
         state.enemies.push({
             kind, x, y, health, maxHealth: health, elite, charging: 0, chargeX: 0, chargeY: 0,
+            combat: { volleys: [], phase: 1, rest: 0, pattern: 1 },
             radius: boss ? 32 : kind === "brute" || kind === "sentinel" ? 22 : kind === "runner" ? 12 : 15,
             speed: boss ? 70 + act * 8 : kind === "runner" ? 160 + act * 10 : kind === "sentinel" ? 55 : kind === "brute" ? 62 : ["wisp", "spitter", "summoner", "cantor", "hexer"].includes(kind) ? 80 : 92 + Math.min(state.wave, LAST_WAVE) * 2.2,
-            damage: Math.round((boss ? 30 + act * 12 : kind === "sentinel" ? 36 : kind === "brute" ? 22 + act * 5 : 13 + Math.min(state.wave, LAST_WAVE) * 1.5) * Math.sqrt(scaling) * (elite ? 1.4 : 1)),
+            damage: Math.round((boss ? 30 + act * 10 : kind === "sentinel" ? 26 + act * 4 : kind === "brute" ? 22 + act * 5 : 13 + Math.min(state.wave, LAST_WAVE) * 1.5)
+                * (1 + act * 0.045 + depth * 0.009 + levelPressure * 0.008) * (elite ? 1.3 : 1)),
             cooldown: 1.2, flash: 0, slam: 4, winding: 0, attackWindup: 0, attackX: x, attackY: y, chilled: 0, chillStrength: 0
         });
         const spawned = state.enemies[state.enemies.length - 1];
+        const traits = Object.keys(ELITE_MODIFIERS).filter(key => key !== "none");
+        spawned.modifier = elite && state.wave >= 11 && state.random() < 0.35
+            ? traits[Math.floor(state.random() * traits.length)] : "none";
         spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * difficulty.health);
         spawned.damage = Math.round(spawned.damage * difficulty.damage);
-        spawned.speed *= difficulty.speed;
+        spawned.speed = Math.min(210, spawned.speed) * difficulty.speed * (1 + Math.min(0.15, depth * 0.0015));
     }
     state.journal = bossWave ? `${map.boss} awakens. Escape the slam${act ? " and its projectile volley" : ""}!`
-        : localWave === 1 && act > 0 ? `${map.name}. Vitality and flasks restored. ${map.description}`
+        : localWave === 1 && act > 0 ? `${map.name}. The next stage begins. ${map.description}`
         : state.wave === 3 ? "Ash runners join the hunt. Fast but fragile: cleave before they surround you."
         : `Wave ${state.wave}. ${count} enemies emerge in ${map.name}.`;
 }
@@ -496,26 +580,27 @@ function spawnWave(state) {
 function fireVolley(state, enemy, angle, offsets, speed) {
     for (const offset of offsets) {
         if (state.projectiles.length >= 48) break;
-        state.projectiles.push({ x: enemy.x, y: enemy.y, vx: Math.cos(angle + offset) * speed, vy: Math.sin(angle + offset) * speed, life: 3, damage: enemy.damage });
+        state.projectiles.push({ x: enemy.x, y: enemy.y, vx: Math.cos(angle + offset) * speed, vy: Math.sin(angle + offset) * speed,
+            life: 3, damage: enemy.damage, source: enemyDamageSource(enemy, "projectile") });
     }
 }
 
-function collectLoot(state, dt) {
+function collectLoot(state, dt, collectAll = false) {
     const p = state.player;
     for (const drop of state.loot) {
-        drop.life -= dt;
+        if (drop.life <= 0) continue;
         const d = distance(p, drop);
         if (d < (state.buffs.magnet > 0 ? 270 : 95) + state.boons.harvest * 16 && d > 1) {
-            const travel = Math.min(d, 230 * dt);
+            const travel = Math.min(d, (1200 + d * 6) * dt);
             drop.x += (p.x - drop.x) / d * travel;
             drop.y += (p.y - drop.y) / d * travel;
         }
-        if (distance(p, drop) > 28) continue;
+        if (!collectAll && distance(p, drop) > 28) continue;
         drop.life = 0;
         if (drop.kind === "gold") state.gold += goldReward(drop.value, state.boons.fortune);
         else if (drop.kind === "flask") {
             const full = p.potions >= MAX_FLASKS;
-            if (full) p.health = Math.min(p.maxHealth, p.health + flaskHealing(state));
+            if (full) p.health = Math.min(p.maxHealth, p.health + p.maxHealth * 0.08 * difficultyFor(state).healing);
             else p.potions++;
             effect(state, "text", p.x, p.y - 45, "#e6a39a", full ? "FLASK HEAL" : "+1 FLASK");
         }
@@ -533,13 +618,13 @@ function collectLoot(state, dt) {
             if (drop.value > p.armorBonus) {
                 p.armorBonus = drop.value;
                 p.armor = drop.value >= 30 ? "Starwoven mantle" : drop.value >= 15 ? "Warden's mail" : "Ashguard leather";
-                state.journal = `${p.armor} equipped. ${drop.value} base armor. Forge bonuses are retained.`;
+                state.journal = `${p.armor} equipped. ${(drop.value * 0.6).toFixed(1)} armor from equipment. Forge bonuses are retained.`;
                 effect(state, "text", p.x, p.y - 45, "#b5b9f2", "ARMOR UPGRADED");
             } else state.gold += goldReward(10);
         } else if (drop.value > p.weaponBonus) {
             p.weaponBonus = drop.value;
             p.weapon = `${drop.value >= 54 ? "Cinder crown" : drop.value >= 33 ? "Mireglass" : drop.value >= 18 ? "Ashen sovereign" : drop.value >= 9 ? "Emberforged" : "Tempered hollow"} ${classFor(state).weaponType}`;
-            state.journal = `${p.weapon} equipped. +${drop.value} weapon damage.`;
+            state.journal = `${p.weapon} equipped. Relic rating ${drop.value}; +${Math.round(60 * (Math.sqrt(1 + drop.value / 30) - 1))} weapon damage.`;
             effect(state, "text", p.x, p.y - 45, "#a8d5cf", "WEAPON UPGRADED");
         } else state.gold += goldReward(10);
     }
@@ -548,15 +633,14 @@ function collectLoot(state, dt) {
 
 function finishCheckpoint(state) {
     const p = state.player;
-    for (const drop of state.loot) { drop.x = p.x; drop.y = p.y; }
-    collectLoot(state, 0);
+    collectLoot(state, 0, true);
     state.projectiles = [];
     state.playerShots = [];
-    p.health = p.maxHealth;
-    p.potions = MAX_FLASKS;
+    p.health = Math.min(p.maxHealth, p.health + p.maxHealth * 0.2 * difficultyFor(state).healing);
+    p.potions = Math.min(MAX_FLASKS, p.potions + 2);
     state.status = state.mode === "campaign" && state.wave === LAST_WAVE ? "won" : "camp";
     if (state.status === "won") state.campaignComplete = 1;
-    state.journal = state.mode === "endless" ? "Another watch completed. Rest, gather your strength, and carry the dawn onward. Your checkpoint is ready to save." : mapForWave(state.wave).ending;
+    state.journal = state.mode === "endless" ? "Stage cleared. All loot collected, partial healing and two flask charges granted. Saving before the next watch." : mapForWave(state.wave).ending;
 }
 
 export function step(state, input, elapsed) {
@@ -572,6 +656,8 @@ export function step(state, input, elapsed) {
         return;
     }
     state.time = (state.time + dt) % 3600;
+    for (const hit of state.damageHistory) hit.age += dt;
+    state.damageHistory = state.damageHistory.filter(hit => hit.age <= 8);
     const p = state.player;
     p.swing = Math.max(0, (p.swing ?? 0) - dt);
     p.casting = Math.max(0, (p.casting ?? 0) - dt);
@@ -579,10 +665,10 @@ export function step(state, input, elapsed) {
     const regeneration = Math.min(p.renewal, dt);
     for (const power of POWER_UPS) state.buffs[power.key] = Math.max(0, state.buffs[power.key] - dt);
     for (const key of [...SKILL_KEYS, "guarding", "invulnerable", "rolling", "afterstep", "flaskWard", "renewal"]) {
-        const recovery = SKILL_KEYS.includes(key)
-            ? (state.buffs.haste > 0 ? 1.4 : 1) * (1 + state.boons.focus * 0.05 + state.mastery.recovery * 0.005) : 1;
+        const recovery = SKILL_KEYS.includes(key) ? cooldownRecovery(state) : 1;
         p[key] = Math.max(0, p[key] - dt * recovery);
     }
+    if (wardWasActive && p.guarding === 0) p.guard = Math.max(p.guard, 4);
     if (regeneration > 0) p.health = Math.min(p.maxHealth, p.health + p.maxHealth * state.skillTree.potion.renewal * 0.02 * regeneration * difficultyFor(state).healing);
     if (wardWasActive && p.guarding === 0 && state.skillTree.guard.refuge > 0) {
         p.health = Math.min(p.maxHealth, p.health + p.maxHealth * state.skillTree.guard.refuge * 0.02 * difficultyFor(state).healing);
@@ -616,13 +702,14 @@ export function step(state, input, elapsed) {
     p.x = clamp(p.x + p.vx * dt, MARGIN, WIDTH - MARGIN);
     p.y = clamp(p.y + p.vy * dt, MARGIN, HEIGHT - MARGIN);
     if (state.enemies.some(enemy => enemy.health > 0) && ["fire", "storm", "void"].includes(map.hazard) && firePhase(state.time) >= 4
-        && map.hazards.some(seal => distance(p, seal) < seal.radius + p.radius)) hurtPlayer(state, 12 + mapIndexForWave(state.wave) * 4);
+        && map.hazards.some(seal => distance(p, seal) < seal.radius + p.radius)) hurtPlayer(state, 12 + mapIndexForWave(state.wave) * 4, `${map.name}: ${map.hazard} ground hazard`);
 
     stepPlayerShots(state, dt);
     if (state.status !== "playing") return;
     for (const enemy of state.enemies) {
         if (state.status !== "playing") break;
         if (enemy.health <= 0) continue;
+        if (enemy.modifier === "mending") enemy.health = Math.min(enemy.maxHealth, enemy.health + enemy.maxHealth * 0.015 * dt);
         enemy.chilled = Math.max(0, enemy.chilled - dt);
         if (enemy.chilled === 0) enemy.chillStrength = 0;
         enemy.cooldown = Math.max(-5, enemy.cooldown - dt);
@@ -639,7 +726,7 @@ export function step(state, input, elapsed) {
                 enemy.x = clamp(enemy.x + enemy.chargeX * travel, MARGIN, WIDTH - MARGIN);
                 enemy.y = clamp(enemy.y + enemy.chargeY * travel, MARGIN, HEIGHT - MARGIN);
                 enemy.charging = Math.max(0, enemy.charging - dt);
-                if (distanceToSegment(p, start, enemy) < enemy.radius + p.radius) hurtPlayer(state, enemy.damage * 1.5);
+                if (distanceToSegment(p, start, enemy) < enemy.radius + p.radius) hurtPlayer(state, enemy.damage * 1.5, enemyDamageSource(enemy, "charge"));
                 if (!enemy.charging) enemy.slam = 3.8;
             } else if (enemy.winding > 0) {
                 enemy.winding = Math.max(0, enemy.winding - dt);
@@ -662,7 +749,7 @@ export function step(state, input, elapsed) {
                 enemy.charging = Math.max(0, enemy.charging - dt);
                 enemy.x = clamp(enemy.x + enemy.chargeX * 560 * dt, MARGIN, WIDTH - MARGIN);
                 enemy.y = clamp(enemy.y + enemy.chargeY * 560 * dt, MARGIN, HEIGHT - MARGIN);
-                if (distance(p, enemy) < enemy.radius + p.radius + 8) hurtPlayer(state, enemy.damage * 2);
+                if (distance(p, enemy) < enemy.radius + p.radius + 8) hurtPlayer(state, enemy.damage * 2, enemyDamageSource(enemy, "charge"));
                 continue;
             }
             if (enemy.winding > 0) {
@@ -681,7 +768,7 @@ export function step(state, input, elapsed) {
                 enemy.winding = Math.max(0, enemy.winding - dt);
                 if (!enemy.winding) {
                     effect(state, "ring", enemy.x, enemy.y, "#ffc36d", "", 110);
-                    if (d < 110 + p.radius) hurtPlayer(state, enemy.damage * 2);
+                    if (d < 110 + p.radius) hurtPlayer(state, enemy.damage * 2, enemyDamageSource(enemy, "explosion"));
                     enemy.health = 0;
                     if (state.status === "playing") killEnemy(state, enemy);
                 }
@@ -690,18 +777,44 @@ export function step(state, input, elapsed) {
             if (d < 95) { enemy.winding = 1.1; continue; }
         }
         if (enemy.kind === "boss") {
+            const combat = enemy.combat;
+            if (combat.rest > 0) {
+                combat.rest = Math.max(0, combat.rest - dt);
+                continue;
+            }
             if (enemy.winding > 0) {
                 enemy.winding = Math.max(0, enemy.winding - dt);
                 if (enemy.winding === 0) {
-                    effect(state, "ring", enemy.x, enemy.y, "#ff775c", "", 135);
-                    if (d < 135 + p.radius) hurtPlayer(state, Math.round(enemy.damage * 1.5));
-                    const act = mapIndexForWave(state.wave);
-                    if (act > 0) fireVolley(state, enemy, Math.atan2(ey, ex), act === 1 ? [-0.4, 0, 0.4] : [-0.8, -0.4, 0, 0.4, 0.8], 170);
-                    enemy.slam = 4.5;
+                    const angle = Math.atan2(enemy.attackY - enemy.y, enemy.attackX - enemy.x);
+                    if (combat.pattern === 1) {
+                        effect(state, "ring", enemy.x, enemy.y, "#ff775c", "", 135);
+                        if (d < 135 + p.radius) hurtPlayer(state, Math.round(enemy.damage * 1.5), enemyDamageSource(enemy, "slam"));
+                    } else if (combat.pattern === 2) {
+                        fireVolley(state, enemy, angle, [-0.6, -0.3, 0, 0.3, 0.6], 190);
+                    } else {
+                        fireVolley(state, enemy, angle, Array.from({ length: 8 }, (_, i) => i * Math.PI / 4), 155);
+                    }
+                    combat.rest = combat.pattern === 3 ? 2 : 1.5;
+                    enemy.slam = 3;
+                    enemy.cooldown = Math.max(enemy.cooldown, 1);
                 }
-            } else {
-                enemy.slam -= dt;
-                if (enemy.slam <= 0) enemy.winding = 1.1;
+                continue;
+            }
+            const phase = enemy.health <= enemy.maxHealth / 3 ? 3 : enemy.health <= enemy.maxHealth * 2 / 3 ? 2 : 1;
+            if (phase > combat.phase) {
+                combat.phase = phase;
+                combat.rest = 1.5;
+                enemy.attackWindup = 0;
+                effect(state, "text", enemy.x, enemy.y - 60, "#ffd18d", `PHASE ${phase}`);
+                continue;
+            }
+            enemy.slam -= dt;
+            if (enemy.slam <= 0 && enemy.attackWindup === 0) {
+                combat.pattern = combat.phase === 1 ? 1 : combat.pattern % combat.phase + 1;
+                enemy.attackX = p.x;
+                enemy.attackY = p.y;
+                enemy.winding = 1.1;
+                continue;
             }
         }
         const ranged = ["wisp", "spitter", "summoner", "cantor", "hexer", "artillerist"].includes(enemy.kind);
@@ -713,7 +826,7 @@ export function step(state, input, elapsed) {
         }
         const stoppingDistance = enemy.kind === "artillerist" ? 360 : ranged ? 230 : enemy.radius + p.radius + 2;
         if (d > stoppingDistance && enemy.winding <= 0 && !attackReady) {
-            const movement = Math.min(enemy.speed * (1 - enemy.chillStrength) * dt, d - stoppingDistance);
+            const movement = Math.min(enemy.speed * (enemy.modifier === "swift" ? 1.18 : 1) * (1 - enemy.chillStrength) * dt, d - stoppingDistance);
             enemy.moving = true;
             enemy.stridePhase = (enemy.stridePhase ?? 0) + movement * 0.1;
             const flank = enemy.kind === "duelist" && d > 100 ? Math.sin(state.time * 2 + enemy.maxHealth) * 0.65 : 0;
@@ -732,13 +845,13 @@ export function step(state, input, elapsed) {
             }
             if (enemy.kind === "artillerist") {
                 effect(state, "ring", enemy.attackX, enemy.attackY, "#d39bff", "", 90);
-                if (Math.hypot(p.x - enemy.attackX, p.y - enemy.attackY) < 90 + p.radius) hurtPlayer(state, enemy.damage * 1.4);
+                if (Math.hypot(p.x - enemy.attackX, p.y - enemy.attackY) < 90 + p.radius) hurtPlayer(state, enemy.damage * 1.4, enemyDamageSource(enemy, "mortar blast"));
                 enemy.cooldown = 3.8;
                 enemy.swing = 0.3;
             } else if (enemy.kind === "summoner") {
                 if (state.enemies.length < 32) {
                     const health = Math.round(enemy.maxHealth * 0.35);
-                    state.enemies.push({ ...enemy, kind: "husk", elite: 0, x: clamp(enemy.x + 24, MARGIN, WIDTH - MARGIN), health, maxHealth: health, radius: 14, speed: 100, cooldown: 1.5, attackWindup: 0, chilled: 0, chillStrength: 0 });
+                    state.enemies.push({ ...enemy, kind: "husk", elite: 0, modifier: "none", combat: { volleys: [], phase: 1, rest: 0, pattern: 1 }, x: clamp(enemy.x + 24, MARGIN, WIDTH - MARGIN), health, maxHealth: health, radius: 14, speed: 100, cooldown: 1.5, attackWindup: 0, chilled: 0, chillStrength: 0 });
                     effect(state, "ring", enemy.x, enemy.y, "#cb9bea", "", 55);
                 }
                 enemy.cooldown = 5.5;
@@ -761,7 +874,7 @@ export function step(state, input, elapsed) {
             } else if (!ranged) {
                 const facing = Math.atan2(enemy.attackY - enemy.y, enemy.attackX - enemy.x);
                 effect(state, "slash", enemy.x, enemy.y, enemy.kind === "duelist" ? "#85e6eb" : "#f18a68", "", meleeReach, facing);
-                if (d < meleeReach + p.radius && Math.cos(Math.atan2(ey, ex) - facing) > 0.25) hurtPlayer(state, enemy.damage);
+                if (d < meleeReach + p.radius && Math.cos(Math.atan2(ey, ex) - facing) > 0.25) hurtPlayer(state, enemy.damage, enemyDamageSource(enemy, "melee strike"));
                 enemy.cooldown = 1;
                 enemy.swing = 0.3;
             }
@@ -774,7 +887,7 @@ export function step(state, input, elapsed) {
         bolt.x += bolt.vx * dt;
         bolt.y += bolt.vy * dt;
         if (distance(p, bolt) < p.radius + 6) {
-            hurtPlayer(state, bolt.damage);
+            hurtPlayer(state, bolt.damage, bolt.source ?? "Enemy projectile (older save)");
             bolt.life = 0;
         }
     }

@@ -20,6 +20,12 @@
         <p>Every fallen enemy counts. Each class keeps its own highest kill score for every difficulty and starting mode, even after death. Inspect a record to see the upgrades used in that build.</p>
     </section>
     <div class="filters">
+        <label>Patch
+            <select @bind="patch" @bind:after="RefreshAsync" disabled="@busy">
+                <option value="004">Patch 004 — fresh runs</option>
+                <option value="pre004">Pre-004 / inherited runs</option>
+            </select>
+        </label>
         <label>Difficulty
             <select @bind="difficulty" @bind:after="RefreshAsync" disabled="@busy">
                 <option value="hard">@RankingRules.DifficultyName("hard")</option>
@@ -44,7 +50,7 @@
         </label>
         <button type="button" @onclick="RefreshAsync" disabled="@busy">Refresh rankings</button>
     </div>
-    <p class="notice">Ranks and ties are calculated within each class. Entering Endless starts a new score on the selected difficulty; campaign-equipped characters and veteran starts have separate boards. Legacy saves are unranked.</p>
+    <p class="notice">Ranks and ties are calculated within each patch and class. New campaigns and fresh veteran Endless runs qualify for Patch 004. Saves from before patch tracking stay on the archive boards, including when continued into Endless, so inherited power cannot compete with fresh builds. Existing records are preserved. Legacy unranked saves remain unranked.</p>
     <p class="notice">Build details are captured when a higher score is submitted; later upgrades or tied scores do not rewrite that record. Older records keep their recorded class, but upgrades and discarded scores from other classes cannot be recovered.</p>
     @if (busy)
     {
@@ -66,7 +72,7 @@
                 <h2>@RankingRules.ClassName(board.Key)</h2>
                 <div class="table-scroll" role="region" aria-label="@(RankingRules.ClassName(board.Key) + " rankings")" tabindex="0">
                     <table>
-                        <caption>@RankingRules.DifficultyName(difficulty) · @(mode == "campaign" ? "CAMPAIGN JOURNEY" : mode == "ascended" ? "ENDLESS AFTER CAMPAIGN" : "VETERAN ENDLESS") · @board.Count() players</caption>
+                        <caption>@RankingRules.PatchName(patch) · @RankingRules.DifficultyName(difficulty) · @(mode == "campaign" ? "CAMPAIGN JOURNEY" : mode == "ascended" ? "ENDLESS AFTER CAMPAIGN" : "VETERAN ENDLESS") · @board.Count() players</caption>
                         <thead><tr><th scope="col">Rank</th><th scope="col">Ashbound</th><th scope="col">Best score</th><th scope="col">Upgrades at record</th><th scope="col">Record set (UTC)</th></tr></thead>
                         <tbody>
                             @foreach (var row in board)
@@ -118,6 +124,7 @@
     private string difficulty = "hard";
     private string mode = "campaign";
     private string heroClass = "all";
+    private string patch = RankingRules.CurrentPatch;
     private bool busy;
     private string? error;
     private IReadOnlyList<RankingRow> rows = [];
@@ -137,7 +144,7 @@
                 error = "Rankings are unavailable. Please try Refresh again shortly.";
                 return;
             }
-            var result = await Saves.GetRankingsAsync(user, difficulty, mode, heroClass);
+            var result = await Saves.GetRankingsAsync(user, difficulty, mode, heroClass, patch);
             if (result is null) error = "Could not load rankings. Please try again shortly.";
             else rows = result;
         }

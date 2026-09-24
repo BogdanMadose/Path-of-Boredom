@@ -18,14 +18,34 @@
     <article id="patch-003" aria-labelledby="patch-003-title">
         <header class="patch-heading">
             <div class="patch-meta"><span class="badge">PATCH 003</span><span class="badge latest">LATEST</span><a href="/patch-notes#patch-003" target="_self" aria-label="Link to patch 003">Permalink ↗</a></div>
-            <h2 id="patch-003-title">Fortune and the Critical Spark</h2>
-            <p>More rewarding battles, independent post-forge prices, and new ways to build critical hits.</p>
-            <div class="tags"><span>Reward buffs</span><span>Forge</span><span>New cards</span><span>Critical hits</span></div>
+            <h2 id="patch-003-title">Paths of Power</h2>
+            <p>New skills and branching trees, more rewarding battles, independent forge prices, and a more readable Endless Watch.</p>
+            <div class="tags"><span>Skills &amp; trees</span><span>New enemies</span><span>Endless fixes</span><span>Reward buffs</span><span>Forge</span><span>Critical hits</span></div>
         </header>
+        <section class="patch-section">
+            <p class="eyebrow">CLASS RANKINGS &amp; BUILDS</p><h3>A record for every class</h3>
+            <ul>
+                <li>Each player now keeps a separate highest kill score for Ember Knight, Dawn Ranger, and Iron Warden within every difficulty and starting mode. Playing another class no longer replaces or hides that class's best. Ranks and ties are calculated independently per class.</li>
+                <li>The rankings page shows all three class boards by default, with a class filter alongside difficulty and starting mode. Registered players appear on each board, with unplayed classes marked clearly.</li>
+                <li>New records include expandable build details: character level, manual and automatic skill slots, learned tree nodes, forge upgrades, level-up cards, and post-forge training, including each upgrade's rank. These are snapshots when a higher score is submitted, not a view of the player's current character; lower or tied scores do not overwrite them.</li>
+                <li>Existing records move to their recorded class without losing scores or timestamps. Pre-class records default to Ember Knight. Older builds and scores previously discarded for other classes cannot be reconstructed; missing build details are labeled rather than guessed.</li>
+                <li>Score synchronization and retries now track each class independently. Build summaries are size- and rank-bounded; rankings remain browser-reported community records, not cheat-proof competition.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">CLEARER DIFFICULTIES</p><h3>Know where to start</h3>
+            <ul>
+                <li><strong>Hard:</strong> the easiest of the three tiers and recommended for a first run, despite its name. Healing restores 80% of its normal amount.</li>
+                <li><strong>Nightmare:</strong> the middle tier, with more enemies that are tougher, faster, and hit harder than on Hard. Healing restores 60% of its normal amount.</li>
+                <li><strong>Inferno:</strong> the hardest tier, with the most enemies and highest enemy health, damage, and speed. Healing restores only 40% of its normal amount.</li>
+                <li>Run setup now explains the selected tier in plain language, and ranking filters use clearer labels. Difficulty names, balance multipliers, save compatibility, and existing score categories are unchanged.</li>
+            </ul>
+        </section>
         <section class="patch-section">
             <p class="eyebrow">REWARD BUFFS</p><h3>A little more from every battle</h3>
             <ul>
                 <li>Enemy XP rewards increased by <strong>10%</strong> on Hard, Nightmare, and Inferno, in both Campaign and Endless. Applies to ordinary enemies, elites, and bosses; rewards round to whole points.</li>
+                <li>After level 15, XP rewards gain another <strong>3% per level</strong>, capped at +60% at level 35. Next-level requirements grow by 22% instead of 35% after level 15; the 25,000 XP requirement cap remains. Existing XP is preserved.</li>
                 <li>Gold rewards increased by <strong>10%</strong>, including gold pickups, equipment salvage, and overflow loot conversion. Fortune cards still multiply gold pickups; starting gold and existing balances are unchanged.</li>
             </ul>
         </section>
@@ -51,10 +71,68 @@
             </ul>
         </section>
         <section class="patch-section">
+            <p class="eyebrow">ACCESS &amp; TRANSITIONS</p><h3>Find your footing</h3>
+            <ul>
+                <li>Fixed the forge and skill-unlock reminder strips blocking attacks and aiming at the bottom of the arena. Their text and backgrounds now pass clicks through to the canvas without selecting text; the reminder buttons remain interactive.</li>
+                <li>A persistent Endless control now sits beside the arena controls. Unlocked profiles can start a veteran Endless run without hunting for an overlay button. At campaign victory it offers to continue the current character. Load a completed campaign save first to keep that character's equipment.</li>
+                <li>Stage travel has a three-second countdown and fade. The next stage is prepared at the midpoint, while combat stays frozen until the countdown ends. New runs also receive three seconds to prepare.</li>
+                <li>Resuming from the forge, skill panel, or pause gives a 2.5-second countdown. Enemies, attacks, hazards, buffs, and cooldowns do not advance during it. Nearby return-to-battle buttons make leaving the shops easier.</li>
+                <li>A dismissible Patch 003 announcement links to these notes. Dismissal is remembered per user in this browser when local storage is available.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">COMBAT SKILLS &amp; CONTROLS</p><h3>Attack freely. Choose your skills.</h3>
+            <ul>
+                <li><strong>J / left click:</strong> regular attack, always available without a skill slot. Its forge, card, critical, and tree upgrades still apply; it cannot be auto-cast.</li>
+                <li><strong>Q:</strong> your selected manual combat skill, initially suggested as the class special. Only special, burst, and ward skills use slots: one manual and up to two automatic. The initial suggestion places burst in one auto slot and leaves the other empty. A skill cannot occupy two slots. Configure while paused through <strong>Skills &amp; loadout</strong>.</li>
+                <li>Starting a campaign, starting a fresh Endless run, or continuing a completed campaign into Endless now requires an explicit <strong>starting loadout confirmation</strong>. Skipping tutorial tips goes to skill selection rather than starting combat. Cancel preserves the existing character.</li>
+                <li>The third combat skill—the class ward—unlocks only at <strong>campaign stage 3 (wave 11)</strong>, or <strong>Echo 11 (wave 41)</strong> in a fresh Endless run. A completed campaign character keeps the unlock when entering Endless. Before that point, the ward cannot be slotted, cast, trained, purchased at the forge, or offered as a new level-up card.</li>
+                <li>Unlocking the ward shows an on-canvas <strong>Slot skill</strong> reminder after the travel countdown. It opens the loadout panel and pauses combat. The reminder stays pending until the ward is slotted or Later is selected; acknowledgement is retained by the next save. It does not resize the canvas or overlap the forge reminder.</li>
+                <li><strong>Space:</strong> dodge. <strong>E:</strong> drink a flask. Both remain upgradeable, always use their own controls, and can never be automatically cast. Touch controls retain separate attack, dodge, flask, and manual-skill buttons.</li>
+                <li>Auto casts have <strong>60% longer cooldowns</strong>. Offense aims at the nearest enemy in range; auto wards wait for nearby danger and avoid overwriting active protection. Updated the HUD, tutorial, loadout selectors, control guide, and low-health prompt to match.</li>
+                <li><strong>Ember Knight:</strong> Flame lance deals 2.4× weapon damage along a narrow 380-range beam (8s base cooldown). Ember aegis deals 0.8× in 125 radius (12s cooldown).</li>
+                <li><strong>Dawn Ranger:</strong> Piercing rain fires seven shield-piercing arrows, each dealing 1.1× weapon damage at 760 range (9s cooldown; each arrow hits once). Briar ward deals 0.65× in 180 radius (11s cooldown).</li>
+                <li><strong>Iron Warden:</strong> Fault line deals 3.2× weapon damage in a forward 280-range cone (10s cooldown). Iron bastion deals 1.2× in 150 radius (14s cooldown).</li>
+                <li>All wards grant <strong>40% damage reduction for three seconds</strong> before duration bonuses, stacking multiplicatively with armor and other protection. Class-colored shields, beams, cones, and arrow fans show the new skills in action.</li>
+                <li>New eight-rank forge entries: <strong>Breaking dawn</strong> adds +10% burst damage, +8 range, and +8% recovery per rank; <strong>Last sanctuary</strong> adds +8% ward damage, +8 radius, +0.2s protection, and +8% recovery per rank.</li>
+                <li>New ten-rank cards: <strong>Dawn unleashed</strong> adds +6% burst damage per rank; <strong>A shelter in embers</strong> adds +0.15s ward protection per rank. Existing damage, cooldown, and area training also supports the new damaging skills.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">LIMITED SKILL POINTS</p><h3>Choose a path for every skill</h3>
+            <p>Earn one point <strong>every two levels</strong>, starting at level 2, capped at <strong>32 total</strong> instead of 12. Each complete tree costs eight points: fully upgrade three trees at level 48 or four at level 64. Existing characters automatically receive their expanded level-appropriate budget without losing learned ranks. Each rank costs one point; choices remain with this character.</p>
+            <ul>
+                <li>Each action now has its own upgrade path instead of sharing Empower, Expand, Ignite, and Flow. Fire damage is exclusive to the class-special tree; wards, dodges, and flasks no longer produce generic fire pulses.</li>
+                <li><strong>Regular attack:</strong> Honed edge adds +8% damage per rank; Long reach adds +10% reach or arrow range per rank; Finisher deals 25% more damage against enemies at or below 35% health; Weapon tempo adds +6% regular-attack speed per rank. Silver trails and crimson finishing marks distinguish weapon upgrades.</li>
+                <li><strong>Class special:</strong> Amplify adds +10% damage per rank; Resonance adds +10% radius or volley range per rank; Sunfire adds 15% fire damage; Chilling wake slows enemy walking by 15% per rank for 1.5 seconds without slowing charges. Golden pulses, fiery arrows, and frost rings show the learned effects.</li>
+                <li><strong>Burst:</strong> Concentrate adds +12% damage per rank. The shape branch widens Flame lance by 20% per rank, adds two Piercing rain arrows per rank, or widens each side of Fault line by 10 degrees per rank. Giant slayer adds 25% damage against elites and bosses; Overdrive adds 10 percentage points critical chance per rank to burst hits only, respecting the 75% cap.</li>
+                <li><strong>Ward:</strong> Bulwark adds five percentage points damage reduction per rank, up to 55%; Enduring ward adds 0.6 seconds protection per rank; Repulsion pushes enemies back 60 units, or 30 for bosses; Safe haven restores 2% maximum health per rank when protection expires. Shields, repulsion waves, and healing crosses replace offensive fire upgrades.</li>
+                <li><strong>Dodge:</strong> Ghoststep adds 0.04 seconds invulnerability per rank; Long stride adds 0.025 seconds roll duration per rank; Windstep grants +20% walking speed for 1.2 seconds from the dodge start without changing roll speed; Quick footing adds +10% dodge cooldown recovery per rank. Evasion outlines and wind trails identify these mobility upgrades.</li>
+                <li><strong>Life flask:</strong> Distill adds +10% healing per rank; Triage adds +12% healing per rank when drinking at or below 35% health; Iron tonic grants 25% damage reduction for two seconds, stacking multiplicatively with other protection; Renewal regenerates 4% maximum health per rank over two seconds and refreshes rather than stacks. Healing respects difficulty penalties; emergency crosses, tonic shields, and regeneration auras show the effects.</li>
+                <li>The skill-tree interface uses circular nodes joined by visible branching paths. Each root has three ranks, its two branches have two and one ranks, and the final node has two ranks. Branches require the root; the final node requires either branch. Learned and available paths have distinct highlights. Hover or keyboard focus reveals upgrade descriptions, rank costs, and unmet prerequisites. On touch, tap once to inspect and again to purchase; locked nodes remain inspectable.</li>
+                <li>Individual node rank limits are unchanged; the larger point budget supports deeper builds while still requiring choices across the six trees. Reduced-motion preferences preserve readable warnings while suppressing cosmetic movement.</li>
+                <li>Fixed skill-node tooltips remaining visible after allocating a point. Successful allocation dismisses the tooltip without removing keyboard focus; hovering again, refocusing, or tapping to inspect reopens it.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
+            <p class="eyebrow">ENEMY VARIETY</p><h3>Read the next strike</h3>
+            <ul>
+                <li><strong>Duelists, from wave 4:</strong> cyan twin-blade fighters flank before a marked 0.65-second forward slash.</li>
+                <li><strong>Artillerists, from wave 13:</strong> violet mortar units mark a ground circle for 1.1 seconds before a 90-radius blast. The aim stays fixed: leave the circle before impact.</li>
+                <li>Ordinary melee attacks now wind up with visible arcs and locked aim: 0.55 seconds normally and 0.8 seconds for brutes. Ranged enemies show casting warnings; aimed projectile attacks lock direction during wind-up.</li>
+                <li>Removed the ranged projectile aiming lines. Casting animations and bright projectiles remain; melee arcs, charge lanes, and mortar-area warnings are unchanged.</li>
+                <li>Enemy projectiles have bright pink-white cores, contrasting dark outlines, glow, and longer directional trails. They render above combat effects and the vignette. Damage, speed, and collision hitboxes are unchanged.</li>
+            </ul>
+        </section>
+        <section class="patch-section">
             <p class="eyebrow">SAVE COMPATIBILITY</p><h3>Keep your existing character</h3>
             <ul>
-                <li>Save format 8 stores the new cards, regular upgrades, and training ranks. Earlier saves load with zero ranks in new cards and training stats, without rerolling pending card offers.</li>
-                <li>Characters that had completed all six old regular forge upgrades receive both new regular critical upgrades at maximum rank, preserving access to post-forge training. Other older characters start those two upgrades at rank zero.</li>
+                <li>Save format 12 stores the action-specific trees, chilling, Windstep, tonic protection, and regeneration alongside existing progression, loadouts, and ward-unlock acknowledgement. Formats 1–11 remain supported without rerolling pending cards.</li>
+                <li>Previously spent generic-tree points are returned for reassignment to the new trees. Equipment, forge upgrades, and cards are preserved; new timed effects start inactive. Skill-point budgets use the expanded one-per-two-levels rate, capped at 32.</li>
+                <li>Older characters below the ward's unlock stage keep their purchased forge upgrades, but the ward is removed from their loadout and active protection ends until the stage requirement is met. Existing unlocked, equipped wards stay equipped without a redundant reminder.</li>
+                <li>Older version 9 loadouts lose attack/dodge/flask auto assignments, retain valid combat-skill assignments, and default Q to the class special if the old manual slot held a regular action. Empty auto slots remain empty after migration; existing upgrades are preserved.</li>
+                <li>Characters that had completed their old regular forge receive newly added regular entries fully ranked, preserving post-forge access. Other older characters start those new upgrades at zero. Existing scroll indices are preserved.</li>
+                <li>Browser and server validation enforce point budgets, prerequisites, unique slots, ranks, and travel state. Skill and loadout changes autosave at checkpoints; elsewhere use Save or reach the next checkpoint.</li>
                 <li>Existing upgrade-scroll indices are preserved, and new scrolls can award critical upgrades. Both browser and server validation support the expanded progression.</li>
             </ul>
         </section>

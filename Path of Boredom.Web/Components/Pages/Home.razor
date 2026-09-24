@@ -23,7 +23,11 @@
             <button type="button" class="quiet-button" data-action="pause" disabled>Pause <kbd>P</kbd></button>
         </div>
     </header>
-
+    <aside class="patch-notice" data-patch-notice role="status">
+        <span><strong>Patch 003 is live — Paths of Power</strong> · New skills and upgrades, independent regular attacks, Q for your manual skill, Space to dodge, E to heal, and clearer enemy projectiles.</span>
+        <a href="/patch-notes#patch-003" target="_blank" rel="noopener">Read patch notes ↗</a>
+        <button type="button" class="quiet-button" data-dismiss-patch aria-label="Dismiss patch announcement">Dismiss</button>
+    </aside>
     <p class="save-status" data-save-status role="status" aria-live="polite">Saves belong to your signed-in Windows account. Checkpoints save automatically; manual Save/Load is also available.</p>
     <p class="save-status" data-ranking-status role="status">@rankingStatus</p>
 
@@ -41,13 +45,15 @@
                     <div>
                         <button type="button" class="quiet-button" data-focus-view aria-pressed="false">Focus view</button>
                         <button type="button" class="quiet-button" data-recenter>Recenter</button>
+                        <button type="button" class="quiet-button" data-launch-endless disabled>Endless (locked)</button>
+                        <button type="button" class="quiet-button" data-open-skills disabled>Skills &amp; loadout</button>
                         <button type="button" class="quiet-button" data-combat-pause disabled>Pause</button>
                     </div>
                 </div>
                 <div class="arena-topline"><span><i class="live-dot"></i> <span data-stat="objective">Recover six dawns across 30 waves.</span></span><span>WAVE <strong data-stat="wave">&mdash;</strong> / <strong data-stat="last-wave">30</strong></span></div>
                 <div class="arena-viewport">
                     <p class="health-warning" data-health-warning role="status" aria-live="polite"></p>
-                    <canvas width="1100" height="650" tabindex="0" aria-label="Action RPG arena. Use WASD or arrow keys to move, J or left mouse for your class attack, Q for your class special, Space to dodge, and P to pause." aria-describedby="game-controls"></canvas>
+                    <canvas width="1100" height="650" tabindex="0" aria-label="Action RPG arena. WASD or arrows move. J or left click attacks. Q uses your manual skill. Space dodges, E drinks a flask, and P pauses. Up to two combat skills can cast automatically." aria-describedby="game-controls"></canvas>
                     <div class="arena-overlay" data-overlay>
                         <section class="level-draft" data-level-draft hidden aria-labelledby="level-draft-title">
                             <p class="eyebrow" data-stat="draft-level">LEVEL UP</p>
@@ -87,11 +93,12 @@
                             <h2 id="setup-title" data-setup-title>Choose your challenge</h2>
                             <p data-setup-description></p>
                             <label class="difficulty-picker" data-setup-difficulty>Difficulty
-                                <select data-difficulty>
-                                    <option value="hard">Hard — relentless</option>
-                                    <option value="nightmare">Nightmare — brutal</option>
-                                    <option value="inferno">Inferno — unforgiving</option>
+                                <select data-difficulty aria-describedby="difficulty-description">
+                                    <option value="hard">Hard — easiest / recommended start</option>
+                                    <option value="nightmare">Nightmare — tougher enemies, less healing</option>
+                                    <option value="inferno">Inferno — hardest / least forgiving</option>
                                 </select>
+                                <small id="difficulty-description" data-difficulty-description aria-live="polite"></small>
                             </label>
                             <label class="difficulty-picker" data-class-picker>Character class
                                 <select data-hero-class aria-describedby="class-preview-description">
@@ -107,13 +114,36 @@
                                 <p data-class-skills></p>
                                 <small>Base stats before equipment and upgrades. Class stays with the character, including continuation into Endless.</small>
                             </section>
+                            <section data-setup-loadout hidden aria-label="Starting skill loadout">
+                                <p data-setup-unlock></p>
+                                <div class="loadout-grid">
+                                    @for (var slot = 0; slot < 3; slot++)
+                                    {
+                                        <label>@(slot == 0 ? "Manual skill (Q)" : $"Auto slot {slot}")
+                                            <select data-setup-slot="@slot">
+                                                @if (slot > 0) { <option value="none">Empty</option> }
+                                                @foreach (var skill in new[] { "nova", "burst", "guard" })
+                                                {
+                                                    <option value="@skill" data-setup-skill="@skill">@skill</option>
+                                                }
+                                            </select>
+                                        </label>
+                                    }
+                                </div>
+                                <p class="forge-feedback" data-setup-loadout-feedback role="status"></p>
+                            </section>
                             <button type="button" class="ember-button" data-setup-next>Continue</button>
-                            <button type="button" class="quiet-button restart-button" data-setup-skip hidden>Skip tips &amp; start</button>
+                            <button type="button" class="quiet-button restart-button" data-setup-skip hidden>Skip tips &amp; choose skills</button>
                             <button type="button" class="quiet-button restart-button" data-setup-cancel>Cancel</button>
                         </section>
                     </div>
                     <div class="arena-caption" data-stat="map-caption" aria-hidden="true">THE ASHEN HOLLOW / ASHBOUND SANCTUM</div>
                     <div class="forge-nudge" data-forge-nudge hidden><span data-stat="forge-hint" role="status"></span><button type="button" class="quiet-button" data-open-forge>Open forge</button></div>
+                    <div class="forge-nudge skill-unlock-nudge" data-skill-unlock hidden>
+                        <span data-stat="skill-unlock-hint" role="status"></span>
+                        <button type="button" class="quiet-button" data-slot-unlocked>Slot skill</button>
+                        <button type="button" class="quiet-button" data-dismiss-unlock aria-label="Dismiss skill unlock reminder">Later</button>
+                    </div>
                 </div>
                 <div class="power-strip" aria-label="Active timed power-ups"><span>EMBER BLESSINGS</span><strong data-stat="buffs">No active power-ups</strong></div>
                 <div class="vitals">
@@ -122,16 +152,67 @@
                     <div class="vital experience"><div><span>EXPERIENCE</span><strong data-stat="xp">0 / 60</strong></div><meter data-meter="xp" min="0" max="60" value="0" aria-label="Experience"></meter></div>
                 </div>
                 <div class="skill-bar">
-                    <button type="button" data-skill="attack"><kbd>J / LMB</kbd><span class="skill-icon" data-stat="class-icon">&#9876;</span><span><span data-stat="attack-name">Cleave</span><small data-stat="attack">Ready</small></span></button>
-                    <button type="button" data-skill="nova"><kbd>Q</kbd><span class="skill-icon nova-icon">&#10023;</span><span><span data-stat="special-name">Ember nova</span><small data-stat="nova">Ready</small></span></button>
-                    <button type="button" data-skill="dodge"><kbd>SPACE</kbd><span class="skill-icon dodge-icon">&raquo;</span><span>Dodge<small data-stat="dodge">Ready</small></span></button>
-                    <button type="button" data-skill="potion"><kbd>E</kbd><span class="skill-icon potion-icon">+</span><span>Life flask<small data-stat="potion">3 charges</small></span></button>
+                    @foreach (var skill in new[] { "attack", "nova", "burst", "guard", "dodge", "potion" })
+                    {
+                        <button type="button" data-skill="@skill"><kbd data-slot-label></kbd><span class="skill-icon">&#10023;</span><span><span data-skill-name="@skill">@skill</span><small data-stat="@skill">Ready</small></span></button>
+                    }
                 </div>
                 <div class="touch-movement" aria-label="Touch movement controls">
                     <button type="button" data-move="up" aria-label="Move up">&uarr;</button>
                     <div><button type="button" data-move="left" aria-label="Move left">&larr;</button><button type="button" data-move="down" aria-label="Move down">&darr;</button><button type="button" data-move="right" aria-label="Move right">&rarr;</button></div>
                 </div>
                 </div>
+                <section class="skills-panel" data-skills aria-labelledby="skills-title">
+                    <div class="forge-heading"><h2 id="skills-title">Paths of power</h2><strong data-stat="skill-points">0 points available</strong></div>
+                    <p>J or left click is your regular attack; Space dodges and E drinks a flask. These actions never need slots and cannot auto-cast. Choose one combat skill for Q and up to two for auto-casting, with 60% longer cooldowns. Pause to configure. Attacks and all abilities remain upgradeable: earn one point every two levels, up to 32 total—enough to fully upgrade four trees at level 64. Choices stay with this character.</p>
+                    <div class="loadout-grid">
+                        @for (var slot = 0; slot < 3; slot++)
+                        {
+                            <label>@(slot == 0 ? "Manual skill (Q)" : $"Auto slot {slot}")
+                                <select data-loadout-slot="@slot" disabled>
+                                    @if (slot > 0) { <option value="none">Empty</option> }
+                                    @foreach (var skill in new[] { "nova", "burst", "guard" })
+                                    {
+                                        <option value="@skill" data-skill-name="@skill">@skill</option>
+                                    }
+                                </select>
+                            </label>
+                        }
+                    </div>
+                    <p class="forge-feedback" data-skill-feedback role="status">Only special, burst, and ward skills use slots; no skill can occupy two slots. Regular attacks, dodge, and flasks are always manual. Unsaved changes require Save or the next checkpoint.</p>
+                    <p class="skill-unlock-status" data-stat="ward-unlock-status"></p>
+                    <button type="button" class="ember-button" data-resume-combat disabled>Return to battle</button>
+                    <div class="skill-tree-grid">
+                        @foreach (var skill in new[] { "attack", "nova", "burst", "guard", "dodge", "potion" })
+                        {
+                            <section class="skill-tree" data-tree-skill="@skill">
+                                <h3 data-skill-name="@skill">@skill</h3>
+                                <p data-skill-description="@skill"></p>
+                                <p class="tree-path">Hover or focus for details. On touch, tap to inspect, then tap again to learn. Each rank costs 1 point.</p>
+                                <div class="skill-tree-map" role="group" aria-label="Upgrade branches">
+                                    <svg class="tree-connections" viewBox="0 0 300 300" preserveAspectRatio="none" aria-hidden="true">
+                                        <path data-tree-link="root-left" d="M150 40 L75 150" />
+                                        <path data-tree-link="root-right" d="M150 40 L225 150" />
+                                        <path data-tree-link="left-capstone" d="M75 150 L150 260" />
+                                        <path data-tree-link="right-capstone" d="M225 150 L150 260" />
+                                    </svg>
+                                    @foreach (var node in new[] { "root", "left", "right", "capstone" })
+                                    {
+                                        <div class="tree-node tree-node-@node">
+                                            <button type="button" data-learn-skill="@skill" data-tree-slot="@node" aria-disabled="true" aria-describedby="tree-tip-@skill-@node">
+                                                <span class="tree-node-icon" data-tree-icon aria-hidden="true">◇</span>
+                                                <strong data-tree-name>@node</strong><small data-tree-rank></small>
+                                            </button>
+                                            <div class="tree-tooltip" id="tree-tip-@skill-@node" role="tooltip">
+                                                <span data-tree-detail></span><strong data-tree-status></strong>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </section>
+                        }
+                    </div>
+                </section>
                 <section class="forge-panel" data-forge aria-labelledby="forge-title">
                     <div class="forge-heading">
                         <div>
@@ -140,6 +221,7 @@
                         </div>
                         <span data-stat="forge-gold">0 gold</span>
                     </div>
+                    <button type="button" class="ember-button" data-resume-combat disabled>Return to battle</button>
                     <p class="forge-hint">Gold is your main upgrade source: select Forge to pause and buy ranks. Scrolls are rare elite/boss drops. Max every forge item to unlock unlimited stat training. Purchases at checkpoints autosave; elsewhere, use Save.</p>
                     <div class="forge-grid">
                         <button type="button" data-upgrade="weapon" disabled><strong>Sunsteel edge</strong><span>Weapon damage</span><small data-upgrade-label="weapon">Rank 0 / 50</small></button>
@@ -150,6 +232,8 @@
                         <button type="button" data-upgrade="flask" disabled><strong>Living ember</strong><span>Healing power + flask refill</span><small data-upgrade-label="flask">Rank 0 / 5</small></button>
                         <button type="button" data-upgrade="critChance" disabled><strong>Keen ember</strong><span>+2 percentage points critical chance; 75% total cap</span><small data-upgrade-label="critChance">Rank 0 / 8</small></button>
                         <button type="button" data-upgrade="critDamage" disabled><strong>Ruin's edge</strong><span>+10 percentage points critical damage</span><small data-upgrade-label="critDamage">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="burst" disabled><strong>Breaking dawn</strong><span data-stat="forge-burst">Class burst damage, range and recovery</span><small data-upgrade-label="burst">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="guard" disabled><strong>Last sanctuary</strong><span data-stat="forge-guard">Class ward damage, radius, duration and recovery</span><small data-upgrade-label="guard">Rank 0 / 8</small></button>
                     </div>
                     <p class="forge-feedback" data-forge-feedback role="status" aria-live="polite">Every coin is a choice. Damage, survival, or skills?</p>
                     <section class="mastery-panel" data-mastery hidden aria-labelledby="mastery-title">
@@ -176,7 +260,7 @@
                 <section class="journal-card"><p class="eyebrow">FIELD JOURNAL</p><p data-stat="journal" role="status" aria-live="polite">A faint warmth lingers beneath the ashes.</p></section>
                 <section class="controls-card"><p class="eyebrow">PICKUP BLESSINGS</p><dl><dt>Bloodsun / 15s</dt><dd>+50% damage</dd><dt>Windwake / 12s</dt><dd>Speed + recovery</dd><dt>Dawn aegis / 10s</dt><dd>Half damage</dd><dt>Gravetide / 20s</dt><dd>Loot magnet</dd></dl><p>Glowing pickups grant temporary powers. Picking up the same blessing refreshes its timer. Pale scrolls permanently add one upgrade rank to this run.</p></section>
                 <section class="controls-card"><p class="eyebrow">THE ROAD AHEAD</p><dl><dt>1-5</dt><dd>Ashen Hollow</dd><dt>6-10</dt><dd>Drowned Wilds</dd><dt>11-15</dt><dd>Cinder Citadel</dd><dt>16-20</dt><dd>Glass Expanse</dd><dt>21-25</dt><dd>Storm Archive</dd><dt>26-30</dt><dd>Starless Gate</dd><dt>After 30</dt><dd>Endless Watch</dd></dl><p data-stat="threat">Husks swarm, brutes strike hard, and wisps attack at range.</p></section>
-                <section class="controls-card" id="game-controls"><p class="eyebrow">HOW TO SURVIVE</p><dl><dt>WASD / arrows</dt><dd>Move</dd><dt>Mouse</dt><dd>Aim</dd><dt>J / left click</dt><dd>Cleave</dd><dt>Q / Space / E</dt><dd>Nova / dodge / heal</dd><dt>P / Escape</dt><dd>Pause</dd><dt>Flask pickups</dt><dd>Carry up to 5</dd></dl><p>At 5 flasks, another pickup heals for one flask's amount. Step sideways out of amber Lancer lanes before they dash. Spend gold at the forge rather than waiting for scrolls.</p></section>
+                <section class="controls-card" id="game-controls"><p class="eyebrow">HOW TO SURVIVE</p><dl><dt>WASD / arrows</dt><dd>Move</dd><dt>Mouse</dt><dd>Aim</dd><dt>J / left click</dt><dd>Regular attack</dd><dt>Q</dt><dd>Selected manual skill</dd><dt>Space / E</dt><dd>Dodge / flask (manual)</dd><dt>Two auto slots</dt><dd>Combat skills only; +60% cooldown</dd><dt>P / Escape</dt><dd>Pause</dd><dt>Skills &amp; loadout</dt><dd>Assign skills / upgrade attacks and abilities</dd><dt>Flask pickups</dt><dd>Carry up to 5</dd></dl><p>Earn an upgrade point every five levels, up to 12. Avoid bright pink-white enemy projectiles, marked attack arcs, and mortar circles. Returning from the forge gives you a countdown.</p></section>
             </aside>
         </div>
         <footer class="game-footer"><span>SIX DAWNS. ONE LAST PROMISE.</span><span>Windows account saves &middot; Checkpoint autosaves &middot; Permanent Endless unlock</span><span class="credit">Developed by MadBone | LIT MES TSR</span></footer>
@@ -197,7 +281,7 @@
         var user = (await AuthenticationState.GetAuthenticationStateAsync()).User;
         windowsUserName = user.Identity?.Name?.Split('\\').Last() ?? string.Empty;
         rankingStatus = await Saves.RegisterPlayerAsync(user)
-            ? "Rankings connected. Best kill scores are kept separately by difficulty and starting mode."
+            ? "Rankings connected. Best kill scores and builds are kept separately by class, difficulty, and starting mode."
             : "Rankings unavailable. Scores will retry during play.";
     }
 

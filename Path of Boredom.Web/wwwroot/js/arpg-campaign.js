@@ -49,7 +49,7 @@ export const MAPS = [
     }
 ];
 export const LAST_WAVE = MAPS.length * WAVES_PER_MAP;
-export const ENEMY_KINDS = ["husk", "brute", "wisp", "runner", "spitter", "sentinel", "reaver", "lancer", "bomber", "summoner", "cantor", "hexer", "boss"];
+export const ENEMY_KINDS = ["husk", "brute", "wisp", "runner", "spitter", "sentinel", "reaver", "lancer", "bomber", "summoner", "cantor", "hexer", "boss", "duelist", "artillerist"];
 export const mapIndexForWave = wave => Math.max(0, Math.floor((wave - 1) / WAVES_PER_MAP)) % MAPS.length;
 export const mapForWave = wave => MAPS[mapIndexForWave(wave)];
 export const firePhase = time => time % 6;
@@ -69,10 +69,14 @@ export const UPGRADES = {
     dodge: { name: "Ghoststep", max: 8, base: 40, detail: "Faster dodge recovery and longer invulnerability" },
     flask: { name: "Living ember", max: 5, base: 35, detail: "Stronger healing; refill all flask charges on purchase" },
     critChance: { name: "Keen ember", max: 8, base: 60, detail: "+2 percentage points critical chance per rank; total chance capped at 75%" },
-    critDamage: { name: "Ruin's edge", max: 8, base: 65, detail: "+10 percentage points critical damage per rank" }
+    critDamage: { name: "Ruin's edge", max: 8, base: 65, detail: "+10 percentage points critical damage per rank" },
+    burst: { name: "Breaking dawn", max: 8, base: 70, detail: "Improves your class burst: +10% damage, +8 range and +8% cooldown recovery per rank" },
+    guard: { name: "Last sanctuary", max: 8, base: 65, detail: "Improves your class ward: +8% damage, +8 radius, +0.2s protection and +8% cooldown recovery per rank" }
 };
 
 export function threatForWave(wave) {
+    if (wave >= 13 && wave < 16) return "Artillerists mark violet blast zones. Leave the circle before the mortar lands!";
+    if (wave >= 4 && wave < 6) return "Duelists flank before a cyan slash. Step out of marked melee arcs during wind-up.";
     if (wave >= 8 && wave < 11) return "Lancers mark a long amber lane, then dash across the arena. Step sideways during the warning!";
     if (wave > LAST_WAVE) return "Endless echoes: mixed armies, more elites, escalating strength. Every fifth echo has a boss.";
     if (wave >= 26) return "Hexers cast radial volleys. Dodge between bolts; take them down before the gate opens.";
@@ -87,6 +91,8 @@ export function threatForWave(wave) {
 }
 
 export function enemyKindForWave(wave, index) {
+    if (wave >= 13 && index % 10 === 7) return "artillerist";
+    if (wave >= 4 && index % 9 === 5) return "duelist";
     if (wave >= 8 && index % 8 === 3) return "lancer";
     if (wave >= 26 && index % 7 === 2) return "hexer";
     if (wave >= 24 && index % 11 === 4) return "cantor";

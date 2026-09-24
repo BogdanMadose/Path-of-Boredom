@@ -17,14 +17,14 @@
     <section class="heading">
         <p class="eyebrow">HALL OF EMBERS</p>
         <h1>Those who held the dawn</h1>
-        <p>Every fallen enemy counts. Your highest kill score is kept for each difficulty and starting mode, even after death.</p>
+        <p>Every fallen enemy counts. Each class keeps its own highest kill score for every difficulty and starting mode, even after death. Inspect a record to see the upgrades used in that build.</p>
     </section>
     <div class="filters">
         <label>Difficulty
             <select @bind="difficulty" @bind:after="RefreshAsync" disabled="@busy">
-                <option value="hard">Hard</option>
-                <option value="nightmare">Nightmare</option>
-                <option value="inferno">Inferno</option>
+                <option value="hard">@RankingRules.DifficultyName("hard")</option>
+                <option value="nightmare">@RankingRules.DifficultyName("nightmare")</option>
+                <option value="inferno">@RankingRules.DifficultyName("inferno")</option>
             </select>
         </label>
         <label>Starting mode
@@ -34,9 +34,18 @@
                 <option value="ascended">Endless after campaign</option>
             </select>
         </label>
+        <label>Class
+            <select @bind="heroClass" @bind:after="RefreshAsync" disabled="@busy">
+                <option value="all">All class boards</option>
+                <option value="knight">Ember Knight</option>
+                <option value="ranger">Dawn Ranger</option>
+                <option value="warden">Iron Warden</option>
+            </select>
+        </label>
         <button type="button" @onclick="RefreshAsync" disabled="@busy">Refresh rankings</button>
     </div>
-    <p class="notice">Entering Endless starts a new score on the selected difficulty. Campaign-equipped characters and veteran starts have separate boards. Legacy saves are unranked. Equal scores share a rank.</p>
+    <p class="notice">Ranks and ties are calculated within each class. Entering Endless starts a new score on the selected difficulty; campaign-equipped characters and veteran starts have separate boards. Legacy saves are unranked.</p>
+    <p class="notice">Build details are captured when a higher score is submitted; later upgrades or tied scores do not rewrite that record. Older records keep their recorded class, but upgrades and discarded scores from other classes cannot be recovered.</p>
     @if (busy)
     {
         <p role="status">Gathering the names of the watch...</p>
@@ -51,24 +60,56 @@
     }
     else
     {
-        <div class="table-scroll" role="region" aria-label="Player rankings" tabindex="0">
-            <table>
-                <caption>@difficulty.ToUpperInvariant() · @(mode == "campaign" ? "CAMPAIGN JOURNEY" : mode == "ascended" ? "ENDLESS AFTER CAMPAIGN" : "VETERAN ENDLESS") · @rows.Count players</caption>
-                <thead><tr><th scope="col">Rank</th><th scope="col">Ashbound</th><th scope="col">Class used</th><th scope="col">Best score</th><th scope="col">Record set (UTC)</th></tr></thead>
-                <tbody>
-                    @foreach (var row in rows)
-                    {
-                        <tr class="@(row.IsCurrentUser ? "current" : null)">
-                            <td><span class="rank">#@row.Rank</span></td>
-                            <th scope="row">@row.Player @if (row.IsCurrentUser) { <small>YOU</small> }</th>
-                            <td><span class="class-badge">@RankingRules.ClassName(row.HeroClass)</span></td>
-                            <td class="score">@row.Score.ToString("N0")</td>
-                            <td>@(row.AchievedAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "Not played yet")</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+        @foreach (var board in rows.GroupBy(row => row.HeroClass))
+        {
+            <section class="class-board" @key="board.Key" aria-label="@RankingRules.ClassName(board.Key)">
+                <h2>@RankingRules.ClassName(board.Key)</h2>
+                <div class="table-scroll" role="region" aria-label="@(RankingRules.ClassName(board.Key) + " rankings")" tabindex="0">
+                    <table>
+                        <caption>@RankingRules.DifficultyName(difficulty) · @(mode == "campaign" ? "CAMPAIGN JOURNEY" : mode == "ascended" ? "ENDLESS AFTER CAMPAIGN" : "VETERAN ENDLESS") · @board.Count() players</caption>
+                        <thead><tr><th scope="col">Rank</th><th scope="col">Ashbound</th><th scope="col">Best score</th><th scope="col">Upgrades at record</th><th scope="col">Record set (UTC)</th></tr></thead>
+                        <tbody>
+                            @foreach (var row in board)
+                            {
+                                <tr class="@(row.IsCurrentUser ? "current" : null)">
+                                    <td><span class="rank">#@row.Rank</span></td>
+                                    <th scope="row">@row.Player @if (row.IsCurrentUser) { <small>YOU</small> }</th>
+                                    <td class="score">@row.Score.ToString("N0")</td>
+                                    <td class="build-cell">
+                                        @if (row.Build is { } build)
+                                        {
+                                            <details class="build-details">
+                                                <summary>Level @build.Level · View upgrades (@build.Upgrades.Count)</summary>
+                                                <p><strong>Manual (Q):</strong> @build.ManualSkill<br /><strong>Auto:</strong> @(build.AutoSkills.Count == 0 ? "None" : string.Join(", ", build.AutoSkills))</p>
+                                                @if (build.Upgrades.Count == 0)
+                                                {
+                                                    <p>No upgrades taken yet.</p>
+                                                }
+                                                @foreach (var group in build.Upgrades.GroupBy(upgrade => upgrade.Category))
+                                                {
+                                                    <h3>@RankingRules.UpgradeCategory(group.Key)</h3>
+                                                    <ul>
+                                                        @foreach (var upgrade in group)
+                                                        {
+                                                            <li>@upgrade.Name <strong>rank @upgrade.Rank.ToString("N0")</strong></li>
+                                                        }
+                                                    </ul>
+                                                }
+                                            </details>
+                                        }
+                                        else
+                                        {
+                                            <span class="build-unavailable">@(row.AchievedAt is null ? "No run yet" : "Not recorded for this older score")</span>
+                                        }
+                                    </td>
+                                    <td>@(row.AchievedAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "Not played yet")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        }
     }
     <footer>Developed by MadBone | LIT MES TSR <span>Community rankings · browser-reported scores, not cheat-proof</span></footer>
 </main>
@@ -76,6 +117,7 @@
 @code {
     private string difficulty = "hard";
     private string mode = "campaign";
+    private string heroClass = "all";
     private bool busy;
     private string? error;
     private IReadOnlyList<RankingRow> rows = [];
@@ -95,7 +137,7 @@
                 error = "Rankings are unavailable. Please try Refresh again shortly.";
                 return;
             }
-            var result = await Saves.GetRankingsAsync(user, difficulty, mode);
+            var result = await Saves.GetRankingsAsync(user, difficulty, mode, heroClass);
             if (result is null) error = "Could not load rankings. Please try again shortly.";
             else rows = result;
         }

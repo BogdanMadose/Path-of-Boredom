@@ -26,7 +26,8 @@ public sealed class GameSaveClient(HttpClient client, IOptions<SaveServiceOption
         using var request = CreateRequest(HttpMethod.Put, user);
         if (request is null) return new(false, "Windows sign-in is required. Reload the page to sign in.");
         request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-        return await SendAsync(request, loading: false);
+        var version = snapshot.TryGetProperty("version", out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number) ? number : (int?)null;
+        return await SendAsync(request, loading: false, version);
     }
 
     public async Task<GameSaveResult> LoadAsync(ClaimsPrincipal user)
@@ -36,7 +37,7 @@ public sealed class GameSaveClient(HttpClient client, IOptions<SaveServiceOption
         return await SendAsync(request, loading: true);
     }
 
-    private async Task<GameSaveResult> SendAsync(HttpRequestMessage request, bool loading)
+    private async Task<GameSaveResult> SendAsync(HttpRequestMessage request, bool loading, int? saveVersion = null)
     {
         try
         {
@@ -53,9 +54,34 @@ public sealed class GameSaveClient(HttpClient client, IOptions<SaveServiceOption
 
             if (!response.IsSuccessStatusCode)
             {
-                return new(false, response.StatusCode == HttpStatusCode.BadRequest
-                    ? "The save is invalid or uses an unsupported version."
-                    : "The API could not complete the request. Your current run is unchanged.");
+                if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.InternalServerError)
+                {
+                    SaveApiError? error = null;
+                    try { error = await response.Content.ReadFromJsonAsync<SaveApiError>(); }
+                    catch (JsonException) { }
+                    var format = saveVersion?.ToString() ?? "unknown";
+                    var reference = string.IsNullOrWhiteSpace(error?.Reference) ? "" : $" API log reference: {error.Reference}.";
+                    if (loading)
+                    {
+                        return new(false, error?.Code switch
+                        {
+                            "CorruptStoredSave" => $"Your server save file contains unreadable JSON. It has not been changed. If your run is still open, use Save or Retry checkpoint save to back up the damaged file and save the current run. Otherwise ask the administrator to restore a known-good backup.{reference}",
+                            "SaveStorageUnavailable" => $"The API could not read its save folder or file. Check the API process's folder permissions and API logs. Your current run is unchanged.{reference}",
+                            _ => "The API could not load the server save. Your current run is unchanged; check the API logs."
+                        });
+                    }
+                    return new(false, error?.Code switch
+                    {
+                        "UnsupportedSaveVersion" => $"This game uses save format {format}, but the API supports up to {error.SupportedVersion}. Deploy/restart ApiService from the matching Web release, then retry. Keep this game open; reloading may lose unsaved progress.",
+                        "InvalidSaveState" => $"The API supports this format but rejected the run's save data (format {format}, InvalidSaveState). Keep this game open and report this error; your previous server save is unchanged.",
+                        "InvalidSaveEnvelope" or "InvalidSaveJson" => $"The API could not read the save request ({error.Code}). No save was written. Keep this game open and check the API logs.{reference}",
+                        "SaveStorageJsonError" => $"The request passed validation, but server storage could not process the save JSON. No save was replaced. Keep this game open and check the API logs.{reference}",
+                        "SaveStorageUnavailable" => $"The request passed validation, but the API could not access its save folder or file. Check the API process's folder permissions, available disk space, and API logs. Keep this game open and retry after correcting storage access.{reference}",
+                        _ when response.StatusCode == HttpStatusCode.InternalServerError => "The API encountered a server error while saving. Keep this game open and check the API logs.",
+                        _ => $"The API rejected save format {format} without a diagnostic code. It may be an older API build: deploy/restart ApiService to match Web, then retry without reloading this game. Your previous server save is unchanged."
+                    });
+                }
+                return new(false, "The API could not complete the request. Your current run is unchanged.");
             }
 
             var payload = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -65,7 +91,10 @@ public sealed class GameSaveClient(HttpClient client, IOptions<SaveServiceOption
                 return new(true, "Server save loaded. Resume when ready.", payload, unlocked);
             }
 
-            return new(true, "Run saved on the server. You can safely close this page.", EndlessUnlocked: unlocked);
+            var recovered = payload.TryGetProperty("recoveredFromCorruptSave", out var recovery) && recovery.ValueKind == JsonValueKind.True;
+            return new(true, recovered
+                ? "Current run saved. The unreadable previous file was backed up on the server. Progress or unlocks only in that damaged file could not be recovered."
+                : "Run saved on the server. You can safely close this page.", EndlessUnlocked: unlocked);
         }
         catch (Exception exception) when (exception is HttpRequestException or OperationCanceledException or JsonException or InvalidOperationException)
         {
@@ -127,4 +156,5 @@ public sealed class GameSaveClient(HttpClient client, IOptions<SaveServiceOption
     }
 }
 
+public sealed record SaveApiError(string? Code, int? SupportedVersion, string? Reference = null);
 public sealed record GameSaveResult(bool Success, string Message, JsonElement? Save = null, bool EndlessUnlocked = false);

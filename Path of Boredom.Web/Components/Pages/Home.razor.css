@@ -215,7 +215,8 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .loadout-grid select:disabled { opacity: .55; }
 .skill-tree-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 18px; }
 .skill-tree { position: relative; min-width: 0; padding: 15px; border: 1px solid #c7a56b44; border-radius: 6px; background: radial-gradient(ellipse at 50% 60%, #33433466, #17252b); }
-.skill-tree:hover, .skill-tree:focus-within { z-index: 2; }
+.skill-tree:focus-within { z-index: 2; }
+.skill-tree:hover { z-index: 3; }
 .skill-tree[data-hero-class="knight"] { --tree-accent: #f5ab62; --tree-tint: #522b1c; }
 .skill-tree[data-hero-class="ranger"] { --tree-accent: #8fefbd; --tree-tint: #163d2b; }
 .skill-tree[data-hero-class="warden"] { --tree-accent: #a7cfff; --tree-tint: #26364e; }
@@ -240,7 +241,9 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .tree-node-left { top: 50%; left: 25%; }
 .tree-node-right { top: 50%; left: 75%; }
 .tree-node-capstone { top: 86.667%; left: 50%; }
-.tree-node:hover, .tree-node:focus-within { z-index: 3; }
+.tree-node:focus-within { z-index: 3; }
+.tree-node:not(.tooltip-dismissed):hover, .tree-node.tooltip-inspected:not(.tooltip-dismissed) { z-index: 5; }
+.tree-node.tooltip-dismissed { z-index: auto; }
 .tree-node button { display: grid; place-content: center; gap: 2px; width: 72px; height: 72px; padding: 6px; border: 2px solid #607b7a; border-radius: 50%; background: #0d1a20; color: #dfcba6; text-align: center; box-shadow: 0 4px 12px #0007; }
 .tree-node button strong { font-size: 11px; line-height: 1.2; }
 .tree-node button small { font-size: 10px; color: #edcc91; }

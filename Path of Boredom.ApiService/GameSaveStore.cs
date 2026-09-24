@@ -1,10 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Path_of_Boredom.ApiService;
 
-public sealed class GameSaveStore(IWebHostEnvironment environment, IConfiguration configuration)
+public sealed class GameSaveStore(IWebHostEnvironment environment, IConfiguration configuration, ILogger<GameSaveStore> logger)
 {
     private readonly string directory = Path.GetFullPath(configuration["Saves:Directory"]
         ?? Path.Combine(environment.ContentRootPath, "App_Data", "saves"));
@@ -22,8 +23,17 @@ public sealed class GameSaveStore(IWebHostEnvironment environment, IConfiguratio
                 return null;
             }
 
-            await using var stream = File.OpenRead(path);
-            return await JsonSerializer.DeserializeAsync<GameSave>(stream, JsonOptions, cancellationToken);
+            try
+            {
+                await using var stream = File.OpenRead(path);
+                return await JsonSerializer.DeserializeAsync<GameSave>(stream, JsonOptions, cancellationToken)
+                    ?? throw new JsonException("The stored save is null.");
+            }
+            catch (JsonException exception)
+            {
+                logger.LogError(exception, "Stored save {SavePath} is unreadable. The file has not been changed.", path);
+                throw;
+            }
         }
         finally
         {
@@ -41,16 +51,31 @@ public sealed class GameSaveStore(IWebHostEnvironment environment, IConfiguratio
             Directory.CreateDirectory(accountDirectory);
             var path = GetPath(ownerId);
             GameSave? previous = null;
+            var recoveredFromCorruptSave = false;
             if (File.Exists(path))
             {
-                await using var existing = File.OpenRead(path);
-                previous = await JsonSerializer.DeserializeAsync<GameSave>(existing, JsonOptions, cancellationToken);
+                try
+                {
+                    await using var existing = File.OpenRead(path);
+                    previous = await JsonSerializer.DeserializeAsync<GameSave>(existing, JsonOptions, cancellationToken)
+                        ?? throw new JsonException("The stored save is null.");
+                }
+                catch (JsonException exception)
+                {
+                    var backupPath = $"{path}.{DateTimeOffset.UtcNow:yyyyMMddTHHmmssfffZ}.{Guid.NewGuid():N}.corrupt";
+                    File.Copy(path, backupPath, overwrite: false);
+                    recoveredFromCorruptSave = true;
+                    logger.LogWarning(exception, "Unreadable save {SavePath} was backed up to {BackupPath} before replacement. Only the submitted run's progress and unlocks can be retained.", path, backupPath);
+                }
             }
 
             var unlocked = previous?.EndlessUnlocked == true
                 || (previous is not null && HasCompletedCampaign(previous.State))
                 || HasCompletedCampaign(state);
-            var save = new GameSave(version, DateTimeOffset.UtcNow, state.Clone(), unlocked, windowsUser);
+            var save = new GameSave(version, DateTimeOffset.UtcNow, state.Clone(), unlocked, windowsUser)
+            {
+                RecoveredFromCorruptSave = recoveredFromCorruptSave
+            };
             temporaryPath = Path.Combine(accountDirectory, $"{Guid.NewGuid():N}.tmp");
             await using (var stream = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
@@ -89,4 +114,8 @@ public sealed class GameSaveStore(IWebHostEnvironment environment, IConfiguratio
         && completed.ValueKind == JsonValueKind.Number && completed.TryGetInt32(out var value) && value == 1;
 }
 
-public sealed record GameSave(int Version, DateTimeOffset SavedAt, JsonElement State, bool EndlessUnlocked = false, string? WindowsUser = null);
+public sealed record GameSave(int Version, DateTimeOffset SavedAt, JsonElement State, bool EndlessUnlocked = false, string? WindowsUser = null)
+{
+    [JsonIgnore]
+    public bool RecoveredFromCorruptSave { get; init; }
+}

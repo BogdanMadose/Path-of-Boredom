@@ -18,6 +18,11 @@ public sealed class SaveServiceAuthenticationHandler(
 {
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        if (!Request.Headers.ContainsKey("Authorization"))
+        {
+            return Task.FromResult(AuthenticateResult.NoResult());
+        }
+
         if (!AuthenticationHeaderValue.TryParse(Request.Headers.Authorization, out var authorization)
             || !string.Equals(authorization.Scheme, "Bearer", StringComparison.OrdinalIgnoreCase)
             || !SaveServiceOptions.IsValidApiKey(authorization.Parameter))

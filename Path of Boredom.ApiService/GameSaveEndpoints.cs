@@ -5,14 +5,28 @@ namespace Path_of_Boredom.ApiService;
 
 public static class GameSaveEndpoints
 {
+    public const int CurrentSaveVersion = 14;
     public static void MapGameSaves(this WebApplication app)
     {
         app.MapGet("/game/save", async (HttpContext context, GameSaveStore store) =>
         {
             context.Response.Headers.CacheControl = "no-store";
             var ownerId = context.User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-            var save = await store.LoadAsync(ownerId, context.RequestAborted);
-            return save is null ? Results.NotFound() : Results.Ok(save);
+            try
+            {
+                var save = await store.LoadAsync(ownerId, context.RequestAborted);
+                return save is null ? Results.NotFound() : Results.Ok(save);
+            }
+            catch (JsonException exception)
+            {
+                app.Logger.LogError(exception, "Stored save JSON could not be loaded; reference: {Reference}", context.TraceIdentifier);
+                return Results.Json(new { code = "CorruptStoredSave", message = "The stored save JSON is unreadable.", reference = context.TraceIdentifier }, statusCode: StatusCodes.Status500InternalServerError);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                app.Logger.LogError(exception, "Save storage access failed while loading; reference: {Reference}", context.TraceIdentifier);
+                return Results.Json(new { code = "SaveStorageUnavailable", message = "The server could not access save storage.", reference = context.TraceIdentifier }, statusCode: StatusCodes.Status500InternalServerError);
+            }
         }).RequireAuthorization();
 
         app.MapPut("/game/save", async (HttpContext context, GameSaveStore store) =>
@@ -40,24 +54,50 @@ public static class GameSaveEndpoints
                 return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
             }
 
+            JsonDocument document;
             try
             {
-                using var document = JsonDocument.Parse(buffer.AsMemory(0, length), new JsonDocumentOptions { MaxDepth = 8 });
+                document = JsonDocument.Parse(buffer.AsMemory(0, length), new JsonDocumentOptions { MaxDepth = 8 });
+            }
+            catch (JsonException exception)
+            {
+                app.Logger.LogWarning(exception, "Save request JSON parsing failed. Bytes: {Bytes}; reference: {Reference}", length, context.TraceIdentifier);
+                return Results.BadRequest(new { code = "InvalidSaveJson", message = "Invalid save request JSON.", supportedVersion = CurrentSaveVersion, reference = context.TraceIdentifier });
+            }
+
+            using (document)
+            {
                 var root = document.RootElement;
                 if (root.ValueKind != JsonValueKind.Object
                     || !root.TryGetProperty("version", out var version) || version.ValueKind != JsonValueKind.Number
-                    || !version.TryGetInt32(out var number) || number is not (1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10 or 11 or 12 or 13 or 14)
-                    || !root.TryGetProperty("state", out var state) || !IsValidState(state, number))
+                    || !version.TryGetInt32(out var number))
                 {
-                    return Results.BadRequest(new { message = "Invalid or unsupported save." });
+                    return Results.BadRequest(new { code = "InvalidSaveEnvelope", message = "The save version is missing or invalid.", supportedVersion = CurrentSaveVersion });
+                }
+                if (number is < 1 or > CurrentSaveVersion)
+                {
+                    return Results.BadRequest(new { code = "UnsupportedSaveVersion", message = "This API does not support the submitted save format.", supportedVersion = CurrentSaveVersion });
+                }
+                if (!root.TryGetProperty("state", out var state) || !IsValidState(state, number))
+                {
+                    return Results.BadRequest(new { code = "InvalidSaveState", message = "The submitted run failed save validation.", supportedVersion = CurrentSaveVersion });
                 }
 
-                var save = await store.SaveAsync(ownerId, context.User.Identity!.Name!, state, number, context.RequestAborted);
-                return Results.Ok(new { save.SavedAt, save.EndlessUnlocked });
-            }
-            catch (JsonException)
-            {
-                return Results.BadRequest(new { message = "Invalid save JSON." });
+                try
+                {
+                    var save = await store.SaveAsync(ownerId, context.User.Identity!.Name!, state, number, context.RequestAborted);
+                    return Results.Ok(new { save.SavedAt, save.EndlessUnlocked, save.RecoveredFromCorruptSave });
+                }
+                catch (JsonException exception)
+                {
+                    app.Logger.LogError(exception, "Save storage JSON processing failed for a validated format {Version} request; reference: {Reference}", number, context.TraceIdentifier);
+                    return Results.Json(new { code = "SaveStorageJsonError", message = "The server could not process stored save JSON.", reference = context.TraceIdentifier }, statusCode: StatusCodes.Status500InternalServerError);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    app.Logger.LogError(exception, "Save storage access failed for a validated format {Version} request; reference: {Reference}", number, context.TraceIdentifier);
+                    return Results.Json(new { code = "SaveStorageUnavailable", message = "The server could not access save storage.", reference = context.TraceIdentifier }, statusCode: StatusCodes.Status500InternalServerError);
+                }
             }
         }).RequireAuthorization();
     }

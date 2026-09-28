@@ -1,14 +1,43 @@
+// arpg-skills.js — skill trees, loadouts, and node/respec logic.
+//
+// Structure: every class shares the same generic node SHAPE per skill (TREE_NODES — 4 nodes per
+// skill: root, then two branch nodes, then a capstone), but the actual node NAMES and flavor
+// effects are class-specific (CLASS_TREE_NAMES / CLASS_TREE_EFFECTS), assembled together at
+// render/lookup time by treeNodeDefinition(). This split exists because the underlying mechanical
+// shape (max ranks, prerequisite structure) is identical across classes, but each class re-skins
+// what those ranks actually do to fit its own theme (e.g. Knight's nova.chill becomes a
+// knockback, Ranger's becomes piercing, Warden's becomes bonus damage).
+//
+// If you're adding a new skill tree node: add it to the right skill's object in TREE_NODES (generic
+// shape), then add matching entries to CLASS_TREE_NAMES for all three classes, and optionally
+// CLASS_TREE_EFFECTS if a class needs a re-skinned effect description. Remember save-version
+// coupling: GameSaveEndpoints.cs's ValidSkillProgress hardcodes the per-skill branchKeys arrays and
+// per-node rank caps, so a new node also needs a save version bump and a matching server-side update.
 import { classFor } from "./arpg-classes.js";
 
 export const SKILL_KEYS = ["attack", "nova", "burst", "guard", "dodge", "potion"];
+// Only these three skills can be placed into an auto-cast slot (manual-only skills like attack/dodge/potion
+// don't make sense to automate) — matches the slotSkills restriction added in save v10.
 export const SLOTTABLE_SKILLS = ["nova", "burst", "guard"];
+// Guard/ward unlocks later in Endless mode (wave 41) than in campaign (wave 11), since Endless
+// effectively starts players over at a higher baseline difficulty.
 export const wardUnlockWave = state => state.rankingMode === "endless" ? 41 : 11;
 export const skillUnlocked = (state, skill) => skill !== "guard" || state.wave >= wardUnlockWave(state);
 export const wardUnlockHint = state => state.rankingMode === "endless" ? "Unlocks at Echo 11 (third five-wave stage)" : "Unlocks at stage 3 (wave 11)";
 export const AUTO_COOLDOWN = 1.6;
+// One skill point earned every 2 levels, capped at 32 total — matches the pointBudget formula in
+// GameSaveEndpoints.cs's ValidSkillProgress for save v12+.
 export const MAX_SKILL_POINTS = 32;
 export const SKILL_POINT_INTERVAL = 2;
+// The four generic "slot" positions every skill's tree branch has, in order: the root node (always
+// learnable first), two parallel branch nodes (each requires the root), and a capstone (requires
+// at least one of the two branch nodes) — see treePrerequisitesMet below for the actual rule.
 export const TREE_SLOTS = ["root", "left", "right", "capstone"];
+
+// The generic node shape shared by every class for a given skill: max rank, a fallback icon/visual
+// theme, and a generic detail description. treeNodeDefinition() overlays class-specific names/effects
+// on top of these at lookup time (see below) — these base descriptions are really just the Knight's
+// flavor and get re-colored/re-worded per class via the tint replacement in treeNodeDefinition.
 export const TREE_NODES = {
     attack: {
         edge: { name: "Honed edge", max: 3, icon: "⚔", visual: "steel", detail: "+8% regular-attack damage per rank. Adds silver impact rays." },
@@ -47,11 +76,17 @@ export const TREE_NODES = {
         renewal: { name: "Renewal", max: 2, icon: "❧", visual: "healing", detail: "After drinking, regenerate 4% maximum health per rank over 2s, subject to difficulty penalties. Another flask refreshes rather than stacks regeneration. Adds a green regeneration aura." }
     }
 };
+// Class-specific manual-only skills for the burst and guard slots — unlike attack/nova/dodge/potion
+// (which every class has an equivalent of), burst and guard are distinct signature abilities per
+// class (e.g. Knight's Flame lance vs Ranger's Piercing rain), each with their own cooldown/reach/damage.
 export const EXTRA_SKILLS = {
     knight: { burst: { name: "Flame lance", cooldown: 8, reach: 380, damage: 2.1, shape: "beam" }, guard: { name: "Ember aegis", cooldown: 12, reach: 125, damage: 0.8 } },
     ranger: { burst: { name: "Piercing rain", cooldown: 8, reach: 760, damage: 1.15, shape: "arrows" }, guard: { name: "Briar ward", cooldown: 11, reach: 180, damage: 0.65 } },
     warden: { burst: { name: "Fault line", cooldown: 11, reach: 250, damage: 2.6, shape: "cone" }, guard: { name: "Iron bastion", cooldown: 14, reach: 150, damage: 1 } }
 };
+// Per-class, per-skill display names for each of the 4 generic tree node slots (indexed 0-3,
+// matching TREE_SLOTS order) — this is what actually shows up in the skill tree UI instead of the
+// generic TREE_NODES keys/names.
 const CLASS_TREE_NAMES = {
     knight: {
         attack: ["Tempered blade", "Flame arc", "Finisher", "Duelist tempo"], nova: ["Furnace", "Heat wave", "Sunfire", "Backdraft"],
@@ -69,6 +104,11 @@ const CLASS_TREE_NAMES = {
         dodge: ["Iron resolve", "Heavy stride", "Unstoppable", "Sure footing"], potion: ["Mineral draught", "Emergency repair", "Iron tonic", "Reconstruction"]
     }
 };
+// Overrides for specific (skill.node) combinations where a class's re-skinned effect isn't just a
+// renamed version of the generic description but actually behaves differently mechanically (e.g.
+// Knight's nova.chill becomes a knockback instead of a slow). Not every node needs an entry here —
+// nodes without an override just get the generic TREE_NODES detail text with color words swapped
+// (see treeNodeDefinition's tint replacement below).
 const CLASS_TREE_EFFECTS = {
     knight: {
         "nova.chill": { icon: "↗", detail: "Ember nova pushes surviving enemies back 16 units per rank; bosses move half as far. Replaces slowing with a fiery outward shockwave." },
@@ -88,16 +128,35 @@ const CLASS_TREE_EFFECTS = {
         "guard.repulse": { icon: "⬡", detail: "Iron bastion pushes living enemies back 100 units, or 50 for bosses. A broad steel shockwave clears breathing room." }
     }
 };
+// Display name for a skill key, accounting for class-specific naming (attack/nova use the class's
+// own attackName/specialName; burst/guard use EXTRA_SKILLS' class-specific names; dodge/potion are
+// the same name for every class).
 export const skillName = (state, key) => key === "attack" ? classFor(state).attackName : key === "nova" ? classFor(state).specialName
     : key === "dodge" ? "Dodge" : key === "potion" ? "Life flask" : EXTRA_SKILLS[state.heroClass][key].name;
+// Maps a generic tree slot name (root/left/right/capstone) to the actual node key for a given
+// skill (e.g. treeNodeKey("attack", "root") => "edge").
 export const treeNodeKey = (skill, slot) => Object.keys(TREE_NODES[skill])[TREE_SLOTS.indexOf(slot)];
+// Builds a brand-new, all-zero skill tree for a fresh character (every node at rank 0).
 export const newSkillTree = () => Object.fromEntries(SKILL_KEYS.map(key => [key, Object.fromEntries(Object.keys(TREE_NODES[key]).map(node => [node, 0]))]));
+// How many total skill points a character's level should have earned by now (capped at MAX_SKILL_POINTS).
 export const skillPointsEarned = state => Math.min(MAX_SKILL_POINTS, Math.floor(state.player.level / SKILL_POINT_INTERVAL));
+// Points earned minus points already spent across every tree — how many are left to spend right now.
 export const skillPointsLeft = state => skillPointsEarned(state) - Object.values(state.skillTree).reduce((total, nodes) => total + Object.values(nodes).reduce((sum, rank) => sum + rank, 0), 0);
+// Total points spent in one specific skill's tree (used for respec cost and display).
 export const treePointsSpent = (state, skill) => SKILL_KEYS.includes(skill) ? Object.values(state.skillTree[skill]).reduce((sum, rank) => sum + rank, 0) : 0;
+// Gold cost to fully respec one skill's tree: a flat 100 plus 50 per point already spent — scales
+// so respeccing a heavily-invested tree costs meaningfully more than a lightly-invested one.
 export const treeRespecCost = (state, skill) => treePointsSpent(state, skill) > 0 ? 100 + 50 * treePointsSpent(state, skill) : 0;
+// A tree can only be respecced while not actively in combat (paused/camp/won), if it actually has
+// points spent, and if the player can afford the cost.
 export const canRespecTree = (state, skill) => SKILL_KEYS.includes(skill) && ["paused", "camp", "won"].includes(state.status)
     && treePointsSpent(state, skill) > 0 && state.gold >= treeRespecCost(state, skill);
+
+// Resets one skill's tree to all-zero and refunds the points (for the player to respend), charging
+// the respec cost in gold. Also cleans up any lingering skill-specific runtime state so a respec
+// can't leave stray effects active (e.g. an in-flight nova chill effect, a guard shield still up, or
+// in-flight projectiles tied to the respecced skill) — this is important because those runtime
+// effects were granted by tree ranks that no longer exist after the reset.
 export function respecTree(state, skill) {
     if (!canRespecTree(state, skill)) return false;
     const points = treePointsSpent(state, skill), cost = treeRespecCost(state, skill);
@@ -113,23 +172,38 @@ export function respecTree(state, skill) {
     state.journal = `${skillName(state, skill)} reset: ${points} points returned for ${cost} gold. Cooldowns and other upgrades are unchanged.`;
     return true;
 }
+
+// The actual prerequisite rule for tree nodes: the root (slot 0) always has no prerequisite; the
+// capstone (slot 3) needs at least 1 point in either branch node (slot 1 or 2); the two branch
+// nodes each just need at least 1 point in the root.
 export const treePrerequisitesMet = (state, skill, node) => {
     const keys = Object.keys(TREE_NODES[skill]);
     return node === keys[0] || (node === keys[3] ? state.skillTree[skill][keys[1]] > 0 || state.skillTree[skill][keys[2]] > 0 : state.skillTree[skill][keys[0]] > 0);
 };
+// Whether a specific node can be learned right now: the skill itself must be unlocked, the node
+// must exist, the game must be paused/at camp/won (never mid-combat), there must be a spare skill
+// point, the node isn't already maxed, and its prerequisite is satisfied.
 export const canLearnSkill = (state, skill, node) => SKILL_KEYS.includes(skill) && skillUnlocked(state, skill) && Object.hasOwn(TREE_NODES[skill], node)
     && ["paused", "camp", "won"].includes(state.status) && skillPointsLeft(state) > 0 && state.skillTree[skill][node] < TREE_NODES[skill][node].max
     && treePrerequisitesMet(state, skill, node);
+// Spends one skill point into a node, if allowed. Returns false (no-op) rather than throwing if
+// the attempt isn't currently valid, so UI code can call this speculatively without needing to
+// duplicate canLearnSkill's checks first.
 export function learnSkill(state, skill, node) {
     if (!canLearnSkill(state, skill, node)) return false;
     state.skillTree[skill][node]++;
     state.journal = `${skillName(state, skill)}: ${treeNodeDefinition(state, skill, node).name} learned. ${skillPointsLeft(state)} skill points remain.`;
     return true;
 }
+// Validates a proposed manual+auto loadout: the manual skill must be a real slottable skill and
+// unlocked; auto must be exactly 2 slots, each either "none" or a distinct unlocked slottable skill
+// that isn't already the manual skill (no duplicate skills across slots).
 export const validLoadout = (state, manual, auto) => SLOTTABLE_SKILLS.includes(manual) && skillUnlocked(state, manual)
     && Array.isArray(auto) && auto.length === 2
     && auto.every(key => key === "none" || SLOTTABLE_SKILLS.includes(key) && skillUnlocked(state, key) && key !== manual)
     && new Set(auto.filter(key => key !== "none")).size === auto.filter(key => key !== "none").length;
+// Applies a new loadout, if valid, and not mid-combat. Also flags wardUnlockSeen once the player
+// has ever actually slotted the guard skill, so the "newly unlocked" UI hint only shows once.
 export function setLoadout(state, manual, auto) {
     if (!["paused", "camp", "won"].includes(state.status) || !validLoadout(state, manual, auto)) return false;
     state.loadout = { manual, auto: [...auto] };
@@ -137,6 +211,13 @@ export function setLoadout(state, manual, auto) {
     return true;
 }
 
+// Builds the full, class-specific display definition for a tree node by overlaying
+// CLASS_TREE_NAMES/CLASS_TREE_EFFECTS on top of the generic TREE_NODES entry, then re-coloring any
+// generic color words in the detail text (silver/golden/violet/crimson) to match the current
+// class's visual theme (ember-colored for Knight, jade for Ranger, steel-blue for Warden). The
+// burst.aperture node gets an extra special case since its actual mechanical effect (beam width vs
+// arrow count vs cone angle) is different enough per class that it needs its own name/detail
+// entirely rather than just a re-themed description.
 export function treeNodeDefinition(state, skill, node) {
     const index = Object.keys(TREE_NODES[skill]).indexOf(node);
     const definition = { ...TREE_NODES[skill][node], name: CLASS_TREE_NAMES[state.heroClass][skill][index],
@@ -150,6 +231,9 @@ export function treeNodeDefinition(state, skill, node) {
     return { ...definition, ...shape };
 }
 
+// Builds the human-readable status line shown under a tree node in the UI (why it can/can't be
+// learned right now), checked in priority order: locked skill > already maxed > missing
+// prerequisite > no points available > not paused > ready to learn.
 export function treeNodeStatus(state, skill, node) {
     const rank = state.skillTree[skill][node];
     const keys = Object.keys(TREE_NODES[skill]);

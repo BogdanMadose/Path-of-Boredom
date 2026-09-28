@@ -1,5 +1,19 @@
+// arpg-graphics.js — pure presentation: hand-drawn canvas art for the hero, floor decoration, and
+// atmosphere/weather effects. Enemy-kind art and most UI drawing lives directly in arpg.js instead;
+// this module only holds the pieces reused across many draw calls or expensive enough to benefit
+// from sprite caching (`sprites`, below) — namely the player hero's body (which is drawn every
+// frame, unlike enemies which are simpler shapes) and orb/glow primitives used throughout arpg.js's
+// enemy art. Nothing here reads or mutates game state beyond the read-only arguments passed in.
+
+// Small LRU-ish cache of pre-rendered offscreen canvases (bodySprite/drawOrb), keyed by a string
+// describing the sprite's parameters (e.g. "orb:8:#ff0000"). Capped at 128 entries (see the
+// `sprites.size >= 128` eviction checks below) so an unbounded variety of orb radii/colors over a
+// long session can't leak memory — evicts the oldest inserted entry (Map iteration order) once full.
 const sprites = new Map();
 
+// Fills (and optionally strokes) an arbitrary closed polygon defined by an array of [x, y] points —
+// the basic building block nearly every hand-drawn shape in this file and arpg.js's enemy art is
+// constructed from.
 function polygon(ctx, points, fill, stroke = "#10191f", width = 1.5) {
     ctx.beginPath();
     points.forEach(([x, y], index) => index ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
@@ -8,12 +22,20 @@ function polygon(ctx, points, fill, stroke = "#10191f", width = 1.5) {
     if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke(); }
 }
 
+// Builds a diagonal light-to-dark linear gradient used to give flat polygon armor/weapon shapes a
+// simple metallic sheen without needing actual lighting/shading math.
 function metal(ctx, light, mid, dark) {
     const gradient = ctx.createLinearGradient(-22, -25, 25, 25);
     gradient.addColorStop(0, light); gradient.addColorStop(0.4, mid); gradient.addColorStop(1, dark);
     return gradient;
 }
 
+// Draws a small glossy sphere (used for heads, joints, projectile cores, etc. all over the game's
+// art) with a highlight-to-shadow radial gradient. Rendered once per distinct (radius, color) pair
+// into a cached offscreen sprite and reused via drawImage() from then on — recreating a radial
+// gradient from scratch every frame for every orb (there can be dozens on screen) would be far more
+// expensive than blitting a pre-rendered bitmap. Rounds the radius to the nearest half-pixel so
+// near-identical radii share the same cache entry instead of each spawning a new one.
 export function drawOrb(ctx, x, y, radius, color) {
     const r = Math.max(1, Math.round(radius * 2) / 2);
     const key = `orb:${r}:${color}`;
@@ -35,6 +57,10 @@ export function drawOrb(ctx, x, y, radius, color) {
     ctx.drawImage(sprite, x - sprite.width / 4, y - sprite.height / 4, sprite.width / 2, sprite.height / 2);
 }
 
+// Pre-renders and caches the hero's torso/armor sprite for a given weapon type (bow/hammer/sword),
+// since the body itself doesn't change frame to frame (only limbs/weapon/cloak, drawn separately by
+// drawHero, actually animate) — only 3 distinct sprites ever exist (one per weapon type) since class
+// is 1:1 with weapon type, so this cache essentially never evicts in practice.
 function bodySprite(hero) {
     const key = `body:${hero.weaponType}`;
     let sprite = sprites.get(key);
@@ -72,6 +98,12 @@ function bodySprite(hero) {
     return sprite;
 }
 
+// Draws the player character every frame: a ground shadow ellipse, a casting-ring pulse while a
+// skill is winding up, an invulnerability flicker, then (rotated to face the player's aim direction)
+// a flowing cloak, legs with a walk-cycle stride offset, the cached body sprite, and finally a
+// weapon drawn per class — a bow with a stretch/loose animation tied to `strike`, or a sword/hammer
+// swung via rotation tied to `strike` and the attack windup. `reduced` disables all of the purely
+// cosmetic motion (flutter, sway, flicker) for the prefers-reduced-motion accessibility setting.
 export function drawHero(ctx, actor, hero, stride, strike, time, reduced) {
     const ranger = hero.weaponType === "bow", warden = hero.weaponType === "hammer";
     ctx.save();
@@ -125,6 +157,11 @@ export function drawHero(ctx, actor, hero, stride, strike, time, reduced) {
     ctx.restore();
 }
 
+// Draws the per-map decorative overlay onto the pre-rendered floor tile (see arpg.js's makeFloor()):
+// a soft ambient light gradient, a scattering of map-specific ground clutter (icicles for glacier,
+// reeds for marsh, cracks for hollow/citadel, generic pebbles otherwise) placed with the given seeded
+// `random`, and a decorative border frame with corner diamonds. Runs once per map when its floor
+// canvas is built, not per frame, since the floor is otherwise static.
 export function decorateFloor(ctx, map, random, width, height) {
     ctx.save();
     const light = ctx.createRadialGradient(width * 0.48, height * 0.35, 30, width / 2, height / 2, width * 0.6);
@@ -159,6 +196,10 @@ export function decorateFloor(ctx, map, random, width, height) {
     ctx.restore();
 }
 
+// Draws a field of slowly drifting/twinkling particles (snow-like on Glacier, embers/motes
+// elsewhere) for ambient atmosphere. Particle positions are a deterministic function of frame time
+// and index rather than stored state, so there's nothing to update/store between frames — just
+// recomputed fresh each call. Frozen in place (t = 0) under reduced-motion.
 export function drawAtmosphere(ctx, map, time, reduced, width, height) {
     const t = reduced ? 0 : time;
     ctx.save();
@@ -172,6 +213,9 @@ export function drawAtmosphere(ctx, map, time, reduced, width, height) {
     ctx.restore();
 }
 
+// Draws the small pickup icon for a ground loot drop: a shadow, an optional glowing ring + gentle
+// bob animation for "important" drops (power-ups/forge upgrades/flasks, to draw the eye compared to
+// routine gold/gear drops), and then a per-kind icon shape (handled further below this comment).
 export function drawLootIcon(ctx, drop, color, weaponType, time, reduced) {
     ctx.save(); ctx.translate(drop.x, drop.y);
     ctx.fillStyle = "#030a0d77"; ctx.beginPath(); ctx.ellipse(1, 5, 10, 4, 0, 0, Math.PI * 2); ctx.fill();

@@ -4,6 +4,12 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Emits an XML doc file (bin\...\Path of Boredom.Web.xml) from the /// summaries in this
+         project, so IDEs can show them as tooltips/IntelliSense for anyone consuming these types. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Only a subset of members carry /// summaries by design (the ones worth explaining); don't
+         warn on every undocumented public member (CS1591). -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

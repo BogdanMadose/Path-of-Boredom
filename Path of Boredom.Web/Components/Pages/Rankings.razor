@@ -121,6 +121,8 @@
 </main>
 
 @code {
+    // Filter state bound directly to the <select> elements above via @bind:after — changing any
+    // filter immediately triggers RefreshAsync rather than needing a separate "apply" step.
     private string difficulty = "hard";
     private string mode = "campaign";
     private string heroClass = "all";
@@ -129,8 +131,15 @@
     private string? error;
     private IReadOnlyList<RankingRow> rows = [];
 
+    /// <summary>Loads the default (Hard / Campaign / All classes / current patch) leaderboard on first render.</summary>
     protected override Task OnInitializedAsync() => RefreshAsync();
 
+    /// <summary>
+    /// Re-registers the player's ranking profile (cheap, idempotent — also doubles as a
+    /// connectivity check to the API) and then fetches the leaderboard for the current filter
+    /// selection. Guards against overlapping calls with the <see cref="busy"/> flag, since rapid
+    /// filter changes could otherwise fire several requests whose responses might race each other.
+    /// </summary>
     private async Task RefreshAsync()
     {
         if (busy) return;

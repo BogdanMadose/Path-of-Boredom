@@ -1,3 +1,15 @@
+// arpg-classes.js — base stats and identity for the three playable classes.
+//
+// This is pure data (no logic) describing each class's starting stats, attack/skill timings and
+// reach, and display info shown in the setup dialog's class preview. Class stays with the
+// character for the whole run, including a continuation into Endless mode.
+//
+// Field meanings:
+//   health/damage/speed/armor  — base stats before any upgrades, cards, or skill tree bonuses.
+//   attackCooldown/attackReach — timing/range of the basic attack (J / left click).
+//   specialCooldown/specialReach/specialDamage — timing/range/damage multiplier of the class's manual skill.
+//   dodgeCooldown              — base cooldown of the dodge roll (Space).
+//   weaponType                 — used by arpg-graphics.js to pick which weapon sprite/shape to draw.
 export const HERO_CLASSES = {
     knight: {
         name: "Ember Knight", role: "Balanced melee", health: 100, damage: 18, speed: 220, armor: 0,
@@ -19,4 +31,6 @@ export const HERO_CLASSES = {
     }
 };
 
+// Looks up the active class definition for a given game state, falling back to Ember Knight if
+// the state's heroClass key is somehow missing/unrecognized.
 export const classFor = state => HERO_CLASSES[state.heroClass] ?? HERO_CLASSES.knight;

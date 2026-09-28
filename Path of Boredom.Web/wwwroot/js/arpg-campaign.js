@@ -1,4 +1,16 @@
+// arpg-campaign.js — the 30-wave, 6-chapter campaign structure and shared world data.
+//
+// This defines: which wave belongs to which map/chapter (5 waves per map, 6 maps = 30 waves total,
+// matching LAST_WAVE), the flavor/story text for each chapter, the timed power-up definitions
+// (Bloodsun/Windwake/etc., matching the "buffs" fields validated in GameSaveEndpoints.cs), the
+// forge upgrade catalog (UPGRADES — matches the upgradeKeys arrays on the API side), which enemy
+// type spawns at which wave, and the threat/warning text shown in the HUD per wave. If you're
+// adding a new map/chapter or new enemy type, this file is where the wave-to-content mapping lives.
 export const WAVES_PER_MAP = 5;
+
+// The six campaign chapters, in order. Each entry's `hazards` array defines environmental hazard
+// zones (slow fields, fire, storm, void) drawn and applied by arpg-engine.js/arpg-graphics.js;
+// `hazard: "none"` means the map has no environmental hazard at all (chapter I only).
 export const MAPS = [
     {
         id: "hollow", name: "The Ashen Hollow", chapter: "I / THE LAST EMBER", caption: "ASHBOUND SANCTUM",
@@ -50,10 +62,16 @@ export const MAPS = [
 ];
 export const LAST_WAVE = MAPS.length * WAVES_PER_MAP;
 export const ENEMY_KINDS = ["husk", "brute", "wisp", "runner", "spitter", "sentinel", "reaver", "lancer", "bomber", "summoner", "cantor", "hexer", "boss", "duelist", "artillerist"];
+// Which map (0-based index) a given wave number belongs to — wraps around past the last map for
+// Endless mode waves, so Endless cycles back through all six maps rather than running out of content.
 export const mapIndexForWave = wave => Math.max(0, Math.floor((wave - 1) / WAVES_PER_MAP)) % MAPS.length;
 export const mapForWave = wave => MAPS[mapIndexForWave(wave)];
+// A 0-5 "fire phase" cycling every 6 seconds of run time, used by fire-hazard maps to time when
+// fire zones actually ignite versus sit dormant.
 export const firePhase = time => time % 6;
 
+// Timed pickup power-ups that drop as loot and apply a temporary buff when collected — duration is
+// in seconds; matches the "buffs" object (fury/haste/ward/magnet) validated server-side.
 export const POWER_UPS = [
     { key: "fury", name: "Bloodsun", duration: 15, color: "#ff9677", detail: "+50% weapon damage" },
     { key: "haste", name: "Windwake", duration: 12, color: "#8be0ed", detail: "+35% movement and +40% cooldown recovery" },
@@ -61,6 +79,11 @@ export const POWER_UPS = [
     { key: "magnet", name: "Gravetide", duration: 20, color: "#ecd28b", detail: "Greatly increases loot pickup range" }
 ];
 
+// The forge upgrade catalog — permanent, gold-purchased upgrades bought between waves at camp.
+// `max` is the rank cap and `base` is the gold cost of the first rank (see arpg-engine.js's
+// upgradeCost() for how cost scales per rank). Keys here must exactly match the upgradeKeys arrays
+// GameSaveEndpoints.cs expects for the current save version — adding a new upgrade here means also
+// updating that server-side list and bumping CurrentSaveVersion.
 export const UPGRADES = {
     weapon: { name: "Sunsteel edge", max: 50, base: 45, detail: "+3 base damage and +2.5% damage per rank, additive with damage cards" },
     armor: { name: "Dawnplate", max: 12, base: 40, detail: "+3 armor and +12 max health per rank; total armor reduction caps at 60%" },
@@ -74,6 +97,10 @@ export const UPGRADES = {
     guard: { name: "Last sanctuary", max: 8, base: 65, detail: "Improves your class ward: +8% damage, +8 radius, +0.2s protection and +8% cooldown recovery per rank" }
 };
 
+// Returns the HUD "combat pressure" warning text for the given wave — tells the player what new
+// enemy behavior to watch for as the campaign/Endless mode escalates. Checked in a specific order
+// (highest/most-recently-introduced threats first) since later ranges are meant to take priority
+// once an enemy type is established as a recurring threat, matching enemyKindForWave's own ordering below.
 export function threatForWave(wave) {
     if (wave >= 13 && wave < 16) return "Artillerists mark violet blast zones. Leave the circle before the mortar lands!";
     if (wave >= 4 && wave < 6) return "Duelists flank before a cyan slash. Step out of marked melee arcs during wind-up.";
@@ -90,6 +117,11 @@ export function threatForWave(wave) {
     return "Husks swarm, brutes strike hard, and wisps attack at range. Gold fuels the forge.";
 }
 
+// Deterministically picks which enemy type spawns for a given wave and spawn index within that
+// wave. Uses modulo checks against `index` so a wave gets a consistent mix of enemy types rather
+// than pure randomness — e.g. `index % 4 === 1` means roughly 1 in 4 spawns is a wisp once the
+// wave threshold is met. Order matters here: later-introduced/rarer enemy types are checked first
+// so they take priority over the fallback husk/brute/wisp mix in the final line.
 export function enemyKindForWave(wave, index) {
     if (wave >= 13 && index % 10 === 7) return "artillerist";
     if (wave >= 4 && index % 9 === 5) return "duelist";

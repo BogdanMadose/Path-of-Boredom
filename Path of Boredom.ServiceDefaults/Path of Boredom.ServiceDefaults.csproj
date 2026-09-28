@@ -5,6 +5,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsAspireSharedProject>true</IsAspireSharedProject>
+    <!-- Emits an XML doc file from the /// summaries in this shared project (SaveServiceOptions,
+         RankingModels, Extensions), so IntelliSense in Web/ApiService picks them up. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

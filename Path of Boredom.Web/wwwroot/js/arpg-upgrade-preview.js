@@ -1,7 +1,20 @@
+// arpg-upgrade-preview.js — "before/after" number previews for the forge upgrade UI.
+//
+// The forge shows exactly what a purchase would change before the player commits gold/mastery to
+// it. This works by computing the full set of derived combat stats (values()) twice — once for the
+// current state, once for a cloned state with the candidate upgrade applied — then diffing the
+// specific metrics that upgrade actually affects (fields lookup table) and formatting a readable
+// string. If you add a new forge/mastery upgrade, you need to: add it to `fields` (which derived
+// stats it touches) and make sure values() actually computes something meaningful for it.
 import { weaponDamage, armorRating, movementSpeed, criticalChance, criticalDamage, skillReach, flaskHealing, cooldownRecovery } from "./arpg-engine.js";
 import { classFor } from "./arpg-classes.js";
 import { EXTRA_SKILLS, AUTO_COOLDOWN } from "./arpg-skills.js";
 
+// Computes the full set of derived, human-relevant combat stats for a given state snapshot — this
+// mirrors (and must stay consistent with) the actual formulas used in arpg-engine.js's combat code,
+// just recomputed here independently for preview purposes rather than shared via a common function.
+// If a formula changes in arpg-engine.js, the equivalent line here needs updating too or the
+// preview numbers will silently drift out of sync with actual gameplay.
 function values(state) {
     const hero = classFor(state), p = state.player, tree = state.skillTree, forge = state.upgrades;
     const damage = weaponDamage(state), recovery = cooldownRecovery(state);
@@ -27,6 +40,8 @@ function values(state) {
         burstReach: skillReach(state, "burst"), guardReach: skillReach(state, "guard")
     };
 }
+// Maps each forge/mastery upgrade key to which of the derived stats (from values() above) it
+// actually affects — this is what upgradePreview() diffs to build its "X: before → after" text.
 const fields = {
     weapon: ["damage"], armor: ["armor", "health"], cleave: ["attackHit", "attackInterval", "attackReach"],
     nova: ["specialHit", "specialInterval", "specialReach"], burst: ["burstHit", "burstInterval", "burstReach"],
@@ -34,6 +49,7 @@ const fields = {
     critChance: ["crit"], critDamage: ["critDamage"], might: ["damage"], vitality: ["health"],
     recovery: ["recovery", "specialInterval"], area: ["attackReach", "specialReach", "burstReach", "guardReach"], speed: ["speed"]
 };
+// Human-readable labels for each derived stat, used to build the preview text.
 const labels = {
     damage: "Weapon damage", armor: "Armor %", health: "Max health", speed: "Move speed", crit: "Crit chance %", critDamage: "Crit damage %", recovery: "Recovery %",
     attackHit: "Attack hit", specialHit: "Special hit / arrow", burstHit: "Burst hit / arrow", guardHit: "Ward pulse",
@@ -42,6 +58,14 @@ const labels = {
     attackReach: "Attack reach", specialReach: "Special reach", burstReach: "Burst reach", guardReach: "Ward radius"
 };
 
+// Builds the preview text shown in the forge UI for buying one more rank of `key` (a forge upgrade,
+// or a mastery upgrade if `mastery` is true). Clones the relevant parts of state, bumps the target
+// upgrade by one rank (plus the associated immediate health gain for armor/vitality, since those
+// apply instantly rather than just changing a formula), recomputes derived stats, and diffs only
+// the metrics that upgrade actually touches. Also flags when a stat is already at its cap (e.g.
+// crit chance at 75%) so the UI can warn the player the purchase won't do anything numerically,
+// even though some upgrades (like flask/guard) still have secondary effects worth calling out
+// separately (refilling flask charges, minimum ward gap) regardless of whether the capped stat moved.
 export function upgradePreview(state, key, mastery = false) {
     const next = { ...state, upgrades: { ...state.upgrades }, mastery: { ...state.mastery }, player: { ...state.player } };
     next[mastery ? "mastery" : "upgrades"][key]++;

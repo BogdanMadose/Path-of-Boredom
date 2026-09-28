@@ -1,3 +1,17 @@
+// arpg.js — main runtime controller / entry point for the whole game.
+//
+// This is the module Home.razor imports and calls createGame(rootElement, saveBridge) on. It does
+// NOT run the simulation itself (that's arpg-engine.js's job) — instead it owns everything around
+// the simulation: the pause menu, the setup dialog (difficulty/class/loadout pickers), the skills &
+// loadout panel, tooltips, the forge/upgrade UI, save/load button wiring (including retry-on-failure),
+// and all keyboard/mouse input listeners. Think of it as the "UI shell + input + render loop driver"
+// while arpg-engine.js is the "what actually happens each frame" logic.
+//
+// General shape of a frame: this file's render loop reads input state, calls arpg-engine.js's
+// step() with it, gets back updated game state, then hands that state to arpg-graphics.js to draw.
+// If you're chasing "why did my character take damage it shouldn't have", look in arpg-engine.js.
+// If it's "why does it look wrong on screen", look in arpg-graphics.js. If it's "why doesn't this
+// button/panel do anything", it's almost certainly wiring that's missing in this file.
 import { WIDTH, HEIGHT, createState, startRun, startEndlessRun, step, togglePause, useSkill, weaponDamage, armorRating, upgradeCost, buyUpgrade, continueJourney, enterEndless, chooseLevelCard } from "./arpg-engine.js";
 import { captureSnapshot, restoreSnapshot } from "./arpg-save.js";
 import { captureRankingBuild } from "./arpg-ranking.js";
@@ -13,12 +27,21 @@ import { treePointsSpent, treeRespecCost, canRespecTree, respecTree } from "./ar
 import { SKILL_KEYS, SLOTTABLE_SKILLS, EXTRA_SKILLS, MAX_SKILL_POINTS, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
 import { drawHero, drawOrb, decorateFloor, drawAtmosphere, drawLootIcon } from "./arpg-graphics.js";
 
+// Respects the OS/browser-level "prefers-reduced-motion" setting so screen shake and other purely
+// cosmetic motion effects can be toggled off for players sensitive to it.
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
+// localStorage key for a purely client-side "best score" fallback/cache — separate from the
+// server-authoritative rankings system, just used for a quick local display before rankings load.
 const BEST_KEY = "path-of-boredom.best.v1";
+// Maps physical keyboard keys to logical movement directions (WASD or arrow keys, either works).
 const movementKeys = { KeyW: "up", ArrowUp: "up", KeyS: "down", ArrowDown: "down", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right" };
+// Maps physical keys to logical skill/action inputs (J = attack, Q = manual skill, Space = dodge, E = flask).
 const skillKeys = { KeyJ: "attack", KeyQ: "manual", Space: "dodge", KeyE: "potion" };
 
+// Pre-renders a map's background floor tile to an offscreen canvas once per map, rather than
+// redrawing the (static) floor tint/decoration every single frame — a basic but effective perf win
+// since the floor never changes mid-run for a given map.
 function makeFloor(map) {
     const floor = document.createElement("canvas");
     const scale = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -28,6 +51,7 @@ function makeFloor(map) {
     ctx.setTransform(floor.width / WIDTH, 0, 0, floor.height / HEIGHT, 0, 0);
     ctx.fillStyle = `rgb(${map.tint.join(",")})`;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
     let seed = 72;
     const random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
     for (let row = -1; row < 12; row++) {
@@ -148,6 +172,7 @@ function makeFloor(map) {
     return floor;
 }
 
+// Tiny shorthand for filling a solid circle — used constantly throughout the per-kind enemy art below.
 function circle(ctx, x, y, radius, color) {
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -155,6 +180,12 @@ function circle(ctx, x, y, radius, color) {
     ctx.fill();
 }
 
+// Draws one actor (the player or any enemy) at its current position: a soft ground shadow, a
+// walk-cycle bob/lean (skipped entirely under reduced-motion), then a big per-kind if/else chain of
+// hand-drawn shape art unique to that enemy kind (each kind's silhouette/colors are deliberately
+// distinct so players can identify threats at a glance mid-fight), and finally shared overlays: a
+// chill frost-ring, an elite modifier ring + label, and a health bar for damaged non-player actors.
+// The player's own art is delegated to drawHero() in arpg-graphics.js instead of being inlined here.
 function drawActor(ctx, actor, player, time, map, heroClass) {
     const hero = actor === player;
     if (reducedMotion.matches) time = 0;
@@ -319,6 +350,11 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
     }
 }
 
+// The main per-frame draw call: blits the pre-rendered floor, draws atmosphere effects, the map's
+// environmental hazards (with a slow/warning/burning visual state driven by firePhase()), the four
+// corner brazier lights, then loops enemies to draw attack-telegraph shapes/labels before actors and
+// projectiles are drawn later in this function. Kept intentionally simple/flat (no z-sorting beyond
+// draw order) since the arena is a flat top-down view.
 function render(ctx, floor, state) {
     const map = mapForWave(state.wave);
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
@@ -623,6 +659,9 @@ function render(ctx, floor, state) {
     }
 }
 
+// Draws the pulsing full-screen "resumeDelay" countdown overlay shown briefly after unpausing or
+// traveling to a new checkpoint/wave, during which combat is frozen (see step()'s early-return for
+// state.resumeDelay > 0). Purely cosmetic — the actual freeze logic lives in arpg-engine.js.
 function drawCountdown(ctx, state) {
     if (state.resumeDelay <= 0 || state.status !== "playing") return;
     ctx.save();
@@ -635,6 +674,16 @@ function drawCountdown(ctx, state) {
     ctx.restore();
 }
 
+// The module's single export and entry point. `root` is the DOM element Home.razor renders the game
+// UI inside (containing the canvas plus every button/panel/overlay referenced below via
+// querySelector); `saveBridge` is the small object Home.razor passes in wrapping its JSInvokable
+// save/load/score C# methods. Returns a `{ dispose() }` handle so Home.razor can tear down all
+// listeners and stop the render loop when the component unmounts (e.g. navigating away).
+//
+// This function does a large amount of one-time setup (grabbing every DOM element it'll touch,
+// building the per-map floor canvases, wiring every button/keyboard/pointer listener) and then
+// returns without blocking — the actual gameplay happens later via the requestAnimationFrame loop
+// defined further down in this function.
 export function createGame(root, saveBridge = null) {
     const canvas = root.querySelector("canvas");
     const bestKey = `${BEST_KEY}:${root.dataset.player || "unknown"}`;
@@ -644,7 +693,10 @@ export function createGame(root, saveBridge = null) {
         loading.textContent = "This game needs a browser with Canvas 2D support.";
         return { dispose() {} };
     }
+    // Pre-render every map's floor tile once up front rather than per-run, so switching maps mid-session never stalls.
     const floors = MAPS.map(makeFloor);
+    // A single AbortController whose signal is passed to every addEventListener call below (via the
+    // `on` helper) so dispose() can remove every listener at once instead of tracking them individually.
     const controller = new AbortController();
     const on = (target, event, handler, options = {}) => target.addEventListener(event, handler, { ...options, signal: controller.signal });
     const stats = Object.fromEntries([...root.querySelectorAll("[data-stat]")].map(element => [element.dataset.stat, element]));
@@ -725,6 +777,12 @@ export function createGame(root, saveBridge = null) {
     let layoutFrame = 0;
     let alignArena = false;
     try { focusView = localStorage.getItem(viewPreference) !== "off"; } catch { /* View preferences are optional. */ }
+    // --- Responsive layout: "focus view" mode -------------------------------------------------
+    // On small/short screens the arena can be taller than the viewport, so "focus view" (persisted
+    // to localStorage) shrinks the arena's max-width to whatever fits above the fold, letting
+    // players still see their HUD/buttons without scrolling. updateCanvasResolution() keeps the
+    // actual canvas backing-store resolution in sync with its CSS size and devicePixelRatio so
+    // rendering stays crisp regardless of the layout mode.
     function updateCanvasResolution() {
         const scale = Math.max(1, Math.min(2, canvas.getBoundingClientRect().width / WIDTH * (window.devicePixelRatio || 1)));
         const width = Math.round(WIDTH * scale), height = Math.round(HEIGHT * scale);
@@ -736,6 +794,9 @@ export function createGame(root, saveBridge = null) {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = "high";
     }
+    // Recomputes the arena viewport's max-width for focus view (or clears it when focus view is
+    // off) based on however much vertical space is actually available around the game's other UI,
+    // then resyncs canvas resolution to match the new size.
     function fitArena() {
         root.classList.toggle("focus-view", focusView);
         focusViewButton.setAttribute("aria-pressed", String(focusView));
@@ -748,6 +809,9 @@ export function createGame(root, saveBridge = null) {
         if (viewport.style.maxWidth !== width) viewport.style.maxWidth = width;
         updateCanvasResolution();
     }
+    // Scrolls the page just enough to bring `element` fully into view (used after entering focus
+    // view or opening the game so the player isn't left having to scroll manually) without
+    // over-scrolling if it's already visible.
     function reveal(element, smooth = false) {
         const box = element.getBoundingClientRect();
         const height = window.visualViewport?.height ?? document.documentElement.clientHeight;
@@ -756,6 +820,9 @@ export function createGame(root, saveBridge = null) {
         const delta = box.height > height - 16 || box.top < top ? box.top - top : box.bottom > bottom ? box.bottom - bottom : 0;
         if (Math.abs(delta) > 1) window.scrollBy({ top: delta, behavior: smooth && !reducedMotion.matches ? "smooth" : "instant" });
     }
+    // Batches layout recalculation into a single requestAnimationFrame call, since resize/orientation
+    // events can fire many times in quick succession — this coalesces them into one fitArena() call
+    // per frame instead of thrashing layout repeatedly.
     function scheduleArenaLayout(align = false) {
         alignArena ||= align;
         if (layoutFrame || disposed) return;
@@ -793,6 +860,13 @@ export function createGame(root, saveBridge = null) {
     const reportedScores = new Map();
     let reporting = false;
     let lastScoreAttempt = 0;
+    // Queues (and attempts to flush) the current run's score to the server rankings. Only reports
+    // when there's actually an improvement over what's already been successfully reported for this
+    // exact (patch, difficulty, mode, class) combination, since the server only cares about a
+    // player's personal best per bucket. `pendingScores` holds not-yet-confirmed submissions;
+    // `reportedScores` remembers the last value that round-tripped successfully so repeated calls
+    // during the same run don't keep resending an unchanged or lower score. On failure, leaves the
+    // pending entry queued so the next reportScore() call (e.g. on the next checkpoint/kill) retries automatically.
     async function reportScore() {
         if (!saveBridge || disposed) return;
         if (state.status !== "ready" && state.rankingMode !== "legacy" && Object.hasOwn(DIFFICULTIES, state.difficulty)) {
@@ -827,16 +901,22 @@ export function createGame(root, saveBridge = null) {
     } catch {
         // Storage is optional; private browsing can disable it.
     }
+    // Small helper to update a HUD stat element's text only if it actually changed, avoiding
+    // needless layout/reflow churn on every frame for values that haven't moved.
     const text = (name, value) => {
         const next = String(value);
         if (stats[name] && stats[name].textContent !== next) stats[name].textContent = next;
         if (stats[name] && (name === "objective" || name === "buffs") && stats[name].title !== next) stats[name].title = next;
     };
+    // Resets all held input state — called whenever focus leaves the game (opening a dialog, pausing,
+    // etc.) so a key/pointer that was down before the interruption doesn't stay "stuck" held after.
     function clearInput() {
         keys.clear();
         pointers.clear();
         aim = null;
     }
+    // Refreshes the setup dialog's class-preview panel text to match whichever class is currently
+    // selected in the dropdown, so players can compare stats before starting a run.
     function updateClassPreview() {
         const hero = HERO_CLASSES[classSelect.value];
         classPreview.querySelector("[data-class-title]").textContent = hero.name;
@@ -849,13 +929,21 @@ export function createGame(root, saveBridge = null) {
         root.querySelector("[data-difficulty-description]").textContent = DIFFICULTIES[difficultySelect.value].description;
     }
     on(difficultySelect, "change", updateDifficultyDescription);
+    // Builds a lightweight preview state reflecting what a new/continued run would look like with
+    // the setup dialog's current class/mode selections, purely so skill-unlock checks (which read
+    // things like wave/heroClass off state) can be evaluated before the run actually starts.
     function setupPreview() {
         return setupAction === "continue" ? state : { ...state, heroClass: classSelect.value,
             rankingMode: setupAction === "endless" ? "endless" : "campaign", wave: setupAction === "endless" ? LAST_WAVE + 1 : 0 };
     }
+    // Reads the loadout dropdowns' current values as a { manual, auto } loadout object.
     function readSetupLoadout() {
         return { manual: setupSlots[0].value, auto: setupSlots.slice(1).map(select => select.value) };
     }
+    // Refreshes the setup dialog's loadout step: disables/labels each skill option by whether it's
+    // unlocked for the previewed class/mode, updates the guard-unlock hint text, and enables/disables
+    // the "confirm" button based on whether the currently selected combination is a valid loadout
+    // (no skill slotted twice, manual skill actually unlocked, etc. — see arpg-skills.js's validLoadout()).
     function updateSetupLoadout() {
         const preview = setupPreview();
         for (const option of root.querySelectorAll("[data-setup-skill]")) {
@@ -879,6 +967,10 @@ export function createGame(root, saveBridge = null) {
         }
         updateSetupLoadout();
     });
+    // Renders whichever step of the multi-step setup dialog is currently active: step 0 is the
+    // difficulty/class picker, the middle steps are the short tutorial slideshow (skipped via
+    // setupSkip), and the final step is the skill-loadout picker gating the actual "start"/"confirm"
+    // button. Sets focus to the most relevant control at each step for keyboard/screen-reader users.
     function showSetupStep() {
         const choosingDifficulty = setupStep === 0;
         const choosingLoadout = setupStep === tutorial.length + 1;
@@ -906,6 +998,10 @@ export function createGame(root, saveBridge = null) {
         if (choosingLoadout) updateSetupLoadout();
         (choosingDifficulty ? difficultySelect : choosingLoadout ? setupSlots[0] : setupNext).focus({ preventScroll: true });
     }
+    // Opens the setup dialog for a given `action` ("campaign", "endless", or "continue" — i.e.
+    // transitioning a completed campaign run into Endless mode). Pauses an in-progress run first,
+    // pre-fills the dialog with sensible defaults (the current run's settings when continuing, or
+    // fresh defaults for a brand-new run), and always starts back at step 0.
     function openSetup(action) {
         if (saving || setupAction || state.status === "choosing") return;
         if (state.status === "playing") togglePause(state);
@@ -922,6 +1018,10 @@ export function createGame(root, saveBridge = null) {
         showSetupStep();
         scheduleArenaLayout(true);
     }
+    // Confirms the setup dialog and actually starts (or transitions into) a run, validating the
+    // chosen loadout one last time as a safety net. Reports any pending score from the previous run
+    // before replacing `state` so nothing is lost. Resets the frame-timing `last` timestamp so the
+    // very next render loop tick doesn't see the (now stale) time since the last frame as elapsed time.
     function finishSetup() {
         if (!setupAction || saving || setupStep !== tutorial.length + 1) return;
         const loadout = readSetupLoadout();
@@ -942,6 +1042,8 @@ export function createGame(root, saveBridge = null) {
         updateHud();
         canvas.focus({ preventScroll: true });
     }
+    // Closes the setup dialog without starting/changing anything, returning focus to whichever
+    // button would have opened it (Endless launch if the run was already won, otherwise Start).
     function cancelSetup() {
         setupAction = null;
         setup.hidden = true;
@@ -962,6 +1064,11 @@ export function createGame(root, saveBridge = null) {
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     });
+    // Refreshes essentially every piece of the HUD/UI that can change between frames: class stat
+    // panels, per-skill descriptions and tooltips, the low-health warning banner, each skill button's
+    // enabled/cooldown/slot-label state, and the score readout. Called every render frame (see the
+    // loop() function below) as well as immediately after any state-changing action (setup, pause,
+    // skill purchase, etc.) so the UI never lags a frame behind the actual game state.
     function updateHud() {
         const p = state.player;
         const map = mapForWave(state.wave);
@@ -1279,6 +1386,9 @@ export function createGame(root, saveBridge = null) {
             }
         }
     }
+    // Adds/updates the small "+X damage" style preview label shown on a forge/mastery button so
+    // players can see the concrete effect of their next purchase before spending gold; also flags
+    // buttons whose underlying stat has hit its display cap (e.g. skillReach's per-skill maximums).
     function showUpgradePreview(button, key, mastery = false) {
         const preview = upgradePreview(state, key, mastery);
         let label = button.querySelector("[data-upgrade-preview]");
@@ -1292,6 +1402,8 @@ export function createGame(root, saveBridge = null) {
         button.classList.toggle("at-stat-cap", preview.capped);
         button.title += ` ${preview.text}`;
     }
+    // Toggles pause via the engine, syncing input state and focus. Guarded against firing while a
+    // save is in flight or the setup dialog is open, since pausing mid-save or mid-dialog would be confusing.
     function pause() {
         if (saving || setupAction) return;
         togglePause(state);
@@ -1299,6 +1411,8 @@ export function createGame(root, saveBridge = null) {
         updateHud();
         if (state.status === "playing") canvas.focus({ preventScroll: true });
     }
+    // Handles the primary "Start/Resume" button: resumes if paused, continues the journey if at a
+    // checkpoint camp, or opens the setup dialog for a brand-new campaign run otherwise.
     function begin() {
         if (saving || setupAction || state.status === "choosing") return;
         if (state.status === "paused") togglePause(state);
@@ -1411,6 +1525,17 @@ export function createGame(root, saveBridge = null) {
         if (state.status === "playing") canvas.focus({ preventScroll: true });
     });
     on(restartButton, "click", () => openSetup("campaign"));
+    // The single save/load entry point, covering both manual Save/Load button clicks and automatic
+    // checkpoint autosaves (`automatic = true`, called right after finishCheckpoint() transitions the
+    // run to "camp"/"won"). Pauses first so the state being saved can't change mid-save. On load,
+    // round-trips the server's raw save envelope through restoreSnapshot() (the same validator the
+    // server-side save went through when it was captured) before accepting it as the new live state
+    // — if the server ever returned something malformed, this throws and the load is treated as
+    // failed rather than corrupting the live run. Endless-mode checkpoint autosaves that succeed
+    // auto-advance to the next stage (`advanceEndless`) so players don't have to manually continue
+    // after every single stage transition; other modes always require an explicit "continue" action.
+    // Any failure (network error, invalid save shape) leaves the current in-memory run completely
+    // unchanged — nothing here can lose progress, only fail to persist it.
     async function persist(loadingSave, automatic = false) {
         if (saving || checkingUnlock || setupAction) return;
         if (!saveBridge) {
@@ -1473,6 +1598,10 @@ export function createGame(root, saveBridge = null) {
     if (saveButton && saveStatus) on(saveButton, "click", () => persist(false));
     on(retrySave, "click", () => persist(false, true));
     if (loadButton && saveStatus) on(loadButton, "click", () => persist(true));
+    // One-time startup check (see the `checkingUnlock` flag) that asks the server whether this
+    // player's profile has already permanently unlocked Endless Watch, without disturbing the
+    // current in-memory run — it only reads endlessUnlocked/campaignComplete off the result, never
+    // replaces `state`. Runs once when the game first loads (see the call site further down).
     async function readUnlock() {
         try {
             if (saveBridge) {
@@ -1510,6 +1639,8 @@ export function createGame(root, saveBridge = null) {
     on(root, "focusout", event => {
         if (event.relatedTarget && !root.contains(event.relatedTarget) && state.status === "playing") pause();
     });
+    // Converts a pointer event's browser (CSS pixel) coordinates into the game's logical WIDTH/HEIGHT
+    // coordinate space, accounting for the canvas possibly being displayed scaled/resized on screen.
     function point(event) {
         const bounds = canvas.getBoundingClientRect();
         return { x: (event.clientX - bounds.left) * WIDTH / bounds.width, y: (event.clientY - bounds.top) * HEIGHT / bounds.height };
@@ -1546,6 +1677,12 @@ export function createGame(root, saveBridge = null) {
     on(window, "pointerup", release);
     on(window, "pointercancel", release);
     on(canvas, "lostpointercapture", release);
+    // Builds the single input snapshot object passed to arpg-engine.js's step() each frame, merging
+    // together every currently-held input source: physical keys, and any on-screen touch/mouse
+    // buttons captured via pointer events (tracked in the `pointers` map so multiple simultaneous
+    // touches — e.g. one finger moving, another attacking — all register). `aim` is the last known
+    // mouse/touch position used for facing direction; it's cleared whenever a non-mouse pointer
+    // leaves so a lifted touch doesn't leave a stale aim point behind.
     function input() {
         const held = new Set(pointers.values());
         for (const key of keys) held.add(movementKeys[key] || skillKeys[key]);
@@ -1556,6 +1693,14 @@ export function createGame(root, saveBridge = null) {
             dodge: held.has("dodge"), potion: held.has("potion")
         };
     }
+    // The main requestAnimationFrame loop: advances the simulation via step(), periodically retries
+    // score reporting (every 15s, as a fallback in case an earlier reportScore() call failed),
+    // triggers exactly one automatic checkpoint autosave per unique (mode, wave) checkpoint reached
+    // (checkpointHandled dedupes this so returning to the same checkpoint state doesn't re-save
+    // repeatedly), then draws the frame and throttles full HUD updates to roughly 10 times per second
+    // (every 100ms) rather than every single frame, since most HUD text doesn't need 60fps updates.
+    // Self-terminates if the game's root element has been removed from the DOM (component unmounted
+    // without dispose() being called for some reason) as a safety net against a leaked loop.
     function animate(now) {
         if (disposed) return;
         if (!root.isConnected) { dispose(); return; }
@@ -1574,6 +1719,11 @@ export function createGame(root, saveBridge = null) {
         if (now - hudTime > 100 || state.status !== shownStatus) { updateHud(); hudTime = now; }
         frame = requestAnimationFrame(animate);
     }
+    // Tears down everything this game instance set up: stops the render loop and any pending layout
+    // frame, disconnects both observers, and aborts every event listener registered via `on()` in one
+    // shot (they all share `controller.signal`). Idempotent — safe to call multiple times or have it
+    // triggered by more than one of the paths that call it (component disposal, DOM removal, the
+    // animate() loop's own DOM-disconnection check).
     function dispose() {
         if (disposed) return;
         disposed = true;
@@ -1584,14 +1734,21 @@ export function createGame(root, saveBridge = null) {
         observer.disconnect();
         clearInput();
     }
+    // Watches for this game's root element being removed from the document (e.g. Blazor tearing down
+    // the component without an explicit dispose call) as a fallback cleanup trigger.
     const observer = new MutationObserver(() => { if (!root.isConnected) dispose(); });
     observer.observe(document.body, { childList: true, subtree: true });
+    // Watches the combat view's own size (independent of window resize — e.g. a sidebar
+    // collapsing/expanding can resize it without the window itself resizing) to keep the arena's
+    // layout/canvas resolution in sync.
     const resizeObserver = new ResizeObserver(() => scheduleArenaLayout());
     resizeObserver.observe(combatView);
     fitArena();
     loading.hidden = true;
     startButton.disabled = false;
     updateHud();
+    // Kick off the render loop and the one-time server unlock check; everything from here on is
+    // driven by the animate() loop and the event listeners registered above.
     frame = requestAnimationFrame(animate);
     void readUnlock();
     return { dispose };

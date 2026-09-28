@@ -1,3 +1,16 @@
+// arpg-save.js — client-side save serialization, validation, and version migration.
+//
+// This is the client-side mirror of GameSaveEndpoints.cs's IsValidState/ValidCardProgress/
+// ValidSkillProgress on the API — there is NO shared schema between the two, they are kept in sync
+// entirely by hand. If you change what gets captured/restored here, you almost certainly also need
+// to update the matching validation on the API side and bump both CurrentSaveVersion constants.
+// See the wwwroot/js README's "save version discipline" section for the full bump checklist.
+//
+// restoreSnapshot() doubles as both "load a save from the server" AND "the validator that runs
+// every time captureSnapshot() builds a new save" (see the bottom of this file) — so a save can
+// never be produced by this client that this same client couldn't also load back. Each
+// `snapshot.version < N` branch below provides a default/migration for a field that didn't exist
+// in save format N, so older saves can still be restored under the current engine.
 import { WIDTH, HEIGHT, createState } from "./arpg-engine.js";
 import { LAST_WAVE, ENEMY_KINDS, UPGRADES, POWER_UPS } from "./arpg-campaign.js";
 import { LEVEL_CARDS } from "./arpg-cards.js";
@@ -7,15 +20,23 @@ import { HERO_CLASSES } from "./arpg-classes.js";
 import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
 import { SKILL_KEYS, SLOTTABLE_SKILLS, TREE_NODES, skillPointsLeft, skillUnlocked, validLoadout } from "./arpg-skills.js";
 
+// Field-name lists used with numbers() below, grouped by the kind of save-state object they belong
+// to — kept as flat arrays so each numbers() call site doesn't need to spell out every field name inline.
 const playerNumbers = "x y radius facing health maxHealth level xp nextLevel damage weaponBonus potions attack nova dodge potion invulnerable rolling rollX rollY vx vy".split(" ");
 const enemyNumbers = "x y health maxHealth radius speed damage cooldown flash slam winding".split(" ");
 const projectileNumbers = "x y vx vy life damage".split(" ");
 const lootNumbers = "x y value life".split(" ");
 
+// Throws with a single generic, player-safe error message if `condition` is false. Every validation
+// check in this file funnels through this one function so failures always produce the same
+// friendly, non-leaky error regardless of which specific check tripped.
 function require(condition) {
     if (!condition) throw new Error("The save is damaged or uses an unsupported version. Your current run is unchanged.");
 }
 
+// Validates that `source` is a plain object and every named field on it is a finite, safe-magnitude
+// number, then returns a fresh object containing just those fields (rather than trusting/copying
+// the original object wholesale, which could carry extra unexpected properties).
 function numbers(source, names) {
     require(source !== null && typeof source === "object" && !Array.isArray(source));
     return Object.fromEntries(names.map(name => {
@@ -25,20 +46,36 @@ function numbers(source, names) {
     }));
 }
 
+// Validates a string field (bounded length) and replaces the Unicode replacement character
+// (U+FFFD, which shows up when malformed byte sequences get decoded) with a plain hyphen so a
+// corrupted string can't smuggle in an unexpected glyph.
 function text(value) {
     require(typeof value === "string" && value.length <= 200);
     return value.replace(/\uFFFD/g, "-");
 }
 
+// Validates that `value` is a bounded-size array, then maps every element through `copy` (which is
+// expected to itself validate and reshape each element) — used for all the entity lists (enemies,
+// projectiles, loot, playerShots, etc.).
 function array(value, copy) {
     require(Array.isArray(value) && value.length <= 128);
     return value.map(copy);
 }
 
+// Validates that `value` is a whole number within [min, max] inclusive.
 function integer(value, min, max) {
     require(Number.isInteger(value) && value >= min && value <= max);
 }
 
+// The core load/validate function: takes a raw save envelope ({ version, state }) and rebuilds a
+// fresh, fully-validated engine state object from it, or throws if anything about the save doesn't
+// check out. Reading this function top to bottom roughly follows the shape of a save: identity/mode
+// tags, class, player shots (Ranger), difficulty/ranking tags, mastery/forge, core counters, player
+// stats, skill tree/loadout, boons/cards, then the enemies/projectiles/loot entity lists.
+//
+// The `snapshot.version < N ? <default/derived value> : saved.field` pattern repeated throughout is
+// the actual migration mechanism — it supplies a sensible default for saves older than the version
+// that introduced a given field, rather than requiring every historical save to be rewritten.
 export function restoreSnapshot(snapshot, random = Math.random) {
     require([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].includes(snapshot?.version));
     const saved = snapshot.state;
@@ -238,6 +275,14 @@ export function restoreSnapshot(snapshot, random = Math.random) {
     return state;
 }
 
+// Builds a new save snapshot from the live, in-progress engine state. Rather than just serializing
+// `state` directly, this round-trips it through restoreSnapshot() first (tagged as the CURRENT
+// version) — which both strips out transient/non-serializable fields (random, effects,
+// damageHistory) and, more importantly, guarantees that anything captureSnapshot() produces is
+// itself something this same client build could successfully load back. If that round-trip
+// validation throws, the save attempt fails loudly here rather than silently uploading bad data
+// the server would reject anyway. Also enforces the same 64KB payload cap the API enforces, so an
+// oversized save is caught client-side with time to react rather than failing after a network round trip.
 export function captureSnapshot(state) {
     require(["playing", "paused", "camp", "won", "choosing"].includes(state.status));
     const restored = restoreSnapshot({ version: 14, state: {

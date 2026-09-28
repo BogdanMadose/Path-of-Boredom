@@ -1,3 +1,19 @@
+// arpg-engine.js — the actual simulation: game state, combat, waves, loot, and the per-frame step().
+//
+// This is the largest and most important gameplay module. Nothing here touches the DOM/canvas
+// directly (that's arpg-graphics.js) and nothing here talks to the server (that's arpg-save.js and
+// Home.razor/GameSaveClient). Everything else reads or mutates the plain state object created by createState().
+//
+// Rough map of this file, top to bottom: derived-stat helpers (weaponDamage, armorRating, etc.) that
+// recompute fresh from state every call; purchase functions (buyMastery/buyUpgrade/chooseLevelCard);
+// run lifecycle (createState/startRun/startEndlessRun/continueJourney/enterEndless/togglePause);
+// combat internals (hurtPlayer/hitEnemy/killEnemy/useSkill/firePlayerArrows/autoCast/stepPlayerShots);
+// world/wave management (spawnWave/fireVolley/collectLoot/finishCheckpoint); and step(), the single
+// per-frame entry point arpg.js's render loop calls.
+//
+// IMPORTANT: this file's state shape is exactly what arpg-save.js serializes/validates and what
+// GameSaveEndpoints.cs re-validates on the server. Adding/removing/renaming a field on `state` or
+// `state.player` generally requires updating arpg-save.js (and bumping the save version) too.
 import { LAST_WAVE, WAVES_PER_MAP, UPGRADES, POWER_UPS, mapForWave, mapIndexForWave, enemyKindForWave, firePhase } from "./arpg-campaign.js";
 export { LAST_WAVE } from "./arpg-campaign.js";
 import { LEVEL_CARDS, drawLevelCards } from "./arpg-cards.js";
@@ -5,9 +21,15 @@ import { DIFFICULTIES, difficultyFor } from "./arpg-difficulty.js";
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
 import { ELITE_MODIFIERS, enemyDamageSource } from "./arpg-modifiers.js";
 import { SKILL_KEYS, SLOTTABLE_SKILLS, AUTO_COOLDOWN, EXTRA_SKILLS, newSkillTree, skillUnlocked } from "./arpg-skills.js";
+// Logical canvas resolution (not the real on-screen pixel size — arpg-graphics.js scales this to
+// fit the actual canvas). All position math throughout this file is in these logical units.
 export const WIDTH = 1100;
 export const HEIGHT = 650;
+// Maximum number of health flasks a player can carry at once, regardless of class or upgrades.
 export const MAX_FLASKS = 5;
+// Mastery training — the gold-cost stat sink unlocked once every forge upgrade is maxed (see
+// forgeComplete() below). Unlike boons/forge upgrades, mastery ranks have no cap; masteryCost()
+// grows linearly with rank so it's always a meaningful, if diminishing, gold sink.
 export const MASTERY = {
     might: { name: "Ember might", detail: "+2 base weapon damage" },
     vitality: { name: "Enduring heart", detail: "+5 maximum health and restore 5 health" },
@@ -17,10 +39,14 @@ export const MASTERY = {
     critChance: { name: "Unerring spark", detail: "+0.5 percentage points critical chance; total chance capped at 75%" },
     critDamage: { name: "Endless ruin", detail: "+2 percentage points critical damage" }
 };
+// How far from the canvas edge the player and enemies are clamped to.
 const MARGIN = 42;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
+// Given a lancer/reaver-style charging enemy already moving in a straight line (chargeX/chargeY is
+// a unit vector), computes where it will stop once it reaches the play area's edge — used to draw
+// the charge-telegraph line and to know when an unobstructed charge naturally ends.
 export function chargeLaneEnd(enemy) {
     const tx = enemy.chargeX > 0 ? (WIDTH - MARGIN - enemy.x) / enemy.chargeX : enemy.chargeX < 0 ? (MARGIN - enemy.x) / enemy.chargeX : Infinity;
     const ty = enemy.chargeY > 0 ? (HEIGHT - MARGIN - enemy.y) / enemy.chargeY : enemy.chargeY < 0 ? (MARGIN - enemy.y) / enemy.chargeY : Infinity;
@@ -28,12 +54,18 @@ export function chargeLaneEnd(enemy) {
     return Number.isFinite(travel) ? { x: enemy.x + enemy.chargeX * travel, y: enemy.y + enemy.chargeY * travel } : { x: enemy.x, y: enemy.y };
 }
 
+// Shortest distance from `point` to the line segment start→end — used for beam/arrow hit testing,
+// since an arrow's flight path during a frame is a segment, not just a single point.
 function distanceToSegment(point, start, end) {
     const dx = end.x - start.x, dy = end.y - start.y;
     const t = clamp(((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy || 1), 0, 1);
     return Math.hypot(point.x - start.x - dx * t, point.y - start.y - dy * t);
 }
 
+// Builds a brand-new, blank engine state object — the single source of truth for what shape a
+// save/run looks like (arpg-save.js's restoreSnapshot() and arpg-ranking.js's captureRankingBuild()
+// both key off this shape). `random` is injectable so tests could supply a seeded PRNG instead of
+// Math.random; production code always calls this with the default.
 export function createState(random = Math.random) {
     return {
         random, status: "ready", time: 0, wave: 0, intermission: 0.8,
@@ -61,29 +93,59 @@ export function createState(random = Math.random) {
     };
 }
 
+// --- Derived stat helpers -------------------------------------------------------------------
+// These all recompute their result from scratch on every call rather than caching anything on
+// `state`, so any change to boons/upgrades/mastery/buffs is reflected immediately. They're called
+// constantly (every attack, every frame, every UI tooltip render), so keep them cheap.
+
+// Total weapon damage: base class damage + mastery flat bonus + a diminishing-returns curve from
+// equipped weapon rarity (weaponBonus, from loot drops) + forge weapon rank, then multiplied by
+// forge/boon percentage bonuses and the Fury power-up.
 export const weaponDamage = state => Math.round((state.player.damage + state.mastery.might * 2
     + 60 * (Math.sqrt(1 + state.player.weaponBonus / 30) - 1) + state.upgrades.weapon * 3)
     * (1 + state.upgrades.weapon * 0.025 + state.boons.edge * 0.04) * (state.buffs.fury > 0 ? 1.5 : 1));
+// Damage reduction rating, capped at 60% — combines class base armor, equipped armor rarity, forge
+// armor rank, and the Unbroken vow boon.
 export const armorRating = state => Math.min(60, classFor(state).armor + state.player.armorBonus * 0.6 + state.upgrades.armor * 3 + state.boons.bulwark * 1.5);
+// Current movement speed: class base speed, boosted by the Haste power-up, Wayfarer's instinct
+// boon, Endless stride mastery, and the dodge tree's "afterstep" burst-of-speed window.
 export const movementSpeed = state => classFor(state).speed * (state.buffs.haste > 0 ? 1.35 : 1) * (1 + state.boons.stride * 0.04 + state.mastery.speed * 0.01) * (state.player.afterstep > 0 ? 1.2 : 1);
+// Chance (0-0.75) that any given hit is a critical, from a base 5% plus card/forge/mastery ranks.
 export const criticalChance = state => Math.min(0.75, 0.05 + state.boons.critChance * 0.02 + state.upgrades.critChance * 0.02 + state.mastery.critChance * 0.005);
+// Damage multiplier applied on a critical hit, starting at 150% and growing with card/forge/mastery ranks.
 export const criticalDamage = state => 1.5 + state.boons.critDamage * 0.1 + state.upgrades.critDamage * 0.1 + state.mastery.critDamage * 0.02;
+// Effective range of a given skill, capped per class/skill and boosted by forge/card ranks,
+// Widening ember mastery, and relevant skill tree nodes.
 export const skillReach = (state, skill) => Math.min(state.heroClass === "ranger" ? 1000 : skill === "attack" ? 220 : skill === "burst" ? 500 : 340, (skill === "attack"
     ? classFor(state).attackReach + state.upgrades.cleave * 6 + state.boons.cleave * 6
     : skill === "nova" ? classFor(state).specialReach + state.upgrades.nova * 10 + state.boons.nova * 10
     : EXTRA_SKILLS[state.heroClass][skill].reach + state.upgrades[skill] * 8) * (1 + state.mastery.area * 0.01)
     * (1 + (skill === "attack" ? state.skillTree.attack.sweep * 0.1 : skill === "nova" ? state.skillTree.nova.resonance * 0.1 : 0)));
+// A flat +10% bonus plus the Ferryman's due boon percentage, applied to every gold pickup's raw value.
 const goldReward = (value, fortune = 0) => Math.round(value * 1.1 * (1 + fortune * 0.08));
+// Gold price of the next rank of a given forge upgrade — grows both linearly and quadratically with
+// current rank so late ranks cost substantially more than early ones.
 export const upgradeCost = (state, key) => UPGRADES[key] ? Math.round(UPGRADES[key].base * (1 + state.upgrades[key] * 0.7 + state.upgrades[key] ** 2 * 0.12)) : Infinity;
+// True once every forge upgrade is at its max rank — the gate that unlocks mastery training
+// (buyMastery below) so gold always has somewhere useful to go even after the forge is exhausted.
 export const forgeComplete = state => Object.entries(UPGRADES).every(([key, value]) => state.upgrades[key] >= value.max);
+// Gold price of the next rank of a mastery stat — starts at 1000 and grows by 100 per rank already
+// owned. Falls back to Infinity for unrecognized keys or if the cost would overflow safe-integer
+// range (guards against pathological long Endless runs).
 export const masteryCost = (state, key) => {
     if (!Object.hasOwn(MASTERY, key)) return Infinity;
     const cost = 1000 + state.mastery[key] * 100;
     return Number.isSafeInteger(cost) ? cost : Infinity;
 };
+// How much health a flask restores: at least 30, or a percentage of max health that grows with the
+// forge flask upgrade, scaled down by the current difficulty's healing penalty.
 export const flaskHealing = state => Math.max(30, Math.round(state.player.maxHealth * (0.22 + state.upgrades.flask * 0.06))) * difficultyFor(state).healing;
+// Multiplier applied to skill cooldown countdown-per-second (capped at 2x) — combines the Haste
+// power-up, Quiet flame boon, and Battle rhythm mastery.
 export const cooldownRecovery = state => Math.min(2, (state.buffs.haste > 0 ? 1.4 : 1) * (1 + state.boons.focus * 0.05 + state.mastery.recovery * 0.005));
 
+// Spends gold for one rank of a mastery stat, only available once the forge is fully upgraded and
+// only while not mid-combat. Vitality mastery immediately grants +5 max health and +5 current health.
 export function buyMastery(state, key) {
     if (!Object.hasOwn(MASTERY, key) || !forgeComplete(state) || !["paused", "camp", "won"].includes(state.status)) return false;
     const cost = masteryCost(state, key);
@@ -98,6 +160,8 @@ export function buyMastery(state, key) {
     return true;
 }
 
+// Spends gold for one rank of a forge upgrade, gated the same way as mastery, plus requiring the
+// skill it powers to actually be unlocked on the skill tree.
 export function buyUpgrade(state, key) {
     const upgrade = UPGRADES[key];
     if (!upgrade || !skillUnlocked(state, key) || !["paused", "camp", "won"].includes(state.status) || state.upgrades[key] >= upgrade.max) return false;
@@ -108,6 +172,10 @@ export function buyUpgrade(state, key) {
     return true;
 }
 
+// Actually increments a forge upgrade's rank and applies one-off side effects (armor grants bonus
+// max health immediately; flask grants a full refill). Shared by buyUpgrade() (gold purchase) and
+// collectLoot() (free "upgrade" loot drops) — if already maxed, converts into a flat gold refund
+// instead of being wasted.
 function grantUpgrade(state, key) {
     const upgrade = UPGRADES[key];
     if (state.upgrades[key] >= upgrade.max) { state.gold += goldReward(50); return; }
@@ -117,6 +185,10 @@ function grantUpgrade(state, key) {
     state.journal = `${upgrade.name} forged to rank ${state.upgrades[key]}. ${upgrade.detail}.`;
 }
 
+// Applies the chosen level-up boon card, incrementing its rank (vitality grants immediate health).
+// If more choices are still queued (multiple level-ups at once), draws a fresh set of 3 cards for
+// the next choice; otherwise resumes play — straight to "playing", or into finishCheckpoint() if this
+// was the last enemy of a boss wave and the level-up dialog was blocking that transition.
 export function chooseLevelCard(state, key) {
     if (state.status !== "choosing" || state.pendingChoices <= 0 || !state.cardChoices.includes(key)) return false;
     const card = LEVEL_CARDS[key];
@@ -139,6 +211,9 @@ export function chooseLevelCard(state, key) {
     return true;
 }
 
+// Leaves a checkpoint camp and heads toward the next wave. Doesn't spawn the wave immediately —
+// instead sets travelPending/resumeDelay so step() shows a brief "traveling" transition before
+// spawnWave() actually fires.
 export function continueJourney(state) {
     if (state.status === "camp") {
         state.status = "playing";
@@ -149,6 +224,10 @@ export function continueJourney(state) {
     return false;
 }
 
+// Transitions a completed campaign run into Endless mode at the chosen difficulty. Only callable
+// from the "won" (campaign-complete) state. rankingMode becomes "ascended" (unless it was already
+// "legacy", a compatibility tag that never changes) so the rankings page can distinguish endless
+// runs entered this way from ones started fresh via startEndlessRun().
 export function enterEndless(state, difficulty = state.difficulty) {
     if (state.status !== "won" || state.campaignComplete !== 1 || !Object.hasOwn(DIFFICULTIES, difficulty)) return false;
     state.rankingMode = state.rankingMode === "legacy" ? "legacy" : "ascended";
@@ -162,6 +241,8 @@ export function enterEndless(state, difficulty = state.difficulty) {
     return true;
 }
 
+// Creates a fresh campaign run from wave 0 with the chosen class's starting stats — the normal
+// "new game" entry point from the setup dialog in arpg.js.
 export function startRun(random = Math.random, difficulty = "hard", heroClass = "knight") {
     if (!Object.hasOwn(DIFFICULTIES, difficulty)) throw new Error("Unknown difficulty.");
     if (!Object.hasOwn(HERO_CLASSES, heroClass)) throw new Error("Unknown class.");
@@ -176,6 +257,10 @@ export function startRun(random = Math.random, difficulty = "hard", heroClass = 
     return state;
 }
 
+// Alternate "new game" entry point for players who want to skip straight to Endless mode without
+// grinding the campaign — sets rankingMode to "endless" (a separate leaderboard bucket from
+// "ascended") and hands the player a fixed "veteran's kit" of gold, forge ranks, level, and gear so
+// it's immediately playable rather than starting from nothing at wave 30+ difficulty.
 export function startEndlessRun(random = Math.random, difficulty = "hard", heroClass = "knight") {
     const state = startRun(random, difficulty, heroClass);
     const hero = classFor(state);
@@ -192,6 +277,8 @@ export function startEndlessRun(random = Math.random, difficulty = "hard", heroC
     return state;
 }
 
+// Flips between playing and paused. On resuming, grants a brief resumeDelay grace window so a
+// player un-pausing doesn't get instantly hit by something that was already mid-attack when paused.
 export function togglePause(state) {
     if (state.status === "playing") state.status = "paused";
     else if (state.status === "paused") {
@@ -200,6 +287,8 @@ export function togglePause(state) {
     }
 }
 
+// Queues a short-lived purely-visual effect (slash arcs, rings, floating damage text, etc.) for
+// arpg-graphics.js to render and fade out. Capped at 256 concurrent effects (oldest dropped first).
 function effect(state, kind, x, y, color, text = "", radius = 0, angle = 0) {
     const life = kind === "text" ? 0.9 : 0.35;
     const item = { kind, x, y, color, text, radius, angle, life, maxLife: life };
@@ -208,6 +297,9 @@ function effect(state, kind, x, y, color, text = "", radius = 0, angle = 0) {
     return item;
 }
 
+// Applies incoming damage to the player after all mitigation (armor, Ward power-up, guard skill
+// block, flask ward) is factored in. Records the hit into damageHistory for the death report,
+// triggers a brief invulnerability window, and transitions to "dead" status if health hits zero.
 function hurtPlayer(state, damage, source = "Unknown attack") {
     const player = state.player;
     if (player.invulnerable > 0 || state.status !== "playing") return;
@@ -225,6 +317,9 @@ function hurtPlayer(state, damage, source = "Unknown attack") {
     }
 }
 
+// Adds XP (scaled up slightly at higher levels so late-game grinding isn't punishing) and resolves
+// any number of level-ups that XP amount triggers. Each level-up grants a flat health/damage bump
+// and queues a boon card choice; if any choices are pending, forces status to "choosing".
 function gainExperience(state, amount) {
     const player = state.player;
     player.xp += Math.round(amount * 1.1 * (1 + Math.min(0.6, Math.max(0, player.level - 15) * 0.03)));
@@ -245,6 +340,10 @@ function gainExperience(state, amount) {
     }
 }
 
+// Handles everything that happens when an enemy's health drops to zero: kill counting, Ashdrinker
+// (siphon) boon lifesteal for elites/bosses, XP award, and a cascade of randomized loot drops (gold
+// always, plus periodic weapon/armor/health/power-up/flask/forge-upgrade drops on kill-count or
+// random-chance triggers). Loot list is hard-capped at 64 — if exceeded, auto-collects everything.
 function killEnemy(state, enemy) {
     state.kills++;
     if (enemy.elite || enemy.kind === "boss") {
@@ -279,6 +378,10 @@ function killEnemy(state, enemy) {
     }
 }
 
+// Applies one hit of skill damage to a single enemy: armored-modifier mitigation, class-specific
+// finishing-move bonus damage, Warden's chilled-enemy burst bonus, critical roll, and the sentinel
+// kind's resistance to non-piercing hits. Triggers killEnemy() if lethal, otherwise applies Nova's
+// chill/knockback follow-up if that skill tree node is taken.
 function hitEnemy(state, enemy, damage, piercing = false, skill = "attack") {
     if (enemy.health <= 0) return;
     if (enemy.modifier === "armored") damage = Math.max(1, Math.round(damage * 0.8));
@@ -310,6 +413,8 @@ function hitEnemy(state, enemy, damage, piercing = false, skill = "attack") {
     }
 }
 
+// Shoves an enemy directly away from the player by `amount` pixels (bosses pushed only half as far).
+// Used by Nova's knockback follow-up (Knight only) and Guard's repulse node.
 function pushEnemy(state, enemy, amount) {
     const p = state.player;
     const d = distance(p, enemy);
@@ -318,6 +423,11 @@ function pushEnemy(state, enemy, amount) {
     enemy.y = clamp(enemy.y + (d ? (enemy.y - p.y) / d : Math.sin(p.facing)) * push, MARGIN, HEIGHT - MARGIN);
 }
 
+// The single entry point for using any skill — attack, nova, class-specific burst/guard, dodge, or
+// potion — whether triggered by player input or autoCast(). Handles cooldown gating, per-skill
+// damage/effect resolution (each skill's shape differs enough that this is one big if/else chain),
+// and applies the automatic-cast cooldown penalty (AUTO_COOLDOWN) so auto-cast skills recharge
+// slower than manually-triggered ones.
 export function useSkill(state, skill, automatic = false) {
     if (state.status !== "playing" || state.resumeDelay > 0 || !SKILL_KEYS.includes(skill) || !skillUnlocked(state, skill)
         || (automatic ? !SLOTTABLE_SKILLS.includes(skill) || !state.loadout.auto.includes(skill)
@@ -433,6 +543,10 @@ export function useSkill(state, skill, automatic = false) {
     return true;
 }
 
+// Spawns Ranger projectile(s) — `offsets` is a list of angle offsets from the player's facing
+// direction, letting one call fire a single arrow (attack) or a whole volley/fan (nova/burst).
+// `volley` groups arrows fired together so hitArrowTarget() can apply diminishing returns per
+// target per volley.
 function firePlayerArrows(state, offsets, damage, reach, piercing, skill) {
     const p = state.player;
     if (state.volleySequence >= Number.MAX_SAFE_INTEGER) {
@@ -448,6 +562,9 @@ function firePlayerArrows(state, offsets, damage, reach, piercing, skill) {
     }
 }
 
+// Called every frame to fire any skills slotted into the auto-loadout (up to 2 slots) at the
+// nearest living enemy in range. Temporarily overrides the player's facing to aim at the target,
+// then restores it — auto-cast shouldn't change which way the player visually faces.
 function autoCast(state) {
     const p = state.player;
     for (const skill of state.loadout.auto) {
@@ -463,6 +580,11 @@ function autoCast(state) {
     }
 }
 
+// Advances every in-flight Ranger arrow this frame: moves it, tests collision against the nearest
+// enemy along its travel segment, and on a hit resolves piercing follow-through (Burst's "shatter"
+// and Nova's "ignition" nodes let an arrow punch through additional enemies, drawn as chained beam
+// links via arrowLink()) plus Attack's "execution" node secondary-target effect. Also prunes stale
+// volley-hit-tracking entries whose originating volley has fully expired.
 function stepPlayerShots(state, dt) {
     const activeVolleys = new Set(state.playerShots.map(shot => shot.volley));
     for (const enemy of state.enemies) enemy.combat.volleys = enemy.combat.volleys.filter(entry => activeVolleys.has(entry.volley));
@@ -510,11 +632,16 @@ function stepPlayerShots(state, dt) {
     state.playerShots = state.playerShots.filter(shot => shot.life > 0);
 }
 
+// Draws the thin connecting beam effect between two enemies hit by the same piercing arrow, purely
+// so it's visually clear one arrow chained through multiple targets.
 function arrowLink(state, from, to) {
     const link = effect(state, "beam", from.x, from.y, classFor(state).color, "", distance(from, to), Math.atan2(to.y - from.y, to.x - from.x));
     link.width = 3;
 }
 
+// Applies one arrow's damage to one enemy, tracking how many times this volley has already hit this
+// enemy (enemy.combat.volleys) so piercing chains can't spam full damage into the same enemy
+// repeatedly within one volley — a 2nd+ hit only deals 25% damage, and a 4th+ hit is ignored.
 function hitArrowTarget(state, shot, enemy, damage, piercing) {
     if (shot.volley > 0) {
         let entry = enemy.combat.volleys.find(entry => entry.volley === shot.volley);
@@ -526,6 +653,11 @@ function hitArrowTarget(state, shot, enemy, damage, piercing) {
     hitEnemy(state, enemy, Math.max(1, Math.round(damage)), piercing, shot.skill);
 }
 
+// Advances to the next wave: increments state.wave, works out which map/act it falls in, and spawns
+// a batch of enemies scaled by act, depth-past-campaign-end (Endless mode gets harder forever via
+// the `depth` term), player level (levelPressure), and difficulty preset. Every 5th wave
+// (WAVES_PER_MAP) is a boss wave with one guaranteed boss. On returning to wave 1 of a new map,
+// clears leftover projectiles/loot/effects and resets the player to the arena center.
 function spawnWave(state) {
     state.wave++;
     const act = mapIndexForWave(state.wave);
@@ -577,6 +709,9 @@ function spawnWave(state) {
         : `Wave ${state.wave}. ${count} enemies emerge in ${map.name}.`;
 }
 
+// Spawns a fan of enemy projectiles centered on `angle` with the given angular `offsets` and speed
+// — shared by boss ranged attack patterns, hexers, and generic ranged enemy kinds. Capped at 48
+// concurrent projectiles total to bound worst-case per-frame collision cost.
 function fireVolley(state, enemy, angle, offsets, speed) {
     for (const offset of offsets) {
         if (state.projectiles.length >= 48) break;
@@ -585,6 +720,11 @@ function fireVolley(state, enemy, angle, offsets, speed) {
     }
 }
 
+// Pulls nearby loot toward the player (range widened by the Magnet power-up and Call of the fallen
+// boon) and, once close enough (or if `collectAll` forces immediate pickup), applies the drop's
+// effect: gold with the Ferryman's due bonus, flask refilling or converting into a bonus heal if
+// full, health/power-up drops applying directly, and weapon/armor/upgrade drops only replacing the
+// player's current gear if strictly better (otherwise auto-salvaged for a small gold refund).
 function collectLoot(state, dt, collectAll = false) {
     const p = state.player;
     for (const drop of state.loot) {
@@ -631,6 +771,9 @@ function collectLoot(state, dt, collectAll = false) {
     state.loot = state.loot.filter(drop => drop.life > 0);
 }
 
+// Called when the last enemy of a boss wave dies — clears the battlefield, grants a partial heal and
+// a couple flask charges, and transitions to "won" (final campaign wave) or "camp" (an
+// in-between-maps checkpoint to rest, shop the forge, and choose to continue).
 function finishCheckpoint(state) {
     const p = state.player;
     collectLoot(state, 0, true);
@@ -643,6 +786,10 @@ function finishCheckpoint(state) {
     state.journal = state.mode === "endless" ? "Stage cleared. All loot collected, partial healing and two flask charges granted. Saving before the next watch." : mapForWave(state.wave).ending;
 }
 
+// The single per-frame simulation entry point, called once per animation frame by arpg.js's render
+// loop with elapsed real time and the current input snapshot (movement axes, aim point, action
+// buttons). Does nothing unless status is "playing". `dt` is clamped to 0.05s so a lag spike can't
+// cause one giant catch-up step that teleports everything or lets enemies all attack at once.
 export function step(state, input, elapsed) {
     if (state.status !== "playing" || !Number.isFinite(elapsed) || elapsed <= 0) return;
     const dt = Math.min(elapsed, 0.05);
@@ -706,6 +853,12 @@ export function step(state, input, elapsed) {
 
     stepPlayerShots(state, dt);
     if (state.status !== "playing") return;
+    // Per-enemy AI: each kind has its own movement/attack pattern below (lancer charges down a
+    // lane, reaver winds up then dashes, bomber self-detonates on approach, boss cycles through
+    // health-gated phases/patterns, and the remaining "generic" kinds share a common
+    // chase-then-windup-then-strike flow at the bottom of the loop). The frequent
+    // `state.status !== "playing"` checks are needed because hurtPlayer() inside this loop can end
+    // the run (player death) mid-iteration.
     for (const enemy of state.enemies) {
         if (state.status !== "playing") break;
         if (enemy.health <= 0) continue;

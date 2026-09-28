@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.ServiceDiscovery;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
@@ -13,11 +12,28 @@ namespace Microsoft.Extensions.Hosting;
 // Adds common Aspire services: service discovery, resilience, health checks, and OpenTelemetry.
 // This project should be referenced by each service project in your solution.
 // To learn more about using this project, see https://aka.ms/dotnet/aspire/service-defaults
+
+/// <summary>
+/// Extension methods shared by Web and ApiService to wire up the standard Aspire cross-cutting
+/// concerns (service discovery, resilient HTTP clients, health checks, OpenTelemetry). This is
+/// mostly unmodified Aspire project-template boilerplate; if you're looking for anything
+/// game-specific (auth, saves, rankings), see SaveServiceOptions and RankingModels instead.
+/// </summary>
 public static class Extensions
 {
+    /// <summary>Route the readiness health check endpoint is mapped to (dev-only, see MapDefaultEndpoints).</summary>
     private const string HealthEndpointPath = "/health";
+
+    /// <summary>Route the liveness-only health check endpoint is mapped to (dev-only, see MapDefaultEndpoints).</summary>
     private const string AlivenessEndpointPath = "/alive";
 
+    /// <summary>
+    /// Call this once from each service's Program.cs right after creating the builder. Turns on
+    /// OpenTelemetry, a basic "self" liveness health check, service discovery (so Aspire's
+    /// https+http://apiservice-style logical URLs resolve), and a standard resilience handler
+    /// (retry/circuit-breaker/timeout) applied to every outgoing HttpClient by default, including
+    /// GameSaveClient's HttpClient.
+    /// </summary>
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.ConfigureOpenTelemetry();
@@ -44,6 +60,11 @@ public static class Extensions
         return builder;
     }
 
+    /// <summary>
+    /// Wires up OpenTelemetry logging, metrics, and tracing for the service. Health-check requests
+    /// are filtered out of traces so they don't spam whatever telemetry backend is configured.
+    /// Whether anything actually gets exported depends on AddOpenTelemetryExporters below.
+    /// </summary>
     public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.Logging.AddOpenTelemetry(logging =>
@@ -78,6 +99,12 @@ public static class Extensions
         return builder;
     }
 
+    /// <summary>
+    /// Turns on the OTLP telemetry exporter, but only if an OTLP endpoint is actually configured
+    /// via the OTEL_EXPORTER_OTLP_ENDPOINT environment variable/setting (Aspire's dashboard sets
+    /// this automatically in local dev; it's typically unset in the IIS production deployment,
+    /// so no telemetry is exported there by default).
+    /// </summary>
     private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
@@ -97,6 +124,11 @@ public static class Extensions
         return builder;
     }
 
+    /// <summary>
+    /// Registers a trivial always-healthy "self" check tagged "live", used by MapDefaultEndpoints's
+    /// /alive endpoint. This just confirms the process is up and able to respond to HTTP at all —
+    /// it says nothing about whether saves/rankings storage is reachable (that's not checked anywhere currently).
+    /// </summary>
     public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.Services.AddHealthChecks()
@@ -106,6 +138,13 @@ public static class Extensions
         return builder;
     }
 
+    /// <summary>
+    /// Maps the /health (readiness — all checks must pass) and /alive (liveness — only "live"-tagged
+    /// checks must pass) endpoints, but only when running in the Development environment. These are
+    /// intentionally not exposed in production/IIS because an unauthenticated health endpoint can leak
+    /// information about the service's internals — see the Aspire docs link above before ever turning
+    /// this on outside development.
+    /// </summary>
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
         // Adding health checks endpoints to applications in non-development environments has security implications.

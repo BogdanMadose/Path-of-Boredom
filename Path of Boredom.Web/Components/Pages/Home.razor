@@ -285,14 +285,28 @@
 </div>
 
 @code {
+    // Reference to the root <div class="arpg"> element — handed to the JS module so it can query
+    // everything else it needs (canvas, buttons, overlays) by selector instead of us wiring each
+    // one up individually through Blazor's own binding syntax.
     private ElementReference gameRoot;
+    // The imported ./js/arpg.js ES module instance, kept around so we can dispose it cleanly.
     private IJSObjectReference? module;
+    // The live game instance returned by arpg.js's createGame() — this is what actually owns the
+    // render loop, input handling, and game state for as long as this page is open.
     private IJSObjectReference? game;
+    // Wraps `this` so JS can call back into our [JSInvokable] methods below (SaveRun/LoadRun/SubmitScore).
     private DotNetObjectReference<Home>? saveBridge;
+    // Guards against racing DisposeAsync with an in-flight OnAfterRenderAsync (e.g. if the user
+    // navigates away before the JS module finishes importing).
     private bool disposed;
     private string windowsUserName = string.Empty;
     private string rankingStatus = "Connecting to the rankings...";
 
+    /// <summary>
+    /// Runs once when the component initializes: reads the signed-in Windows username off the
+    /// authenticated principal (domain prefix stripped for a cleaner display), then registers/pings
+    /// the rankings profile so the leaderboard has a row for this player before any score is submitted.
+    /// </summary>
     protected override async Task OnInitializedAsync()
     {
         var user = (await AuthenticationState.GetAuthenticationStateAsync()).User;
@@ -302,18 +316,39 @@
             : "Rankings unavailable. Scores will retry during play.";
     }
 
+    /// <summary>
+    /// Called by arpg-ranking.js/arpg.js whenever a run ends (or hits a scoring milestone) to
+    /// submit the score/build for the leaderboard. Re-reads the current ClaimsPrincipal each call
+    /// rather than caching it, so a stale/expired identity can never be reused for a stale request.
+    /// </summary>
     [JSInvokable]
     public async Task<bool> SubmitScore(Path_of_Boredom.ServiceDefaults.ScoreSubmission submission) =>
         await Saves.SubmitScoreAsync((await AuthenticationState.GetAuthenticationStateAsync()).User, submission);
 
+    /// <summary>
+    /// Called by arpg-save.js whenever the player manually saves, or a checkpoint auto-saves.
+    /// The snapshot arrives as a raw JsonElement because Blazor JS interop already deserializes JS
+    /// objects into JSON for us — there's no need to define a strongly-typed C# save model here
+    /// since this project never actually reads individual save fields, it just forwards the blob.
+    /// </summary>
     [JSInvokable]
     public async Task<GameSaveResult> SaveRun(System.Text.Json.JsonElement snapshot) =>
         await Saves.SaveAsync((await AuthenticationState.GetAuthenticationStateAsync()).User, snapshot);
 
+    /// <summary>
+    /// Called by arpg.js when the player clicks Load (or the game auto-attempts a load at startup).
+    /// </summary>
     [JSInvokable]
     public async Task<GameSaveResult> LoadRun() =>
         await Saves.LoadAsync((await AuthenticationState.GetAuthenticationStateAsync()).User);
 
+    /// <summary>
+    /// Fires once, after the component's first render, once the <canvas> and all the static markup
+    /// actually exist in the DOM. This is where the entire JS game gets bootstrapped: import the
+    /// module, hand it the root element plus a callback bridge to this component, and let it take
+    /// over from there. Runs at most once per page load — Blazor won't call this again on
+    /// subsequent re-renders because of the `firstRender` guard.
+    /// </summary>
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender || disposed) return;
@@ -322,6 +357,9 @@
         {
             var importedModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/arpg.js");
 
+            // If the component got disposed while the import was in flight (e.g. fast navigation
+            // away), don't leave an orphaned module reference around — clean it up immediately
+            // instead of proceeding to create a game nobody will ever see.
             if (disposed)
             {
                 await importedModule.DisposeAsync();
@@ -332,6 +370,8 @@
             saveBridge = DotNetObjectReference.Create(this);
             var instance = await module.InvokeAsync<IJSObjectReference>("createGame", gameRoot, saveBridge);
 
+            // Same disposal race, but after the game instance itself was created — make sure its
+            // own dispose() is called before tearing down the object reference.
             if (disposed)
             {
                 await instance.InvokeVoidAsync("dispose");
@@ -343,9 +383,18 @@
         }
         catch (JSDisconnectedException)
         {
+            // The SignalR circuit dropped mid-setup (e.g. browser tab closed during initial JS
+            // interop calls) — nothing meaningful to do here, the component is going away anyway.
         }
     }
 
+    /// <summary>
+    /// Tears down the JS side cleanly when the page/component goes away: tells the game instance to
+    /// dispose itself (stop the render loop, remove event listeners) before disposing the JS object
+    /// references themselves, then releases the .NET callback reference. Order matters here — disposing
+    /// the module before the game instance has a chance to call dispose() would leave JS-side timers/
+    /// listeners dangling until the browser tab itself closes.
+    /// </summary>
     public async ValueTask DisposeAsync()
     {
         disposed = true;
@@ -363,6 +412,8 @@
         }
         catch (JSDisconnectedException)
         {
+            // The circuit may already be gone by the time we try to clean up JS-side state (e.g.
+            // browser tab closed abruptly) — safe to ignore, there's nothing left to talk to.
         }
     }
 }

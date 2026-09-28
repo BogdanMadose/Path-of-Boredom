@@ -1,5 +1,16 @@
+// arpg-cards.js — the level-up "boon" draft system.
+//
+// On every level-up, drawLevelCards() offers 3 random cards from LEVEL_CARDS (filtering out
+// anything already maxed or not yet unlocked); the player picks one, which increments its rank in
+// state.boons — see the "Choose your next oath" overlay in Home.razor for the UI this feeds.
+// Boons are separate from skill tree points and forge upgrades: they're the passive, permanent-for-the-run
+// bonuses earned purely by leveling up. This mirrors the "boons"/"cardChoices"/"pendingChoices"
+// fields that GameSaveEndpoints.cs's ValidCardProgress validates on the server.
 import { skillUnlocked } from "./arpg-skills.js";
 
+// Every possible boon card. `max` is the rank cap (Number.MAX_SAFE_INTEGER effectively means
+// uncapped/always offerable — matches the "edge"/"vitality"/"fortune" special-cased caps in
+// GameSaveEndpoints.cs's ValidCardProgress). `category` is just the display grouping shown on the card.
 export const LEVEL_CARDS = {
     edge: { name: "Sunforged oath", category: "OFFENSE", max: Number.MAX_SAFE_INTEGER, description: "+4% weapon damage per rank, affecting all damaging actions. Adds to the forge damage bonus instead of multiplying it." },
     vitality: { name: "Heart of the dawn", category: "SURVIVAL", max: Number.MAX_SAFE_INTEGER, description: "+16 maximum health and restore 16 health immediately. Each rank adds another 16." },
@@ -17,9 +28,14 @@ export const LEVEL_CARDS = {
     guard: { name: "A shelter in embers", category: "WARD SKILL", max: 10, description: "+0.15 seconds of class ward protection per rank. Wards reduce incoming damage by 40% while active." }
 };
 
+// Picks 3 distinct random boon keys to offer on level-up, drawn only from boons that are both
+// unlocked for the player's class/skill state (skillUnlocked) and not already at their rank cap.
+// Uses state.random() (the run's seeded PRNG, defined in arpg-engine.js) rather than Math.random()
+// so card offers are reproducible from a given seed/state rather than truly random each call.
 export function drawLevelCards(state) {
     const available = Object.keys(LEVEL_CARDS).filter(key => skillUnlocked(state, key) && state.boons[key] < LEVEL_CARDS[key].max);
     const choices = [];
+
     for (let i = 0; i < 3; i++) {
         const index = Math.floor(state.random() * available.length);
         choices.push(available.splice(index, 1)[0]);

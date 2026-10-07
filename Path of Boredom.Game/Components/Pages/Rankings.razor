@@ -1,10 +1,8 @@
 @page "/rankings"
-@layout Path_of_Boredom.Web.Components.Layout.GameLayout
-@rendermode InteractiveServer
+@layout GameLayout
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using Path_of_Boredom.ServiceDefaults
-@inject GameSaveClient Saves
-@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationState
+@inject IGameSession Session
 
 <PageTitle>Hall of Embers · Path of Boredom</PageTitle>
 
@@ -147,13 +145,12 @@
         error = null;
         try
         {
-            var user = (await AuthenticationState.GetAuthenticationStateAsync()).User;
-            if (!await Saves.RegisterPlayerAsync(user))
+            if (!await Session.RegisterPlayerAsync())
             {
                 error = "Rankings are unavailable. Please try Refresh again shortly.";
                 return;
             }
-            var result = await Saves.GetRankingsAsync(user, difficulty, mode, heroClass, patch);
+            var result = await Session.GetRankingsAsync(difficulty, mode, heroClass, patch);
             if (result is null) error = "Could not load rankings. Please try again shortly.";
             else rows = result;
         }

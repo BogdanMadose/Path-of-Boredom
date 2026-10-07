@@ -45,6 +45,11 @@ builder.Services.AddHttpClient<GameSaveClient>(client =>
         client.Timeout = TimeSpan.FromSeconds(15);
     });
 
+// Supplies the shared game components (Path of Boredom.Game) with their host-specific identity and
+// save transport. On this host that means Negotiate-authenticated Windows identity plus the
+// shared-secret GameSaveClient; the MAUI head will register its own implementation instead.
+builder.Services.AddScoped<Path_of_Boredom.Game.IGameSession, WindowsGameSession>();
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -71,6 +76,10 @@ app.MapStaticAssets();
 // challenge before Blazor ever renders anything.
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
+    // The routable game pages (Home, Rankings, PatchNotes) live in Path of Boredom.Game now, so
+    // endpoint routing has to be told about that assembly explicitly — the <Router> component's
+    // AdditionalAssemblies only covers client-side navigation, not the server-side endpoint table.
+    .AddAdditionalAssemblies(typeof(Path_of_Boredom.Game.IGameSession).Assembly)
     .RequireAuthorization();
 
 // Exists purely so Negotiate has an authenticated route to challenge against and redirect back

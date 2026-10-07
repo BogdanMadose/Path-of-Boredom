@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Path of Boredom.Game\Path of Boredom.Game.csproj" />
     <ProjectReference Include="..\Path of Boredom.ServiceDefaults\Path of Boredom.ServiceDefaults.csproj" />
   </ItemGroup>
 

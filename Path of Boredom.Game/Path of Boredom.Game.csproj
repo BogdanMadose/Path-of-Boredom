@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFrameworks>net9.0;net9.0-android</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx'))">net9.0;net9.0-android;net9.0-ios</TargetFrameworks>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+    <!-- Deliberately space-free, unlike the other projects. The static web asset pipeline builds
+         endpoint keys out of the assembly name, and spaces there collide when the scoped-CSS
+         project bundle is registered, failing the build in FilterStaticWebAssetEndpoints. -->
+    <AssemblyName>PathOfBoredom.Game</AssemblyName>
+    <RootNamespace>Path_of_Boredom.Game</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+    <!-- Package references rather than a FrameworkReference to Microsoft.AspNetCore.App: the
+         framework reference has no runtime pack for android-arm64/android-x64, so it breaks the
+         MAUI head. These packages carry the component model this library actually uses. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="9.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="9.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Path of Boredom.Contracts\Path of Boredom.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

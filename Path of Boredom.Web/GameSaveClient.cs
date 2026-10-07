@@ -254,13 +254,3 @@ public sealed class GameSaveClient(HttpClient client, IOptions<SaveServiceOption
 /// <param name="SupportedVersion">For UnsupportedSaveVersion specifically: the highest save format version this API build actually supports.</param>
 /// <param name="Reference">An opaque log correlation id, if the API logged additional detail server-side that an admin could look up.</param>
 public sealed record SaveApiError(string? Code, int? SupportedVersion, string? Reference = null);
-
-/// <summary>
-/// The outcome of a save or load operation, returned all the way back to JS via the Home.razor
-/// [JSInvokable] bridge methods.
-/// </summary>
-/// <param name="Success">Whether the operation succeeded.</param>
-/// <param name="Message">A message safe to display directly to the player, explaining success or (on failure) what went wrong and what to do next.</param>
-/// <param name="Save">The loaded save payload, present only on a successful load.</param>
-/// <param name="EndlessUnlocked">Whether this account has permanently unlocked Endless mode, echoed back from the API so the client doesn't need a separate call to know.</param>
-public sealed record GameSaveResult(bool Success, string Message, JsonElement? Save = null, bool EndlessUnlocked = false);

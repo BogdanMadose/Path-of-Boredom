@@ -1,10 +1,8 @@
 @page "/"
-@layout Path_of_Boredom.Web.Components.Layout.GameLayout
-@rendermode InteractiveServer
+@layout GameLayout
 @implements IAsyncDisposable
 @inject IJSRuntime JS
-@inject GameSaveClient Saves
-@inject Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider AuthenticationState
+@inject IGameSession Session
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 
 <PageTitle>Path of Boredom - The Ember Campaign</PageTitle>
@@ -309,9 +307,8 @@
     /// </summary>
     protected override async Task OnInitializedAsync()
     {
-        var user = (await AuthenticationState.GetAuthenticationStateAsync()).User;
-        windowsUserName = user.Identity?.Name?.Split('\\').Last() ?? string.Empty;
-        rankingStatus = await Saves.RegisterPlayerAsync(user)
+        windowsUserName = await Session.GetPlayerNameAsync();
+        rankingStatus = await Session.RegisterPlayerAsync()
             ? "Rankings connected. Best kill scores and builds are kept separately by class, difficulty, and starting mode."
             : "Rankings unavailable. Scores will retry during play.";
     }
@@ -323,7 +320,7 @@
     /// </summary>
     [JSInvokable]
     public async Task<bool> SubmitScore(Path_of_Boredom.ServiceDefaults.ScoreSubmission submission) =>
-        await Saves.SubmitScoreAsync((await AuthenticationState.GetAuthenticationStateAsync()).User, submission);
+        await Session.SubmitScoreAsync(submission);
 
     /// <summary>
     /// Called by arpg-save.js whenever the player manually saves, or a checkpoint auto-saves.
@@ -333,14 +330,14 @@
     /// </summary>
     [JSInvokable]
     public async Task<GameSaveResult> SaveRun(System.Text.Json.JsonElement snapshot) =>
-        await Saves.SaveAsync((await AuthenticationState.GetAuthenticationStateAsync()).User, snapshot);
+        await Session.SaveAsync(snapshot);
 
     /// <summary>
     /// Called by arpg.js when the player clicks Load (or the game auto-attempts a load at startup).
     /// </summary>
     [JSInvokable]
     public async Task<GameSaveResult> LoadRun() =>
-        await Saves.LoadAsync((await AuthenticationState.GetAuthenticationStateAsync()).User);
+        await Session.LoadAsync();
 
     /// <summary>
     /// Fires once, after the component's first render, once the <canvas> and all the static markup
@@ -355,7 +352,7 @@
 
         try
         {
-            var importedModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/arpg.js");
+            var importedModule = await JS.InvokeAsync<IJSObjectReference>("import", "/_content/PathOfBoredom.Game/js/arpg.js");
 
             // If the component got disposed while the import was in flight (e.g. fast navigation
             // away), don't leave an orphaned module reference around — clean it up immediately

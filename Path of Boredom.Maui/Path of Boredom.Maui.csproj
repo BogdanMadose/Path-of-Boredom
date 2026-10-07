@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <!-- iOS only enters the build on a Mac (or a Windows box paired to one). Including it
+         unconditionally would break `dotnet build` of the solution on a plain Windows dev machine,
+         which is where this project is actually developed. Android is the shipping target for now;
+         iOS stays wired up so it can be built later without restructuring. -->
+    <TargetFrameworks>net9.0-android</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx'))">net9.0-android;net9.0-ios</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <UseMaui>true</UseMaui>
+    <SingleProject>true</SingleProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- Space-free, for the same reason as Path of Boredom.Game: the static web asset pipeline
+         builds endpoint keys from the assembly name and spaces collide. -->
+    <AssemblyName>PathOfBoredom.Maui</AssemblyName>
+    <RootNamespace>Path_of_Boredom.Maui</RootNamespace>
+
+    <ApplicationTitle>Path of Boredom</ApplicationTitle>
+    <!-- Reverse-DNS id. This is permanent once published: Google Play keys a listing to it and it
+         can never be changed or reused afterwards. -->
+    <ApplicationId>com.madbone.pathofboredom</ApplicationId>
+    <ApplicationDisplayVersion>0.5.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <MauiIcon Include="Resources\AppIcon\appicon.svg" Color="#0b0a10" />
+    <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#0b0a10" BaseSize="128,128" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.110" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="9.0.110" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Path of Boredom.Game\Path of Boredom.Game.csproj" />
+  </ItemGroup>
+
+</Project>

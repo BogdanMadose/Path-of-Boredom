@@ -1,0 +1,13 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+@using Path_of_Boredom.Game
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="typeof(Routes).Assembly"
+            AdditionalAssemblies="[typeof(IGameSession).Assembly]">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Path_of_Boredom.Game.Components.Layout.GameLayout)" />
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+    </Router>
+</CascadingAuthenticationState>

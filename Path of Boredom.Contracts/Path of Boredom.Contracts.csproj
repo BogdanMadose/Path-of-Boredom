@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Plain netstandard-style .NET target with NO framework reference and no Aspire/OpenTelemetry
+         dependencies, so this can be referenced from the MAUI heads (android/ios) as well as from
+         the server projects. Path of Boredom.ServiceDefaults cannot: it pulls in
+         Microsoft.AspNetCore.App, which has no runtime pack for android-arm64. -->
+    <TargetFrameworks>net9.0;net9.0-android</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx'))">net9.0;net9.0-android;net9.0-ios</TargetFrameworks>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+    <AssemblyName>PathOfBoredom.Contracts</AssemblyName>
+    <RootNamespace>Path_of_Boredom.ServiceDefaults</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+</Project>

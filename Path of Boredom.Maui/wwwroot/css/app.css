@@ -1,0 +1,40 @@
+/* Minimal mobile host styling. The game's own look comes from the shared scoped-CSS bundle in
+   Path of Boredom.Game; this only covers the WebView shell around it. */
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #0b0a10;
+    color: #f4efe6;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* The canvas handles its own input; browser-level touch gestures (pull-to-refresh,
+       overscroll bounce, text selection) only interfere during combat. */
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+    height: 100%;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    padding: 0.8rem 1.2rem;
+    background: #2a1414;
+    border-top: 1px solid #a33;
+}
+
+    #blazor-error-ui .dismiss {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.75rem;
+        cursor: pointer;
+    }

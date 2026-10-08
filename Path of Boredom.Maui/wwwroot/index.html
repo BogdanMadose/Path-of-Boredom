@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -13,18 +13,122 @@
          into the APK, and that hash changes whenever the game's component styles change. -->
     <link rel="stylesheet" href="PathOfBoredom.Maui.styles.css" />
     <link rel="stylesheet" href="css/app.css" />
+    <!-- Loaded last so it can override the shared game stylesheet: collapses the web-page chrome
+         into a fullscreen game layout and promotes the touch controls. Mobile head only. -->
+    <link rel="stylesheet" href="css/mobile-shell.css" />
+    <!-- Owns the canvas-style menu layer (tab bar + full-screen panels) built by js/mobile-menu.js. -->
+    <link rel="stylesheet" href="css/mobile-menu.css" />
+    <!-- Inlined, not in mobile-shell.css: this must paint on the very first frame, while the
+         stylesheets above are still being fetched. A linked rule would flash unstyled first. -->
+    <style>
+        html, body { margin: 0; background: #0b1114; }
+
+        .boot {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            background: radial-gradient(circle at 50% 42%, #1c2a2b 0%, #0b1114 62%);
+            color: #f0d9ad;
+            font-family: Georgia, serif;
+            text-align: center;
+            padding: 24px;
+        }
+
+        .boot h1 {
+            margin: 0;
+            font-size: 26px;
+            font-weight: 400;
+            letter-spacing: 1px;
+            color: #f1e5cc;
+        }
+
+        .boot p {
+            margin: 0;
+            font-family: system-ui, sans-serif;
+            font-size: 12px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #9fb0ad;
+        }
+
+        /* The ember: a pulsing core inside a slowly turning ring. */
+        .boot-ember {
+            position: relative;
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ffcf87 0%, #e08a2e 38%, #7a3d12 62%, transparent 70%);
+            animation: boot-pulse 1.9s ease-in-out infinite;
+        }
+
+        .boot-ember::after {
+            content: "";
+            position: absolute;
+            inset: -14px;
+            border-radius: 50%;
+            border: 1px solid #c7a56b44;
+            border-top-color: #f0c98d;
+            animation: boot-spin 1.5s linear infinite;
+        }
+
+        /* Animated ellipsis that does not reflow the line. */
+        .boot-dots::after {
+            content: "";
+            animation: boot-dots 1.4s steps(4, end) infinite;
+        }
+
+        @keyframes boot-pulse {
+            0%, 100% { transform: scale(.88); opacity: .78; }
+            50%      { transform: scale(1.06); opacity: 1; }
+        }
+
+        @keyframes boot-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes boot-dots {
+            0%   { content: ""; }
+            25%  { content: "."; }
+            50%  { content: ".."; }
+            75%  { content: "..."; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .boot-ember, .boot-ember::after, .boot-dots::after { animation: none; }
+        }
+    </style>
 </head>
 
-<body>
-    <div id="app">Loading...</div>
+<!-- mobile-shell: hook used by css/mobile-shell.css. Needed because the game's component styles
+     are Blazor scoped CSS (`.x[b-hash]`, specificity 0,2,0); a bare `.x` override would lose
+     regardless of load order, so the shell rules qualify themselves with this class to match it. -->
+<body class="mobile-shell">
+    <!-- Splash shown until Blazor renders. Styles are inline so it paints immediately, before any
+         stylesheet has loaded — otherwise the first frame is unstyled "Loading..." text. Blazor
+         replaces the whole of #app once the root component renders, so no teardown is needed. -->
+    <div id="app">
+        <div class="boot">
+            <div class="boot-ember" aria-hidden="true"></div>
+            <h1>Path of Boredom</h1>
+            <p>Kindling the last ember<span class="boot-dots"></span></p>
+        </div>
+    </div>
 
     <div id="blazor-error-ui">
         An unexpected error has occurred.
         <a href="" class="reload">Reload</a>
-        <a class="dismiss">Ã—</a>
+        <a class="dismiss">&times;</a>
     </div>
 
     <script src="_framework/blazor.webview.js" autostart="false"></script>
+    <!-- Floating joystick. MAUI head only. -->
+    <script src="js/mobile-shell.js" defer></script>
+    <!-- Rebuilds Skills/Forge as an in-game menu layer over the canvas. MAUI head only. -->
+    <script src="js/mobile-menu.js" defer></script>
 </body>
 
 </html>

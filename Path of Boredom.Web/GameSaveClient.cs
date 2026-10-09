@@ -187,6 +187,9 @@ public sealed class GameSaveClient(HttpClient client, IOptions<SaveServiceOption
     /// parameters) and on any transport/parsing failure — callers treat both the same way
     /// (show "rankings unavailable" rather than distinguishing the reason).
     /// </summary>
+    /// <param name="user">The authenticated Windows principal whose ranking identity is forwarded to the API.</param>
+    /// <param name="difficulty">The difficulty key for the requested board.</param>
+    /// <param name="mode">The starting-mode key for the requested board.</param>
     /// <param name="heroClass">A class key, or "all" to include every class in one combined board.</param>
     /// <param name="patch">Which patch's board to fetch; defaults to the current patch.</param>
     public async Task<IReadOnlyList<RankingRow>?> GetRankingsAsync(ClaimsPrincipal user, string difficulty, string mode, string heroClass = "all", string patch = RankingRules.CurrentPatch)

@@ -12,7 +12,7 @@ public static class RankingEndpoints
 {
     public static void MapRankings(this WebApplication app)
     {
-        var group = app.MapGroup("/game/rankings").RequireAuthorization();
+        var group = app.MapGroup("/game/rankings").RequireAuthorization().RequireRateLimiting("PlayerRequests");
 
         // POST /game/rankings/profile — "touch" the caller's ranking profile so it exists even
         // before they've submitted a score. Called once per page load (Home.razor's OnInitializedAsync).
@@ -20,7 +20,7 @@ public static class RankingEndpoints
         {
             context.Response.Headers.CacheControl = "no-store";
             await store.RegisterAsync(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-                context.User.Identity!.Name!, context.RequestAborted);
+                context.User.Identity!.Name!, context.RequestAborted, GoogleTokenAuthenticationHandler.IssuedAt(context.User));
             return Results.NoContent();
         });
 
@@ -46,7 +46,7 @@ public static class RankingEndpoints
             context.Response.Headers.CacheControl = "no-store";
             if (!RankingRules.IsValid(submission)) return Results.BadRequest();
             await store.UpdateAsync(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!,
-                context.User.Identity!.Name!, submission, context.RequestAborted);
+                context.User.Identity!.Name!, submission, context.RequestAborted, GoogleTokenAuthenticationHandler.IssuedAt(context.User));
             return Results.NoContent();
         }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(16 * 1024));
     }

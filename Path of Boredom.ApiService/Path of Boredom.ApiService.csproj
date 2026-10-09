@@ -16,6 +16,8 @@
 
   <ItemGroup>
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />
+    <PackageReference Include="Google.Cloud.Firestore" Version="4.4.0" />
+    <PackageReference Include="Google.Apis.Auth" Version="1.77.0" />
   </ItemGroup>
 
   <ItemGroup>

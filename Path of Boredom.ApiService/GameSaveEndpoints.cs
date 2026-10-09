@@ -33,6 +33,7 @@ public static class GameSaveEndpoints
             try
             {
                 var save = await store.LoadAsync(ownerId, context.RequestAborted);
+                context.Response.Headers.ETag = $"\"{save?.Revision ?? 0}\"";
                 return save is null ? Results.NotFound() : Results.Ok(save);
             }
             catch (JsonException exception)
@@ -50,13 +51,24 @@ public static class GameSaveEndpoints
                 app.Logger.LogError(exception, "Save storage access failed while loading; reference: {Reference}", context.TraceIdentifier);
                 return Results.Json(new { code = "SaveStorageUnavailable", message = "The server could not access save storage.", reference = context.TraceIdentifier }, statusCode: StatusCodes.Status500InternalServerError);
             }
-        }).RequireAuthorization();
+        }).RequireAuthorization().RequireRateLimiting("PlayerRequests");
 
         // PUT /game/save — validates and persists a new save for the caller.
         app.MapPut("/game/save", async (HttpContext context, GameSaveStore store) =>
         {
             context.Response.Headers.CacheControl = "no-store";
             var ownerId = context.User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+            long? expectedRevision = null;
+            if (context.User.HasClaim(claim => claim.Type == "sub"))
+            {
+                // Mobile writes must acknowledge the exact cloud revision. Revision zero creates
+                // only when no save exists. No blind last-writer-wins or client-clock comparisons.
+                var match = context.Request.Headers.IfMatch;
+                if (match.Count != 1 || !TryParseRevision(match[0], out var revision))
+                    return Results.Json(new { code = "SaveRevisionRequired", message = "Load cloud metadata and submit If-Match with its quoted revision." }, statusCode: 428);
+                expectedRevision = revision;
+            }
 
             if (!context.Request.HasJsonContentType()) return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
 
@@ -114,8 +126,17 @@ public static class GameSaveEndpoints
 
                 try
                 {
-                    var save = await store.SaveAsync(ownerId, context.User.Identity!.Name!, state, number, context.RequestAborted);
-                    return Results.Ok(new { save.SavedAt, save.EndlessUnlocked, save.RecoveredFromCorruptSave });
+                    var save = await store.SaveAsync(ownerId, context.User.Identity!.Name!, state, number, context.RequestAborted,
+                        expectedRevision, GoogleTokenAuthenticationHandler.IssuedAt(context.User));
+                    return Results.Ok(new { save.SavedAt, save.EndlessUnlocked, save.RecoveredFromCorruptSave, save.Revision });
+                }
+                catch (SaveConflictException exception)
+                {
+                    return Results.Conflict(new { code = "SaveConflict", message = "The cloud save changed. Choose which save to keep before retrying.", revision = exception.Current?.Revision ?? 0 });
+                }
+                catch (AccountDeletedException)
+                {
+                    return Results.Unauthorized();
                 }
                 catch (JsonException exception)
                 {
@@ -131,7 +152,15 @@ public static class GameSaveEndpoints
                     return Results.Json(new { code = "SaveStorageUnavailable", message = "The server could not access save storage.", reference = context.TraceIdentifier }, statusCode: StatusCodes.Status500InternalServerError);
                 }
             }
-        }).RequireAuthorization();
+        }).RequireAuthorization().RequireRateLimiting("PlayerRequests");
+    }
+
+    public static bool TryParseRevision(string? value, out long revision)
+    {
+        revision = 0;
+        return value is { Length: >= 3 and <= 21 } && value[0] == '"' && value[^1] == '"'
+            && long.TryParse(value.AsSpan(1, value.Length - 2), System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out revision) && revision >= 0;
     }
 
     /// <summary>

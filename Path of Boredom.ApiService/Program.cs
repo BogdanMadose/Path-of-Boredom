@@ -79,12 +79,17 @@ app.Use(async (context, next) =>
         if (account.Exists && account.TryGetValue<long>("deletedAt", out var deletedAt)
             && GoogleTokenAuthenticationHandler.IssuedAt(context.User) <= deletedAt)
         {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            await RejectDeletedSessionAsync(context);
             return;
         }
     }
     try { await next(context); }
-    catch (AccountDeletedException) { context.Response.StatusCode = StatusCodes.Status401Unauthorized; }
+    catch (AccountDeletedException)
+    {
+        if (context.Response.HasStarted) throw;
+        context.Response.Clear();
+        await RejectDeletedSessionAsync(context);
+    }
 });
 app.UseAuthorization();
 app.UseRateLimiter();
@@ -97,5 +102,16 @@ app.MapPlayerAccount();
 app.MapDefaultEndpoints();
 
 app.Run();
+
+static Task RejectDeletedSessionAsync(HttpContext context)
+{
+    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+    context.Response.Headers.CacheControl = "no-store";
+    return context.Response.WriteAsJsonAsync(new
+    {
+        code = "AccountDeleted",
+        message = "This Google session predates account deletion. Sign in again to create a new game account."
+    }, context.RequestAborted);
+}
 
 public partial class Program;

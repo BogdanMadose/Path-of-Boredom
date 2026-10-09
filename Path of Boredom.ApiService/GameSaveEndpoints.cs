@@ -203,7 +203,7 @@ public static class GameSaveEndpoints
         // size/depth-bounded (see IsBounded), core scalar counters must be present and numeric, the
         // status must be a recognized value, and the player object must have all its core stats —
         // including a sane health/maxHealth relationship (alive, and not overhealed).
-        if (!IsBounded(state)
+        if (!IsBounded(state, version >= 15 ? 40 : 32)
             || !Numbers(state, "time", "wave", "intermission", "kills", "gold")
             || !state.TryGetProperty("status", out var status) || status.ValueKind != JsonValueKind.String
             || status.GetString() is not ("playing" or "paused" or "camp" or "won" or "choosing")
@@ -587,18 +587,19 @@ public static class GameSaveEndpoints
 
     /// <summary>
     /// Recursively checks that a JSON value (and everything nested inside it) stays within sane
-    /// size/shape bounds: objects capped at 32 properties with short (&lt;=40 char) property names,
+    /// size/shape bounds: objects capped at 32 properties (40 for v15's added skill cooldowns)
+    /// with short (&lt;=40 char) property names,
     /// arrays capped at 128 entries, strings capped at 200 characters, and numbers finite and of a
     /// safe magnitude. This is the first line of defense against a maliciously huge or deeply-varied
     /// save payload before any field-specific validation even runs — it deliberately rejects
     /// booleans/null outright since the save format never legitimately uses them (everything is
     /// represented as 0/1 numbers instead, see e.g. campaignComplete).
     /// </summary>
-    private static bool IsBounded(JsonElement value) => value.ValueKind switch
+    private static bool IsBounded(JsonElement value, int maxProperties) => value.ValueKind switch
     {
-        JsonValueKind.Object => value.EnumerateObject().Count() <= 32
-            && value.EnumerateObject().All(property => property.Name.Length <= 40 && IsBounded(property.Value)),
-        JsonValueKind.Array => value.GetArrayLength() <= 128 && value.EnumerateArray().All(IsBounded),
+        JsonValueKind.Object => value.EnumerateObject().Count() <= maxProperties
+            && value.EnumerateObject().All(property => property.Name.Length <= 40 && IsBounded(property.Value, maxProperties)),
+        JsonValueKind.Array => value.GetArrayLength() <= 128 && value.EnumerateArray().All(item => IsBounded(item, maxProperties)),
         JsonValueKind.String => value.GetString()!.Length <= 200,
         JsonValueKind.Number => value.TryGetDouble(out var number) && double.IsFinite(number) && Math.Abs(number) <= 9_007_199_254_740_991,
         _ => false

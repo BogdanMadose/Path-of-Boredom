@@ -13,7 +13,7 @@
 // in save format N, so older saves can still be restored under the current engine.
 import { WIDTH, HEIGHT, createState } from "./arpg-engine.js";
 import { LAST_WAVE, ENEMY_KINDS, UPGRADES, POWER_UPS } from "./arpg-campaign.js";
-import { LEVEL_CARDS } from "./arpg-cards.js";
+import { LEVEL_CARDS, normalizeCardChoices } from "./arpg-cards.js";
 import { DIFFICULTIES } from "./arpg-difficulty.js";
 import { MASTERY, MAX_FLASKS } from "./arpg-engine.js";
 import { HERO_CLASSES } from "./arpg-classes.js";
@@ -291,6 +291,7 @@ export function restoreSnapshot(snapshot, random = Math.random) {
         state.loadout = { manual: "none", auto: Array.from({ length: 4 }, (_, index) => skills[index] ?? "none") };
         state.wardUnlockSeen = 1;
     }
+    normalizeCardChoices(state);
     state.status = ["camp", "won", "choosing"].includes(saved.status) ? saved.status : "paused";
     return state;
 }

@@ -29,10 +29,16 @@
 .arpg ::deep .account-confirm { position: fixed; inset: 10% 0 auto; margin: auto; z-index: 100; }
 .arpg ::deep .game-confirm button { min-height: 44px; padding: 10px 24px; margin: 6px; background: #273b36; color: #ecdfc2; border: 1px solid #c7a56b; border-radius: 8px; }
 .run-skill-pool { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.run-skill-pool button { white-space: normal; text-align: left; display: grid; align-content: start; gap: 8px; padding: 16px; border: 1px solid #c7a56b55; border-radius: 10px; background: linear-gradient(135deg, #29332e, #14212a); }
+.run-skill-pool button { white-space: normal; text-align: left; display: grid; grid-template-columns: 44px minmax(0, 1fr); align-content: start; align-items: center; gap: 8px; padding: 16px; border: 1px solid #c7a56b55; border-radius: 10px; background: linear-gradient(135deg, #29332e, #14212a); }
 .run-skill-pool button:hover:not(:disabled), .run-skill-pool button:focus-visible { border-color: #efcb86; background: #303c35; outline: 2px solid #efcb86; outline-offset: -2px; }
 .run-skill-pool strong { color: #f3dfb9; font: 18px/1.3 Georgia, serif; }
 .run-skill-pool span { color: #bdc9c6; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.run-skill-pool span { grid-column: 1 / -1; }
+.run-skill-icon { width: 44px; height: 44px; border-radius: 10px; border: 1px solid #c7a56b55; }
+.starter-skill-pool { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.starter-skill-pool button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-width: 0; padding: 10px 6px; white-space: normal; color: #f3dfb9; }
+.starter-skill-pool button[aria-pressed="true"] { border-color: #efcb86; background: #303c35; outline: 2px solid #efcb86; outline-offset: -2px; }
+.starter-skill-pool span { font-size: 12px; line-height: 1.3; }
 .skill-choice-overlay { z-index: 3; overflow-y: auto; align-items: safe center; touch-action: pan-y; overscroll-behavior: contain; }
 .skill-choice-overlay .overlay-card { width: 100%; max-width: 760px; max-height: 100%; overflow-y: auto; padding: 16px; text-align: left; touch-action: pan-y; scrollbar-width: thin; scrollbar-color: #c7a56b #14212a; }
 @media (max-width: 540px) {
@@ -234,6 +240,9 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .death-report ol { max-height: 160px; overflow-y: auto; overscroll-behavior: contain; padding-left: 24px; font-size: 12px; line-height: 1.7; }
 .death-report li { margin-bottom: 6px; overflow-wrap: anywhere; }
 .death-report .fatal-hit { color: #ffad97; font-weight: 700; }
+.arpg[data-game-status="dead"] [data-overlay] { grid-template-rows: minmax(0, 1fr); touch-action: pan-y; }
+.arpg[data-game-status="dead"] [data-run-menu] { box-sizing: border-box; min-height: 0; max-height: 100%; overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #c7a56b #14212a; }
+.arpg[data-game-status="dead"] .death-report, .arpg[data-game-status="dead"] .death-report ol { max-height: none; overflow: visible; }
 .loadout-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .loadout-grid label { min-width: 0; display: grid; gap: 8px; color: #dbc18e; font-size: 12px; }
 .loadout-grid select { min-width: 0; width: 100%; padding: 10px; background: #0e181e; border: 1px solid #bda36b55; border-radius: 4px; color: #e8ddc3; font: inherit; }
@@ -270,9 +279,9 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .tree-node:not(.tooltip-dismissed):hover, .tree-node.tooltip-inspected:not(.tooltip-dismissed) { z-index: 5; }
 .tree-node.tooltip-dismissed { z-index: auto; }
 .tree-node button { display: grid; place-content: center; gap: 2px; width: 72px; height: 72px; padding: 6px; border: 2px solid #607b7a; border-radius: 50%; background: #0d1a20; color: #dfcba6; text-align: center; box-shadow: 0 4px 12px #0007; }
-.tree-node button strong { font-size: 11px; line-height: 1.2; }
+.tree-node button strong { font-size: 11px; line-height: 1.2; overflow-wrap: anywhere; }
 .tree-node button small { font-size: 10px; color: #edcc91; }
-.tree-node-icon { font-size: 20px; line-height: 1; color: #b8d1d0; }
+.tree-node-icon { display: block; width: 24px; height: 24px; margin-inline: auto; border-radius: 5px; background: var(--skill-art) center / contain no-repeat; font-size: 0; line-height: 1; color: #b8d1d0; }
 .tree-node button[aria-disabled="true"] { cursor: help; border-style: dashed; color: #a8b6b2; }
 .tree-node button.available { border-color: #edc581; box-shadow: 0 0 15px #d9ad4433; }
 .tree-node button.learned { border-color: #d5ac62; border-style: solid; background: #303029; }

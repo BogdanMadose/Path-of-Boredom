@@ -14,14 +14,16 @@
 // IMPORTANT: this file's state shape is exactly what arpg-save.js serializes/validates and what
 // GameSaveEndpoints.cs re-validates on the server. Adding/removing/renaming a field on `state` or
 // `state.player` generally requires updating arpg-save.js (and bumping the save version) too.
-import { LAST_WAVE, WAVES_PER_MAP, UPGRADES, POWER_UPS, mapForWave, mapIndexForWave, enemyKindForWave, firePhase } from "./arpg-campaign.js";
+import { LAST_WAVE, WAVES_PER_MAP, UPGRADES, POWER_UPS, mapForWave, mapIndexForWave, enemyKindForWave } from "./arpg-campaign.js";
 export { LAST_WAVE } from "./arpg-campaign.js";
-import { LEVEL_CARDS, drawLevelCards } from "./arpg-cards.js";
+import { LEVEL_CARDS, drawLevelCards, levelCardAvailable } from "./arpg-cards.js";
 import { DIFFICULTIES, difficultyFor } from "./arpg-difficulty.js";
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
 import { ELITE_MODIFIERS, enemyDamageSource } from "./arpg-modifiers.js";
 import { SKILL_KEYS, SLOTTABLE_SKILLS, AUTO_COOLDOWN, EXTRA_SKILLS, NEW_SKILLS, combatSkillDefinition, newSkillTree, skillUnlocked, skillSelected, needsSkillChoice } from "./arpg-skills.js";
 import { updateCombatFacing } from "./arpg-facing.js";
+import { skillRangeBonus } from "./arpg-skill-trees.js";
+import { arenaHazards, hazardPhase } from "./arpg-hazards.js";
 // Logical canvas resolution (not the real on-screen pixel size — arpg-graphics.js scales this to
 // fit the actual canvas). All position math throughout this file is in these logical units.
 export const WIDTH = 1100;
@@ -119,7 +121,7 @@ export const criticalDamage = state => 1.5 + state.boons.critDamage * 0.1 + stat
 // Effective range of a given skill, capped per class/skill and boosted by forge/card ranks,
 // Widening ember mastery, and relevant skill tree nodes.
 export const skillReach = (state, skill) => NEW_SKILLS[skill]
-    ? combatSkillDefinition(state, skill).reach * (1 + state.skillTree[skill].reach * 0.1)
+    ? combatSkillDefinition(state, skill).reach + skillRangeBonus(state, skill)
     : Math.min(state.heroClass === "ranger" ? 1000 : skill === "attack" ? 220 : skill === "burst" ? 500 : 340, (skill === "attack"
     ? classFor(state).attackReach + state.upgrades.cleave * 6 + state.boons.cleave * 6
     : skill === "nova" ? classFor(state).specialReach + state.upgrades.nova * 10 + state.boons.nova * 10
@@ -197,7 +199,7 @@ function grantUpgrade(state, key) {
 export function chooseLevelCard(state, key) {
     if (state.status !== "choosing" || state.pendingChoices <= 0 || !state.cardChoices.includes(key)) return false;
     const card = LEVEL_CARDS[key];
-    if (!card || state.boons[key] >= card.max) return false;
+    if (!levelCardAvailable(state, key)) return false;
     state.boons[key]++;
     if (key === "vitality") {
         state.player.maxHealth += 16;
@@ -431,7 +433,7 @@ function pushEnemy(state, enemy, amount) {
 
 function castClassSkill(state, skill) {
     const p = state.player, definition = combatSkillDefinition(state, skill), nodes = state.skillTree[skill];
-    const reach = skillReach(state, skill), scale = 1 + nodes.reach * 0.1;
+    const reach = skillReach(state, skill);
     const targets = state.enemies.filter(enemy => enemy.health > 0 && distance(p, enemy) <= reach + enemy.radius)
         .sort((a, b) => distance(p, a) - distance(p, b));
     if (!targets.length) return false;
@@ -443,6 +445,11 @@ function castClassSkill(state, skill) {
         hits++;
     };
     const visual = (kind, centre = p, radius = reach, angle = p.facing) => effect(state, kind, centre.x, centre.y, definition.color, "", radius, angle);
+    const art = (centre = p, radius = reach, angle = p.facing, variant = "cast") => {
+        const item = visual("class-skill", centre, radius, angle);
+        Object.assign(item, { heroClass: state.heroClass, skill, variant, rank: nodes.potency });
+        return item;
+    };
     const slow = (enemy, strength, duration) => {
         if (enemy.health <= 0) return;
         enemy.chilled = Math.max(enemy.chilled, duration);
@@ -461,43 +468,47 @@ function castClassSkill(state, skill) {
             let previous = p;
             const visited = new Set();
             for (let index = 0; index < 3 + nodes.ember * 2; index++) {
-                const target = state.enemies.filter(enemy => enemy.health > 0 && !visited.has(enemy) && distance(previous, enemy) <= (index ? 180 * scale : reach))
+                const target = state.enemies.filter(enemy => enemy.health > 0 && !visited.has(enemy) && distance(previous, enemy) <= (index ? 180 + nodes.reach * 30 : reach))
                     .sort((a, b) => distance(previous, a) - distance(previous, b))[0];
                 if (!target) break;
-                visual("beam", previous, distance(previous, target), Math.atan2(target.y - previous.y, target.x - previous.x));
+                art(previous, distance(previous, target), Math.atan2(target.y - previous.y, target.x - previous.x));
                 visited.add(target);
-                strike(target, 0.75 ** index);
+                strike(target, (0.75 + nodes.recovery * 0.05) ** index);
                 previous = target;
             }
         } else if (skill === "frost") {
-            const width = 24 * scale * (nodes.ember ? 1.5 : 1);
+            const width = (24 + nodes.reach * 6) * (nodes.ember ? 1.5 : 1);
             for (let lane = 0; lane < 4; lane++) {
                 const angle = p.facing + lane * Math.PI / 2;
-                visual("beam", p, reach, angle).width = width * 2;
+                art(p, reach, angle).width = width * 2;
             }
             for (const enemy of targets) {
                 const dx = enemy.x - p.x, dy = enemy.y - p.y;
                 const along = dx * Math.cos(p.facing) + dy * Math.sin(p.facing);
                 const across = -dx * Math.sin(p.facing) + dy * Math.cos(p.facing);
-                if (Math.min(Math.abs(along), Math.abs(across)) <= width + enemy.radius) strike(enemy);
+                if (Math.min(Math.abs(along), Math.abs(across)) <= width + enemy.radius) strike(enemy, distance(p, enemy) <= reach / 4 ? 1 + nodes.recovery * 0.1 : 1);
             }
         } else if (skill === "reap") {
-            visual("slash").arc = 80 * Math.PI / 180;
-            for (const enemy of targets) if (inCone(enemy, 80 * Math.PI / 180)) strike(enemy, enemy.health <= enemy.maxHealth * 0.35 ? 1.5 : 1, nodes.ember > 0);
+            const angle = (80 + nodes.reach * 12.5) * Math.PI / 180;
+            art().arc = angle;
+            for (const enemy of targets) if (inCone(enemy, angle)) strike(enemy, enemy.health <= enemy.maxHealth * (0.35 + nodes.recovery * 0.05) ? 1.5 : 1, nodes.ember > 0);
         } else if (skill === "meteor") {
             const target = targets.at(-1), angle = Math.atan2(target.y - p.y, target.x - p.x);
             const end = { x: p.x + Math.cos(angle) * reach, y: p.y + Math.sin(angle) * reach };
-            const width = 18 * scale * (nodes.ember ? 2 : 1);
-            visual("beam", p, reach, angle).width = width * 2;
-            for (const enemy of targets) if (distanceToSegment(enemy, p, end) <= width + enemy.radius) strike(enemy);
+            const width = (18 + nodes.reach * 8) * (nodes.ember ? 2 : 1);
+            art(p, reach, angle).width = width * 2;
+            for (const enemy of targets) if (distanceToSegment(enemy, p, end) <= width + enemy.radius) strike(enemy, distance(p, enemy) >= reach / 2 ? 1 + nodes.recovery * 0.1 : 1);
         } else if (skill === "siphon") {
-            visual("execute", targets[0], 35);
-            strike(targets[0], 1 + (1 - p.health / p.maxHealth));
-            heal(p.maxHealth * (nodes.ember ? 0.05 : 0.03));
+            art(targets[0], 35);
+            strike(targets[0], 1 + (1 - p.health / p.maxHealth) * (1 + nodes.recovery * 0.1));
+            heal(p.maxHealth * ((nodes.ember ? 0.05 : 0.03) + nodes.reach * 0.005));
         } else {
-            const angle = (nodes.ember ? 90 : 60) * Math.PI / 180;
-            visual("slash").arc = angle;
-            for (const enemy of targets) if (inCone(enemy, angle)) strike(enemy);
+            const angle = ((nodes.ember ? 90 : 60) + nodes.reach * 5) * Math.PI / 180;
+            art().arc = angle;
+            for (const enemy of targets) if (inCone(enemy, angle)) {
+                strike(enemy);
+                if (enemy.health > 0 && nodes.recovery) pushEnemy(state, enemy, nodes.recovery * 15);
+            }
             clearCone(angle);
         }
     } else if (state.heroClass === "ranger") {
@@ -505,58 +516,62 @@ function castClassSkill(state, skill) {
             let previous = p;
             const visited = new Set();
             for (let index = 0; index < 2 + nodes.ember; index++) {
-                const candidates = state.enemies.filter(enemy => enemy.health > 0 && !visited.has(enemy) && distance(previous, enemy) <= (index ? 220 * scale : reach))
+                const candidates = state.enemies.filter(enemy => enemy.health > 0 && !visited.has(enemy) && distance(previous, enemy) <= (index ? 220 + nodes.reach * 35 : reach))
                     .sort((a, b) => distance(previous, a) - distance(previous, b));
                 const target = index ? candidates.at(-1) : candidates[0];
                 if (!target) break;
-                arrowLink(state, previous, target);
+                art(previous, distance(previous, target), Math.atan2(target.y - previous.y, target.x - previous.x));
                 visited.add(target);
-                strike(target, index ? 1.1 : 1);
+                strike(target, index ? 1.1 + nodes.recovery * 0.1 : 1);
                 previous = target;
             }
         } else if (skill === "frost") {
-            const centre = { x: targets[0].x, y: targets[0].y }, radius = 90 * scale;
-            arrowLink(state, p, centre);
-            visual("ring", centre, radius);
+            const centre = { x: targets[0].x, y: targets[0].y }, radius = 90 + nodes.reach * 20;
+            art(p, distance(p, centre), Math.atan2(centre.y - p.y, centre.x - p.x), "link");
+            art(centre, radius);
             for (const enemy of state.enemies) if (enemy.health > 0 && distance(centre, enemy) <= radius + enemy.radius) {
-                strike(enemy);
+                strike(enemy, enemy.chilled > 0 ? 1 + nodes.recovery * 0.15 : 1);
                 slow(enemy, 0.55, nodes.ember ? 3 : 2);
             }
         } else if (skill === "reap") {
             const target = targets.at(-1);
-            arrowLink(state, p, target);
-            strike(target, (1 + Math.min(1, distance(p, target) / reach)) * (nodes.ember && (target.elite || target.kind === "boss") ? 1.25 : 1));
+            art(p, distance(p, target), Math.atan2(target.y - p.y, target.x - p.x));
+            strike(target, (1 + Math.min(1, distance(p, target) / reach) * (1 + nodes.recovery * 0.1)) * (nodes.ember && (target.elite || target.kind === "boss") ? 1.25 : 1));
         } else if (skill === "meteor") {
             const visited = new Set(), count = nodes.ember ? 7 : 5;
             for (let lane = 0; lane < count; lane++) {
-                const angle = p.facing + (lane / (count - 1) - 0.5) * 70 * Math.PI / 180;
+                const angle = p.facing + (lane / (count - 1) - 0.5) * (70 + nodes.reach * 10) * Math.PI / 180;
                 const end = { x: p.x + Math.cos(angle) * reach, y: p.y + Math.sin(angle) * reach };
-                visual("beam", p, reach, angle).width = 5;
-                const target = targets.find(enemy => enemy.health > 0 && distanceToSegment(enemy, p, end) <= enemy.radius + 5 * scale);
+                art(p, reach, angle).width = 5 + nodes.recovery * 2;
+                const target = targets.find(enemy => enemy.health > 0 && distanceToSegment(enemy, p, end) <= enemy.radius + 5 + nodes.recovery * 2);
                 if (target && !visited.has(target)) { visited.add(target); strike(target); }
             }
         } else if (skill === "siphon") {
-            const wounded = targets.filter(enemy => enemy.health < enemy.maxHealth * 0.5).slice(0, nodes.ember ? 4 : 3);
+            const wounded = targets.filter(enemy => enemy.health < enemy.maxHealth * (0.5 + nodes.reach * 0.05)).slice(0, nodes.ember ? 4 : 3);
             if (!wounded.length) return false;
             for (const enemy of wounded) {
-                arrowLink(state, p, enemy);
+                art(enemy, distance(enemy, p), Math.atan2(p.y - enemy.y, p.x - enemy.x));
                 strike(enemy);
-                heal((p.maxHealth - p.health) * 0.08);
+                heal((p.maxHealth - p.health) * (0.08 + nodes.recovery * 0.01));
             }
         } else {
-            visual("repulse");
-            for (const enemy of targets) { strike(enemy); if (enemy.health > 0) pushEnemy(state, enemy, nodes.ember ? 135 : 90); }
+            art();
+            for (const enemy of targets) {
+                const ranged = ["wisp", "spitter", "summoner", "cantor", "hexer", "artillerist"].includes(enemy.kind);
+                strike(enemy, ranged ? 1 + nodes.recovery * 0.15 : 1);
+                if (enemy.health > 0) pushEnemy(state, enemy, (nodes.ember ? 135 : 90) + nodes.reach * 15);
+            }
             p.afterstep = Math.max(p.afterstep, 1.2);
             visual("wind", p, 55);
         }
     } else {
         if (skill === "chain") {
-            const centre = { x: targets[0].x, y: targets[0].y }, radius = (nodes.ember ? 180 : 130) * scale;
-            visual("ring", centre, radius);
+            const centre = { x: targets[0].x, y: targets[0].y }, radius = (nodes.ember ? 180 : 130) + nodes.reach * 20;
+            art(centre, radius);
             for (const enemy of state.enemies) if (enemy.health > 0 && distance(centre, enemy) <= radius + enemy.radius) {
                 strike(enemy);
                 if (enemy.health > 0 && enemy.kind !== "boss") {
-                    const d = distance(centre, enemy), pull = Math.min(65, d);
+                    const d = distance(centre, enemy), pull = Math.min(65 + nodes.recovery * 20, d);
                     if (d) {
                         enemy.x = clamp(enemy.x + (centre.x - enemy.x) / d * pull, MARGIN, WIDTH - MARGIN);
                         enemy.y = clamp(enemy.y + (centre.y - enemy.y) / d * pull, MARGIN, HEIGHT - MARGIN);
@@ -564,38 +579,41 @@ function castClassSkill(state, skill) {
                 }
             }
         } else if (skill === "frost") {
-            visual("slash").arc = Math.PI / 4;
-            for (const enemy of targets) if (inCone(enemy, Math.PI / 4)) { strike(enemy); slow(enemy, 0.45, nodes.ember ? 3 : 2); }
-            clearCone(Math.PI / 4);
+            const angle = (45 + nodes.reach * 7.5) * Math.PI / 180;
+            art().arc = angle;
+            for (const enemy of targets) if (inCone(enemy, angle)) { strike(enemy); slow(enemy, 0.45 + nodes.recovery * 0.05, nodes.ember ? 3 : 2); }
+            clearCone(angle);
         } else if (skill === "reap") {
             const armored = enemy => enemy.kind === "sentinel" || enemy.modifier === "armored";
             const target = targets.find(armored) ?? targets[0];
-            visual("execute", target, 40);
-            strike(target, armored(target) || nodes.ember && (target.elite || target.kind === "boss") ? 1.5 : 1);
+            art(target, 40);
+            strike(target, armored(target) ? 1.5 + nodes.recovery * 0.25 : nodes.ember && (target.elite || target.kind === "boss") ? 1.5 : 1);
         } else if (skill === "meteor") {
-            const radius = (nodes.ember ? 90 : 65) * scale;
+            const radius = (nodes.ember ? 90 : 65) + nodes.reach * 10;
             const centres = [1 / 3, 2 / 3, 1].map(part => ({ x: p.x + Math.cos(p.facing) * reach * part, y: p.y + Math.sin(p.facing) * reach * part }));
             if (!state.enemies.some(enemy => enemy.health > 0 && centres.some(centre => distance(centre, enemy) <= radius + enemy.radius))) return false;
-            for (const centre of centres) visual("burst", centre, radius);
-            for (const enemy of state.enemies) if (enemy.health > 0 && centres.some(centre => distance(centre, enemy) <= radius + enemy.radius)) strike(enemy);
+            for (const centre of centres) art(centre, radius);
+            for (const enemy of state.enemies) if (enemy.health > 0) {
+                const overlaps = centres.filter(centre => distance(centre, enemy) <= radius + enemy.radius).length;
+                if (overlaps) strike(enemy, overlaps > 1 ? 1 + nodes.recovery * 0.1 : 1);
+            }
         } else if (skill === "siphon") {
-            visual("shield");
+            art();
             for (const enemy of targets) strike(enemy);
-            heal(p.maxHealth * Math.min(5, hits) * 0.01);
+            heal(p.maxHealth * Math.min(5, hits) * (0.01 + nodes.reach * 0.0025) * (p.health <= p.maxHealth * 0.35 ? 1 + nodes.recovery * 0.1 : 1));
             p.flaskWard = Math.max(p.flaskWard, nodes.ember ? 2 : 1);
         } else {
-            const inner = reach * (nodes.ember ? 0.2 : 0.4);
+            const inner = reach * ((nodes.ember ? 0.2 : 0.4) - nodes.reach * 0.025);
             if (!targets.some(enemy => distance(p, enemy) >= inner)) return false;
-            visual("repulse");
-            visual("ring", p, inner);
+            art().inner = inner;
             for (const enemy of targets) if (distance(p, enemy) >= inner) {
                 strike(enemy);
-                if (enemy.health > 0) pushEnemy(state, enemy, 80);
+                if (enemy.health > 0) pushEnemy(state, enemy, 80 + nodes.recovery * 20);
             }
         }
     }
     if (!hits) return false;
-    p[skill] = definition.cooldown / (1 + nodes.recovery * 0.1);
+    p[skill] = definition.cooldown / (1 + nodes.recovery * 0.08);
     p.casting = 0.4;
     return true;
 }
@@ -617,6 +635,11 @@ export function useSkill(state, skill, automatic = false) {
         : skill === "burst" ? 1 + nodes.focus * 0.12 : 1;
     const damage = multiplier => Math.round(weaponDamage(state) * multiplier * power);
     const color = skill === "nova" && nodes.ignition && state.heroClass === "knight" ? "#ff8b32" : hero.color;
+    const art = (radius, angle = p.facing) => {
+        const item = effect(state, "class-skill", p.x, p.y, color, "", radius, angle);
+        Object.assign(item, { heroClass: state.heroClass, skill, rank: nodes.amplitude ?? nodes.focus ?? nodes.barrier ?? 0 });
+        return item;
+    };
     if (NEW_SKILLS[skill]) {
         if (!castClassSkill(state, skill)) return false;
     } else if (skill === "attack") {
@@ -640,9 +663,10 @@ export function useSkill(state, skill, automatic = false) {
         p.nova = hero.specialCooldown / (1 + state.upgrades.nova * 0.07);
         const reach = skillReach(state, "nova");
         if (state.heroClass === "ranger") {
+            art(reach);
             firePlayerArrows(state, [-0.36, -0.18, 0, 0.18, 0.36], damage(hero.specialDamage + state.upgrades.nova * 0.1), reach, 1, skill);
         } else {
-            effect(state, "ring", p.x, p.y, color, "", reach);
+            art(reach);
             if (state.heroClass === "warden") effect(state, "ring", p.x, p.y, color, "", reach / 2);
             for (const enemy of state.enemies) {
                 if (distance(p, enemy) < reach + enemy.radius) {
@@ -663,11 +687,12 @@ export function useSkill(state, skill, automatic = false) {
         p.casting = 0.4;
         if (extra.shape === "arrows") {
             const count = 7 + nodes.aperture * 2;
+            art(reach).count = count;
             firePlayerArrows(state, Array.from({ length: count }, (_, index) => -0.36 + index * 0.72 / (count - 1)), hit, reach, 1, skill);
         } else {
             const end = { x: p.x + Math.cos(p.facing) * reach, y: p.y + Math.sin(p.facing) * reach };
             const halfAngle = (60 + nodes.aperture * 10) * Math.PI / 180;
-            const visual = effect(state, extra.shape === "beam" ? "beam" : "slash", p.x, p.y, color, "", reach, p.facing);
+            const visual = art(reach);
             visual.width = 44 * (1 + nodes.aperture * 0.2);
             visual.arc = halfAngle;
             for (const enemy of state.enemies) {
@@ -681,7 +706,7 @@ export function useSkill(state, skill, automatic = false) {
         const reach = skillReach(state, skill);
         p.guard = extra.cooldown / (1 + state.upgrades.guard * 0.08);
         p.guarding = Math.min(8, 3 + state.upgrades.guard * 0.2 + state.boons.guard * 0.15 + nodes.duration * 0.6);
-        effect(state, "shield", p.x, p.y, color, "", reach);
+        art(reach);
         for (const enemy of state.enemies) {
             if (distance(p, enemy) < reach + enemy.radius) {
                 hitEnemy(state, enemy, Math.round(weaponDamage(state) * extra.damage * (1 + state.upgrades.guard * 0.08)
@@ -870,12 +895,12 @@ function spawnWave(state) {
         const x = side === 0 ? MARGIN : side === 1 ? WIDTH - MARGIN : WIDTH * t;
         const y = side === 2 ? MARGIN : side === 3 ? HEIGHT - MARGIN : HEIGHT * t;
         const elite = !boss && state.wave >= 6 && i % (depth ? 3 : 5) === 0 ? 1 : 0;
-        const health = Math.round((boss ? 680 + act * 380 : (kind === "brute" || kind === "sentinel" ? 75 : kind === "runner" ? 20 : 32) + Math.min(state.wave, LAST_WAVE) * 10) * scaling * (elite ? 1.7 : 1));
+        const health = Math.round((boss ? (680 + act * 380) * 1.5 : (kind === "brute" || kind === "sentinel" ? 75 : kind === "runner" ? 20 : 32) + Math.min(state.wave, LAST_WAVE) * 10) * scaling * (elite ? 1.7 : 1));
         state.enemies.push({
             kind, x, y, health, maxHealth: health, elite, charging: 0, chargeX: 0, chargeY: 0,
             combat: { volleys: [], phase: 1, rest: 0, pattern: 1 },
             radius: boss ? 32 : kind === "brute" || kind === "sentinel" ? 22 : kind === "runner" ? 12 : 15,
-            speed: boss ? 70 + act * 8 : kind === "runner" ? 160 + act * 10 : kind === "sentinel" ? 55 : kind === "brute" ? 62 : ["wisp", "spitter", "summoner", "cantor", "hexer"].includes(kind) ? 80 : 92 + Math.min(state.wave, LAST_WAVE) * 2.2,
+            speed: boss ? 90 + act * 10 : kind === "runner" ? 160 + act * 10 : kind === "sentinel" ? 55 : kind === "brute" ? 62 : ["wisp", "spitter", "summoner", "cantor", "hexer"].includes(kind) ? 80 : 92 + Math.min(state.wave, LAST_WAVE) * 2.2,
             damage: Math.round((boss ? 30 + act * 10 : kind === "sentinel" ? 26 + act * 4 : kind === "brute" ? 22 + act * 5 : 13 + Math.min(state.wave, LAST_WAVE) * 1.5)
                 * (1 + act * 0.045 + depth * 0.009 + levelPressure * 0.008) * (elite ? 1.3 : 1)),
             cooldown: 1.2, flash: 0, slam: 4, winding: 0, attackWindup: 0, attackX: x, attackY: y, chilled: 0, chillStrength: 0
@@ -1044,7 +1069,8 @@ export function step(state, input, elapsed) {
     if (state.status !== "playing") return;
     const rolling = p.rolling > 0;
     const map = mapForWave(state.wave);
-    const slowed = map.hazard === "slow" && map.hazards.some(pool => distance(p, pool) < pool.radius);
+    const hazards = arenaHazards(state);
+    const slowed = map.hazard === "slow" && hazards.some(pool => hazardPhase(pool, state.time) >= 0 && distance(p, pool) < pool.radius);
     const speed = movementSpeed(state) * (slowed ? 135 / 220 : 1);
     const targetVx = rolling ? p.rollX * 690 : dx * speed;
     const targetVy = rolling ? p.rollY * 690 : dy * speed;
@@ -1054,8 +1080,8 @@ export function step(state, input, elapsed) {
     p.stridePhase = (p.stridePhase ?? 0) + Math.hypot(p.vx, p.vy) * dt * 0.08;
     p.x = clamp(p.x + p.vx * dt, MARGIN, WIDTH - MARGIN);
     p.y = clamp(p.y + p.vy * dt, MARGIN, HEIGHT - MARGIN);
-    if (state.enemies.some(enemy => enemy.health > 0) && ["fire", "storm", "void"].includes(map.hazard) && firePhase(state.time) >= 4
-        && map.hazards.some(seal => distance(p, seal) < seal.radius + p.radius)) hurtPlayer(state, 12 + mapIndexForWave(state.wave) * 4, `${map.name}: ${map.hazard} ground hazard`);
+    if (state.enemies.some(enemy => enemy.health > 0) && ["fire", "storm", "void"].includes(map.hazard)
+        && hazards.some(seal => hazardPhase(seal, state.time) >= 4 && distance(p, seal) < seal.radius + p.radius)) hurtPlayer(state, 12 + mapIndexForWave(state.wave) * 4, `${map.name}: ${map.hazard} ground hazard`);
 
     stepPlayerShots(state, dt);
     if (state.status !== "playing") return;
@@ -1138,8 +1164,16 @@ export function step(state, input, elapsed) {
         }
         if (enemy.kind === "boss") {
             const combat = enemy.combat;
+            const phase = enemy.health <= enemy.maxHealth / 3 ? 3 : enemy.health <= enemy.maxHealth * 2 / 3 ? 2 : 1;
+            if (phase > combat.phase && enemy.winding <= 0) {
+                combat.phase = phase;
+                combat.rest = Math.min(combat.rest || 0.35, 0.35);
+                enemy.attackWindup = 0;
+                effect(state, "text", enemy.x, enemy.y - 60, "#ffd18d", `PHASE ${phase}`);
+            }
             if (combat.rest > 0) {
-                combat.rest = Math.max(0, combat.rest - dt);
+                combat.rest = Math.max(0, Math.min(combat.rest, 0.65) - dt);
+                enemy.slam = Math.max(0, Math.min(enemy.slam, 2.4) - dt);
                 continue;
             }
             if (enemy.winding > 0) {
@@ -1154,18 +1188,10 @@ export function step(state, input, elapsed) {
                     } else {
                         fireVolley(state, enemy, angle, Array.from({ length: 8 }, (_, i) => i * Math.PI / 4), 155);
                     }
-                    combat.rest = combat.pattern === 3 ? 2 : 1.5;
-                    enemy.slam = 3;
+                    combat.rest = combat.pattern === 3 ? 0.65 : 0.45;
+                    enemy.slam = 2.4;
                     enemy.cooldown = Math.max(enemy.cooldown, 1);
                 }
-                continue;
-            }
-            const phase = enemy.health <= enemy.maxHealth / 3 ? 3 : enemy.health <= enemy.maxHealth * 2 / 3 ? 2 : 1;
-            if (phase > combat.phase) {
-                combat.phase = phase;
-                combat.rest = 1.5;
-                enemy.attackWindup = 0;
-                effect(state, "text", enemy.x, enemy.y - 60, "#ffd18d", `PHASE ${phase}`);
                 continue;
             }
             enemy.slam -= dt;

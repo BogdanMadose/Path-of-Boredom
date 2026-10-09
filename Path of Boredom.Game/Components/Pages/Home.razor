@@ -109,6 +109,7 @@
                                 @foreach (var skill in CombatSkills)
                                 {
                                     <button type="button" class="quiet-button" data-choose-run-skill="@skill">
+                                        <img class="run-skill-icon" data-skill-icon="@skill" alt="" />
                                         <strong data-skill-name="@skill">@skill</strong>
                                         <span data-skill-description="@skill"></span>
                                     </button>
@@ -149,7 +150,7 @@
                                     @for (var slot = 0; slot < 1; slot++)
                                     {
                                         <label>Starting automatic skill
-                                            <select data-setup-slot="@slot">
+                                            <select data-setup-slot="@slot" hidden>
                                                 <option value="none">Choose your first skill</option>
                                                 @foreach (var skill in StarterSkills)
                                                 {
@@ -157,6 +158,15 @@
                                                 }
                                             </select>
                                         </label>
+                                    }
+                                </div>
+                                <div class="starter-skill-pool" role="group" aria-label="Choose your starting skill">
+                                    @foreach (var skill in StarterSkills)
+                                    {
+                                        <button type="button" class="quiet-button" data-choose-starter-skill="@skill" aria-pressed="false">
+                                            <img class="run-skill-icon" alt="" />
+                                            <span data-starter-skill-name>@skill</span>
+                                        </button>
                                     }
                                 </div>
                                 <p class="forge-feedback" data-setup-loadout-feedback role="status"></p>
@@ -220,7 +230,7 @@
                     <div class="skill-tree-grid">
                         @foreach (var skill in AllSkills)
                         {
-                            <section class="skill-tree" data-tree-skill="@skill">
+                            <section class="skill-tree" data-tree-skill="@skill" hidden="@CombatSkills.Contains(skill)">
                                 <h3 data-skill-name="@skill">@skill</h3>
                                 <p data-skill-description="@skill"></p>
                                 <p class="tree-path">Hover or focus for details. On touch, tap to inspect, then tap again to learn. Each rank costs 1 point.</p>

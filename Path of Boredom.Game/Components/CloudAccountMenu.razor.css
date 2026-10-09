@@ -1,0 +1,30 @@
+.mm-account-body,
+.mm-account-body fieldset {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.mm-display-name {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.mm-display-name input {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #c7a56b66;
+    border-radius: 8px;
+    background: #102024;
+    color: #f6e7c6;
+    font-size: 16px;
+}
+
+.mm-name-result {
+    color: #f1d49b;
+    overflow-wrap: anywhere;
+}

@@ -14,6 +14,7 @@
 // coupling: GameSaveEndpoints.cs's ValidSkillProgress hardcodes the per-skill branchKeys arrays and
 // per-node rank caps, so a new node also needs a save version bump and a matching server-side update.
 import { classFor } from "./arpg-classes.js";
+import { CLASS_SKILL_TREES } from "./arpg-skill-trees.js";
 
 // Stable keys identify saved slots; each class supplies its own ability and keystone.
 export const CLASS_SKILLS = {
@@ -47,6 +48,9 @@ export const NEW_SKILLS = CLASS_SKILLS.knight;
 export const SKILL_KEYS = ["attack", "nova", "burst", "guard", "dodge", "potion", ...Object.keys(NEW_SKILLS)];
 // Nine combat slots per class; attack/dodge/potion never occupy a chosen skill slot.
 export const SLOTTABLE_SKILLS = ["nova", "burst", "guard", ...Object.keys(NEW_SKILLS)];
+export const skillIcon = (state, skill) => SLOTTABLE_SKILLS.includes(skill) || skill === "attack"
+    ? `/_content/PathOfBoredom.Game/images/skills/${state.heroClass}/${skill}.svg`
+    : `/_content/PathOfBoredom.Game/images/skills/${skill}.svg`;
 export const STARTER_SKILLS = ["nova", "chain", "reap"];
 // Guard/ward unlocks later in Endless mode (wave 41) than in campaign (wave 11), since Endless
 // effectively starts players over at a higher baseline difficulty.
@@ -212,7 +216,7 @@ export function respecTree(state, skill) {
     if (skill === "potion") { p.flaskWard = 0; p.renewal = 0; }
     if (skill === "siphon" && state.heroClass === "warden") p.flaskWard = 0;
     if (skill === "nullwave" && state.heroClass === "ranger") p.afterstep = 0;
-    if (skill === "nova") for (const enemy of state.enemies) { enemy.chilled = 0; enemy.chillStrength = 0; }
+    if (skill === "nova" || skill === "frost") for (const enemy of state.enemies) { enemy.chilled = 0; enemy.chillStrength = 0; }
     state.journal = `${skillName(state, skill)} reset: ${points} points returned for ${cost} gold. Cooldowns and other upgrades are unchanged.`;
     return true;
 }
@@ -265,8 +269,8 @@ export function setLoadout(state, manual, auto) {
 export function treeNodeDefinition(state, skill, node) {
     if (NEW_SKILLS[skill]) {
         const definition = combatSkillDefinition(state, skill);
-        return { ...TREE_NODES[skill][node], name: node === "ember" ? `${definition.name} keystone` : TREE_NODES[skill][node].name,
-            detail: node === "ember" ? definition.keystone : node === "reach" ? "+10% targeting range and area per rank." : TREE_NODES[skill][node].detail };
+        return { ...TREE_NODES[skill][node], ...CLASS_SKILL_TREES[state.heroClass][skill][node], visual: state.heroClass,
+            ...(node === "ember" ? { detail: definition.keystone } : {}) };
     }
     const index = Object.keys(TREE_NODES[skill]).indexOf(node);
     const definition = { ...TREE_NODES[skill][node], name: CLASS_TREE_NAMES[state.heroClass][skill][index],

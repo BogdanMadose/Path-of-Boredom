@@ -16,7 +16,7 @@ import { WIDTH, HEIGHT, createState, startRun, startEndlessRun, step, togglePaus
 import { captureSnapshot, restoreSnapshot } from "./arpg-save.js";
 import { captureRankingBuild, resetToReleaseRankings } from "./arpg-ranking.js";
 import { upgradePreview } from "./arpg-upgrade-preview.js";
-import { MAPS, LAST_WAVE, UPGRADES, POWER_UPS, threatForWave, mapForWave, mapIndexForWave, firePhase } from "./arpg-campaign.js";
+import { MAPS, LAST_WAVE, UPGRADES, POWER_UPS, threatForWave, mapForWave, mapIndexForWave } from "./arpg-campaign.js";
 import { LEVEL_CARDS } from "./arpg-cards.js";
 import { DIFFICULTIES } from "./arpg-difficulty.js";
 import { MASTERY, MAX_FLASKS, forgeComplete, masteryCost, buyMastery, chargeLaneEnd } from "./arpg-engine.js";
@@ -24,9 +24,14 @@ import { movementSpeed, criticalChance, criticalDamage, skillReach } from "./arp
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
 import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
 import { treePointsSpent, treeRespecCost, canRespecTree, respecTree } from "./arpg-skills.js";
-import { SKILL_KEYS, SLOTTABLE_SKILLS, STARTER_SKILLS, EXTRA_SKILLS, NEW_SKILLS, combatSkillDefinition, MAX_SKILL_POINTS, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, skillSelected, skillCapacity, selectedSkills, needsSkillChoice, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
+import { SKILL_KEYS, SLOTTABLE_SKILLS, STARTER_SKILLS, EXTRA_SKILLS, NEW_SKILLS, combatSkillDefinition, MAX_SKILL_POINTS, skillIcon, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, skillSelected, skillCapacity, selectedSkills, needsSkillChoice, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
 import { drawHero, drawOrb, decorateFloor, drawAtmosphere, drawLootIcon } from "./arpg-graphics.js";
+import { drawClassSkillEffect } from "./arpg-skill-effects.js";
 import { drawHud } from "./arpg-hud.js";
+import { arenaHazards, hazardPhase } from "./arpg-hazards.js";
+import { turnToward } from "./arpg-facing.js";
+
+const mobFacing = new WeakMap();
 
 // Respects the OS/browser-level "prefers-reduced-motion" setting so screen shake and other purely
 // cosmetic motion effects can be toggled off for players sensitive to it.
@@ -194,25 +199,39 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
     const r = actor.radius;
     ctx.save();
     ctx.translate(actor.x, actor.y);
-    ctx.fillStyle = "#0006";
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    const shadow = ctx.createRadialGradient(2, r * 0.55, 0, 2, r * 0.55, r * 1.4);
+    shadow.addColorStop(0, "#02080c88"); shadow.addColorStop(1, "#02080c00");
+    ctx.fillStyle = shadow;
     ctx.beginPath();
     ctx.ellipse(3, r * 0.55, r * 1.35, r * 0.65, 0, 0, Math.PI * 2);
     ctx.fill();
+    const targetFacing = actor.winding > 0 || actor.charging > 0
+        ? Math.atan2(actor.chargeY || 0, actor.chargeX || 0)
+        : actor.attackWindup > 0 ? Math.atan2(actor.attackY - actor.y, actor.attackX - actor.x)
+        : Math.atan2(player.y - actor.y, player.x - actor.x);
+    const previousFacing = mobFacing.get(actor);
+    const facing = !previousFacing || reducedMotion.matches ? targetFacing
+        : turnToward(previousFacing.angle, targetFacing, Math.min(0.05, (time - previousFacing.time + 3600) % 3600), 10);
+    if (!hero) mobFacing.set(actor, { angle: facing, time });
     const walking = hero ? Math.min(1, Math.hypot(actor.vx || 0, actor.vy || 0) / 180) : actor.moving ? 1 : 0;
     const stride = reducedMotion.matches ? 0 : Math.sin(actor.stridePhase ?? 0) * walking;
     const strike = Math.sin(Math.PI * Math.min(1, (actor.swing ?? 0) / (hero ? 0.26 : 0.3)));
     if (!reducedMotion.matches) {
-        ctx.translate(0, -Math.abs(stride) * (hero ? 2 : 3));
+        ctx.translate(0, -stride * stride * (hero ? 2 : 2.5));
         if (!hero) {
             const angle = Math.atan2(player.y - actor.y, player.x - actor.x);
             ctx.translate(Math.cos(angle) * strike * 7, Math.sin(angle) * strike * 7);
+            const breath = Math.sin(time * 2.8 + actor.x * 0.01) * 0.012;
+            ctx.scale(1 + breath, 1 - breath);
             if (actor.winding > 0 || actor.attackWindup > 0) ctx.scale(1.06, 0.94);
         }
     }
     if (hero) {
         drawHero(ctx, actor, HERO_CLASSES[heroClass], stride, strike, time, reducedMotion.matches);
     } else if (actor.kind === "duelist") {
-        ctx.rotate(actor.attackWindup > 0 ? Math.atan2(actor.attackY - actor.y, actor.attackX - actor.x) : Math.atan2(player.y - actor.y, player.x - actor.x));
+        ctx.rotate(facing);
         drawOrb(ctx, 0, 0, 15, actor.flash > 0 ? "#fff4d6" : "#357a89");
         drawOrb(ctx, 7, 0, 9, "#b9e8e9");
         ctx.fillStyle = "#153d4e"; ctx.fillRect(8, -7, 4, 14);
@@ -223,7 +242,7 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
     } else if (actor.kind === "artillerist") {
         drawOrb(ctx, 0, 0, 21, actor.flash > 0 ? "#fff4d6" : "#705887");
         ctx.fillStyle = "#292638"; ctx.fillRect(-18, 9, 36, 12);
-        ctx.rotate(Math.atan2(actor.attackY - actor.y, actor.attackX - actor.x));
+        ctx.rotate(facing);
         ctx.fillStyle = "#ad95c7"; ctx.fillRect(0, -8, 31, 16);
         drawOrb(ctx, 29, 0, actor.attackWindup > 0 ? 9 : 5, "#e1b7ff");
     } else if (["summoner", "cantor", "hexer"].includes(actor.kind)) {
@@ -231,7 +250,9 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
         const cloth = ctx.createLinearGradient(-20, -25, 20, 20);
         cloth.addColorStop(0, color); cloth.addColorStop(1, "#252437");
         ctx.fillStyle = actor.flash > 0 ? "#fff4d6" : cloth;
-        ctx.beginPath(); ctx.moveTo(0, -25); ctx.lineTo(20, 20); ctx.lineTo(0, 12); ctx.lineTo(-20, 20); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(0, -25); ctx.bezierCurveTo(13, -23, 12, 4, 20, 20);
+        ctx.quadraticCurveTo(10, 24, 0, 16); ctx.quadraticCurveTo(-10, 24, -20, 20);
+        ctx.bezierCurveTo(-12, 4, -13, -23, 0, -25); ctx.closePath(); ctx.fill();
         ctx.strokeStyle = color + "88"; ctx.lineWidth = 1; ctx.stroke();
         ctx.beginPath(); ctx.moveTo(-7, -5); ctx.lineTo(-12, 13); ctx.moveTo(7, -5); ctx.lineTo(12, 13); ctx.stroke();
         drawOrb(ctx, 0, -8, 8, "#292033");
@@ -249,17 +270,22 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
         ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(16, 0); ctx.moveTo(0, -17); ctx.lineTo(0, 17); ctx.stroke();
         circle(ctx, 0, -22, 4 + Math.sin(time * 15), "#ffb65d");
     } else if (["reaver", "lancer"].includes(actor.kind)) {
-        ctx.rotate(actor.winding > 0 || actor.charging > 0 ? Math.atan2(actor.chargeY, actor.chargeX) : Math.atan2(player.y - actor.y, player.x - actor.x));
-        ctx.fillStyle = actor.flash > 0 ? "#fff4d6" : actor.kind === "lancer" ? "#e9ac63" : "#83b9cb";
+        ctx.rotate(facing);
+        const plate = ctx.createLinearGradient(-18, -18, 22, 18);
+        plate.addColorStop(0, actor.kind === "lancer" ? "#ffe2ad" : "#c7f1ed");
+        plate.addColorStop(0.45, actor.kind === "lancer" ? "#e9ac63" : "#83b9cb");
+        plate.addColorStop(1, "#304958");
+        ctx.fillStyle = actor.flash > 0 ? "#fff4d6" : plate;
         if (actor.charging > 0 && !reducedMotion.matches) ctx.scale(1.3, 0.8);
-        ctx.beginPath(); ctx.moveTo(25, 0); ctx.lineTo(-18, -18); ctx.lineTo(-9, 0); ctx.lineTo(-18, 18); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(25, 0); ctx.quadraticCurveTo(3, -18, -18, -18);
+        ctx.quadraticCurveTo(-8, 0, -18, 18); ctx.quadraticCurveTo(3, 18, 25, 0); ctx.closePath(); ctx.fill();
         ctx.strokeStyle = "#142734"; ctx.lineWidth = 2; ctx.stroke();
         ctx.fillStyle = "#f2e9c566";
         ctx.beginPath(); ctx.moveTo(23, 0); ctx.lineTo(-16, -16); ctx.lineTo(-5, -2); ctx.closePath(); ctx.fill();
         ctx.strokeStyle = "#d3f5ff"; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(30, -14); ctx.lineTo(-2, -14); ctx.moveTo(30, 14); ctx.lineTo(-2, 14); ctx.stroke();
     } else if (actor.kind === "runner") {
-        ctx.rotate(Math.atan2(player.y - actor.y, player.x - actor.x));
+        ctx.rotate(facing);
         ctx.save(); ctx.scale(1, 0.5);
         drawOrb(ctx, 0, 0, 19, actor.flash > 0 ? "#fff0cc" : "#c29068");
         ctx.restore();
@@ -271,14 +297,21 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
         circle(ctx, 17, -4, 2, "#ff725a");
     } else if (actor.kind === "spitter") {
         drawOrb(ctx, 0, 0, 19, actor.flash > 0 ? "#fff0cc" : "#6b9764");
+        ctx.strokeStyle = "#2e533e"; ctx.lineWidth = 4;
+        for (const side of [-1, 1]) {
+            ctx.beginPath(); ctx.moveTo(side * 12, 4); ctx.quadraticCurveTo(side * 25, 8 + stride * side * 3, side * 23, 16); ctx.stroke();
+        }
         drawOrb(ctx, -8, -7, 7, "#a0b56b");
         drawOrb(ctx, 8, -7, 7, "#a0b56b");
+        circle(ctx, -8, -8, 2, "#e7f5b7"); circle(ctx, 8, -8, 2, "#e7f5b7");
         circle(ctx, 0, 6, 8, "#253e36");
         circle(ctx, 0, 7, 4 + Math.sin(time * 3), "#bde498");
     } else if (actor.kind === "wisp") {
         ctx.shadowBlur = 20;
         ctx.shadowColor = "#85c0c6";
-        ctx.fillStyle = actor.flash > 0 ? "#fff3d5" : "#568188";
+        const mist = ctx.createRadialGradient(-5, -10, 1, 0, 0, 28);
+        mist.addColorStop(0, "#c8f2e9"); mist.addColorStop(0.45, "#568188"); mist.addColorStop(1, "#24344866");
+        ctx.fillStyle = actor.flash > 0 ? "#fff3d5" : mist;
         ctx.beginPath();
         ctx.moveTo(0, -23 + Math.sin(time * 4) * 3);
         ctx.bezierCurveTo(20, -20, 22, 8, 7, 17);
@@ -302,10 +335,22 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
             ctx.bezierCurveTo(r * 1.2, r, r * 1.4, -r * 0.4, r * 0.65, -r);
             ctx.closePath(); ctx.fill(); ctx.stroke();
         }
-        ctx.fillStyle = boss ? "#403845" : "#43453e";
-        ctx.fillRect(-r * 0.6, 2 + stride * 5, r * 0.45, r);
-        ctx.fillRect(r * 0.2, 2 - stride * 5, r * 0.45, r);
-        drawOrb(ctx, 0, -3, r * 0.88, base);
+        ctx.strokeStyle = boss ? "#403845" : "#43453e"; ctx.lineWidth = r * 0.4;
+        for (const side of [-1, 1]) {
+            ctx.beginPath(); ctx.moveTo(side * r * 0.4, 2);
+            ctx.quadraticCurveTo(side * r * 0.5, r * 0.6, side * r * 0.5, r + stride * side * 5); ctx.stroke();
+        }
+        const armor = ctx.createLinearGradient(-r, -r, r, r);
+        armor.addColorStop(0, base); armor.addColorStop(0.35, base); armor.addColorStop(1, "#27333a");
+        ctx.fillStyle = armor; ctx.strokeStyle = "#15222b"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(-r * 0.65, -r * 0.65);
+        ctx.bezierCurveTo(-r * 1.1, -r * 0.15, -r * 0.75, r * 0.65, 0, r * 0.7);
+        ctx.bezierCurveTo(r * 0.75, r * 0.65, r * 1.1, -r * 0.15, r * 0.65, -r * 0.65);
+        ctx.quadraticCurveTo(0, -r * 0.95, -r * 0.65, -r * 0.65); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "#dfd7b555"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(-r * 0.5, -r * 0.35); ctx.quadraticCurveTo(0, -r * 0.05, r * 0.5, -r * 0.35); ctx.stroke();
+        ctx.fillStyle = "#332d29"; ctx.fillRect(-r * 0.65, r * 0.3, r * 1.3, r * 0.17);
+        drawOrb(ctx, 0, r * 0.38, r * 0.13, "#c7a66b");
         drawOrb(ctx, -r * 0.9, -3, r * 0.38, base);
         drawOrb(ctx, r * 0.9, -3, r * 0.38, base);
         drawOrb(ctx, 0, -r * 0.75, r * 0.55, boss ? "#b5aaa2" : "#aea58b");
@@ -362,7 +407,7 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
 }
 
 // The main per-frame draw call: blits the pre-rendered floor, draws atmosphere effects, the map's
-// environmental hazards (with a slow/warning/burning visual state driven by firePhase()), the four
+// randomized stage hazards (with staggered slow/warning/burning visual states), the four
 // corner brazier lights, then loops enemies to draw attack-telegraph shapes/labels before actors and
 // projectiles are drawn later in this function. Kept intentionally simple/flat (no z-sorting beyond
 // draw order) since the arena is a flat top-down view.
@@ -371,10 +416,12 @@ function render(ctx, floor, state) {
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     ctx.drawImage(floor, 0, 0, WIDTH, HEIGHT);
     drawAtmosphere(ctx, map, state.time, reducedMotion.matches, WIDTH, HEIGHT);
-    for (const hazard of map.hazards) {
-        const phase = firePhase(state.time);
-        const burning = map.hazard !== "slow" && phase >= 4 && state.enemies.length > 0;
-        const warning = map.hazard !== "slow" && phase >= 2 && !burning && state.enemies.length > 0;
+    const enemiesAlive = state.enemies.some(enemy => enemy.health > 0);
+    for (const hazard of arenaHazards(state)) {
+        const phase = hazardPhase(hazard, state.time);
+        if (phase < 0) continue;
+        const burning = map.hazard !== "slow" && phase >= 4 && enemiesAlive;
+        const warning = map.hazard !== "slow" && phase >= 2 && !burning && enemiesAlive;
         circle(ctx, hazard.x, hazard.y, hazard.radius, map.hazard === "slow" ? map.accent + "20" : burning ? map.accent + "77" : warning ? map.accent + "44" : "#4e333366");
         ctx.strokeStyle = map.accent;
         ctx.lineWidth = 2;
@@ -567,6 +614,8 @@ function render(ctx, floor, state) {
             ctx.strokeStyle = "#111921"; ctx.lineWidth = 3;
             ctx.strokeText(item.text, item.x, item.y - progress * 35);
             ctx.fillText(item.text, item.x, item.y - progress * 35);
+        } else if (item.kind === "class-skill") {
+            drawClassSkillEffect(ctx, item, progress, reducedMotion.matches);
         } else if (item.kind === "beam") {
             ctx.lineWidth = (item.width ?? 44) * (1 - progress) + 3;
             ctx.beginPath(); ctx.moveTo(item.x, item.y); ctx.lineTo(item.x + Math.cos(item.angle) * item.radius, item.y + Math.sin(item.angle) * item.radius); ctx.stroke();
@@ -779,6 +828,7 @@ export function createGame(root, saveBridge = null) {
     const setupLoadoutPanel = root.querySelector("[data-setup-loadout]");
     const skillChoice = root.querySelector("[data-skill-choice]");
     const setupSlots = [...root.querySelectorAll("[data-setup-slot]")];
+    const setupSkillButtons = [...root.querySelectorAll("[data-choose-starter-skill]")];
     const skillUnlockNotice = root.querySelector("[data-skill-unlock]");
     const skillFeedback = root.querySelector("[data-skill-feedback]");
     const patchNotice = root.querySelector("[data-patch-notice]");
@@ -1011,6 +1061,13 @@ export function createGame(root, saveBridge = null) {
             option.disabled = !STARTER_SKILLS.includes(key);
             option.textContent = `${skillName(preview, key)}${option.disabled ? " — Locked" : ""}`;
         }
+        for (const button of setupSkillButtons) {
+            const key = button.dataset.chooseStarterSkill;
+            button.querySelector("[data-starter-skill-name]").textContent = skillName(preview, key);
+            button.querySelector("img").setAttribute("src", skillIcon(preview, key));
+            button.setAttribute("aria-pressed", String(setupSlots[0].value === key));
+            button.disabled = saving;
+        }
         root.querySelector("[data-setup-unlock]").textContent = `Choose from ${STARTER_SKILLS.map(key => skillName(preview, key)).join(", ")}. Add skills from your class's nine-skill pool at levels 5 and 10, for three total. Choices are locked for this run.`;
         const loadout = readSetupLoadout();
         const valid = validLoadout(preview, loadout.manual, loadout.auto) && (setupAction === "continue" || STARTER_SKILLS.includes(loadout.auto[0]));
@@ -1023,6 +1080,11 @@ export function createGame(root, saveBridge = null) {
         if (select === setupSlots[0]) {
             for (const auto of setupSlots.slice(1)) if (auto.value === select.value) auto.value = "none";
         }
+        updateSetupLoadout();
+    });
+    for (const button of setupSkillButtons) on(button, "click", () => {
+        if (saving || !setupAction || setupAction === "continue") return;
+        setupSlots[0].value = button.dataset.chooseStarterSkill;
         updateSetupLoadout();
     });
     // Renders whichever step of the multi-step setup dialog is currently active: step 0 is the
@@ -1055,7 +1117,7 @@ export function createGame(root, saveBridge = null) {
         setupNext.textContent = mobile ? "Start adventure" : choosingLoadout ? setupAction === "campaign" ? "Confirm slots & begin" : "Confirm slots & enter Endless" : "Next";
         setupNext.disabled = saving;
         if (choosingLoadout || mobile) updateSetupLoadout();
-        (choosingDifficulty ? difficultySelect : choosingLoadout ? setupSlots[0] : setupNext).focus({ preventScroll: true });
+        (choosingDifficulty ? difficultySelect : choosingLoadout ? setupSkillButtons[0] : setupNext).focus({ preventScroll: true });
     }
     // Opens the setup dialog for a given `action` ("campaign", "endless", or "continue" — i.e.
     // transitioning a completed campaign run into Endless mode). Pauses an in-progress run first,
@@ -1160,6 +1222,10 @@ export function createGame(root, saveBridge = null) {
             const name = skillName(state, element.dataset.skillName) + (element.tagName === "OPTION" && !skillUnlocked(state, element.dataset.skillName) ? " — Locked" : "");
             if (element.textContent !== name) element.textContent = name;
         }
+        for (const image of root.querySelectorAll("img[data-skill-icon]")) {
+            const src = skillIcon(state, image.dataset.skillIcon);
+            if (image.getAttribute("src") !== src) image.setAttribute("src", src);
+        }
         const extra = EXTRA_SKILLS[state.heroClass];
         const descriptions = {
             attack: `${hero.attackCooldown}s base cooldown. Regular attack: always available on J / left click, no slot required. Upgrades remain active.`,
@@ -1184,6 +1250,12 @@ export function createGame(root, saveBridge = null) {
         if (healthWarning.textContent !== warning) healthWarning.textContent = warning;
         for (const button of skillButtons) {
             const skill = button.dataset.skill;
+            const icon = button.querySelector(".skill-icon"), src = skillIcon(state, skill);
+            button.dataset.skillIcon = src;
+            if (icon && icon.dataset.iconSource !== src) {
+                icon.style.backgroundImage = `url('${src}')`;
+                icon.dataset.iconSource = src;
+            }
             const manual = !SLOTTABLE_SKILLS.includes(skill) || state.loadout.manual === skill;
             const automatic = state.loadout.auto.includes(skill);
             const locked = !skillSelected(state, skill);
@@ -1327,6 +1399,8 @@ export function createGame(root, saveBridge = null) {
         for (const tree of root.querySelectorAll("[data-tree-skill]")) {
             tree.dataset.heroClass = state.heroClass;
             const skill = tree.dataset.treeSkill, nodes = state.skillTree[skill];
+            tree.dataset.skillIcon = skillIcon(state, skill);
+            tree.style.setProperty("--skill-art", `url('${tree.dataset.skillIcon}')`);
             tree.hidden = !skillSelected(state, skill);
             tree.classList.toggle("tree-locked", !skillUnlocked(state, skill));
             for (const link of tree.querySelectorAll("[data-tree-link]")) {
@@ -1404,7 +1478,9 @@ export function createGame(root, saveBridge = null) {
                     button.querySelector("[data-card-name]").textContent = card.name;
                     button.querySelector("[data-card-description]").textContent = key === "cleave"
                         ? `+6 ${hero.attackName} ${ranged ? "arrow range" : "reach"} per rank, up to +60.`
-                        : key === "nova" ? `+10 ${hero.specialName} ${ranged ? "arrow range" : "radius"} per rank, up to +100.` : card.description;
+                        : key === "nova" ? `+10 ${hero.specialName} ${ranged ? "arrow range" : "radius"} per rank, up to +100.`
+                        : key === "burst" ? `+6% ${skillName(state, "burst")} damage per rank, up to +60%.`
+                        : key === "guard" ? `+0.15 seconds of ${skillName(state, "guard")} protection per rank. Reduces incoming damage by 40% before tree upgrades.` : card.description;
                     button.querySelector("[data-card-rank]").textContent = `Rank ${state.boons[key]} to ${state.boons[key] + 1}${card.max < Number.MAX_SAFE_INTEGER ? ` / Max ${card.max}` : " / Stacking"}`;
                 });
                 if (!saving) { shownDraft = signature; cardButtons[0].focus({ preventScroll: true }); }

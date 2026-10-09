@@ -12,8 +12,14 @@ button { cursor: pointer; background: linear-gradient(135deg, #85582c, #593922);
 button:disabled { opacity: .5; cursor: not-allowed; }
 :focus-visible { outline: 2px solid #f4c989; outline-offset: 4px; }
 .notice { font-size: 12px; margin: 20px 0; }
-.class-board { margin-top: 28px; }
-.class-board h2 { color: #f3dfb9; font: 26px Georgia, serif; }
+.class-boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 16px; align-items: start; margin-top: 24px; }
+.class-board { --class-accent: #f3dfb9; min-width: 0; padding: 12px; border: 1px solid #c7a56b40; border-top: 3px solid var(--class-accent); border-radius: 10px; background: #101c23; }
+.class-board[data-hero-class="knight"] { --class-accent: #e9ac63; }
+.class-board[data-hero-class="ranger"] { --class-accent: #99d6ad; }
+.class-board[data-hero-class="warden"] { --class-accent: #a7bfdc; }
+.class-heading { display: grid; gap: 4px; margin-bottom: 12px; }
+.class-heading > span { color: #a8b1af; font-size: 11px; }
+.class-board h2 { color: var(--class-accent); font: 22px Georgia, serif; margin: 0; }
 .build-cell { min-width: 250px; max-width: 440px; vertical-align: top; }
 .build-details { font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
 .build-details summary { cursor: pointer; color: #edc581; }
@@ -42,21 +48,25 @@ footer { margin-top: 30px; display: flex; justify-content: space-between; flex-w
 
 .rankings.embedded { min-height: 0; padding: 0; background: none; font-size: 13px; }
 .rankings.embedded > header, .rankings.embedded > .heading, .rankings.embedded > .notice, .rankings.embedded > footer { display: none; }
-.rankings.embedded .filters { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 8px; padding: 10px; background: #15252a; }
+.rankings.embedded .filters { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr)); gap: 8px; padding: 10px; background: #15252a; }
 .rankings.embedded .filters > * { width: auto; min-width: 0; }
 .rankings.embedded label { gap: 4px; font-size: 10px; }
 .rankings.embedded select, .rankings.embedded button { min-height: 44px; width: 100%; padding: 8px; font-size: 12px; }
-.rankings.embedded .class-board { margin-top: 12px; }
-.rankings.embedded .class-board h2 { margin: 8px 0; font-size: 18px; }
-.ranking-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rankings.embedded .class-boards { grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 10px; margin-top: 12px; }
+.rankings.embedded .class-board h2 { font-size: 18px; }
+.ranking-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .ranking-card { min-width: 0; padding: 12px; border: 1px solid #c7a56b44; border-radius: 12px; background: linear-gradient(145deg, #213530, #111f25); }
-.record-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.record-heading > strong { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.record-heading { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; margin-bottom: 8px; }
+.record-heading > strong { min-width: 0; overflow-wrap: anywhere; }
+.record-score { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.record-score > small { order: -1; margin: 0; color: #a8b1af; font-size: 9px; letter-spacing: 1px; }
+.record-score .score { min-width: 0; overflow-wrap: anywhere; }
+.record-date { margin: 0 0 8px; color: #a8b1af; font-size: 10px; }
 .rankings.embedded .rank, .rankings.embedded .score { font-size: 18px; }
 .rankings.embedded .build-details summary { min-height: 44px; display: flex; align-items: center; }
 .rankings.embedded .error, .ranking-status { padding: 16px; border-radius: 12px; background: #17272c; line-height: 1.5; }
 @media (max-width: 650px) {
     .rankings.embedded .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .rankings.embedded .filters button { grid-column: 1 / -1; }
-    .ranking-cards { grid-template-columns: minmax(0, 1fr); }
+    .class-boards, .rankings.embedded .class-boards { grid-template-columns: minmax(0, 1fr); }
 }

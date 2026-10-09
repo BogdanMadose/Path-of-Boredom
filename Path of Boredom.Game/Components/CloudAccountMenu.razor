@@ -16,10 +16,11 @@
             {
                 <p>Signed in as <strong>@cloud.AccountStatus.Player</strong></p>
                 <label class="mm-display-name">Player display name
-                    <input @bind="displayName" maxlength="24" autocomplete="nickname" />
+                    <input @bind="displayName" @bind:event="oninput" maxlength="24" autocomplete="nickname" aria-describedby="nickname-result" />
                 </label>
                 <small>@PlayerDisplayNameRules.Guidance Your Google name is not required.</small>
-                <button type="button" class="mm-pause-option" @onclick="Rename">Save player name</button>
+                <button type="button" class="mm-pause-option" @onclick="Rename">@(busy ? "Please wait…" : "Save player name")</button>
+                <p id="nickname-result" class="mm-name-result" role="status" aria-live="polite">@renameResult</p>
                 <button type="button" class="mm-pause-option" @onclick="SignOut">Sign out · keep device save</button>
             }
             else
@@ -69,6 +70,7 @@
     private bool busy;
     private string? lastResult;
     private string displayName = string.Empty;
+    private string? renameResult;
     private string? confirmation;
     private TaskCompletionSource<bool>? confirmationResult;
     private ICloudGameSession Cloud => (ICloudGameSession)Session;
@@ -95,26 +97,39 @@
         busy = true;
         lastResult = null;
         try { await action(); }
-        catch { lastResult = "This operation could not be completed. Device progress is safe; retry when connected."; }
+        catch
+        {
+            lastResult = "This operation could not be completed. Device progress is safe; retry when connected.";
+            if (renameResult == "Saving player name…") renameResult = lastResult;
+        }
         finally { busy = false; }
         await Changed.InvokeAsync();
     }
 
     private Task SignIn() => Run(async () =>
     {
+        renameResult = null;
         status = await Cloud.SignInAsync();
         displayName = status.Player;
     });
     private Task SignOut() => Run(async () =>
     {
+        renameResult = null;
         status = await Cloud.SignOutAsync();
         displayName = string.Empty;
     });
     private Task Refresh() => Run(async () => status = await Cloud.RefreshCloudAsync());
     private Task Rename() => Run(async () =>
     {
+        if (!PlayerDisplayNameRules.TryNormalize(displayName, out var normalized))
+        {
+            renameResult = PlayerDisplayNameRules.Guidance;
+            return;
+        }
+        renameResult = "Saving player name…";
         status = await Cloud.ChangeDisplayNameAsync(displayName);
-        displayName = status.Player;
+        renameResult = status.Message;
+        if (status.SignedIn && status.Player == normalized) displayName = status.Player;
     });
     private Task Upload() => Run(async () =>
     {
@@ -135,6 +150,7 @@
         if (status.Deleted)
         {
             displayName = string.Empty;
+            renameResult = null;
             await Deleted.InvokeAsync();
         }
     });

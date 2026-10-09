@@ -77,12 +77,14 @@
     }
     else
     {
-        @foreach (var board in rows.GroupBy(row => row.HeroClass))
-        {
-            <section class="class-board" @key="board.Key" aria-label="@RankingRules.ClassName(board.Key)">
-                <h2>@RankingRules.ClassName(board.Key)</h2>
-                @if (Embedded)
-                {
+        <div class="class-boards">
+            @foreach (var board in rows.GroupBy(row => row.HeroClass))
+            {
+                <section class="class-board" data-hero-class="@board.Key" @key="board.Key" aria-label="@RankingRules.ClassName(board.Key)">
+                    <div class="class-heading">
+                        <h2>@RankingRules.ClassName(board.Key)</h2>
+                        <span>@board.Count() players</span>
+                    </div>
                     <div class="ranking-cards">
                         @foreach (var row in board)
                         {
@@ -90,13 +92,18 @@
                                 <div class="record-heading">
                                     <span class="rank">#@row.Rank</span>
                                     <strong>@row.Player @if (row.IsCurrentUser) { <small>YOU</small> }</strong>
-                                    <span class="score">@row.Score.ToString("N0")</span>
+                                    <span class="record-score"><span class="score">@row.Score.ToString("N0")</span><small>BEST KILLS</small></span>
                                 </div>
+                                <p class="record-date">@(row.AchievedAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "No run yet")</p>
                                 @if (row.Build is { } build)
                                 {
                                     <details class="build-details">
                                         <summary>Level @build.Level · Build details</summary>
-                                        <p><strong>Manual:</strong> @build.ManualSkill<br /><strong>Auto:</strong> @(build.AutoSkills.Count == 0 ? "None" : string.Join(", ", build.AutoSkills))</p>
+                                        <p><strong>Automatic skills:</strong> @(build.AutoSkills.Count == 0 ? "None" : string.Join(", ", build.AutoSkills))</p>
+                                        @if (build.Upgrades.Count == 0)
+                                        {
+                                            <p>No upgrades taken yet.</p>
+                                        }
                                         @foreach (var group in build.Upgrades.GroupBy(upgrade => upgrade.Category))
                                         {
                                             <h3>@RankingRules.UpgradeCategory(group.Key)</h3>
@@ -111,61 +118,14 @@
                                 }
                                 else
                                 {
-                                    <span class="build-unavailable">Build not recorded</span>
+                                    <span class="build-unavailable">@(row.AchievedAt is null ? "No run yet" : "Build not recorded")</span>
                                 }
                             </article>
                         }
                     </div>
-                }
-                else
-                {
-                <div class="table-scroll" role="region" aria-label="@(RankingRules.ClassName(board.Key) + " rankings")" tabindex="0">
-                    <table>
-                        <caption>@RankingRules.PatchName(patch) · @RankingRules.DifficultyName(difficulty) · @(mode == "campaign" ? "CAMPAIGN JOURNEY" : mode == "ascended" ? "ENDLESS AFTER CAMPAIGN" : "VETERAN ENDLESS") · @board.Count() players</caption>
-                        <thead><tr><th scope="col">Rank</th><th scope="col">Ashbound</th><th scope="col">Best score</th><th scope="col">Upgrades at record</th><th scope="col">Record set (UTC)</th></tr></thead>
-                        <tbody>
-                            @foreach (var row in board)
-                            {
-                                <tr class="@(row.IsCurrentUser ? "current" : null)">
-                                    <td><span class="rank">#@row.Rank</span></td>
-                                    <th scope="row">@row.Player @if (row.IsCurrentUser) { <small>YOU</small> }</th>
-                                    <td class="score">@row.Score.ToString("N0")</td>
-                                    <td class="build-cell">
-                                        @if (row.Build is { } build)
-                                        {
-                                            <details class="build-details">
-                                                <summary>Level @build.Level · View upgrades (@build.Upgrades.Count)</summary>
-                                                <p><strong>Manual (Q):</strong> @build.ManualSkill<br /><strong>Auto:</strong> @(build.AutoSkills.Count == 0 ? "None" : string.Join(", ", build.AutoSkills))</p>
-                                                @if (build.Upgrades.Count == 0)
-                                                {
-                                                    <p>No upgrades taken yet.</p>
-                                                }
-                                                @foreach (var group in build.Upgrades.GroupBy(upgrade => upgrade.Category))
-                                                {
-                                                    <h3>@RankingRules.UpgradeCategory(group.Key)</h3>
-                                                    <ul>
-                                                        @foreach (var upgrade in group)
-                                                        {
-                                                            <li>@upgrade.Name <strong>rank @upgrade.Rank.ToString("N0")</strong></li>
-                                                        }
-                                                    </ul>
-                                                }
-                                            </details>
-                                        }
-                                        else
-                                        {
-                                            <span class="build-unavailable">@(row.AchievedAt is null ? "No run yet" : "Not recorded for this older score")</span>
-                                        }
-                                    </td>
-                                    <td>@(row.AchievedAt?.UtcDateTime.ToString("yyyy-MM-dd HH:mm") ?? "Not played yet")</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-                }
-            </section>
-        }
+                </section>
+            }
+        </div>
     }
     <footer>Developed by MadBone | LIT MES TSR <span>Community rankings · browser-reported scores, not cheat-proof</span></footer>
 </main>

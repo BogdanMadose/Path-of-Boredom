@@ -6,7 +6,7 @@
 // Boons are separate from skill tree points and forge upgrades: they're the passive, permanent-for-the-run
 // bonuses earned purely by leveling up. This mirrors the "boons"/"cardChoices"/"pendingChoices"
 // fields that GameSaveEndpoints.cs's ValidCardProgress validates on the server.
-import { skillUnlocked } from "./arpg-skills.js";
+import { skillUnlocked, skillSelected } from "./arpg-skills.js";
 
 // Every possible boon card. `max` is the rank cap (Number.MAX_SAFE_INTEGER effectively means
 // uncapped/always offerable — matches the "edge"/"vitality"/"fortune" special-cased caps in
@@ -28,12 +28,24 @@ export const LEVEL_CARDS = {
     guard: { name: "A shelter in embers", category: "WARD SKILL", max: 10, description: "+0.15 seconds of class ward protection per rank. Wards reduce incoming damage by 40% while active." }
 };
 
+const CARD_SKILLS = { nova: "nova", burst: "burst", guard: "guard" };
+export const levelCardAvailable = (state, key) => Object.hasOwn(LEVEL_CARDS, key)
+    && skillUnlocked(state, CARD_SKILLS[key] ?? key)
+    && (!CARD_SKILLS[key] || skillSelected(state, CARD_SKILLS[key]))
+    && state.boons[key] < LEVEL_CARDS[key].max;
+
+export function normalizeCardChoices(state) {
+    const kept = new Set(state.cardChoices.filter(key => levelCardAvailable(state, key)));
+    const replacements = Object.keys(LEVEL_CARDS).filter(key => levelCardAvailable(state, key) && !kept.has(key));
+    state.cardChoices = state.cardChoices.map(key => levelCardAvailable(state, key) ? key : replacements.shift());
+}
+
 // Picks 3 distinct random boon keys to offer on level-up, drawn only from boons that are both
-// unlocked for the player's class/skill state (skillUnlocked) and not already at their rank cap.
+// available for the selected loadout and not already at their rank cap.
 // Uses state.random() (the run's seeded PRNG, defined in arpg-engine.js) rather than Math.random()
 // so card offers are reproducible from a given seed/state rather than truly random each call.
 export function drawLevelCards(state) {
-    const available = Object.keys(LEVEL_CARDS).filter(key => skillUnlocked(state, key) && state.boons[key] < LEVEL_CARDS[key].max);
+    const available = Object.keys(LEVEL_CARDS).filter(key => levelCardAvailable(state, key));
     const choices = [];
 
     for (let i = 0; i < 3; i++) {

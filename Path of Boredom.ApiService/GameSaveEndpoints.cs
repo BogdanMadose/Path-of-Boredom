@@ -17,7 +17,7 @@ public static class GameSaveEndpoints
     /// version-gated branch below) any time the client-side save shape changes in a way that needs
     /// server-side validation — see the Web project's JS runtime README for the full checklist.
     /// </summary>
-    public const int CurrentSaveVersion = 15;
+    public const int CurrentSaveVersion = 16;
 
     /// <summary>Registers the GET (load) and PUT (save) endpoints under /game/save.</summary>
     public static void MapGameSaves(this WebApplication app)
@@ -342,8 +342,8 @@ public static class GameSaveEndpoints
                 && (version < 13 || ValidEliteModifier(item, wave))
                 && (version < 14 || ValidEnemyCombat(item, volleySequence))
                 && (version < 12 || Numbers(item, "chilled", "chillStrength")
-                    && item.GetProperty("chilled").GetDouble() is >= 0 and <= 1.5
-                    && item.GetProperty("chillStrength").GetDouble() is >= 0 and <= 0.3
+                     && item.GetProperty("chilled").GetDouble() >= 0 && item.GetProperty("chilled").GetDouble() <= (version >= 16 ? 3 : 1.5)
+                     && item.GetProperty("chillStrength").GetDouble() >= 0 && item.GetProperty("chillStrength").GetDouble() <= (version >= 16 ? 0.55 : 0.3)
                     && (item.GetProperty("chilled").GetDouble() > 0 || item.GetProperty("chillStrength").GetDouble() == 0))
                 && (version < 9 || Numbers(item, "attackWindup", "attackX", "attackY")
                     && item.GetProperty("attackWindup").GetDouble() is >= 0 and <= 1.1
@@ -449,7 +449,7 @@ public static class GameSaveEndpoints
         }
         if (version >= 15)
         {
-            var capacity = 1 + (level >= 5 ? 1 : 0) + (level >= 10 ? 1 : 0) + (level >= 15 ? 1 : 0);
+            var capacity = 1 + (level >= 5 ? 1 : 0) + (level >= 10 ? 1 : 0) + (version < 16 && level >= 15 ? 1 : 0);
             if (auto[0].GetString() == "none" || auto.EnumerateArray().Skip(capacity).Any(item => item.GetString() != "none")) return false;
         }
         if (version >= 11)
@@ -500,7 +500,9 @@ public static class GameSaveEndpoints
             // These derived stats can only be non-zero if the tree node that grants them has
             // actually been spent into — otherwise a save could claim a buff the tree doesn't support.
             || player.GetProperty("afterstep").GetDouble() > 0 && tree.GetProperty("dodge").GetProperty("afterstep").GetInt32() == 0
+                && !(version >= 16 && state.GetProperty("heroClass").GetString() == "ranger" && slotted.Contains("nullwave"))
             || player.GetProperty("flaskWard").GetDouble() > 0 && tree.GetProperty("potion").GetProperty("tonic").GetInt32() == 0
+                && !(version >= 16 && state.GetProperty("heroClass").GetString() == "warden" && slotted.Contains("siphon"))
             || player.GetProperty("renewal").GetDouble() > 0 && tree.GetProperty("potion").GetProperty("renewal").GetInt32() == 0)) return false;
         // Total skill points spent across every tree can't exceed what the level should have earned
         // — one point per two levels (capped at 32) from v12 onward, or the older one-per-five (capped

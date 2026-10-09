@@ -24,7 +24,7 @@ import { movementSpeed, criticalChance, criticalDamage, skillReach } from "./arp
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
 import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
 import { treePointsSpent, treeRespecCost, canRespecTree, respecTree } from "./arpg-skills.js";
-import { SKILL_KEYS, SLOTTABLE_SKILLS, EXTRA_SKILLS, NEW_SKILLS, MAX_SKILL_POINTS, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, skillSelected, skillCapacity, selectedSkills, needsSkillChoice, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
+import { SKILL_KEYS, SLOTTABLE_SKILLS, STARTER_SKILLS, EXTRA_SKILLS, NEW_SKILLS, combatSkillDefinition, MAX_SKILL_POINTS, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, skillSelected, skillCapacity, selectedSkills, needsSkillChoice, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
 import { drawHero, drawOrb, decorateFloor, drawAtmosphere, drawLootIcon } from "./arpg-graphics.js";
 import { drawHud } from "./arpg-hud.js";
 
@@ -892,7 +892,7 @@ export function createGame(root, saveBridge = null) {
     // during the same run don't keep resending an unchanged or lower score. On failure, leaves the
     // pending entry queued so the next reportScore() call (e.g. on the next checkpoint/kill) retries automatically.
     async function reportScore() {
-        if (!saveBridge || disposed) return;
+        if (!saveBridge || disposed || releaseRankings && root.dataset.cloudSignedIn !== "on") return;
         if (state.status !== "ready" && state.rankingMode !== "legacy" && Object.hasOwn(DIFFICULTIES, state.difficulty)) {
             const key = `${state.rankingPatch}:${state.difficulty}:${state.rankingMode}:${state.heroClass}`;
             const score = state.kills - state.scoreBaseline;
@@ -919,7 +919,7 @@ export function createGame(root, saveBridge = null) {
                 ? "Initial release ranking synced. Scores are separate by class, difficulty and starting mode."
                 : `Class best synced with its upgrades. Board: ${state.rankingPatch === "004" ? "Patch 004" : "archive / inherited run"}. Rankings also separate class, difficulty, and starting mode.`;
         } catch {
-            if (!disposed) rankingStatus.textContent = "Score sync failed. Keep this page open; it will retry automatically.";
+            if (!disposed && generation === accountGeneration) rankingStatus.textContent = "Score sync failed. Keep this page open; it will retry automatically.";
         } finally { reporting = false; }
     }
     try {
@@ -981,7 +981,10 @@ export function createGame(root, saveBridge = null) {
         classPreview.querySelector("[data-class-stats]").textContent = `${hero.health} health · ${hero.damage} damage · ${hero.speed} speed · ${hero.armor}% innate armor`;
         classPreview.querySelector("[data-class-skills]").textContent = `${hero.attackName}: ${hero.attackCooldown}s, ${hero.attackReach} range · ${hero.specialName}: ${hero.specialCooldown}s · Dodge: ${hero.dodgeCooldown}s`;
     }
-    on(classSelect, "change", updateClassPreview);
+    on(classSelect, "change", () => {
+        updateClassPreview();
+        updateSetupLoadout();
+    });
     function updateDifficultyDescription() {
         root.querySelector("[data-difficulty-description]").textContent = DIFFICULTIES[difficultySelect.value].description;
     }
@@ -1005,15 +1008,15 @@ export function createGame(root, saveBridge = null) {
         const preview = setupPreview();
         for (const option of root.querySelectorAll("[data-setup-skill]")) {
             const key = option.dataset.setupSkill;
-            option.disabled = !skillUnlocked(preview, key);
+            option.disabled = !STARTER_SKILLS.includes(key);
             option.textContent = `${skillName(preview, key)}${option.disabled ? " — Locked" : ""}`;
         }
-        root.querySelector("[data-setup-unlock]").textContent = "Auto attack + one skill. Add another at levels 5, 10 and 15. Choices are locked for this run.";
+        root.querySelector("[data-setup-unlock]").textContent = `Choose from ${STARTER_SKILLS.map(key => skillName(preview, key)).join(", ")}. Add skills from your class's nine-skill pool at levels 5 and 10, for three total. Choices are locked for this run.`;
         const loadout = readSetupLoadout();
-        const valid = validLoadout(preview, loadout.manual, loadout.auto);
+        const valid = validLoadout(preview, loadout.manual, loadout.auto) && (setupAction === "continue" || STARTER_SKILLS.includes(loadout.auto[0]));
         setupNext.disabled = saving || !valid;
         root.querySelector("[data-setup-loadout-feedback]").textContent = valid
-            ? `${skillName(preview, setupSlots[0].value)}: ${NEW_SKILLS[setupSlots[0].value]?.detail ?? "Your class combat skill casts automatically at nearby enemies."}`
+            ? `${skillName(preview, setupSlots[0].value)}: ${combatSkillDefinition(preview, setupSlots[0].value)?.detail ?? "Your class combat skill casts automatically at nearby enemies."}`
             : "Choose one starting skill.";
     }
     for (const select of setupSlots) on(select, "change", () => {
@@ -1040,10 +1043,10 @@ export function createGame(root, saveBridge = null) {
         root.querySelector("[data-setup-description]").textContent = choosingDifficulty
             ? setupAction === "continue" ? "Keep your character and choose your Endless difficulty. Endless kills start a new score on the campaign-equipped board. Your campaign record is kept."
                 : "Choose once for this new run. Stage transitions never change your difficulty. Starting replaces the current character; Cancel keeps it. Higher tiers strengthen enemies and reduce healing."
-            : choosingLoadout ? "Choose which combat skill you want on Q and which should cast automatically. Your regular attack, dodge, and flask never need slots. You can change slots later while paused." : tutorial[setupStep - 1].text;
+            : choosingLoadout ? "Choose your first automatic combat skill. Add your second at level 5 and your third at level 10. Each choice is locked for this run; dodge and flask remain manual." : tutorial[setupStep - 1].text;
         if (setupStep === 1) {
             const hero = HERO_CLASSES[classSelect.value];
-            root.querySelector("[data-setup-description]").textContent = `Move with WASD or arrows. J or left click always uses ${hero.attackName}; Q uses your manual skill (initially ${hero.specialName}). Space dodges; E drinks a flask. Only special, burst, and ward skills use slots. Open Skills & loadout to configure them or upgrade your attack and abilities. ${hero.description}`;
+            root.querySelector("[data-setup-description]").textContent = `Move with WASD or arrows. ${hero.attackName} and your three chosen combat skills target automatically. Space dodges; E drinks a flask. Choose one of three class-specific starters, then add a skill at levels 5 and 10. Open Skills & loadout to upgrade your abilities. ${hero.description}`;
         }
         root.querySelector("[data-setup-difficulty]").hidden = !choosingDifficulty;
         difficultySelect.disabled = !choosingDifficulty;
@@ -1066,7 +1069,7 @@ export function createGame(root, saveBridge = null) {
         setupStep = 0;
         difficultySelect.value = Object.hasOwn(DIFFICULTIES, state.difficulty) ? state.difficulty : "hard";
         classSelect.value = state.heroClass;
-        setupSlots[0].value = action === "continue" ? state.loadout.auto[0] : "nova";
+        setupSlots[0].value = action === "continue" ? state.loadout.auto[0] : "none";
         setup.hidden = false;
         updateHud();
         showSetupStep();
@@ -1080,6 +1083,7 @@ export function createGame(root, saveBridge = null) {
         if (!setupAction || saving || setupStep !== tutorial.length + 1) return;
         const loadout = readSetupLoadout();
         if (!validLoadout(setupPreview(), loadout.manual, loadout.auto)) return;
+        if (setupAction !== "continue" && !STARTER_SKILLS.includes(loadout.auto[0])) return;
         void reportScore();
         if (setupAction === "continue") {
             if (!enterEndless(state, difficultySelect.value)) return;
@@ -1159,12 +1163,15 @@ export function createGame(root, saveBridge = null) {
         const extra = EXTRA_SKILLS[state.heroClass];
         const descriptions = {
             attack: `${hero.attackCooldown}s base cooldown. Regular attack: always available on J / left click, no slot required. Upgrades remain active.`,
-            nova: `${hero.specialCooldown}s base cooldown. ${ranged ? "Five-arrow fan. Bodkin volley adds a second target per arrow at 70% damage." : state.heroClass === "knight" ? "A fire pulse; Backdraft pushes survivors away." : "A seismic pulse; train its inner core and slow to set up Fault line."}`,
+            nova: `${hero.specialCooldown}s base cooldown. ${ranged ? "Five-arrow fan. Bodkin volley adds a second target per arrow at 70% damage." : state.heroClass === "knight" ? "A fire pulse; Backdraft pushes survivors away." : "A seismic pulse dealing 25% extra damage inside half its radius and slowing walking by 15% for 1.5s. Train its core and slow to set up Fault line."}`,
             burst: `${extra.burst.cooldown}s base cooldown. ${extra.burst.shape === "beam" ? "A narrow lance strikes every enemy along its line." : extra.burst.shape === "arrows" ? "Seven arrows, each penetrating a second target at 70% damage. Deep penetration adds a third." : "A heavy cone; Crushing force rewards hitting slowed enemies."}`,
-            guard: `${extra.guard.cooldown}s base cooldown. Grants 40% damage reduction for at least 3s. Cannot refresh while active; at least 2s without protection after expiry.`,
+            guard: `${extra.guard.cooldown}s base cooldown. ${state.heroClass === "knight" ? "An opening fire pulse burns nearby enemies." : ranged ? "Opening vines slow nearby enemies' walking by 25% for 1.5s." : "An opening shockwave pushes ordinary enemies back 60 units."} Grants 40% damage reduction for at least 3s. Cannot refresh while active; at least 2s without protection after expiry.`,
             dodge: "Directional evasion on Space. Always available without a slot; manual-only.",
             potion: "Press E to consume one flask and heal. Always available without a slot; manual-only.",
-            ...Object.fromEntries(Object.entries(NEW_SKILLS).map(([key, skill]) => [key, `${skill.cooldown}s cooldown. ${skill.detail}`]))
+            ...Object.fromEntries(Object.keys(NEW_SKILLS).map(key => {
+                const skill = combatSkillDefinition(state, key);
+                return [key, `${skill.cooldown}s cooldown · ${Math.round(skill.damage * 100)}% weapon damage before conditional bonuses. ${skill.detail}`];
+            }))
         };
         for (const element of root.querySelectorAll("[data-skill-description]")) {
             const value = descriptions[element.dataset.skillDescription];
@@ -1275,7 +1282,7 @@ export function createGame(root, saveBridge = null) {
         retrySave.textContent = saving ? "Retrying checkpoint save…" : "Retry checkpoint save";
         const wardUnlocked = skillUnlocked(state, "guard");
         const remindWard = false;
-        text("ward-unlock-status", `${selectedSkills(state).map(key => skillName(state, key)).join(" · ")}. Next skill at ${[5, 10, 15].find(level => level > p.level) ?? "maximum loadout"}.`);
+        text("ward-unlock-status", `${selectedSkills(state).map(key => skillName(state, key)).join(" · ")}. ${p.level < 10 ? `Next skill at level ${p.level < 5 ? 5 : 10}.` : "All three skill slots unlocked."}`);
         text("skill-unlock-hint", `${skillName(state, "guard")} unlocked! Slot your new skill.`);
         skillUnlockNotice.hidden = !remindWard || state.status !== "playing" || state.resumeDelay > 0 || draftClosing || !!setupAction;
         for (const button of root.querySelectorAll("[data-resume-combat]")) {
@@ -1551,7 +1558,7 @@ export function createGame(root, saveBridge = null) {
     });
     for (const select of loadoutSelects) on(select, "change", () => {
         const manual = "none";
-        const auto = loadoutSelects.map(element => element.value);
+        const auto = [...loadoutSelects.map(element => element.value), "none"];
         if (saving || setupAction || !setLoadout(state, manual, auto)) {
             skillFeedback.textContent = "Chosen slots stay locked for this run. Choose a different skill for an unlocked empty slot.";
         } else {
@@ -1901,15 +1908,18 @@ export function createGame(root, saveBridge = null) {
     void readUnlock();
     return {
         dispose,
-        accountChanged() {
+        accountChanged(signedIn = true) {
             accountGeneration++;
+            if (releaseRankings) root.dataset.cloudSignedIn = signedIn ? "on" : "off";
             // Never replay a previous account's queued score submissions after switching users.
             pendingScores.clear();
             reportedScores.clear();
-            rankingStatus.textContent = "Account updated. Rankings use your current verified sign-in.";
+            rankingStatus.textContent = signedIn ? "Account updated. Rankings use your current verified sign-in."
+                : "Signed out. Online ranking requests are paused until you sign in.";
         },
         resetAfterDeletion() {
             accountGeneration++;
+            root.dataset.cloudSignedIn = "off";
             pendingScores.clear();
             reportedScores.clear();
             state = createState();

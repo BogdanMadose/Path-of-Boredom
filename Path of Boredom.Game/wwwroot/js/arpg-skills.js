@@ -15,23 +15,44 @@
 // per-node rank caps, so a new node also needs a save version bump and a matching server-side update.
 import { classFor } from "./arpg-classes.js";
 
-export const NEW_SKILLS = {
-    chain: { name: "Chain lightning", cooldown: 7, reach: 420, damage: 1.4, color: "#e3d68c", detail: "Strikes the nearest enemy within 420, then jumps to two more within 180 of the previous target. Each jump retains 75% damage. Base hit: 140% weapon damage." },
-    frost: { name: "Frost ring", cooldown: 9, reach: 230, damage: 1.1, color: "#9be5ff", detail: "Hits all enemies within 230 for 110% weapon damage and slows walking by 30% for 1.5s. Boss slow resistance applies; charges are unaffected." },
-    reap: { name: "Reaping arc", cooldown: 5, reach: 190, damage: 1.9, color: "#df9ee9", detail: "Sweeps a 160-degree arc within 190 for 190% weapon damage. Deals 50% more damage to targets below 35% health." },
-    meteor: { name: "Meteor", cooldown: 12, reach: 600, damage: 2.4, color: "#ffad68", detail: "Targets the nearest enemy within 600. Explodes immediately in a 100-radius blast for 240% weapon damage. Useful against packed ranged enemies." },
-    siphon: { name: "Siphon", cooldown: 10, reach: 300, damage: 1.3, color: "#e28296", detail: "Drains up to three enemies within 300 for 130% weapon damage each. Restores 2% maximum health per hit, modified by difficulty; does not consume a flask." },
-    nullwave: { name: "Null wave", cooldown: 14, reach: 220, damage: 0.9, color: "#b6aadf", detail: "Hits all enemies within 220 for 90% weapon damage, pushes ordinary enemies back 45, and destroys enemy projectiles in the same radius. Boss attacks are not interrupted." }
+// Stable keys identify saved slots; each class supplies its own ability and keystone.
+export const CLASS_SKILLS = {
+    knight: {
+        chain: { name: "Cinder relay", cooldown: 7, reach: 420, damage: 1.4, color: "#ffc477", detail: "Fire jumps through three nearby enemies, losing 25% damage per jump. Jumps travel up to 180 units.", keystone: "Cinder relay jumps to two additional enemies." },
+        frost: { name: "Blazing cross", cooldown: 9, reach: 260, damage: 1.6, color: "#ff9850", detail: "Four narrow fire lanes extend from you in a cross. Enemies between the lanes are not hit.", keystone: "Blazing cross lanes become 50% wider." },
+        reap: { name: "Execution arc", cooldown: 5, reach: 190, damage: 1.9, color: "#ef8065", detail: "Sweeps a 160-degree melee arc. Deals 50% extra damage below 35% enemy health; Sentinel resistance applies.", keystone: "Execution arc bypasses Sentinel resistance." },
+        meteor: { name: "Sun spear", cooldown: 12, reach: 600, damage: 2.4, color: "#ffdb82", detail: "A narrow fire beam aims at the farthest enemy in range and pierces every enemy along its line.", keystone: "Sun spear beam becomes twice as wide." },
+        siphon: { name: "Bloodbrand", cooldown: 10, reach: 210, damage: 1.5, color: "#ed7680", detail: "Brands the nearest enemy. Damage rises by up to 100% as your health falls; restores 3% maximum health on hit, modified by difficulty.", keystone: "Bloodbrand restores 5% maximum health instead of 3%." },
+        nullwave: { name: "Flamebreaker", cooldown: 14, reach: 240, damage: 1.2, color: "#ffb060", detail: "A forward 120-degree fire cone burns enemies and destroys enemy projectiles inside the cone. Does not clear attacks behind you.", keystone: "Flamebreaker widens to a 180-degree cone." }
+    },
+    ranger: {
+        chain: { name: "Rebound shot", cooldown: 6, reach: 650, damage: 1.2, color: "#bbdf90", detail: "An instant shot hits the nearest enemy, then rebounds to the farthest other enemy within 220 units of it for 110% damage.", keystone: "Rebound shot makes one additional rebound." },
+        frost: { name: "Snaring shot", cooldown: 9, reach: 620, damage: 0.9, color: "#8fdcbe", detail: "A shot bursts into vines around the nearest enemy in a 90-unit radius, slowing walking by 55% for 2s. Boss resistance applies; charges are unaffected.", keystone: "Snaring shot slow lasts 3s instead of 2s." },
+        reap: { name: "Deadeye", cooldown: 7, reach: 800, damage: 1.6, color: "#e7dc9d", detail: "An instant precision shot hits only the farthest enemy. Deals up to 100% extra damage at the edge of its targeting range.", keystone: "Deadeye deals 25% extra damage to elites and bosses." },
+        meteor: { name: "Scattershot", cooldown: 10, reach: 480, damage: 1.3, color: "#c4e795", detail: "Five instant arrow lanes spread across a 70-degree fan. Each lane stops at its first enemy; no enemy can be hit twice.", keystone: "Scattershot fires seven lanes instead of five." },
+        siphon: { name: "Field harvest", cooldown: 11, reach: 500, damage: 1.1, color: "#89e6a6", detail: "Hits up to three enemies below half health. Each hit restores 8% of your missing health, modified by difficulty. Cannot cast without a wounded target.", keystone: "Field harvest can hit four wounded enemies." },
+        nullwave: { name: "Gale escape", cooldown: 13, reach: 180, damage: 0.65, color: "#b2ebe1", detail: "A close-range wind blast pushes ordinary enemies back 90 units and grants 20% walking speed for 1.2s. Bosses are not displaced.", keystone: "Gale escape pushes enemies back 135 units." }
+    },
+    warden: {
+        chain: { name: "Gravity well", cooldown: 9, reach: 360, damage: 1.1, color: "#afa3e1", detail: "Crushes a 130-unit area around the nearest enemy and pulls ordinary survivors 65 units toward its centre. Bosses are not displaced.", keystone: "Gravity well radius grows from 130 to 180." },
+        frost: { name: "Glacial rampart", cooldown: 11, reach: 260, damage: 1.2, color: "#95d6ef", detail: "A forward 90-degree ice wedge slows enemy walking by 45% for 2s and clears enemy projectiles in the wedge. Charges and boss attack timing are unaffected.", keystone: "Glacial rampart slow lasts 3s instead of 2s." },
+        reap: { name: "Shieldbreaker", cooldown: 6, reach: 200, damage: 2, color: "#ccd4e4", detail: "Crushes one nearby enemy, prioritizing Sentinels and armored enemies. Bypasses Sentinel resistance and deals 50% extra damage to those targets.", keystone: "Shieldbreaker also deals 50% extra damage to elites and bosses." },
+        meteor: { name: "Fault pillars", cooldown: 12, reach: 450, damage: 1.9, color: "#c6ac88", detail: "Three stone eruptions rise along your facing direction. Each has a 65-unit radius, leaving gaps between pillars. Each enemy is hit at most once.", keystone: "Fault pillars radius grows from 65 to 90." },
+        siphon: { name: "Stone renewal", cooldown: 12, reach: 170, damage: 0.8, color: "#9dd7c7", detail: "Hits nearby enemies, restores 1% maximum health per hit up to 5%, modified by difficulty, and grants 25% damage reduction for 1s. Stacks multiplicatively with armor and ward.", keystone: "Stone renewal protection lasts 2s instead of 1s." },
+        nullwave: { name: "Siege wave", cooldown: 14, reach: 320, damage: 1.8, color: "#aac9eb", detail: "An outer shockwave hits enemies between 40% and 100% of its radius, pushing ordinary survivors back 80 units. Enemies in its inner blind spot are untouched.", keystone: "Siege wave inner blind spot shrinks to 20% of its radius." }
+    }
 };
+export const combatSkillDefinition = (state, skill) => CLASS_SKILLS[state.heroClass]?.[skill];
+export const NEW_SKILLS = CLASS_SKILLS.knight;
 export const SKILL_KEYS = ["attack", "nova", "burst", "guard", "dodge", "potion", ...Object.keys(NEW_SKILLS)];
-// Only these three skills can be placed into an auto-cast slot (manual-only skills like attack/dodge/potion
-// don't make sense to automate) — matches the slotSkills restriction added in save v10.
+// Nine combat slots per class; attack/dodge/potion never occupy a chosen skill slot.
 export const SLOTTABLE_SKILLS = ["nova", "burst", "guard", ...Object.keys(NEW_SKILLS)];
+export const STARTER_SKILLS = ["nova", "chain", "reap"];
 // Guard/ward unlocks later in Endless mode (wave 41) than in campaign (wave 11), since Endless
 // effectively starts players over at a higher baseline difficulty.
 export const wardUnlockWave = state => state.rankingMode === "endless" ? 41 : 11;
 export const skillUnlocked = (state, skill) => true;
-export const skillCapacity = state => 1 + [5, 10, 15].filter(level => state.player.level >= level).length;
+export const skillCapacity = state => 1 + [5, 10].filter(level => state.player.level >= level).length;
 export const selectedSkills = state => state.loadout.auto.filter(key => key !== "none");
 export const needsSkillChoice = state => selectedSkills(state).length < skillCapacity(state);
 export const skillSelected = (state, skill) => !SLOTTABLE_SKILLS.includes(skill) || selectedSkills(state).includes(skill);
@@ -88,16 +109,11 @@ export const TREE_NODES = {
         renewal: { name: "Renewal", max: 2, icon: "❧", visual: "healing", detail: "After drinking, regenerate 4% maximum health per rank over 2s, subject to difficulty penalties. Another flask refreshes rather than stacks regeneration. Adds a green regeneration aura." }
     }
 };
-for (const [key, skill] of Object.entries(NEW_SKILLS)) {
+for (const key of Object.keys(NEW_SKILLS)) {
     TREE_NODES[key] = {
         potency: { name: "Empower", max: 3, icon: "✦", visual: key, detail: "+10% skill damage per rank." },
         reach: { name: "Expand", max: 2, icon: "◎", visual: key, detail: "+10% targeting range and area per rank." },
-        ember: { name: "Keystone", max: 1, icon: "◆", visual: key, detail: key === "chain" ? "Chain lightning jumps to two additional targets."
-            : key === "frost" ? "Frost ring deals 40% more damage to already slowed targets."
-            : key === "reap" ? "Reaping arc bypasses Sentinel resistance."
-            : key === "meteor" ? "Meteor blast radius grows from 100 to 150."
-            : key === "siphon" ? "Siphon heals 3% maximum health per hit instead of 2%."
-            : "Null wave radius increases by another 30%, including projectile clearing." },
+        ember: { name: "Keystone", max: 1, icon: "◆", visual: key, detail: "Unlocks this class ability's unique keystone." },
         recovery: { name: "Rhythm", max: 2, icon: "↻", visual: key, detail: "+10% skill cooldown recovery per rank." }
     };
 }
@@ -144,11 +160,12 @@ const CLASS_TREE_EFFECTS = {
         "attack.execution": { icon: "↝", detail: "Dawn shot ricochets once to a different living enemy within 180 units for 60% damage. A green tracer connects the targets. Cannot bounce back." },
         "nova.ignition": { icon: "➶", detail: "Each Sunburst volley arrow penetrates one additional target in its remaining flight path for 70% damage. Green tracers show the piercing path; no added fire damage." },
         "burst.shatter": { icon: "⋙", detail: "Piercing rain penetrates two additional targets instead of one. Each penetration retains 70% of the previous hit's damage; no target is hit twice by the same arrow." },
-        "guard.repulse": { icon: "♧", detail: "Briar ward pushes enemies back 60 units (bosses 30) and slows surviving targets' walking by 15% for 1.5 seconds. Charges are unaffected." }
+        "guard.repulse": { icon: "♧", detail: "Briar ward also pushes ordinary enemies back 60 units and strengthens its walking slow from 25% to 40% for 1.5 seconds. Bosses are not displaced; charges are unaffected." }
     },
     warden: {
         "attack.execution": { icon: "⬟", detail: "Hammer sweep bypasses Sentinel resistance and deals 25% extra damage to Sentinels. A steel impact mark identifies shield-breaking hits." },
-        "nova.ignition": { icon: "◆", detail: "Iron quake deals 25% extra damage inside half its radius. A steel inner ring marks the seismic core; no added fire damage." },
+        "nova.ignition": { icon: "◆", detail: "Iron quake's inner-half damage bonus rises from 25% to 50%. A steel inner ring marks the seismic core; no added fire damage." },
+        "nova.chill": { icon: "❄", detail: "+15 percentage points Iron quake walking slow per rank, added to its base 15% slow for 1.5s. Charges are unaffected." },
         "burst.overdrive": { icon: "⬢", detail: "Fault line deals 12% more damage per rank against slowed targets. Combines with Quaking ground; replaces extra critical chance." },
         "guard.repulse": { icon: "⬡", detail: "Iron bastion pushes living enemies back 100 units, or 50 for bosses. A broad steel shockwave clears breathing room." }
     }
@@ -157,7 +174,7 @@ const CLASS_TREE_EFFECTS = {
 // own attackName/specialName; burst/guard use EXTRA_SKILLS' class-specific names; dodge/potion are
 // the same name for every class).
 export const skillName = (state, key) => key === "attack" ? classFor(state).attackName : key === "nova" ? classFor(state).specialName
-    : key === "dodge" ? "Dodge" : key === "potion" ? "Life flask" : key === "none" ? "No manual skill" : NEW_SKILLS[key]?.name ?? EXTRA_SKILLS[state.heroClass][key].name;
+    : key === "dodge" ? "Dodge" : key === "potion" ? "Life flask" : key === "none" ? "No manual skill" : combatSkillDefinition(state, key)?.name ?? EXTRA_SKILLS[state.heroClass][key].name;
 // Maps a generic tree slot name (root/left/right/capstone) to the actual node key for a given
 // skill (e.g. treeNodeKey("attack", "root") => "edge").
 export const treeNodeKey = (skill, slot) => Object.keys(TREE_NODES[skill])[TREE_SLOTS.indexOf(slot)];
@@ -193,6 +210,8 @@ export function respecTree(state, skill) {
     if (skill === "guard") { p.guarding = 0; p.guard = Math.max(p.guard, 4); }
     if (skill === "dodge") { p.afterstep = 0; p.invulnerable = 0; p.rolling = 0; p.vx = 0; p.vy = 0; }
     if (skill === "potion") { p.flaskWard = 0; p.renewal = 0; }
+    if (skill === "siphon" && state.heroClass === "warden") p.flaskWard = 0;
+    if (skill === "nullwave" && state.heroClass === "ranger") p.afterstep = 0;
     if (skill === "nova") for (const enemy of state.enemies) { enemy.chilled = 0; enemy.chillStrength = 0; }
     state.journal = `${skillName(state, skill)} reset: ${points} points returned for ${cost} gold. Cooldowns and other upgrades are unchanged.`;
     return true;
@@ -220,9 +239,7 @@ export function learnSkill(state, skill, node) {
     state.journal = `${skillName(state, skill)}: ${treeNodeDefinition(state, skill, node).name} learned. ${skillPointsLeft(state)} skill points remain.`;
     return true;
 }
-// Validates a proposed manual+auto loadout: the manual skill must be a real slottable skill and
-// unlocked; auto must be exactly 2 slots, each either "none" or a distinct unlocked slottable skill
-// that isn't already the manual skill (no duplicate skills across slots).
+// Three playable auto slots; the fourth stays empty to preserve the v15 serialized layout.
 export const validLoadout = (state, manual, auto) => manual === "none"
     && Array.isArray(auto) && auto.length === 4
     && auto.every((key, index) => key === "none" || SLOTTABLE_SKILLS.includes(key) && index < skillCapacity(state))
@@ -246,7 +263,11 @@ export function setLoadout(state, manual, auto) {
 // arrow count vs cone angle) is different enough per class that it needs its own name/detail
 // entirely rather than just a re-themed description.
 export function treeNodeDefinition(state, skill, node) {
-    if (NEW_SKILLS[skill]) return { ...TREE_NODES[skill][node] };
+    if (NEW_SKILLS[skill]) {
+        const definition = combatSkillDefinition(state, skill);
+        return { ...TREE_NODES[skill][node], name: node === "ember" ? `${definition.name} keystone` : TREE_NODES[skill][node].name,
+            detail: node === "ember" ? definition.keystone : node === "reach" ? "+10% targeting range and area per rank." : TREE_NODES[skill][node].detail };
+    }
     const index = Object.keys(TREE_NODES[skill]).indexOf(node);
     const definition = { ...TREE_NODES[skill][node], name: CLASS_TREE_NAMES[state.heroClass][skill][index],
         visual: state.heroClass, ...CLASS_TREE_EFFECTS[state.heroClass][`${skill}.${node}`] };

@@ -617,9 +617,38 @@
 
     body.mobile-shell .setup-overlay .class-preview,
     body.mobile-shell .setup-overlay [data-setup-skip],
-    body.mobile-shell .setup-overlay [data-setup-loadout],
     body.mobile-shell .setup-overlay [data-difficulty-description] {
         display: none !important;
+    }
+
+    body.mobile-shell .setup-overlay [data-setup-loadout] {
+        grid-column: 1 / -1;
+        margin: 0;
+    }
+
+    body.mobile-shell .setup-overlay .overlay-card {
+        overflow-y: auto;
+        touch-action: pan-y;
+    }
+
+    body.mobile-shell .skill-choice-overlay .overlay-card {
+        display: block;
+        max-width: 760px;
+        max-height: 100%;
+        overflow-y: auto;
+        touch-action: pan-y;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    body.mobile-shell .run-skill-pool {
+        grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+        gap: 10px;
+    }
+
+    body.mobile-shell .run-skill-pool button {
+        padding: 14px;
+        touch-action: pan-y;
     }
 
     body.mobile-shell [data-run-menu] {

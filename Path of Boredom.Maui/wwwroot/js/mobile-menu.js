@@ -483,7 +483,11 @@
             syncBadges();
         });
         root.addEventListener("mobile-account-deleted", function () {
-            closePanel(false);
+            if (openName === "account") root.dataset.menuOpen = "on";
+            else {
+                closePanel(false);
+                openPanel("account");
+            }
             syncBadges();
         });
 

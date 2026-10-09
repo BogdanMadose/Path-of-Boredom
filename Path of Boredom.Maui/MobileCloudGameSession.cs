@@ -10,11 +10,18 @@ namespace Path_of_Boredom.Maui;
 /// <summary>Local-first saves, verified Google accounts and optimistic-revision cloud sync.</summary>
 public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSession, ICloudGameSession
 {
+    private const string AutoSignInPreference = "cloud.auto-sign-in";
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly HttpClient http = new(new HttpClientHandler { AllowAutoRedirect = false })
     {
         Timeout = TimeSpan.FromSeconds(20)
     };
+    internal MobileCloudGameSession(OfflineGameSession local, HttpClient cloudClient) : this(local)
+    {
+        ArgumentNullException.ThrowIfNull(cloudClient);
+        http.Dispose();
+        http = cloudClient;
+    }
     private string? token;
     private bool restoreAttempted;
     private long? expectedRevision;
@@ -29,8 +36,28 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
     public CloudAccountStatus AccountStatus => new(GoogleSignInConfiguration.IsConfigured, token is not null,
         token is not null && expectedRevision is null, observedSave is not null, player, message, observedRevision, deleted);
 
-    // No token is embedded in the APK or persisted. Restart/expiry requires native sign-in again;
-    // each sign-in requires an explicit save choice, including when switching Google accounts.
+    // Tokens stay in memory; only the user's permission to restore a native session is persisted.
+    private void ClearCloudSession()
+    {
+        token = null;
+        expectedRevision = null;
+        observedRevision = null;
+        observedSave = null;
+        player = "Offline player";
+    }
+
+    private static async Task<bool> IsDeletedSessionAsync(HttpResponseMessage response)
+    {
+        if (response.StatusCode != HttpStatusCode.Unauthorized) return false;
+        try
+        {
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+            return body.ValueKind == JsonValueKind.Object && body.TryGetProperty("code", out var code)
+                && code.ValueKind == JsonValueKind.String && code.GetString() == "AccountDeleted";
+        }
+        catch (Exception exception) when (exception is JsonException or NotSupportedException) { return false; }
+    }
+
     private HttpRequestMessage Request(HttpMethod method, string path)
     {
         if (token is null || !GoogleSignInConfiguration.IsConfigured) throw new InvalidOperationException("Sign in first.");
@@ -44,12 +71,11 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         var response = await http.SendAsync(request);
         if (response.StatusCode == HttpStatusCode.Unauthorized)
         {
-            token = null;
-            expectedRevision = null;
-            observedRevision = null;
-            observedSave = null;
-            player = "Offline player";
-            message = "Sign-in expired or the account was deleted. Your device save is unchanged; sign in again.";
+            ClearCloudSession();
+            Preferences.Set(AutoSignInPreference, false);
+            message = await IsDeletedSessionAsync(response)
+                ? "This session belongs to a deleted game account. Continue with Google to sign in afresh."
+                : "Sign-in expired. Your device save is unchanged; continue with Google again.";
         }
         return response;
     }
@@ -62,33 +88,60 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         try
         {
             if (!GoogleSignInConfiguration.IsConfigured) return AccountStatus;
-            deleted = false;
-            token = null;
-            expectedRevision = null;
-            observedSave = null;
-            observedRevision = null;
+            ClearCloudSession();
             restoreAttempted = true;
             var candidate = silent ? await NativeGoogleSignIn.TrySilentSignInAsync(GoogleSignInConfiguration.WebClientId)
                 : await NativeGoogleSignIn.SignInAsync(GoogleSignInConfiguration.WebClientId);
-            if (candidate is null) { if (!silent) message = "Sign-in cancelled. Your device save is unchanged."; return AccountStatus; }
-            using var request = new HttpRequestMessage(HttpMethod.Get,
-                GoogleSignInConfiguration.ApiBaseUrl.TrimEnd('/') + "/game/account/");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", candidate);
-            using var response = await http.SendAsync(request);
-            if (!response.IsSuccessStatusCode) { message = "The server could not verify Google sign-in. Check deployment configuration."; return AccountStatus; }
-            var identity = await response.Content.ReadFromJsonAsync<VerifiedIdentity>();
-            if (identity is null || string.IsNullOrWhiteSpace(identity.Subject)) throw new JsonException();
-            // Identity comes exclusively from the server's verified sub, never from caller headers.
-            token = candidate;
-            player = identity.Name;
-            await ReadCloudMetadataAsync();
-            expectedRevision = observedRevision;
-            using var profile = Request(HttpMethod.Post, "game/rankings/profile");
-            using var registered = await SendAsync(profile);
+            for (var attempt = 0; attempt < 2; attempt++)
+            {
+                if (candidate is null) { if (!silent) message = "Sign-in cancelled. Your device save is unchanged."; return AccountStatus; }
+                using var request = new HttpRequestMessage(HttpMethod.Get,
+                    GoogleSignInConfiguration.ApiBaseUrl.TrimEnd('/') + "/game/account/");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", candidate);
+                using var response = await http.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                {
+                    if (await IsDeletedSessionAsync(response))
+                    {
+                        Preferences.Set(AutoSignInPreference, false);
+                        if (!silent && attempt == 0)
+                        {
+                            await NativeGoogleSignIn.RevokeAccessAsync();
+                            candidate = await NativeGoogleSignIn.SignInAsync(GoogleSignInConfiguration.WebClientId);
+                            continue;
+                        }
+                        message = "Your previous game account was deleted. Continue with Google to create a new account with a fresh session.";
+                    }
+                    else message = response.StatusCode == HttpStatusCode.Unauthorized
+                        ? "Google sign-in could not be verified. Continue with Google again to refresh your session."
+                        : "The sign-in service is unavailable. Retry when connected; your device save is unchanged.";
+                    return AccountStatus;
+                }
+                var identity = await response.Content.ReadFromJsonAsync<VerifiedIdentity>();
+                if (identity is null || string.IsNullOrWhiteSpace(identity.Subject)) throw new JsonException();
+                // Identity comes exclusively from the server's verified sub, never from caller headers.
+                token = candidate;
+                player = identity.Name;
+                await ReadCloudMetadataAsync();
+                expectedRevision = observedRevision;
+                using var profile = Request(HttpMethod.Post, "game/rankings/profile");
+                using var registered = await SendAsync(profile);
+                if (!registered.IsSuccessStatusCode)
+                {
+                    if (registered.StatusCode != HttpStatusCode.Unauthorized)
+                        message = "Sign-in was verified, but account registration failed. Please retry.";
+                    ClearCloudSession();
+                    return AccountStatus;
+                }
+                deleted = false;
+                Preferences.Set(AutoSignInPreference, true);
+                return AccountStatus;
+            }
             return AccountStatus;
         }
         catch (Exception exception) when (IsRecoverable(exception))
         {
+            ClearCloudSession();
             message = "Sign-in/cloud lookup unavailable. Device progress is safe. Check the connection and Google registration.";
             return AccountStatus;
         }
@@ -100,11 +153,9 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         await gate.WaitAsync();
         try
         {
-            token = null;
-            expectedRevision = null;
-            observedSave = null;
-            observedRevision = null;
-            player = "Offline player";
+            ClearCloudSession();
+            restoreAttempted = true;
+            Preferences.Set(AutoSignInPreference, false);
             message = "Signed out. Device progress remains; no further cloud requests are authorized.";
             await NativeGoogleSignIn.SignOutAsync();
             return AccountStatus;
@@ -219,15 +270,15 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
             var result = await local.SaveAsync(snapshot);
             if (!result.Success) return result;
             if (token is null) return result with { Message = "Saved on this device. Sign in for cloud sync." };
-            if (expectedRevision is null) return result with { Message = "Saved on this device. Open Account & cloud to choose which save to keep before syncing." };
+            if (expectedRevision is null) return result with { Success = false, Message = "Saved on this device, but cloud sync is paused. Open Account & cloud to choose which save to keep before syncing." };
             try
             {
                 var synced = await UploadAsync(snapshot, expectedRevision.Value);
-                return result with { Message = synced.Success ? "Saved on this device and synced to cloud." : "Saved on this device. " + synced.Message };
+                return result with { Success = synced.Success, Message = synced.Success ? "Saved on this device and synced to cloud." : "Saved on this device. " + synced.Message };
             }
             catch (Exception exception) when (IsRecoverable(exception))
             {
-                return result with { Message = "Saved on this device; cloud sync unavailable. Retry Save when connected." };
+                return result with { Success = false, Message = "Saved on this device; cloud sync unavailable. Retry Save when connected." };
             }
         }
         finally { gate.Release(); }
@@ -247,7 +298,16 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
             return new(false, "Cloud conflict: another device changed the save. Open Account & cloud, refresh, then explicitly choose a save. Neither cloud save nor device progress was overwritten.");
         }
         if (!response.IsSuccessStatusCode)
+        {
+            if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+                if (error.ValueKind == JsonValueKind.Object && error.TryGetProperty("code", out var code)
+                    && code.ValueKind == JsonValueKind.String && code.GetString() == "UnsupportedSaveVersion")
+                    return new(false, "The API needs the latest save-format update. Your device checkpoint is safe; deploy the updated backend, then retry Save.");
+            }
             return new(false, response.StatusCode == HttpStatusCode.Unauthorized ? message : "Cloud rejected the save. Device progress is safe; check sign-in and server compatibility.");
+        }
         var receipt = await response.Content.ReadFromJsonAsync<SaveReceipt>();
         if (receipt is null || receipt.Revision <= revision) throw new JsonException();
         expectedRevision = observedRevision = receipt.Revision;
@@ -282,7 +342,7 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
 
     public async Task<string> GetPlayerNameAsync()
     {
-        if (!restoreAttempted) await SignInAsync(true);
+        if (!restoreAttempted && Preferences.Get(AutoSignInPreference, true)) await SignInAsync(true);
         return player;
     }
 
@@ -327,18 +387,18 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
             if (token is null) { message = "Sign in to delete the verified account."; return AccountStatus; }
             using var request = Request(HttpMethod.Delete, "game/account/");
             using var response = await SendAsync(request);
-            if (!response.IsSuccessStatusCode) { message = "Account deletion was not confirmed. Retry; local files were not deleted."; return AccountStatus; }
+            if (response.StatusCode != HttpStatusCode.NoContent) { message = "Account deletion was not confirmed. Retry; local files were not deleted."; return AccountStatus; }
             deleted = true;
-            token = null;
-            expectedRevision = null;
-            observedRevision = null;
-            observedSave = null;
-            player = "Offline player";
+            ClearCloudSession();
+            restoreAttempted = true;
+            Preferences.Set(AutoSignInPreference, false);
             // Server deletion is already committed; report a local-cleanup error separately.
-            try { await local.ClearAsync(); message = "Account save and rankings deleted, device files cleared. The current run has been discarded."; }
+            try { await local.ClearAsync(); message = "Game account deleted. Continue with Google to create a new account, or start a new offline run."; }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             { message = "Cloud data deleted. Device cleanup failed; clear app storage before playing again."; }
-            await NativeGoogleSignIn.SignOutAsync();
+            try { await NativeGoogleSignIn.RevokeAccessAsync(); }
+            catch (Exception)
+            { message += " Google cleanup could not finish; continue with Google again to refresh the session."; }
             return AccountStatus;
         }
         catch (Exception exception) when (IsRecoverable(exception))

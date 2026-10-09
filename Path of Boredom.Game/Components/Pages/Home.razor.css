@@ -29,8 +29,15 @@
 .arpg ::deep .account-confirm { position: fixed; inset: 10% 0 auto; margin: auto; z-index: 100; }
 .arpg ::deep .game-confirm button { min-height: 44px; padding: 10px 24px; margin: 6px; background: #273b36; color: #ecdfc2; border: 1px solid #c7a56b; border-radius: 8px; }
 .run-skill-pool { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.run-skill-pool button { white-space: normal; text-align: left; display: grid; gap: 6px; padding: 12px; }
-.run-skill-pool span { font-size: 12px; line-height: 1.5; }
+.run-skill-pool button { white-space: normal; text-align: left; display: grid; align-content: start; gap: 8px; padding: 16px; border: 1px solid #c7a56b55; border-radius: 10px; background: linear-gradient(135deg, #29332e, #14212a); }
+.run-skill-pool button:hover:not(:disabled), .run-skill-pool button:focus-visible { border-color: #efcb86; background: #303c35; outline: 2px solid #efcb86; outline-offset: -2px; }
+.run-skill-pool strong { color: #f3dfb9; font: 18px/1.3 Georgia, serif; }
+.run-skill-pool span { color: #bdc9c6; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.skill-choice-overlay { z-index: 3; overflow-y: auto; align-items: safe center; touch-action: pan-y; overscroll-behavior: contain; }
+.skill-choice-overlay .overlay-card { width: 100%; max-width: 760px; max-height: 100%; overflow-y: auto; padding: 16px; text-align: left; touch-action: pan-y; scrollbar-width: thin; scrollbar-color: #c7a56b #14212a; }
+@media (max-width: 540px) {
+    .run-skill-pool { grid-template-columns: 1fr; }
+}
 .game-header { min-height: 84px; padding: 20px 4%; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid #ffffff0c; }
 .game-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .signed-in-user { display: grid; gap: 3px; max-width: 240px; min-width: 0; }

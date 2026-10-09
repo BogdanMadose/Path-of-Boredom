@@ -4,6 +4,7 @@
 // from sprite caching (`sprites`, below) — namely the player hero's body (which is drawn every
 // frame, unlike enemies which are simpler shapes) and orb/glow primitives used throughout arpg.js's
 // enemy art. Nothing here reads or mutates game state beyond the read-only arguments passed in.
+import { angleDifference } from "./arpg-facing.js";
 
 // Small LRU-ish cache of pre-rendered offscreen canvases (bodySprite/drawOrb), keyed by a string
 // describing the sprite's parameters (e.g. "orb:8:#ff0000"). Capped at 128 entries (see the
@@ -104,8 +105,8 @@ function bodySprite(hero) {
 }
 
 // Draws the player character every frame: a ground shadow ellipse, a casting-ring pulse while a
-// skill is winding up, an invulnerability flicker, then (rotated to face the player's aim direction)
-// a flowing cloak, legs with a walk-cycle stride offset, the cached body sprite, and finally a
+// skill is winding up, an invulnerability flicker, then a flowing cloak and walking legs facing
+// the body's heading, a partially twisted torso, and finally a weapon following its attack aim — a
 // weapon drawn per class — a bow with a stretch/loose animation tied to `strike`, or a sword/hammer
 // swung via rotation tied to `strike` and the attack windup. `reduced` disables all of the purely
 // cosmetic motion (flutter, sway, flicker) for the prefers-reduced-motion accessibility setting.
@@ -134,7 +135,12 @@ export function drawHero(ctx, actor, hero, stride, strike, time, reduced) {
         polygon(ctx, [[side * 4, y - 5], [side * 11, y - 5], [side * 12, y + 7], [side * 4, y + 8]], "#344753", "#a2b9ac55", 1);
     }
     const body = bodySprite(hero);
+    const twist = angleDifference(actor.facing, actor.weaponFacing ?? actor.facing);
+    ctx.save();
+    ctx.rotate(twist * 0.45);
     ctx.drawImage(body, -32, -36, 64, 72);
+    ctx.restore();
+    ctx.rotate(twist);
     const steel = metal(ctx, "#fff9de", "#a9d1d2", "#456276");
     if (ranger) {
         ctx.strokeStyle = "#15282b"; ctx.lineWidth = 6;

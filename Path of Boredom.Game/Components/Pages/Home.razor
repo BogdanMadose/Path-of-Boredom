@@ -100,11 +100,11 @@
                             <small data-loading role="status">Preparing the hollow...</small>
                         </div>
                     </div>
-                    <div class="arena-overlay setup-overlay" data-skill-choice hidden role="dialog" aria-modal="true" aria-labelledby="skill-choice-title">
+                    <div class="arena-overlay skill-choice-overlay" data-skill-choice hidden role="dialog" aria-modal="true" aria-labelledby="skill-choice-title">
                         <section class="overlay-card">
                             <p class="eyebrow">BUILD YOUR PATH</p>
                             <h2 id="skill-choice-title">Choose your next automatic skill</h2>
-                            <p>Combat is paused. This choice is locked until the run ends. Add a skill at levels 5, 10, and 15.</p>
+                            <p>Combat is paused. Pick a second skill at level 5 and a third at level 10. Each choice is locked for this run.</p>
                             <div class="run-skill-pool">
                                 @foreach (var skill in CombatSkills)
                                 {
@@ -150,7 +150,8 @@
                                     {
                                         <label>Starting automatic skill
                                             <select data-setup-slot="@slot">
-                                                @foreach (var skill in CombatSkills)
+                                                <option value="none">Choose your first skill</option>
+                                                @foreach (var skill in StarterSkills)
                                                 {
                                                     <option value="@skill" data-setup-skill="@skill">@skill</option>
                                                 }
@@ -192,11 +193,11 @@
                 </div>
                 <section class="skills-panel" data-skills aria-labelledby="skills-title">
                     <div class="forge-heading"><h2 id="skills-title">Paths of power</h2><strong data-stat="skill-points">0 points available</strong></div>
-                    <p>Attacks and selected combat skills target automatically. Dodge and flask remain manual. Start with one combat skill, then add another at levels 5, 10 and 15. Each choice is locked for this run. Earn one upgrade point every two levels, up to 32.</p>
+                    <p>Attacks and selected combat skills target automatically. Dodge and flask remain manual. Choose one starting skill, then add another at levels 5 and 10 for three total. Each choice is locked for this run. Earn one upgrade point every two levels, up to 32.</p>
                     <div class="loadout-grid">
-                        @for (var slot = 1; slot <= 4; slot++)
+                        @for (var slot = 1; slot <= 3; slot++)
                         {
-                            <label>@($"Auto slot {slot} · level {new[] { 1, 5, 10, 15 }[slot - 1]}")
+                            <label>@($"Auto slot {slot} · level {new[] { 1, 5, 10 }[slot - 1]}")
                                 <select data-loadout-slot="@slot" disabled>
                                     <option value="none">Choose when unlocked</option>
                                     @foreach (var skill in CombatSkills)
@@ -320,6 +321,7 @@
 
 @code {
     private static readonly string[] CombatSkills = ["nova", "burst", "guard", "chain", "frost", "reap", "meteor", "siphon", "nullwave"];
+    private static readonly string[] StarterSkills = ["nova", "chain", "reap"];
     private static readonly string[] AllSkills = ["attack", "nova", "burst", "guard", "dodge", "potion", "chain", "frost", "reap", "meteor", "siphon", "nullwave"];
     // Reference to the root <div class="arpg"> element — handed to the JS module so it can query
     // everything else it needs (canvas, buttons, overlays) by selector instead of us wiring each
@@ -341,7 +343,7 @@
     private async Task AccountChanged()
     {
         windowsUserName = await Session.GetPlayerNameAsync();
-        if (game is not null) await game.InvokeVoidAsync("accountChanged");
+        if (game is not null) await game.InvokeVoidAsync("accountChanged", Session is not ICloudGameSession cloud || cloud.AccountStatus.SignedIn);
     }
 
     private async Task AccountDeleted()

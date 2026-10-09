@@ -77,7 +77,7 @@ function integer(value, min, max) {
 // the actual migration mechanism — it supplies a sensible default for saves older than the version
 // that introduced a given field, rather than requiring every historical save to be rewritten.
 export function restoreSnapshot(snapshot, random = Math.random) {
-    require([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].includes(snapshot?.version));
+    require([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].includes(snapshot?.version));
     const saved = snapshot.state;
     const state = createState(random);
     state.rankingPatch = snapshot.version < 13 ? "pre004" : saved.rankingPatch;
@@ -180,7 +180,17 @@ export function restoreSnapshot(snapshot, random = Math.random) {
     if (snapshot.version >= 11) {
         integer(saved.wardUnlockSeen, 0, 1);
         state.wardUnlockSeen = saved.wardUnlockSeen;
-        if (snapshot.version >= 15) require(validLoadout(state, state.loadout.manual, state.loadout.auto));
+        if (snapshot.version >= 15) {
+            const removed = state.loadout.auto[3];
+            require(removed === "none" || snapshot.version === 15 && p.level >= 15);
+            state.loadout.auto[3] = "none";
+            require(validLoadout(state, state.loadout.manual, state.loadout.auto));
+            if (removed !== "none") {
+                for (const node of Object.keys(state.skillTree[removed])) state.skillTree[removed][node] = 0;
+                p[removed] = 0;
+                if (removed === "guard") p.guarding = 0;
+            }
+        }
         require(skillUnlocked(state, "guard") || p.guarding === 0);
     } else {
         if (!skillUnlocked(state, state.loadout.manual)) state.loadout.manual = "nova";
@@ -217,15 +227,15 @@ export function restoreSnapshot(snapshot, random = Math.random) {
     for (const key of ["invulnerable", "rolling"]) require(p[key] >= 0 && p[key] <= 10);
     require(p.guarding >= 0 && p.guarding <= 8);
     require(p.afterstep >= 0 && p.afterstep <= 1.2 && p.flaskWard >= 0 && p.flaskWard <= 2 && p.renewal >= 0 && p.renewal <= 2);
-    require(!p.afterstep || state.skillTree.dodge.afterstep > 0);
-    require(!p.flaskWard || state.skillTree.potion.tonic > 0);
+    require(!p.afterstep || state.skillTree.dodge.afterstep > 0 || snapshot.version >= 16 && state.heroClass === "ranger" && state.loadout.auto.includes("nullwave"));
+    require(!p.flaskWard || state.skillTree.potion.tonic > 0 || snapshot.version >= 16 && state.heroClass === "warden" && state.loadout.auto.includes("siphon"));
     require(!p.renewal || state.skillTree.potion.renewal > 0);
     state.enemies = array(saved.enemies, item => {
         const enemy = numbers(item, enemyNumbers);
         Object.assign(enemy, numbers({ elite: 0, charging: 0, chargeX: 0, chargeY: 0, ...item }, ["elite", "charging", "chargeX", "chargeY"]));
         Object.assign(enemy, numbers(snapshot.version < 9 ? { attackWindup: 0, attackX: enemy.x, attackY: enemy.y } : item, ["attackWindup", "attackX", "attackY"]));
         Object.assign(enemy, numbers(snapshot.version < 12 ? { chilled: 0, chillStrength: 0 } : item, ["chilled", "chillStrength"]));
-        require(enemy.chilled >= 0 && enemy.chilled <= 1.5 && enemy.chillStrength >= 0 && enemy.chillStrength <= 0.3);
+        require(enemy.chilled >= 0 && enemy.chilled <= (snapshot.version >= 16 ? 3 : 1.5) && enemy.chillStrength >= 0 && enemy.chillStrength <= (snapshot.version >= 16 ? 0.55 : 0.3));
         require(enemy.chilled > 0 || enemy.chillStrength === 0);
         require(enemy.attackWindup >= 0 && enemy.attackWindup <= 1.1 && enemy.attackX >= 0 && enemy.attackX <= WIDTH && enemy.attackY >= 0 && enemy.attackY <= HEIGHT);
         integer(enemy.elite, 0, 1);
@@ -270,6 +280,7 @@ export function restoreSnapshot(snapshot, random = Math.random) {
     });
     state.journal = text(saved.journal);
     if (previousTreePoints > 0) state.journal = `Skill trees redesigned: ${previousTreePoints} spent points returned. Open Skills & loadout to choose upgrades; your other progression is unchanged.`;
+    if (snapshot.version >= 15 && saved.loadout.auto[3] !== "none") state.journal = "Runs now use three skills. Your first three choices were kept and fourth-skill tree points refunded.";
     if (state.travelPending) require(state.resumeDelay > 0 && state.wave > 0 && state.wave % 5 === 0 && !state.enemies.length
         && ["playing", "paused"].includes(saved.status) && (state.mode === "endless" || state.wave < LAST_WAVE));
     if (saved.status === "camp") require(state.wave > 0 && state.wave % 5 === 0 && !state.enemies.length && (state.mode === "endless" ? state.wave > LAST_WAVE : state.wave < LAST_WAVE));
@@ -294,7 +305,7 @@ export function restoreSnapshot(snapshot, random = Math.random) {
 // oversized save is caught client-side with time to react rather than failing after a network round trip.
 export function captureSnapshot(state) {
     require(["playing", "paused", "camp", "won", "choosing"].includes(state.status));
-    const restored = restoreSnapshot({ version: 15, state: {
+    const restored = restoreSnapshot({ version: 16, state: {
         ...state,
         playerShots: state.playerShots.filter(shot => shot.life > 0),
         enemies: state.enemies.filter(enemy => enemy.health > 0),
@@ -302,7 +313,7 @@ export function captureSnapshot(state) {
         loot: state.loot.filter(drop => drop.life > 0)
     } });
     const { random, effects, damageHistory, ...saved } = restored;
-    const snapshot = { version: 15, state: saved };
+    const snapshot = { version: 16, state: saved };
     require(new TextEncoder().encode(JSON.stringify(snapshot)).length <= 64 * 1024);
     return snapshot;
 }

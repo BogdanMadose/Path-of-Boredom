@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Path_of_Boredom.Game;
 using Path_of_Boredom.ServiceDefaults;
@@ -17,6 +18,8 @@ namespace Path_of_Boredom.Maui;
 /// </remarks>
 public sealed class OfflineGameSession : IGameSession
 {
+    private const int CurrentSaveVersion = 16;
+    private const int MaximumSaveBytes = 128 * 1024;
     private readonly SemaphoreSlim saveLock = new(1, 1);
     private readonly string savePath = Path.Combine(FileSystem.AppDataDirectory, "offline-run.json");
 
@@ -26,17 +29,28 @@ public sealed class OfflineGameSession : IGameSession
 
     public async Task<GameSaveResult> SaveAsync(JsonElement snapshot)
     {
-        if (!IsSnapshot(snapshot) || snapshot.GetRawText().Length > 128 * 1024)
+        if (!IsSnapshot(snapshot) || Encoding.UTF8.GetByteCount(snapshot.GetRawText()) > MaximumSaveBytes)
             return new(false, "The save is invalid. Your previous local save is unchanged.");
 
         await saveLock.WaitAsync();
         try
         {
             var unlocked = IsEndlessUnlocked(snapshot);
+            var recovered = false;
             if (File.Exists(savePath))
             {
-                using var previous = JsonDocument.Parse(await File.ReadAllTextAsync(savePath));
-                unlocked |= IsEndlessUnlocked(previous.RootElement);
+                try
+                {
+                    if (new FileInfo(savePath).Length > MaximumSaveBytes) throw new JsonException();
+                    using var previous = JsonDocument.Parse(await File.ReadAllTextAsync(savePath));
+                    if (!IsSnapshot(previous.RootElement)) throw new JsonException();
+                    unlocked |= IsEndlessUnlocked(previous.RootElement);
+                }
+                catch (JsonException)
+                {
+                    File.Copy(savePath, savePath + ".corrupt-" + Guid.NewGuid().ToString("N") + ".json");
+                    recovered = true;
+                }
             }
             var envelope = new
             {
@@ -48,7 +62,8 @@ public sealed class OfflineGameSession : IGameSession
             var temporary = savePath + ".tmp";
             await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(envelope));
             File.Move(temporary, savePath, overwrite: true);
-            return new(true, "Saved on this device. Cloud sync is not enabled.", EndlessUnlocked: unlocked);
+            return new(true, recovered ? "Saved on this device. The previous damaged save was preserved as a backup."
+                : "Saved on this device. Cloud sync is not enabled.", EndlessUnlocked: unlocked);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -63,7 +78,7 @@ public sealed class OfflineGameSession : IGameSession
         try
         {
             if (!File.Exists(savePath)) return new(false, "No local save yet. Start a campaign and save from the pause menu.");
-            if (new FileInfo(savePath).Length > 128 * 1024) return new(false, "The local save is invalid. Your current run is unchanged.");
+            if (new FileInfo(savePath).Length > MaximumSaveBytes) return new(false, "The local save is invalid. Your current run is unchanged.");
             using var document = JsonDocument.Parse(await File.ReadAllTextAsync(savePath));
             var snapshot = document.RootElement;
             if (!IsSnapshot(snapshot)) return new(false, "The local save is damaged or unsupported. Your current run is unchanged.");
@@ -79,7 +94,7 @@ public sealed class OfflineGameSession : IGameSession
     private static bool IsSnapshot(JsonElement snapshot) =>
         snapshot.ValueKind == JsonValueKind.Object
         && snapshot.TryGetProperty("version", out var version)
-        && version.ValueKind == JsonValueKind.Number && version.TryGetInt32(out var number) && number is >= 1 and <= 14
+        && version.ValueKind == JsonValueKind.Number && version.TryGetInt32(out var number) && number is >= 1 and <= CurrentSaveVersion
         && snapshot.TryGetProperty("state", out var state) && state.ValueKind == JsonValueKind.Object;
 
     private static bool IsEndlessUnlocked(JsonElement snapshot) =>
@@ -108,6 +123,9 @@ public sealed class OfflineGameSession : IGameSession
         {
             foreach (var path in new[] { savePath, savePath + ".tmp", savePath + ".before-cloud.json" })
                 if (File.Exists(path)) File.Delete(path);
+            var directory = Path.GetDirectoryName(savePath)!;
+            if (Directory.Exists(directory))
+                foreach (var path in Directory.EnumerateFiles(directory, "offline-run.json.corrupt-*.json")) File.Delete(path);
         }
         finally { saveLock.Release(); }
     }

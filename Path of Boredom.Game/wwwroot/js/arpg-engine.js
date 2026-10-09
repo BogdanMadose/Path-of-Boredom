@@ -20,7 +20,8 @@ import { LEVEL_CARDS, drawLevelCards } from "./arpg-cards.js";
 import { DIFFICULTIES, difficultyFor } from "./arpg-difficulty.js";
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
 import { ELITE_MODIFIERS, enemyDamageSource } from "./arpg-modifiers.js";
-import { SKILL_KEYS, SLOTTABLE_SKILLS, AUTO_COOLDOWN, EXTRA_SKILLS, NEW_SKILLS, newSkillTree, skillUnlocked, skillSelected, needsSkillChoice } from "./arpg-skills.js";
+import { SKILL_KEYS, SLOTTABLE_SKILLS, AUTO_COOLDOWN, EXTRA_SKILLS, NEW_SKILLS, combatSkillDefinition, newSkillTree, skillUnlocked, skillSelected, needsSkillChoice } from "./arpg-skills.js";
+import { MAX_WEAPON_TWIST, ATTACK_ALIGNMENT, angleDifference, updateCombatFacing } from "./arpg-facing.js";
 // Logical canvas resolution (not the real on-screen pixel size — arpg-graphics.js scales this to
 // fit the actual canvas). All position math throughout this file is in these logical units.
 export const WIDTH = 1100;
@@ -118,7 +119,7 @@ export const criticalDamage = state => 1.5 + state.boons.critDamage * 0.1 + stat
 // Effective range of a given skill, capped per class/skill and boosted by forge/card ranks,
 // Widening ember mastery, and relevant skill tree nodes.
 export const skillReach = (state, skill) => NEW_SKILLS[skill]
-    ? NEW_SKILLS[skill].reach * (1 + state.skillTree[skill].reach * 0.1) * (skill === "nullwave" && state.skillTree[skill].ember ? 1.3 : 1)
+    ? combatSkillDefinition(state, skill).reach * (1 + state.skillTree[skill].reach * 0.1)
     : Math.min(state.heroClass === "ranger" ? 1000 : skill === "attack" ? 220 : skill === "burst" ? 500 : 340, (skill === "attack"
     ? classFor(state).attackReach + state.upgrades.cleave * 6 + state.boons.cleave * 6
     : skill === "nova" ? classFor(state).specialReach + state.upgrades.nova * 10 + state.boons.nova * 10
@@ -428,6 +429,177 @@ function pushEnemy(state, enemy, amount) {
     enemy.y = clamp(enemy.y + (d ? (enemy.y - p.y) / d : Math.sin(p.facing)) * push, MARGIN, HEIGHT - MARGIN);
 }
 
+function castClassSkill(state, skill) {
+    const p = state.player, definition = combatSkillDefinition(state, skill), nodes = state.skillTree[skill];
+    const reach = skillReach(state, skill), scale = 1 + nodes.reach * 0.1;
+    const targets = state.enemies.filter(enemy => enemy.health > 0 && distance(p, enemy) <= reach + enemy.radius)
+        .sort((a, b) => distance(p, a) - distance(p, b));
+    if (!targets.length) return false;
+    const base = weaponDamage(state) * definition.damage * (1 + nodes.potency * 0.1);
+    let hits = 0;
+    const strike = (enemy, multiplier = 1, piercing = true) => {
+        if (enemy.health <= 0) return;
+        hitEnemy(state, enemy, Math.round(base * multiplier), piercing, skill);
+        hits++;
+    };
+    const visual = (kind, centre = p, radius = reach, angle = p.facing) => effect(state, kind, centre.x, centre.y, definition.color, "", radius, angle);
+    const slow = (enemy, strength, duration) => {
+        if (enemy.health <= 0) return;
+        enemy.chilled = Math.max(enemy.chilled, duration);
+        enemy.chillStrength = Math.max(enemy.chillStrength, strength);
+        visual("frost", enemy, enemy.radius + 10);
+    };
+    const heal = amount => {
+        p.health = Math.min(p.maxHealth, p.health + amount * difficultyFor(state).healing);
+        visual("heal", p, 35);
+    };
+    const inCone = (actor, halfAngle) => distance(p, actor) <= reach + (actor.radius ?? 0)
+        && Math.cos(Math.atan2(actor.y - p.y, actor.x - p.x) - p.facing) >= Math.cos(halfAngle);
+    const clearCone = halfAngle => { state.projectiles = state.projectiles.filter(shot => !inCone(shot, halfAngle)); };
+    if (state.heroClass === "knight") {
+        if (skill === "chain") {
+            let previous = p;
+            const visited = new Set();
+            for (let index = 0; index < 3 + nodes.ember * 2; index++) {
+                const target = state.enemies.filter(enemy => enemy.health > 0 && !visited.has(enemy) && distance(previous, enemy) <= (index ? 180 * scale : reach))
+                    .sort((a, b) => distance(previous, a) - distance(previous, b))[0];
+                if (!target) break;
+                visual("beam", previous, distance(previous, target), Math.atan2(target.y - previous.y, target.x - previous.x));
+                visited.add(target);
+                strike(target, 0.75 ** index);
+                previous = target;
+            }
+        } else if (skill === "frost") {
+            const width = 24 * scale * (nodes.ember ? 1.5 : 1);
+            for (let lane = 0; lane < 4; lane++) {
+                const angle = p.facing + lane * Math.PI / 2;
+                visual("beam", p, reach, angle).width = width * 2;
+            }
+            for (const enemy of targets) {
+                const dx = enemy.x - p.x, dy = enemy.y - p.y;
+                const along = dx * Math.cos(p.facing) + dy * Math.sin(p.facing);
+                const across = -dx * Math.sin(p.facing) + dy * Math.cos(p.facing);
+                if (Math.min(Math.abs(along), Math.abs(across)) <= width + enemy.radius) strike(enemy);
+            }
+        } else if (skill === "reap") {
+            visual("slash").arc = 80 * Math.PI / 180;
+            for (const enemy of targets) if (inCone(enemy, 80 * Math.PI / 180)) strike(enemy, enemy.health <= enemy.maxHealth * 0.35 ? 1.5 : 1, nodes.ember > 0);
+        } else if (skill === "meteor") {
+            const target = targets.at(-1), angle = Math.atan2(target.y - p.y, target.x - p.x);
+            const end = { x: p.x + Math.cos(angle) * reach, y: p.y + Math.sin(angle) * reach };
+            const width = 18 * scale * (nodes.ember ? 2 : 1);
+            visual("beam", p, reach, angle).width = width * 2;
+            for (const enemy of targets) if (distanceToSegment(enemy, p, end) <= width + enemy.radius) strike(enemy);
+        } else if (skill === "siphon") {
+            visual("execute", targets[0], 35);
+            strike(targets[0], 1 + (1 - p.health / p.maxHealth));
+            heal(p.maxHealth * (nodes.ember ? 0.05 : 0.03));
+        } else {
+            const angle = (nodes.ember ? 90 : 60) * Math.PI / 180;
+            visual("slash").arc = angle;
+            for (const enemy of targets) if (inCone(enemy, angle)) strike(enemy);
+            clearCone(angle);
+        }
+    } else if (state.heroClass === "ranger") {
+        if (skill === "chain") {
+            let previous = p;
+            const visited = new Set();
+            for (let index = 0; index < 2 + nodes.ember; index++) {
+                const candidates = state.enemies.filter(enemy => enemy.health > 0 && !visited.has(enemy) && distance(previous, enemy) <= (index ? 220 * scale : reach))
+                    .sort((a, b) => distance(previous, a) - distance(previous, b));
+                const target = index ? candidates.at(-1) : candidates[0];
+                if (!target) break;
+                arrowLink(state, previous, target);
+                visited.add(target);
+                strike(target, index ? 1.1 : 1);
+                previous = target;
+            }
+        } else if (skill === "frost") {
+            const centre = { x: targets[0].x, y: targets[0].y }, radius = 90 * scale;
+            arrowLink(state, p, centre);
+            visual("ring", centre, radius);
+            for (const enemy of state.enemies) if (enemy.health > 0 && distance(centre, enemy) <= radius + enemy.radius) {
+                strike(enemy);
+                slow(enemy, 0.55, nodes.ember ? 3 : 2);
+            }
+        } else if (skill === "reap") {
+            const target = targets.at(-1);
+            arrowLink(state, p, target);
+            strike(target, (1 + Math.min(1, distance(p, target) / reach)) * (nodes.ember && (target.elite || target.kind === "boss") ? 1.25 : 1));
+        } else if (skill === "meteor") {
+            const visited = new Set(), count = nodes.ember ? 7 : 5;
+            for (let lane = 0; lane < count; lane++) {
+                const angle = p.facing + (lane / (count - 1) - 0.5) * 70 * Math.PI / 180;
+                const end = { x: p.x + Math.cos(angle) * reach, y: p.y + Math.sin(angle) * reach };
+                visual("beam", p, reach, angle).width = 5;
+                const target = targets.find(enemy => enemy.health > 0 && distanceToSegment(enemy, p, end) <= enemy.radius + 5 * scale);
+                if (target && !visited.has(target)) { visited.add(target); strike(target); }
+            }
+        } else if (skill === "siphon") {
+            const wounded = targets.filter(enemy => enemy.health < enemy.maxHealth * 0.5).slice(0, nodes.ember ? 4 : 3);
+            if (!wounded.length) return false;
+            for (const enemy of wounded) {
+                arrowLink(state, p, enemy);
+                strike(enemy);
+                heal((p.maxHealth - p.health) * 0.08);
+            }
+        } else {
+            visual("repulse");
+            for (const enemy of targets) { strike(enemy); if (enemy.health > 0) pushEnemy(state, enemy, nodes.ember ? 135 : 90); }
+            p.afterstep = Math.max(p.afterstep, 1.2);
+            visual("wind", p, 55);
+        }
+    } else {
+        if (skill === "chain") {
+            const centre = { x: targets[0].x, y: targets[0].y }, radius = (nodes.ember ? 180 : 130) * scale;
+            visual("ring", centre, radius);
+            for (const enemy of state.enemies) if (enemy.health > 0 && distance(centre, enemy) <= radius + enemy.radius) {
+                strike(enemy);
+                if (enemy.health > 0 && enemy.kind !== "boss") {
+                    const d = distance(centre, enemy), pull = Math.min(65, d);
+                    if (d) {
+                        enemy.x = clamp(enemy.x + (centre.x - enemy.x) / d * pull, MARGIN, WIDTH - MARGIN);
+                        enemy.y = clamp(enemy.y + (centre.y - enemy.y) / d * pull, MARGIN, HEIGHT - MARGIN);
+                    }
+                }
+            }
+        } else if (skill === "frost") {
+            visual("slash").arc = Math.PI / 4;
+            for (const enemy of targets) if (inCone(enemy, Math.PI / 4)) { strike(enemy); slow(enemy, 0.45, nodes.ember ? 3 : 2); }
+            clearCone(Math.PI / 4);
+        } else if (skill === "reap") {
+            const armored = enemy => enemy.kind === "sentinel" || enemy.modifier === "armored";
+            const target = targets.find(armored) ?? targets[0];
+            visual("execute", target, 40);
+            strike(target, armored(target) || nodes.ember && (target.elite || target.kind === "boss") ? 1.5 : 1);
+        } else if (skill === "meteor") {
+            const radius = (nodes.ember ? 90 : 65) * scale;
+            const centres = [1 / 3, 2 / 3, 1].map(part => ({ x: p.x + Math.cos(p.facing) * reach * part, y: p.y + Math.sin(p.facing) * reach * part }));
+            if (!state.enemies.some(enemy => enemy.health > 0 && centres.some(centre => distance(centre, enemy) <= radius + enemy.radius))) return false;
+            for (const centre of centres) visual("burst", centre, radius);
+            for (const enemy of state.enemies) if (enemy.health > 0 && centres.some(centre => distance(centre, enemy) <= radius + enemy.radius)) strike(enemy);
+        } else if (skill === "siphon") {
+            visual("shield");
+            for (const enemy of targets) strike(enemy);
+            heal(p.maxHealth * Math.min(5, hits) * 0.01);
+            p.flaskWard = Math.max(p.flaskWard, nodes.ember ? 2 : 1);
+        } else {
+            const inner = reach * (nodes.ember ? 0.2 : 0.4);
+            if (!targets.some(enemy => distance(p, enemy) >= inner)) return false;
+            visual("repulse");
+            visual("ring", p, inner);
+            for (const enemy of targets) if (distance(p, enemy) >= inner) {
+                strike(enemy);
+                if (enemy.health > 0) pushEnemy(state, enemy, 80);
+            }
+        }
+    }
+    if (!hits) return false;
+    p[skill] = definition.cooldown / (1 + nodes.recovery * 0.1);
+    p.casting = 0.4;
+    return true;
+}
+
 // The single entry point for using any skill — attack, nova, class-specific burst/guard, dodge, or
 // potion — whether triggered by player input or autoCast(). Handles cooldown gating, per-skill
 // damage/effect resolution (each skill's shape differs enough that this is one big if/else chain),
@@ -446,59 +618,18 @@ export function useSkill(state, skill, automatic = false) {
     const damage = multiplier => Math.round(weaponDamage(state) * multiplier * power);
     const color = skill === "nova" && nodes.ignition && state.heroClass === "knight" ? "#ff8b32" : hero.color;
     if (NEW_SKILLS[skill]) {
-        const definition = NEW_SKILLS[skill];
-        const reach = skillReach(state, skill);
-        const targets = state.enemies.filter(enemy => enemy.health > 0 && distance(p, enemy) <= reach + enemy.radius)
-            .sort((a, b) => distance(p, a) - distance(p, b));
-        if (!targets.length) return false;
-        p[skill] = definition.cooldown / (1 + nodes.recovery * 0.1);
-        p.casting = 0.4;
-        const base = damage(definition.damage * (1 + nodes.potency * 0.1));
-        const strike = (enemy, multiplier = 1, piercing = true) => hitEnemy(state, enemy, Math.round(base * multiplier), piercing, skill);
-        if (skill === "chain") {
-            let previous = p;
-            const hit = new Set();
-            for (let index = 0; index < 3 + nodes.ember * 2; index++) {
-                const target = state.enemies.filter(enemy => enemy.health > 0 && !hit.has(enemy) && distance(previous, enemy) <= (index ? 180 : reach))
-                    .sort((a, b) => distance(previous, a) - distance(previous, b))[0];
-                if (!target) break;
-                arrowLink(state, previous, target);
-                hit.add(target);
-                strike(target, 0.75 ** index);
-                previous = target;
-            }
-        } else if (skill === "meteor") {
-            const centre = { x: targets[0].x, y: targets[0].y };
-            const radius = (nodes.ember ? 150 : 100) * (1 + nodes.reach * 0.1);
-            effect(state, "fire", centre.x, centre.y, definition.color, "", radius);
-            for (const enemy of state.enemies) if (enemy.health > 0 && distance(centre, enemy) <= radius + enemy.radius) strike(enemy);
-        } else {
-            effect(state, skill === "reap" ? "slash" : "ring", p.x, p.y, definition.color, "", reach, p.facing);
-            let hits = 0;
-            for (const enemy of targets) {
-                if (skill === "reap" && Math.cos(Math.atan2(enemy.y - p.y, enemy.x - p.x) - p.facing) < Math.cos(80 * Math.PI / 180)) continue;
-                if (skill === "siphon" && hits >= 3) break;
-                strike(enemy, skill === "reap" && enemy.health <= enemy.maxHealth * 0.35 ? 1.5 : skill === "frost" && nodes.ember && enemy.chilled > 0 ? 1.4 : 1, skill !== "reap" || nodes.ember > 0);
-                hits++;
-                if (skill === "frost" && enemy.health > 0) { enemy.chilled = 1.5; enemy.chillStrength = 0.3; }
-                if (skill === "nullwave" && enemy.health > 0) pushEnemy(state, enemy, 45);
-            }
-            if (skill === "siphon") {
-                p.health = Math.min(p.maxHealth, p.health + p.maxHealth * (nodes.ember ? 0.03 : 0.02) * hits * difficultyFor(state).healing);
-                effect(state, "heal", p.x, p.y, definition.color, "", 35);
-            }
-            if (skill === "nullwave") state.projectiles = state.projectiles.filter(shot => distance(p, shot) > reach);
-        }
+        if (!castClassSkill(state, skill)) return false;
     } else if (skill === "attack") {
+        const facing = p.weaponFacing ?? p.facing;
         p.swing = 0.26;
         p.attack = hero.attackCooldown / (1 + state.upgrades.cleave * 0.07) / (1 + nodes.rhythm * 0.06);
         const reach = skillReach(state, "attack");
         if (state.heroClass === "ranger") {
-            firePlayerArrows(state, [0], damage(1 + state.upgrades.cleave * 0.08), reach, 0, skill);
+            firePlayerArrows(state, [0], damage(1 + state.upgrades.cleave * 0.08), reach, 0, skill, facing);
         } else {
-            effect(state, "slash", p.x, p.y, color, "", reach, p.facing);
+            effect(state, "slash", p.x, p.y, color, "", reach, facing);
             for (const enemy of state.enemies) {
-                const angle = Math.atan2(enemy.y - p.y, enemy.x - p.x) - p.facing;
+                const angle = Math.atan2(enemy.y - p.y, enemy.x - p.x) - facing;
                 if (distance(p, enemy) < reach + enemy.radius && Math.cos(angle) > 0.25 - state.upgrades.cleave * 0.02) {
                     hitEnemy(state, enemy, damage(1 + state.upgrades.cleave * 0.08));
                 }
@@ -512,11 +643,15 @@ export function useSkill(state, skill, automatic = false) {
             firePlayerArrows(state, [-0.36, -0.18, 0, 0.18, 0.36], damage(hero.specialDamage + state.upgrades.nova * 0.1), reach, 1, skill);
         } else {
             effect(state, "ring", p.x, p.y, color, "", reach);
-            if (state.heroClass === "warden" && nodes.ignition) effect(state, "ring", p.x, p.y, color, "", reach / 2);
+            if (state.heroClass === "warden") effect(state, "ring", p.x, p.y, color, "", reach / 2);
             for (const enemy of state.enemies) {
                 if (distance(p, enemy) < reach + enemy.radius) {
-                    const core = state.heroClass === "warden" && nodes.ignition && distance(p, enemy) <= reach / 2 ? 1.25 : 1;
+                    const core = state.heroClass === "warden" && distance(p, enemy) <= reach / 2 ? nodes.ignition ? 1.5 : 1.25 : 1;
                     hitEnemy(state, enemy, damage((hero.specialDamage + state.upgrades.nova * 0.12) * core), true, skill);
+                    if (state.heroClass === "warden" && enemy.health > 0) {
+                        enemy.chilled = Math.max(enemy.chilled, 1.5);
+                        enemy.chillStrength = Math.max(enemy.chillStrength, 0.15 + nodes.chill * 0.15);
+                    }
                 }
             }
         }
@@ -551,11 +686,12 @@ export function useSkill(state, skill, automatic = false) {
             if (distance(p, enemy) < reach + enemy.radius) {
                 hitEnemy(state, enemy, Math.round(weaponDamage(state) * extra.damage * (1 + state.upgrades.guard * 0.08)
                     * (state.heroClass === "knight" && nodes.repulse ? 2 : 1)), true, skill);
-                if (nodes.repulse && enemy.health > 0) {
-                    if (state.heroClass !== "knight") pushEnemy(state, enemy, state.heroClass === "warden" ? 100 : 60);
+                if (enemy.health > 0) {
+                    if (state.heroClass === "warden") pushEnemy(state, enemy, nodes.repulse ? 100 : 60);
                     if (state.heroClass === "ranger") {
-                        enemy.chilled = 1.5;
-                        enemy.chillStrength = Math.max(enemy.chillStrength, 0.15);
+                        if (nodes.repulse) pushEnemy(state, enemy, 60);
+                        enemy.chilled = Math.max(enemy.chilled, 1.5);
+                        enemy.chillStrength = Math.max(enemy.chillStrength, nodes.repulse ? 0.4 : 0.25);
                     }
                 }
             }
@@ -596,7 +732,7 @@ export function useSkill(state, skill, automatic = false) {
 // direction, letting one call fire a single arrow (attack) or a whole volley/fan (nova/burst).
 // `volley` groups arrows fired together so hitArrowTarget() can apply diminishing returns per
 // target per volley.
-function firePlayerArrows(state, offsets, damage, reach, piercing, skill) {
+function firePlayerArrows(state, offsets, damage, reach, piercing, skill, facing = state.player.facing) {
     const p = state.player;
     if (state.volleySequence >= Number.MAX_SAFE_INTEGER) {
         if (state.playerShots.length) return;
@@ -606,7 +742,7 @@ function firePlayerArrows(state, offsets, damage, reach, piercing, skill) {
     const volley = skill === "attack" ? 0 : ++state.volleySequence;
     for (const offset of offsets) {
         if (state.playerShots.length >= 48) break;
-        const angle = p.facing + offset;
+        const angle = facing + offset;
         state.playerShots.push({ x: p.x, y: p.y, vx: Math.cos(angle) * 780, vy: Math.sin(angle) * 780, damage, life: reach / 780, piercing, skill, volley });
     }
 }
@@ -877,24 +1013,36 @@ export function step(state, input, elapsed) {
     if (length > 0) {
         dx /= length;
         dy /= length;
-        p.facing = Math.atan2(dy, dx);
     }
-    // Touch steering retains the last heading after the finger lifts.
-    if (Number.isFinite(input.faceAngle)) p.facing = input.faceAngle;
-    if (input.aim) p.facing = Math.atan2(input.aim.y - p.y, input.aim.x - p.x);
-    if (input.dodge) useSkill(state, "dodge");
+    const movementAngle = length > 0 ? Math.atan2(dy, dx) : Math.hypot(p.vx, p.vy) > 15 ? Math.atan2(p.vy, p.vx) : undefined;
+    let attackTarget;
+    if (input.autoAttack) {
+        attackTarget = state.enemies.filter(enemy => {
+            const angle = Math.atan2(enemy.y - p.y, enemy.x - p.x);
+            return enemy.health > 0 && distance(p, enemy) <= skillReach(state, "attack") + enemy.radius
+                && (movementAngle === undefined || Math.abs(angleDifference(movementAngle, angle)) <= MAX_WEAPON_TWIST);
+        }).sort((a, b) => distance(p, a) - distance(p, b))[0];
+        const targetAngle = attackTarget ? Math.atan2(attackTarget.y - p.y, attackTarget.x - p.x) : undefined;
+        updateCombatFacing(p, movementAngle, targetAngle, dt);
+    } else {
+        delete p.weaponFacing;
+        if (length > 0) p.facing = Math.atan2(dy, dx);
+        if (Number.isFinite(input.faceAngle)) p.facing = input.faceAngle;
+        if (input.aim) p.facing = Math.atan2(input.aim.y - p.y, input.aim.x - p.x);
+    }
+    if (input.dodge) {
+        const facing = p.facing;
+        if (input.autoAttack && movementAngle !== undefined) p.facing = movementAngle;
+        useSkill(state, "dodge");
+        p.facing = facing;
+    }
     if (input.potion) useSkill(state, "potion");
-    if (input.attack) useSkill(state, "attack");
-    // Automatic attacks aim independently; dodge retains the movement direction.
-    if (input.autoAttack && !input.attack && p.attack <= 0) {
-        const target = state.enemies.filter(enemy => enemy.health > 0 && distance(p, enemy) <= skillReach(state, "attack") + enemy.radius)
-            .sort((a, b) => distance(p, a) - distance(p, b))[0];
-        if (target) {
-            const facing = p.facing;
-            p.facing = Math.atan2(target.y - p.y, target.x - p.x);
-            useSkill(state, "attack");
-            p.facing = facing;
-        }
+    const forwardWeapon = movementAngle === undefined || Math.abs(angleDifference(movementAngle, p.weaponFacing ?? p.facing)) <= MAX_WEAPON_TWIST;
+    if (input.attack && (!input.autoAttack || forwardWeapon)) useSkill(state, "attack");
+    if (input.autoAttack && !input.attack && p.attack <= 0 && forwardWeapon && attackTarget) {
+        const targetAngle = Math.atan2(attackTarget.y - p.y, attackTarget.x - p.x);
+        const alignment = state.heroClass === "ranger" ? Math.min(ATTACK_ALIGNMENT, Math.atan2(attackTarget.radius, distance(p, attackTarget))) : ATTACK_ALIGNMENT;
+        if (Math.abs(angleDifference(p.weaponFacing, targetAngle)) <= alignment) useSkill(state, "attack");
     }
     if (input.manual) useSkill(state, state.loadout.manual);
     autoCast(state);

@@ -56,17 +56,43 @@ public static class NativeGoogleSignIn
         catch (Exception) { pending.TrySetException(new InvalidOperationException("Google sign-in failed.")); }
     }
 
-    public static Task SignOutAsync() => MainThread.InvokeOnMainThreadAsync(() =>
+    private static async Task WaitForCleanupAsync(Android.Gms.Tasks.Task task)
     {
-        var activity = Platform.CurrentActivity;
-        if (activity is not null)
-            Android.Gms.Auth.Api.SignIn.GoogleSignIn.GetClient(activity,
+        for (var attempt = 0; attempt < 200 && !task.IsComplete; attempt++) await Task.Delay(100);
+        if (!task.IsComplete) throw new TimeoutException("Google account cleanup timed out.");
+        if (!task.IsSuccessful) throw new InvalidOperationException("Google account cleanup failed.");
+    }
+
+    public static async Task SignOutAsync()
+    {
+        var task = await MainThread.InvokeOnMainThreadAsync(() =>
+        {
+            var activity = Platform.CurrentActivity ?? throw new InvalidOperationException("No Android activity.");
+            return Android.Gms.Auth.Api.SignIn.GoogleSignIn.GetClient(activity,
                 Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.DefaultSignIn).SignOut();
-    });
+        });
+        await WaitForCleanupAsync(task);
+    }
+
+    public static async Task RevokeAccessAsync()
+    {
+        try
+        {
+            var task = await MainThread.InvokeOnMainThreadAsync(() =>
+            {
+                var activity = Platform.CurrentActivity ?? throw new InvalidOperationException("No Android activity.");
+                return Android.Gms.Auth.Api.SignIn.GoogleSignIn.GetClient(activity,
+                    Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.DefaultSignIn).RevokeAccess();
+            });
+            await WaitForCleanupAsync(task);
+        }
+        finally { await SignOutAsync(); }
+    }
 #else
     public static Task<string?> TrySilentSignInAsync(string webClientId) => Task.FromResult<string?>(null);
     public static Task<string?> SignInAsync(string webClientId) =>
         throw new NotSupportedException("Google sign-in is currently available on Android only.");
     public static Task SignOutAsync() => Task.CompletedTask;
+    public static Task RevokeAccessAsync() => Task.CompletedTask;
 #endif
 }

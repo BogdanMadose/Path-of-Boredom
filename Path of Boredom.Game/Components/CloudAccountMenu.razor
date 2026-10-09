@@ -24,7 +24,11 @@
             }
             else
             {
-                <button type="button" class="mm-pause-option" disabled="@(!cloud.AccountStatus.Configured)" @onclick="SignIn">Continue with Google</button>
+                <button type="button" class="mm-pause-option" disabled="@(!cloud.AccountStatus.Configured)" @onclick="SignIn">@(cloud.AccountStatus.Deleted ? "Create a new game account with Google" : "Continue with Google")</button>
+                @if (cloud.AccountStatus.Deleted)
+                {
+                    <p>Your previous game data was deleted. Signing in again starts a new account; deleted saves and rankings cannot be restored.</p>
+                }
                 <p>Offline play needs no account. Only the backend verifies Google identity.</p>
             }
         </fieldset>
@@ -101,7 +105,11 @@
         status = await Cloud.SignInAsync();
         displayName = status.Player;
     });
-    private Task SignOut() => Run(async () => status = await Cloud.SignOutAsync());
+    private Task SignOut() => Run(async () =>
+    {
+        status = await Cloud.SignOutAsync();
+        displayName = string.Empty;
+    });
     private Task Refresh() => Run(async () => status = await Cloud.RefreshCloudAsync());
     private Task Rename() => Run(async () =>
     {
@@ -124,6 +132,10 @@
     {
         if (!await Confirm("Permanently delete your game saves and rankings, including device backups? This cannot be undone. Your Google account stays unchanged.")) return;
         status = await Cloud.DeleteAccountAsync();
-        if (status.Deleted) await Deleted.InvokeAsync();
+        if (status.Deleted)
+        {
+            displayName = string.Empty;
+            await Deleted.InvokeAsync();
+        }
     });
 }

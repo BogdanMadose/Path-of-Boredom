@@ -1,39 +1,17 @@
 @page "/patch-notes"
 @layout GameLayout
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IGameSession Session
 
 @if (!Embedded)
 {
-    <PageTitle>Patch Notes · Path of Boredom</PageTitle>
+    <PageTitle>@(Session is ICloudGameSession ? "Path of Boredom" : "Patch Notes · Path of Boredom")</PageTitle>
 }
 
 <main class="patch-notes @(Embedded ? "embedded" : null)">
-    @if (Embedded)
+    @if (Embedded || Session is ICloudGameSession)
     {
-        <article id="mobile-patch-001" aria-labelledby="mobile-patch-001-title">
-            <header class="patch-heading">
-                <div class="patch-meta"><span class="badge">MOBILE 001</span><span class="badge latest">INITIAL RELEASE</span></div>
-                <h2 id="mobile-patch-001-title">First Ember</h2>
-                <p>The first mobile release begins a new patch-note history. Desktop development notes remain in the desktop archive.</p>
-            </header>
-            <section class="patch-section">
-                <h3>Your ember, your name</h3>
-                <ul>
-                    <li>Google sign-in, device saves, cloud save choices and online rankings. An always-visible status shows whether you are signed in.</li>
-                    <li>Choose a public player name in Account &amp; cloud. Saves belong to your verified account, not your name; renaming preserves saves and scores.</li>
-                    <li>Cloud revisions protect against overwriting another device's progress. Account deletion and offline play remain available.</li>
-                </ul>
-                <h3>Thumb-friendly combat</h3>
-                <ul>
-                    <li>Smaller, translucent floating movement and aim sticks.</li>
-                    <li>While aiming, pull farther and hold briefly: up for your manual skill, left for Dodge, down for Flask. Aim stays locked during selection; return to the centre to re-arm. Existing skill buttons remain available.</li>
-                    <li>Bosses resist knockback and heavy slows. Hit flashes no longer obscure their attack animations.</li>
-                    <li>Ranger gains stronger, faster basic shots and a little more health; special volleys retain their per-target hit limits.</li>
-                </ul>
-                <h3>A richer hollow</h3>
-                <p>Softened cloth silhouettes, layered scenery and illustrated character details reduce the geometric look while preserving clear combat warnings. Future mobile patches appear here in full, without topic-by-topic navigation.</p>
-            </section>
-        </article>
+        <p>Release notes are not available during mobile testing.</p>
     }
     else
     {

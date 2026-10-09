@@ -20,7 +20,7 @@ import { LEVEL_CARDS, drawLevelCards } from "./arpg-cards.js";
 import { DIFFICULTIES, difficultyFor } from "./arpg-difficulty.js";
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
 import { ELITE_MODIFIERS, enemyDamageSource } from "./arpg-modifiers.js";
-import { SKILL_KEYS, SLOTTABLE_SKILLS, AUTO_COOLDOWN, EXTRA_SKILLS, newSkillTree, skillUnlocked } from "./arpg-skills.js";
+import { SKILL_KEYS, SLOTTABLE_SKILLS, AUTO_COOLDOWN, EXTRA_SKILLS, NEW_SKILLS, newSkillTree, skillUnlocked, skillSelected, needsSkillChoice } from "./arpg-skills.js";
 // Logical canvas resolution (not the real on-screen pixel size — arpg-graphics.js scales this to
 // fit the actual canvas). All position math throughout this file is in these logical units.
 export const WIDTH = 1100;
@@ -76,7 +76,7 @@ export function createState(random = Math.random) {
         buffs: Object.fromEntries(POWER_UPS.map(power => [power.key, 0])),
         boons: Object.fromEntries(Object.keys(LEVEL_CARDS).map(key => [key, 0])),
         pendingChoices: 0, cardChoices: [],
-        loadout: { manual: "nova", auto: ["burst", "none"] }, skillTree: newSkillTree(), wardUnlockSeen: 0,
+        loadout: { manual: "none", auto: ["nova", "none", "none", "none"] }, skillTree: newSkillTree(), wardUnlockSeen: 1,
         resumeDelay: 0, travelPending: 0,
         heroClass: "knight", playerShots: [],
         kills: 0, gold: 0, enemies: [], projectiles: [], loot: [], effects: [],
@@ -87,6 +87,7 @@ export function createState(random = Math.random) {
             damage: 18, weaponBonus: 0, weapon: "Worn iron blade", potions: 3,
             armorBonus: 0, armor: "Traveler's coat",
             attack: 0, nova: 0, burst: 0, guard: 0, guarding: 0, dodge: 0, potion: 0, invulnerable: 0,
+            ...Object.fromEntries(Object.keys(NEW_SKILLS).map(key => [key, 0])),
             afterstep: 0, flaskWard: 0, renewal: 0,
             rolling: 0, rollX: 0, rollY: -1, vx: 0, vy: 0
         }
@@ -116,7 +117,9 @@ export const criticalChance = state => Math.min(0.75, 0.05 + state.boons.critCha
 export const criticalDamage = state => 1.5 + state.boons.critDamage * 0.1 + state.upgrades.critDamage * 0.1 + state.mastery.critDamage * 0.02;
 // Effective range of a given skill, capped per class/skill and boosted by forge/card ranks,
 // Widening ember mastery, and relevant skill tree nodes.
-export const skillReach = (state, skill) => Math.min(state.heroClass === "ranger" ? 1000 : skill === "attack" ? 220 : skill === "burst" ? 500 : 340, (skill === "attack"
+export const skillReach = (state, skill) => NEW_SKILLS[skill]
+    ? NEW_SKILLS[skill].reach * (1 + state.skillTree[skill].reach * 0.1) * (skill === "nullwave" && state.skillTree[skill].ember ? 1.3 : 1)
+    : Math.min(state.heroClass === "ranger" ? 1000 : skill === "attack" ? 220 : skill === "burst" ? 500 : 340, (skill === "attack"
     ? classFor(state).attackReach + state.upgrades.cleave * 6 + state.boons.cleave * 6
     : skill === "nova" ? classFor(state).specialReach + state.upgrades.nova * 10 + state.boons.nova * 10
     : EXTRA_SKILLS[state.heroClass][skill].reach + state.upgrades[skill] * 8) * (1 + state.mastery.area * 0.01)
@@ -128,7 +131,8 @@ const goldReward = (value, fortune = 0) => Math.round(value * 1.1 * (1 + fortune
 export const upgradeCost = (state, key) => UPGRADES[key] ? Math.round(UPGRADES[key].base * (1 + state.upgrades[key] * 0.7 + state.upgrades[key] ** 2 * 0.12)) : Infinity;
 // True once every forge upgrade is at its max rank — the gate that unlocks mastery training
 // (buyMastery below) so gold always has somewhere useful to go even after the forge is exhausted.
-export const forgeComplete = state => Object.entries(UPGRADES).every(([key, value]) => state.upgrades[key] >= value.max);
+export const forgeSkillSelected = (state, key) => skillSelected(state, key);
+export const forgeComplete = state => Object.entries(UPGRADES).filter(([key]) => forgeSkillSelected(state, key)).every(([key, value]) => state.upgrades[key] >= value.max);
 // Gold price of the next rank of a mastery stat — starts at 1000 and grows by 100 per rank already
 // owned. Falls back to Infinity for unrecognized keys or if the cost would overflow safe-integer
 // range (guards against pathological long Endless runs).
@@ -164,7 +168,7 @@ export function buyMastery(state, key) {
 // skill it powers to actually be unlocked on the skill tree.
 export function buyUpgrade(state, key) {
     const upgrade = UPGRADES[key];
-    if (!upgrade || !skillUnlocked(state, key) || !["paused", "camp", "won"].includes(state.status) || state.upgrades[key] >= upgrade.max) return false;
+    if (!upgrade || !forgeSkillSelected(state, key) || !["paused", "camp", "won"].includes(state.status) || state.upgrades[key] >= upgrade.max) return false;
     const cost = upgradeCost(state, key);
     if (state.gold < cost) return false;
     state.gold -= cost;
@@ -206,7 +210,7 @@ export function chooseLevelCard(state, key) {
         state.cardChoices = [];
         state.enemies = state.enemies.filter(enemy => enemy.health > 0);
         if (!state.enemies.length && state.wave > 0 && state.wave % WAVES_PER_MAP === 0) finishCheckpoint(state);
-        else state.status = "playing";
+        else state.status = needsSkillChoice(state) ? "paused" : "playing";
     }
     return true;
 }
@@ -430,7 +434,7 @@ function pushEnemy(state, enemy, amount) {
 // and applies the automatic-cast cooldown penalty (AUTO_COOLDOWN) so auto-cast skills recharge
 // slower than manually-triggered ones.
 export function useSkill(state, skill, automatic = false) {
-    if (state.status !== "playing" || state.resumeDelay > 0 || !SKILL_KEYS.includes(skill) || !skillUnlocked(state, skill)
+    if (state.status !== "playing" || state.resumeDelay > 0 || !SKILL_KEYS.includes(skill) || !skillSelected(state, skill)
         || (automatic ? !SLOTTABLE_SKILLS.includes(skill) || !state.loadout.auto.includes(skill)
             : SLOTTABLE_SKILLS.includes(skill) && state.loadout.manual !== skill)) return false;
     const p = state.player;
@@ -441,7 +445,51 @@ export function useSkill(state, skill, automatic = false) {
         : skill === "burst" ? 1 + nodes.focus * 0.12 : 1;
     const damage = multiplier => Math.round(weaponDamage(state) * multiplier * power);
     const color = skill === "nova" && nodes.ignition && state.heroClass === "knight" ? "#ff8b32" : hero.color;
-    if (skill === "attack") {
+    if (NEW_SKILLS[skill]) {
+        const definition = NEW_SKILLS[skill];
+        const reach = skillReach(state, skill);
+        const targets = state.enemies.filter(enemy => enemy.health > 0 && distance(p, enemy) <= reach + enemy.radius)
+            .sort((a, b) => distance(p, a) - distance(p, b));
+        if (!targets.length) return false;
+        p[skill] = definition.cooldown / (1 + nodes.recovery * 0.1);
+        p.casting = 0.4;
+        const base = damage(definition.damage * (1 + nodes.potency * 0.1));
+        const strike = (enemy, multiplier = 1, piercing = true) => hitEnemy(state, enemy, Math.round(base * multiplier), piercing, skill);
+        if (skill === "chain") {
+            let previous = p;
+            const hit = new Set();
+            for (let index = 0; index < 3 + nodes.ember * 2; index++) {
+                const target = state.enemies.filter(enemy => enemy.health > 0 && !hit.has(enemy) && distance(previous, enemy) <= (index ? 180 : reach))
+                    .sort((a, b) => distance(previous, a) - distance(previous, b))[0];
+                if (!target) break;
+                arrowLink(state, previous, target);
+                hit.add(target);
+                strike(target, 0.75 ** index);
+                previous = target;
+            }
+        } else if (skill === "meteor") {
+            const centre = { x: targets[0].x, y: targets[0].y };
+            const radius = (nodes.ember ? 150 : 100) * (1 + nodes.reach * 0.1);
+            effect(state, "fire", centre.x, centre.y, definition.color, "", radius);
+            for (const enemy of state.enemies) if (enemy.health > 0 && distance(centre, enemy) <= radius + enemy.radius) strike(enemy);
+        } else {
+            effect(state, skill === "reap" ? "slash" : "ring", p.x, p.y, definition.color, "", reach, p.facing);
+            let hits = 0;
+            for (const enemy of targets) {
+                if (skill === "reap" && Math.cos(Math.atan2(enemy.y - p.y, enemy.x - p.x) - p.facing) < Math.cos(80 * Math.PI / 180)) continue;
+                if (skill === "siphon" && hits >= 3) break;
+                strike(enemy, skill === "reap" && enemy.health <= enemy.maxHealth * 0.35 ? 1.5 : skill === "frost" && nodes.ember && enemy.chilled > 0 ? 1.4 : 1, skill !== "reap" || nodes.ember > 0);
+                hits++;
+                if (skill === "frost" && enemy.health > 0) { enemy.chilled = 1.5; enemy.chillStrength = 0.3; }
+                if (skill === "nullwave" && enemy.health > 0) pushEnemy(state, enemy, 45);
+            }
+            if (skill === "siphon") {
+                p.health = Math.min(p.maxHealth, p.health + p.maxHealth * (nodes.ember ? 0.03 : 0.02) * hits * difficultyFor(state).healing);
+                effect(state, "heal", p.x, p.y, definition.color, "", 35);
+            }
+            if (skill === "nullwave") state.projectiles = state.projectiles.filter(shot => distance(p, shot) > reach);
+        }
+    } else if (skill === "attack") {
         p.swing = 0.26;
         p.attack = hero.attackCooldown / (1 + state.upgrades.cleave * 0.07) / (1 + nodes.rhythm * 0.06);
         const reach = skillReach(state, "attack");
@@ -793,6 +841,7 @@ function finishCheckpoint(state) {
 // cause one giant catch-up step that teleports everything or lets enemies all attack at once.
 export function step(state, input, elapsed) {
     if (state.status !== "playing" || !Number.isFinite(elapsed) || elapsed <= 0) return;
+    if (needsSkillChoice(state)) { state.status = "paused"; return; }
     const dt = Math.min(elapsed, 0.05);
     if (state.resumeDelay > 0) {
         state.resumeDelay = Math.max(0, state.resumeDelay - dt);
@@ -836,9 +885,16 @@ export function step(state, input, elapsed) {
     if (input.dodge) useSkill(state, "dodge");
     if (input.potion) useSkill(state, "potion");
     if (input.attack) useSkill(state, "attack");
-    // Mobile regular attacks follow the player's heading, without target snapping.
+    // Automatic attacks aim independently; dodge retains the movement direction.
     if (input.autoAttack && !input.attack && p.attack <= 0) {
-        useSkill(state, "attack");
+        const target = state.enemies.filter(enemy => enemy.health > 0 && distance(p, enemy) <= skillReach(state, "attack") + enemy.radius)
+            .sort((a, b) => distance(p, a) - distance(p, b))[0];
+        if (target) {
+            const facing = p.facing;
+            p.facing = Math.atan2(target.y - p.y, target.x - p.x);
+            useSkill(state, "attack");
+            p.facing = facing;
+        }
     }
     if (input.manual) useSkill(state, state.loadout.manual);
     autoCast(state);

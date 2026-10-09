@@ -18,7 +18,7 @@ import { DIFFICULTIES } from "./arpg-difficulty.js";
 import { MASTERY, MAX_FLASKS } from "./arpg-engine.js";
 import { HERO_CLASSES } from "./arpg-classes.js";
 import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
-import { SKILL_KEYS, SLOTTABLE_SKILLS, TREE_NODES, skillPointsLeft, skillUnlocked, validLoadout } from "./arpg-skills.js";
+import { SKILL_KEYS, SLOTTABLE_SKILLS, TREE_NODES, NEW_SKILLS, skillCapacity, skillPointsLeft, skillUnlocked, validLoadout } from "./arpg-skills.js";
 
 // Field-name lists used with numbers() below, grouped by the kind of save-state object they belong
 // to — kept as flat arrays so each numbers() call site doesn't need to spell out every field name inline.
@@ -77,11 +77,11 @@ function integer(value, min, max) {
 // the actual migration mechanism — it supplies a sensible default for saves older than the version
 // that introduced a given field, rather than requiring every historical save to be rewritten.
 export function restoreSnapshot(snapshot, random = Math.random) {
-    require([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].includes(snapshot?.version));
+    require([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].includes(snapshot?.version));
     const saved = snapshot.state;
     const state = createState(random);
     state.rankingPatch = snapshot.version < 13 ? "pre004" : saved.rankingPatch;
-    require(["004", "pre004"].includes(state.rankingPatch));
+    require(["release", "005", "004", "pre004"].includes(state.rankingPatch));
     state.volleySequence = snapshot.version < 14 ? 2 : saved.volleySequence;
     integer(state.volleySequence, 2, Number.MAX_SAFE_INTEGER);
     state.heroClass = snapshot.version < 7 ? "knight" : saved.heroClass;
@@ -130,7 +130,8 @@ export function restoreSnapshot(snapshot, random = Math.random) {
         integer(rank, 0, upgrade.max);
         state.upgrades[key] = rank;
     }
-    require(!Object.values(state.mastery).some(rank => rank > 0) || Object.entries(UPGRADES).every(([key, value]) => state.upgrades[key] === value.max));
+    require(!Object.values(state.mastery).some(rank => rank > 0) || Object.entries(UPGRADES)
+        .filter(([key]) => snapshot.version < 15 || !["nova", "burst", "guard"].includes(key)).every(([key, value]) => state.upgrades[key] === value.max));
     for (const power of POWER_UPS) {
         const remaining = snapshot.version < 3 ? 0 : saved.buffs?.[power.key];
         require(typeof remaining === "number" && Number.isFinite(remaining) && remaining >= 0 && remaining <= power.duration);
@@ -141,6 +142,7 @@ export function restoreSnapshot(snapshot, random = Math.random) {
     require(state.time >= 0 && state.intermission >= 0 && state.intermission <= 3.5);
     state.player = numbers({ vx: 0, vy: 0, ...saved.player }, playerNumbers);
     const p = state.player;
+    Object.assign(p, snapshot.version < 15 ? Object.fromEntries(Object.keys(NEW_SKILLS).map(key => [key, 0])) : numbers(saved.player, Object.keys(NEW_SKILLS)));
     Object.assign(p, numbers(snapshot.version < 9 ? { burst: 0, guard: 0, guarding: 0 } : saved.player, ["burst", "guard", "guarding"]));
     Object.assign(p, numbers(snapshot.version < 12 ? { afterstep: 0, flaskWard: 0, renewal: 0 } : saved.player, ["afterstep", "flaskWard", "renewal"]));
     let previousTreePoints = 0;
@@ -149,13 +151,13 @@ export function restoreSnapshot(snapshot, random = Math.random) {
         require(state.resumeDelay >= 0 && state.resumeDelay <= 3);
         integer(state.travelPending, 0, 1);
         const slotKeys = snapshot.version < 10 ? SKILL_KEYS : SLOTTABLE_SKILLS;
-        require(saved.loadout && slotKeys.includes(saved.loadout.manual));
+        require(saved.loadout && (snapshot.version >= 15 ? saved.loadout.manual === "none" : slotKeys.includes(saved.loadout.manual)));
         state.loadout = { manual: saved.loadout.manual, auto: array(saved.loadout.auto, key => {
             require(key === "none" || slotKeys.includes(key) && key !== saved.loadout.manual);
             return key;
         }) };
         const slotted = state.loadout.auto.filter(key => key !== "none");
-        require(state.loadout.auto.length === (snapshot.version < 10 ? 3 : 2) && new Set(slotted).size === slotted.length);
+        require(state.loadout.auto.length === (snapshot.version >= 15 ? 4 : snapshot.version < 10 ? 3 : 2) && new Set(slotted).size === slotted.length);
         if (snapshot.version < 10) {
             if (!SLOTTABLE_SKILLS.includes(state.loadout.manual)) state.loadout.manual = "nova";
             const auto = state.loadout.auto.filter(key => SLOTTABLE_SKILLS.includes(key) && key !== state.loadout.manual);
@@ -163,6 +165,7 @@ export function restoreSnapshot(snapshot, random = Math.random) {
         }
         require(saved.skillTree && typeof saved.skillTree === "object");
         for (const skill of SKILL_KEYS) {
+            if (snapshot.version < 15 && NEW_SKILLS[skill]) continue;
             const keys = snapshot.version < 12 ? ["potency", "reach", "ember", "recovery"] : Object.keys(TREE_NODES[skill]);
             const nodes = numbers(saved.skillTree[skill], keys);
             keys.forEach((key, index) => integer(nodes[key], 0, [3, 2, 1, 2][index]));
@@ -177,7 +180,7 @@ export function restoreSnapshot(snapshot, random = Math.random) {
     if (snapshot.version >= 11) {
         integer(saved.wardUnlockSeen, 0, 1);
         state.wardUnlockSeen = saved.wardUnlockSeen;
-        require(validLoadout(state, state.loadout.manual, state.loadout.auto));
+        if (snapshot.version >= 15) require(validLoadout(state, state.loadout.manual, state.loadout.auto));
         require(skillUnlocked(state, "guard") || p.guarding === 0);
     } else {
         if (!skillUnlocked(state, state.loadout.manual)) state.loadout.manual = "nova";
@@ -271,6 +274,12 @@ export function restoreSnapshot(snapshot, random = Math.random) {
         && ["playing", "paused"].includes(saved.status) && (state.mode === "endless" || state.wave < LAST_WAVE));
     if (saved.status === "camp") require(state.wave > 0 && state.wave % 5 === 0 && !state.enemies.length && (state.mode === "endless" ? state.wave > LAST_WAVE : state.wave < LAST_WAVE));
     if (saved.status === "won") require(state.mode === "campaign" && state.wave === LAST_WAVE && state.campaignComplete === 1 && !state.enemies.length);
+    if (snapshot.version < 15) {
+        const skills = [...new Set([state.loadout.manual, ...state.loadout.auto].filter(key => SLOTTABLE_SKILLS.includes(key)))].slice(0, skillCapacity(state));
+        if (!skills.length) skills.push("nova");
+        state.loadout = { manual: "none", auto: Array.from({ length: 4 }, (_, index) => skills[index] ?? "none") };
+        state.wardUnlockSeen = 1;
+    }
     state.status = ["camp", "won", "choosing"].includes(saved.status) ? saved.status : "paused";
     return state;
 }
@@ -285,7 +294,7 @@ export function restoreSnapshot(snapshot, random = Math.random) {
 // oversized save is caught client-side with time to react rather than failing after a network round trip.
 export function captureSnapshot(state) {
     require(["playing", "paused", "camp", "won", "choosing"].includes(state.status));
-    const restored = restoreSnapshot({ version: 14, state: {
+    const restored = restoreSnapshot({ version: 15, state: {
         ...state,
         playerShots: state.playerShots.filter(shot => shot.life > 0),
         enemies: state.enemies.filter(enemy => enemy.health > 0),
@@ -293,7 +302,7 @@ export function captureSnapshot(state) {
         loot: state.loot.filter(drop => drop.life > 0)
     } });
     const { random, effects, damageHistory, ...saved } = restored;
-    const snapshot = { version: 14, state: saved };
+    const snapshot = { version: 15, state: saved };
     require(new TextEncoder().encode(JSON.stringify(snapshot)).length <= 64 * 1024);
     return snapshot;
 }

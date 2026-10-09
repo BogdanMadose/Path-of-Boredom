@@ -12,7 +12,7 @@
 <main class="rankings @(Embedded ? "embedded" : null)">
     <header>
         <a href="/">◇ PATH OF BOREDOM</a>
-        <a href="/patch-notes">Patch notes</a>
+        @if (!Mobile) { <a href="/patch-notes">Patch notes</a> }
         <span>THE WATCH REMEMBERS</span>
     </header>
     <section class="heading">
@@ -21,12 +21,15 @@
         <p>Every fallen enemy counts. Each class keeps its own highest kill score for every difficulty and starting mode, even after death. Inspect a record to see the upgrades used in that build.</p>
     </section>
     <div class="filters">
+        @if (!Mobile)
+        {
         <label>Patch
             <select @bind="patch" @bind:after="RefreshAsync" disabled="@busy">
                 <option value="004">Patch 004 — fresh runs</option>
                 <option value="pre004">Pre-004 / inherited runs</option>
             </select>
         </label>
+        }
         <label>Difficulty
             <select @bind="difficulty" @bind:after="RefreshAsync" disabled="@busy">
                 <option value="hard">@RankingRules.DifficultyName("hard")</option>
@@ -51,8 +54,15 @@
         </label>
         <button type="button" data-rankings-refresh @onclick="RefreshAsync" disabled="@busy">Refresh</button>
     </div>
-    <p class="notice">Ranks and ties are calculated within each patch and class. New campaigns and fresh veteran Endless runs qualify for Patch 004. Saves from before patch tracking stay on the archive boards, including when continued into Endless, so inherited power cannot compete with fresh builds. Existing records are preserved. Legacy unranked saves remain unranked.</p>
-    <p class="notice">Build details are captured when a higher score is submitted; later upgrades or tied scores do not rewrite that record. Older records keep their recorded class, but upgrades and discarded scores from other classes cannot be recovered.</p>
+    @if (Mobile)
+    {
+        <p class="notice">Initial release · Rankings start fresh, without development-patch records. Scores are separate by class, difficulty and starting mode.</p>
+    }
+    else
+    {
+        <p class="notice">New runs compete on Patch 004. Older saves and records stay on their archive boards, including when continued into Endless. Rankings are separate by patch, class, difficulty and starting mode.</p>
+    }
+    <p class="notice">Build details are captured when a higher score is submitted; later upgrades or tied scores do not rewrite that record.</p>
     @if (busy)
     {
         <p role="status">Gathering the names of the watch...</p>
@@ -162,6 +172,7 @@
 
 @code {
     [Parameter] public bool Embedded { get; set; }
+    private bool Mobile => Session is ICloudGameSession;
     private bool loaded;
     // Filter state bound directly to the <select> elements above via @bind:after — changing any
     // filter immediately triggers RefreshAsync rather than needing a separate "apply" step.
@@ -174,7 +185,11 @@
     private IReadOnlyList<RankingRow> rows = [];
 
     /// <summary>Loads the default (Hard / Campaign / All classes / current patch) leaderboard on first render.</summary>
-    protected override Task OnInitializedAsync() => Embedded ? Task.CompletedTask : RefreshAsync();
+    protected override Task OnInitializedAsync()
+    {
+        patch = Mobile ? RankingRules.MobileRelease : RankingRules.CurrentPatch;
+        return Embedded ? Task.CompletedTask : RefreshAsync();
+    }
 
     /// <summary>
     /// Re-registers the player's ranking profile (cheap, idempotent — also doubles as a

@@ -7,32 +7,31 @@
 
 <PageTitle>Path of Boredom - The Ember Campaign</PageTitle>
 
-<div class="arpg" data-player="@windowsUserName" @ref="gameRoot">
-    @if (Session is ICloudGameSession mobileAccount)
-    {
-        <div class="mobile-account-status" role="status" aria-live="polite">
-            <span>@(mobileAccount.AccountStatus.SignedIn ? "Logged in as" : "Offline · not signed in")</span>
-            @if (mobileAccount.AccountStatus.SignedIn) { <strong>@windowsUserName</strong> }
-        </div>
-    }
+<div class="arpg" data-player="@windowsUserName" data-ranking-board="@(Session is ICloudGameSession ? Path_of_Boredom.ServiceDefaults.RankingRules.MobileRelease : Path_of_Boredom.ServiceDefaults.RankingRules.CurrentPatch)" data-cloud-signed-in="@(Session is ICloudGameSession account && account.AccountStatus.SignedIn ? "on" : "off")" @ref="gameRoot">
     <header class="game-header">
         <a class="brand" href="/" aria-label="Path of Boredom home"><span class="brand-mark">&#9671;</span> PATH <small>OF</small> BOREDOM</a>
         <span class="edition"><span data-stat="mode">THE EMBER CAMPAIGN</span> <span>&middot;</span> <span data-stat="campaign">MAP 1 / 6</span></span>
         <div class="signed-in-user" title="@windowsUserName"><small>@(Session is ICloudGameSession ? "PLAYER ACCOUNT" : "WINDOWS SIGN-IN")</small><strong>@windowsUserName</strong></div>
         <div class="game-actions">
             <a class="quiet-button" href="/rankings" target="_blank" rel="noopener">Rankings ↗</a>
-            <a class="quiet-button" href="/patch-notes" target="_blank" rel="noopener">Patch notes ↗</a>
+            @if (Session is not ICloudGameSession)
+            {
+                <a class="quiet-button" href="/patch-notes" target="_blank" rel="noopener">Patch notes ↗</a>
+            }
             <button type="button" class="quiet-button" data-action="forge" disabled>Forge</button>
             <button type="button" class="quiet-button" data-action="save" disabled>Save</button>
             <button type="button" class="quiet-button" data-action="load" disabled>Load</button>
             <button type="button" class="quiet-button" data-action="pause" disabled>Pause <kbd>P</kbd></button>
         </div>
     </header>
+    @if (Session is not ICloudGameSession)
+    {
     <aside class="patch-notice" data-patch-notice role="status">
         <span><strong>Patch 004 is live — Power Under Pressure</strong> · Growing enemy threats, class-specific trees, Ranger ricochets and piercing, faster loot, and automatic Endless checkpoints. Flasks matter: stage rests are now partial.</span>
         <a href="/patch-notes#patch-004" target="_blank" rel="noopener">Read patch notes ↗</a>
         <button type="button" class="quiet-button" data-dismiss-patch aria-label="Dismiss patch announcement">Dismiss</button>
     </aside>
+    }
     <p class="save-status" data-save-status role="status" aria-live="polite">Saves belong to your signed-in Windows account. Checkpoints save automatically; manual Save/Load is also available.</p>
     <p class="save-status" data-ranking-status role="status">@rankingStatus</p>
 
@@ -101,6 +100,22 @@
                             <small data-loading role="status">Preparing the hollow...</small>
                         </div>
                     </div>
+                    <div class="arena-overlay setup-overlay" data-skill-choice hidden role="dialog" aria-modal="true" aria-labelledby="skill-choice-title">
+                        <section class="overlay-card">
+                            <p class="eyebrow">BUILD YOUR PATH</p>
+                            <h2 id="skill-choice-title">Choose your next automatic skill</h2>
+                            <p>Combat is paused. This choice is locked until the run ends. Add a skill at levels 5, 10, and 15.</p>
+                            <div class="run-skill-pool">
+                                @foreach (var skill in CombatSkills)
+                                {
+                                    <button type="button" class="quiet-button" data-choose-run-skill="@skill">
+                                        <strong data-skill-name="@skill">@skill</strong>
+                                        <span data-skill-description="@skill"></span>
+                                    </button>
+                                }
+                            </div>
+                        </section>
+                    </div>
                     <div class="arena-overlay setup-overlay" data-setup hidden role="dialog" aria-modal="true" aria-labelledby="setup-title">
                         <section class="overlay-card">
                             <p class="eyebrow" data-setup-step>PREPARE YOUR JOURNEY</p>
@@ -131,12 +146,11 @@
                             <section data-setup-loadout hidden aria-label="Starting skill loadout">
                                 <p data-setup-unlock></p>
                                 <div class="loadout-grid">
-                                    @for (var slot = 0; slot < 3; slot++)
+                                    @for (var slot = 0; slot < 1; slot++)
                                     {
-                                        <label>@(slot == 0 ? "Manual skill (Q)" : $"Auto slot {slot}")
+                                        <label>Starting automatic skill
                                             <select data-setup-slot="@slot">
-                                                @if (slot > 0) { <option value="none">Empty</option> }
-                                                @foreach (var skill in new[] { "nova", "burst", "guard" })
+                                                @foreach (var skill in CombatSkills)
                                                 {
                                                     <option value="@skill" data-setup-skill="@skill">@skill</option>
                                                 }
@@ -166,7 +180,7 @@
                     <div class="vital experience"><div><span>EXPERIENCE</span><strong data-stat="xp">0 / 60</strong></div><meter data-meter="xp" min="0" max="60" value="0" aria-label="Experience"></meter></div>
                 </div>
                 <div class="skill-bar">
-                    @foreach (var skill in new[] { "attack", "nova", "burst", "guard", "dodge", "potion" })
+                    @foreach (var skill in AllSkills)
                     {
                         <button type="button" data-skill="@skill"><kbd data-slot-label></kbd><span class="skill-icon">&#10023;</span><span><span data-skill-name="@skill">@skill</span><small data-stat="@skill">Ready</small></span></button>
                     }
@@ -178,14 +192,14 @@
                 </div>
                 <section class="skills-panel" data-skills aria-labelledby="skills-title">
                     <div class="forge-heading"><h2 id="skills-title">Paths of power</h2><strong data-stat="skill-points">0 points available</strong></div>
-                    <p>J or left click is your regular attack; Space dodges and E drinks a flask. These actions never need slots and cannot auto-cast. Choose one combat skill for Q and up to two for auto-casting, with 60% longer cooldowns. Pause to configure. Attacks and all abilities remain upgradeable: earn one point every two levels, up to 32 total—enough to fully upgrade four trees at level 64. Choices stay with this character.</p>
+                    <p>Attacks and selected combat skills target automatically. Dodge and flask remain manual. Start with one combat skill, then add another at levels 5, 10 and 15. Each choice is locked for this run. Earn one upgrade point every two levels, up to 32.</p>
                     <div class="loadout-grid">
-                        @for (var slot = 0; slot < 3; slot++)
+                        @for (var slot = 1; slot <= 4; slot++)
                         {
-                            <label>@(slot == 0 ? "Manual skill (Q)" : $"Auto slot {slot}")
+                            <label>@($"Auto slot {slot} · level {new[] { 1, 5, 10, 15 }[slot - 1]}")
                                 <select data-loadout-slot="@slot" disabled>
-                                    @if (slot > 0) { <option value="none">Empty</option> }
-                                    @foreach (var skill in new[] { "nova", "burst", "guard" })
+                                    <option value="none">Choose when unlocked</option>
+                                    @foreach (var skill in CombatSkills)
                                     {
                                         <option value="@skill" data-skill-name="@skill">@skill</option>
                                     }
@@ -193,7 +207,7 @@
                             </label>
                         }
                     </div>
-                    <p class="forge-feedback" data-skill-feedback role="status">Only special, burst, and ward skills use slots; no skill can occupy two slots. Regular attacks, dodge, and flasks are always manual. Unsaved changes require Save or the next checkpoint.</p>
+                    <p class="forge-feedback" data-skill-feedback role="status">Skills cast automatically. Chosen slots are locked for this run; unlocked empty slots can be filled while paused. Save to keep your build.</p>
                     <p class="skill-unlock-status" data-stat="ward-unlock-status"></p>
                     <p>Reset one tree while paused for 100 gold + 50 per spent point. All points from that tree return; gold is spent permanently. Cooldowns stay unchanged and refunded effects end. Save to keep changes outside checkpoints.</p>
                     <details class="elite-guide">
@@ -203,7 +217,7 @@
                     </details>
                     <button type="button" class="ember-button" data-resume-combat disabled>Return to battle</button>
                     <div class="skill-tree-grid">
-                        @foreach (var skill in new[] { "attack", "nova", "burst", "guard", "dodge", "potion" })
+                        @foreach (var skill in AllSkills)
                         {
                             <section class="skill-tree" data-tree-skill="@skill">
                                 <h3 data-skill-name="@skill">@skill</h3>
@@ -290,9 +304,12 @@
     <section class="game-information" data-game-rankings hidden aria-label="In-game rankings">
         <Rankings Embedded="true" />
     </section>
-    <section class="game-information" data-game-patch-notes hidden aria-label="In-game patch notes">
-        <PatchNotes Embedded="true" />
-    </section>
+    @if (Session is not ICloudGameSession)
+    {
+        <section class="game-information" data-game-patch-notes hidden aria-label="In-game patch notes">
+            <PatchNotes Embedded="true" />
+        </section>
+    }
     @if (Session is ICloudGameSession)
     {
         <section class="game-information mm-info-panel mm-account" data-game-account hidden aria-label="Account and cloud saves">
@@ -302,6 +319,8 @@
 </div>
 
 @code {
+    private static readonly string[] CombatSkills = ["nova", "burst", "guard", "chain", "frost", "reap", "meteor", "siphon", "nullwave"];
+    private static readonly string[] AllSkills = ["attack", "nova", "burst", "guard", "dodge", "potion", "chain", "frost", "reap", "meteor", "siphon", "nullwave"];
     // Reference to the root <div class="arpg"> element — handed to the JS module so it can query
     // everything else it needs (canvas, buttons, overlays) by selector instead of us wiring each
     // one up individually through Blazor's own binding syntax.

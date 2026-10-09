@@ -14,7 +14,7 @@
 // button/panel do anything", it's almost certainly wiring that's missing in this file.
 import { WIDTH, HEIGHT, createState, startRun, startEndlessRun, step, togglePause, useSkill, weaponDamage, armorRating, upgradeCost, buyUpgrade, continueJourney, enterEndless, chooseLevelCard } from "./arpg-engine.js";
 import { captureSnapshot, restoreSnapshot } from "./arpg-save.js";
-import { captureRankingBuild } from "./arpg-ranking.js";
+import { captureRankingBuild, resetToReleaseRankings } from "./arpg-ranking.js";
 import { upgradePreview } from "./arpg-upgrade-preview.js";
 import { MAPS, LAST_WAVE, UPGRADES, POWER_UPS, threatForWave, mapForWave, mapIndexForWave, firePhase } from "./arpg-campaign.js";
 import { LEVEL_CARDS } from "./arpg-cards.js";
@@ -24,7 +24,7 @@ import { movementSpeed, criticalChance, criticalDamage, skillReach } from "./arp
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
 import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
 import { treePointsSpent, treeRespecCost, canRespecTree, respecTree } from "./arpg-skills.js";
-import { SKILL_KEYS, SLOTTABLE_SKILLS, EXTRA_SKILLS, MAX_SKILL_POINTS, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
+import { SKILL_KEYS, SLOTTABLE_SKILLS, EXTRA_SKILLS, NEW_SKILLS, MAX_SKILL_POINTS, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, skillSelected, skillCapacity, selectedSkills, needsSkillChoice, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
 import { drawHero, drawOrb, decorateFloor, drawAtmosphere, drawLootIcon } from "./arpg-graphics.js";
 import { drawHud } from "./arpg-hud.js";
 
@@ -698,7 +698,8 @@ function drawCountdown(ctx, state) {
 export function createGame(root, saveBridge = null) {
     const loadingReadyAt = performance.now() + 2500;
     const canvas = root.querySelector("canvas");
-    const bestKey = `${BEST_KEY}:${root.dataset.player || "unknown"}`;
+    const releaseRankings = root.dataset.rankingBoard === "release";
+    const bestKey = `${BEST_KEY}:${releaseRankings ? "release:" : ""}${root.dataset.player || "unknown"}`;
     const ctx = canvas.getContext("2d");
     const loading = root.querySelector("[data-loading]");
     if (!ctx) {
@@ -735,6 +736,7 @@ export function createGame(root, saveBridge = null) {
     const pointers = new Map();
     let aim = null;
     let state = createState();
+    if (releaseRankings) resetToReleaseRankings(state);
     let best = 0;
     let frame = 0;
     let last = 0;
@@ -775,16 +777,19 @@ export function createGame(root, saveBridge = null) {
     const loadoutSelects = [...root.querySelectorAll("[data-loadout-slot]")];
     const treeButtons = [...root.querySelectorAll("[data-learn-skill]")];
     const setupLoadoutPanel = root.querySelector("[data-setup-loadout]");
+    const skillChoice = root.querySelector("[data-skill-choice]");
     const setupSlots = [...root.querySelectorAll("[data-setup-slot]")];
     const skillUnlockNotice = root.querySelector("[data-skill-unlock]");
     const skillFeedback = root.querySelector("[data-skill-feedback]");
     const patchNotice = root.querySelector("[data-patch-notice]");
     const patchPreference = `path-of-boredom.patch-004:${root.dataset.player || "unknown"}`;
-    try { patchNotice.hidden = localStorage.getItem(patchPreference) === "seen"; } catch { /* Announcements work without storage. */ }
-    on(root.querySelector("[data-dismiss-patch]"), "click", () => {
-        patchNotice.hidden = true;
-        try { localStorage.setItem(patchPreference, "seen"); } catch { /* Dismissal persistence is optional. */ }
-    });
+    if (patchNotice) {
+        try { patchNotice.hidden = localStorage.getItem(patchPreference) === "seen"; } catch { /* Announcements work without storage. */ }
+        on(root.querySelector("[data-dismiss-patch]"), "click", () => {
+            patchNotice.hidden = true;
+            try { localStorage.setItem(patchPreference, "seen"); } catch { /* Dismissal persistence is optional. */ }
+        });
+    }
     const viewPreference = "path-of-boredom.focus-view";
     let focusView = true;
     let layoutFrame = 0;
@@ -910,7 +915,9 @@ export function createGame(root, saveBridge = null) {
                 reportedScores.set(key, Math.max(submission.score, reportedScores.get(key) ?? 0));
                 if (pendingScores.get(key) === submission) pendingScores.delete(key);
             }
-            rankingStatus.textContent = `Class best synced with its upgrades. Board: ${state.rankingPatch === "004" ? "Patch 004" : "archive / inherited run"}. Rankings also separate class, difficulty, and starting mode.`;
+            rankingStatus.textContent = releaseRankings
+                ? "Initial release ranking synced. Scores are separate by class, difficulty and starting mode."
+                : `Class best synced with its upgrades. Board: ${state.rankingPatch === "004" ? "Patch 004" : "archive / inherited run"}. Rankings also separate class, difficulty, and starting mode.`;
         } catch {
             if (!disposed) rankingStatus.textContent = "Score sync failed. Keep this page open; it will retry automatically.";
         } finally { reporting = false; }
@@ -937,6 +944,34 @@ export function createGame(root, saveBridge = null) {
         delete root.dataset.stickX;
         delete root.dataset.stickY;
     }
+    let promptOpen = false;
+    function gameConfirm(message) {
+        if (promptOpen) return Promise.resolve(false);
+        promptOpen = true;
+        if (state.status === "playing") togglePause(state);
+        clearInput();
+        updateHud();
+        const dialog = document.createElement("dialog");
+        dialog.className = "game-confirm";
+        dialog.setAttribute("aria-label", "Confirm game action");
+        const heading = document.createElement("h2");
+        heading.textContent = "Keep your ember safe";
+        const copy = document.createElement("p");
+        copy.textContent = message;
+        const accept = document.createElement("button"), cancel = document.createElement("button");
+        accept.textContent = "Confirm";
+        cancel.textContent = "Cancel";
+        dialog.append(heading, copy, accept, cancel);
+        root.append(dialog);
+        dialog.showModal();
+        cancel.focus();
+        return new Promise(resolve => {
+            const finish = result => { promptOpen = false; dialog.remove(); resolve(result); };
+            accept.addEventListener("click", () => finish(true), { once: true });
+            cancel.addEventListener("click", () => finish(false), { once: true });
+            dialog.addEventListener("cancel", event => { event.preventDefault(); finish(false); }, { once: true });
+        });
+    }
     // Refreshes the setup dialog's class-preview panel text to match whichever class is currently
     // selected in the dropdown, so players can compare stats before starting a run.
     function updateClassPreview() {
@@ -960,7 +995,7 @@ export function createGame(root, saveBridge = null) {
     }
     // Reads the loadout dropdowns' current values as a { manual, auto } loadout object.
     function readSetupLoadout() {
-        return { manual: setupSlots[0].value, auto: setupSlots.slice(1).map(select => select.value) };
+        return setupAction === "continue" ? state.loadout : { manual: "none", auto: [setupSlots[0].value, "none", "none", "none"] };
     }
     // Refreshes the setup dialog's loadout step: disables/labels each skill option by whether it's
     // unlocked for the previewed class/mode, updates the guard-unlock hint text, and enables/disables
@@ -973,15 +1008,13 @@ export function createGame(root, saveBridge = null) {
             option.disabled = !skillUnlocked(preview, key);
             option.textContent = `${skillName(preview, key)}${option.disabled ? " — Locked" : ""}`;
         }
-        root.querySelector("[data-setup-unlock]").textContent = skillUnlocked(preview, "guard")
-            ? `${skillName(preview, "guard")} is unlocked and available to slot.`
-            : `${skillName(preview, "guard")}: ${wardUnlockHint(preview)}. You will be reminded to slot it when it unlocks.`;
+        root.querySelector("[data-setup-unlock]").textContent = "Auto attack + one skill. Add another at levels 5, 10 and 15. Choices are locked for this run.";
         const loadout = readSetupLoadout();
         const valid = validLoadout(preview, loadout.manual, loadout.auto);
         setupNext.disabled = saving || !valid;
         root.querySelector("[data-setup-loadout-feedback]").textContent = valid
-            ? "Confirm your slots to begin. J / click attacks, Space dodges, E heals. Q casts your manual skill; auto skills have 60% longer cooldowns. Empty auto slots are allowed."
-            : "Choose an unlocked skill for Q. Each skill can appear in only one slot; use Empty to free an auto slot.";
+            ? `${skillName(preview, setupSlots[0].value)}: ${NEW_SKILLS[setupSlots[0].value]?.detail ?? "Your class combat skill casts automatically at nearby enemies."}`
+            : "Choose one starting skill.";
     }
     for (const select of setupSlots) on(select, "change", () => {
         if (select === setupSlots[0]) {
@@ -1015,10 +1048,10 @@ export function createGame(root, saveBridge = null) {
         root.querySelector("[data-setup-difficulty]").hidden = !choosingDifficulty;
         difficultySelect.disabled = !choosingDifficulty;
         setupSkip.hidden = choosingDifficulty || choosingLoadout;
-        setupLoadoutPanel.hidden = mobile || !choosingLoadout;
+        setupLoadoutPanel.hidden = setupAction === "continue" || (mobile ? !choosingDifficulty : !choosingLoadout);
         setupNext.textContent = mobile ? "Start adventure" : choosingLoadout ? setupAction === "campaign" ? "Confirm slots & begin" : "Confirm slots & enter Endless" : "Next";
         setupNext.disabled = saving;
-        if (choosingLoadout) updateSetupLoadout();
+        if (choosingLoadout || mobile) updateSetupLoadout();
         (choosingDifficulty ? difficultySelect : choosingLoadout ? setupSlots[0] : setupNext).focus({ preventScroll: true });
     }
     // Opens the setup dialog for a given `action` ("campaign", "endless", or "continue" — i.e.
@@ -1033,9 +1066,7 @@ export function createGame(root, saveBridge = null) {
         setupStep = 0;
         difficultySelect.value = Object.hasOwn(DIFFICULTIES, state.difficulty) ? state.difficulty : "hard";
         classSelect.value = state.heroClass;
-        const loadout = action === "continue" ? state.loadout : { manual: "nova", auto: ["burst", "none"] };
-        setupSlots[0].value = loadout.manual;
-        setupSlots.slice(1).forEach((select, index) => { select.value = loadout.auto[index]; });
+        setupSlots[0].value = action === "continue" ? state.loadout.auto[0] : "nova";
         setup.hidden = false;
         updateHud();
         showSetupStep();
@@ -1051,11 +1082,11 @@ export function createGame(root, saveBridge = null) {
         if (!validLoadout(setupPreview(), loadout.manual, loadout.auto)) return;
         void reportScore();
         if (setupAction === "continue") {
-            if (!setLoadout(state, loadout.manual, loadout.auto)) return;
             if (!enterEndless(state, difficultySelect.value)) return;
         } else {
             state = setupAction === "endless" ? startEndlessRun(Math.random, difficultySelect.value, classSelect.value) : startRun(Math.random, difficultySelect.value, classSelect.value);
             state.loadout = loadout;
+            if (releaseRankings) resetToReleaseRankings(state);
         }
         setupAction = null;
         setup.hidden = true;
@@ -1132,7 +1163,8 @@ export function createGame(root, saveBridge = null) {
             burst: `${extra.burst.cooldown}s base cooldown. ${extra.burst.shape === "beam" ? "A narrow lance strikes every enemy along its line." : extra.burst.shape === "arrows" ? "Seven arrows, each penetrating a second target at 70% damage. Deep penetration adds a third." : "A heavy cone; Crushing force rewards hitting slowed enemies."}`,
             guard: `${extra.guard.cooldown}s base cooldown. Grants 40% damage reduction for at least 3s. Cannot refresh while active; at least 2s without protection after expiry.`,
             dodge: "Directional evasion on Space. Always available without a slot; manual-only.",
-            potion: "Press E to consume one flask and heal. Always available without a slot; manual-only."
+            potion: "Press E to consume one flask and heal. Always available without a slot; manual-only.",
+            ...Object.fromEntries(Object.entries(NEW_SKILLS).map(([key, skill]) => [key, `${skill.cooldown}s cooldown. ${skill.detail}`]))
         };
         for (const element of root.querySelectorAll("[data-skill-description]")) {
             const value = descriptions[element.dataset.skillDescription];
@@ -1147,7 +1179,7 @@ export function createGame(root, saveBridge = null) {
             const skill = button.dataset.skill;
             const manual = !SLOTTABLE_SKILLS.includes(skill) || state.loadout.manual === skill;
             const automatic = state.loadout.auto.includes(skill);
-            const locked = !skillUnlocked(state, skill);
+            const locked = !skillSelected(state, skill);
             const unavailable = locked || state.status !== "playing" || state.resumeDelay > 0 || !!setupAction || saving;
             const cannotHeal = skill === "potion" && (p.potions === 0 || p.health >= p.maxHealth);
             button.disabled = unavailable || cannotHeal || !manual;
@@ -1195,8 +1227,9 @@ export function createGame(root, saveBridge = null) {
         const acquired = Object.entries(state.boons).filter(([, rank]) => rank > 0);
         text("boon-count", acquired.reduce((total, [, rank]) => total + rank, 0));
         text("boons", acquired.length ? acquired.map(([key, rank]) => `${LEVEL_CARDS[key].name} x${rank}`).join(" / ") : "Level up to choose your first lasting boon.");
-        if (state.kills > best) {
-            best = state.kills;
+        const bestScore = releaseRankings ? state.kills - state.scoreBaseline : state.kills;
+        if (bestScore > best) {
+            best = bestScore;
             try { localStorage.setItem(bestKey, String(best)); } catch { /* Best score is optional. */ }
         }
         text("best", best);
@@ -1241,8 +1274,8 @@ export function createGame(root, saveBridge = null) {
         retrySave.disabled = saving || checkingUnlock || !saveBridge;
         retrySave.textContent = saving ? "Retrying checkpoint save…" : "Retry checkpoint save";
         const wardUnlocked = skillUnlocked(state, "guard");
-        const remindWard = wardUnlocked && !state.wardUnlockSeen;
-        text("ward-unlock-status", wardUnlocked ? `${skillName(state, "guard")} unlocked — choose Q or an auto slot to equip it.` : `${skillName(state, "guard")}: ${wardUnlockHint(state)}.`);
+        const remindWard = false;
+        text("ward-unlock-status", `${selectedSkills(state).map(key => skillName(state, key)).join(" · ")}. Next skill at ${[5, 10, 15].find(level => level > p.level) ?? "maximum loadout"}.`);
         text("skill-unlock-hint", `${skillName(state, "guard")} unlocked! Slot your new skill.`);
         skillUnlockNotice.hidden = !remindWard || state.status !== "playing" || state.resumeDelay > 0 || draftClosing || !!setupAction;
         for (const button of root.querySelectorAll("[data-resume-combat]")) {
@@ -1262,10 +1295,10 @@ export function createGame(root, saveBridge = null) {
         openSkills.classList.toggle("forge-available", active && (skillPointsLeft(state) > 0 || remindWard));
         for (const select of loadoutSelects) {
             const slot = Number(select.dataset.loadoutSlot);
-            const value = slot === 0 ? state.loadout.manual : state.loadout.auto[slot - 1];
+            const value = state.loadout.auto[slot - 1];
             if (select.value !== value) select.value = value;
-            select.disabled = saving || !canForge;
-            for (const option of select.options) option.disabled = !skillUnlocked(state, option.value);
+            select.disabled = saving || !canForge || value !== "none" || slot > skillCapacity(state);
+            for (const option of select.options) option.disabled = option.value !== "none" && selectedSkills(state).includes(option.value) && option.value !== value;
         }
         for (const button of treeButtons) {
             const skill = button.dataset.learnSkill, node = treeNodeKey(skill, button.dataset.treeSlot);
@@ -1287,6 +1320,7 @@ export function createGame(root, saveBridge = null) {
         for (const tree of root.querySelectorAll("[data-tree-skill]")) {
             tree.dataset.heroClass = state.heroClass;
             const skill = tree.dataset.treeSkill, nodes = state.skillTree[skill];
+            tree.hidden = !skillSelected(state, skill);
             tree.classList.toggle("tree-locked", !skillUnlocked(state, skill));
             for (const link of tree.querySelectorAll("[data-tree-link]")) {
                 const [from, to] = link.dataset.treeLink.split("-").map(slot => treeNodeKey(skill, slot));
@@ -1371,6 +1405,7 @@ export function createGame(root, saveBridge = null) {
         } else shownDraft = "";
         for (const button of upgradeButtons) {
             const key = button.dataset.upgrade;
+            button.hidden = !skillSelected(state, key);
             const rank = state.upgrades[key];
             const max = UPGRADES[key].max;
             const cost = upgradeCost(state, key);
@@ -1385,6 +1420,12 @@ export function createGame(root, saveBridge = null) {
             else if (button.querySelector("[data-upgrade-preview]")) button.querySelector("[data-upgrade-preview]").textContent = rank >= max ? "Fully forged" : "";
         }
         if (saveButton) saveButton.disabled = saving || checkingUnlock || !saveBridge || !active || !!setupAction;
+        const choosingSkill = active && !choosing && !setupAction && needsSkillChoice(state);
+        skillChoice.hidden = !choosingSkill || root.dataset.menuOpen === "on";
+        for (const button of skillChoice.querySelectorAll("[data-choose-run-skill]")) {
+            button.hidden = selectedSkills(state).includes(button.dataset.chooseRunSkill);
+            button.disabled = saving || !choosingSkill;
+        }
         if (loadButton) loadButton.disabled = saving || checkingUnlock || !saveBridge || !!setupAction;
         pauseButton.firstChild.textContent = state.status === "paused" ? "Resume " : "Pause ";
         if (state.status !== shownStatus) {
@@ -1509,14 +1550,23 @@ export function createGame(root, saveBridge = null) {
         reveal(root.querySelector("[data-skills]"), true);
     });
     for (const select of loadoutSelects) on(select, "change", () => {
-        const manual = loadoutSelects[0].value;
-        const auto = loadoutSelects.slice(1).map(element => select === loadoutSelects[0] && element.value === manual ? "none" : element.value);
+        const manual = "none";
+        const auto = loadoutSelects.map(element => element.value);
         if (saving || setupAction || !setLoadout(state, manual, auto)) {
-            skillFeedback.textContent = "Each skill can occupy only one slot. Choose Empty to free an auto slot first.";
+            skillFeedback.textContent = "Chosen slots stay locked for this run. Choose a different skill for an unlocked empty slot.";
         } else {
             skillFeedback.textContent = "Loadout changed. Save to keep it, or continue to the next autosaved checkpoint.";
             if (["camp", "won"].includes(state.status)) void persist(false, true);
         }
+        clearInput();
+        updateHud();
+    });
+    for (const button of root.querySelectorAll("[data-choose-run-skill]")) on(button, "click", () => {
+        if (saving || setupAction || !needsSkillChoice(state)) return;
+        const auto = [...state.loadout.auto];
+        auto[auto.indexOf("none")] = button.dataset.chooseRunSkill;
+        if (!setLoadout(state, "none", auto)) return;
+        if (!needsSkillChoice(state) && state.status === "paused") togglePause(state);
         clearInput();
         updateHud();
     });
@@ -1547,10 +1597,10 @@ export function createGame(root, saveBridge = null) {
             if (["camp", "won"].includes(state.status)) void persist(false, true);
         });
     }
-    for (const button of root.querySelectorAll("[data-respec-tree]")) on(button, "click", () => {
+    for (const button of root.querySelectorAll("[data-respec-tree]")) on(button, "click", async () => {
         const skill = button.dataset.respecTree;
         if (saving || setupAction || !canRespecTree(state, skill)) return;
-        if (!window.confirm(`Reset ${skillName(state, skill)} for ${treeRespecCost(state, skill)} gold and refund ${treePointsSpent(state, skill)} points? Other trees stay unchanged. Cooldowns remain and this tree's active effects end.`)) return;
+        if (!await gameConfirm(`Reset ${skillName(state, skill)} for ${treeRespecCost(state, skill)} gold and refund ${treePointsSpent(state, skill)} points? Other trees stay unchanged. Cooldowns remain and this tree's active effects end.`)) return;
         if (!respecTree(state, skill)) return;
         skillFeedback.textContent = `${state.journal} Save or reach a checkpoint to keep this change.`;
         clearInput();
@@ -1607,16 +1657,17 @@ export function createGame(root, saveBridge = null) {
             updateHud();
             return;
         }
+        if (promptOpen) return;
         if (loadingSave && ["playing", "paused", "camp", "won", "choosing"].includes(state.status)
-            && !window.confirm(root.dataset.localSaves === "on"
-                ? "Replace this run with your saved run from this device? Unsaved progress will be lost."
-                : "Replace this run with your last server save? Unsaved progress will be lost.")) return;
+            && !await gameConfirm(root.dataset.cloudSignedIn === "on"
+                ? "Load the cloud run and replace this run? Unsaved progress will be lost."
+                : "Load your saved run and replace this run? Unsaved progress will be lost.")) return;
         if (state.status === "playing") pause();
         clearInput();
         saving = true;
         let advanceEndless = false;
         let operationSucceeded = false;
-        const local = root.dataset.localSaves === "on";
+        const local = root.dataset.localSaves === "on" && root.dataset.cloudSignedIn !== "on";
         saveStatus.textContent = loadingSave ? local ? "Loading from this device..." : "Loading from the server..."
             : automatic ? local ? "Saving checkpoint on this device..." : "Autosaving checkpoint to the server..."
             : local ? "Saving on this device..." : "Saving to the server...";
@@ -1634,6 +1685,7 @@ export function createGame(root, saveBridge = null) {
                 const restored = restoreSnapshot(result.save);
                 void reportScore();
                 state = restored;
+                if (releaseRankings) resetToReleaseRankings(state);
                 checkpointSaveFailed = false;
                 if (state.mode === "endless" && state.status === "camp") {
                     continueJourney(state);
@@ -1685,7 +1737,8 @@ export function createGame(root, saveBridge = null) {
                 if (result.success) {
                     endlessUnlocked = !!(result.endlessUnlocked || result.save?.endlessUnlocked || result.save?.state?.campaignComplete === 1);
                     root.dataset.hasSave = "on";
-                    if (root.dataset.localSaves === "on") saveStatus.textContent = "Local save found. Choose Load to restore it.";
+                    if (root.dataset.localSaves === "on") saveStatus.textContent = root.dataset.cloudSignedIn === "on"
+                        ? "Cloud save available. Choose Load to continue it." : "Device save found. Choose Load to restore it.";
                 }
                 else saveStatus.textContent = root.dataset.localSaves === "on" ? result.message : `${result.message} Load can retry the server profile check.`;
             }
@@ -1860,6 +1913,7 @@ export function createGame(root, saveBridge = null) {
             pendingScores.clear();
             reportedScores.clear();
             state = createState();
+            if (releaseRankings) resetToReleaseRankings(state);
             endlessUnlocked = false;
             checkpointHandled = null;
             checkpointSaveFailed = false;

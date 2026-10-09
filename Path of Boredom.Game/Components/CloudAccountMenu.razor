@@ -5,7 +5,7 @@
 {
     <div class="mm-account-body">
         <h2>Keep your ember.</h2>
-        <p role="status" aria-live="polite">@(status?.Message ?? cloud.AccountStatus.Message)</p>
+        <p role="status" aria-live="polite">@cloud.AccountStatus.Message</p>
         @if (lastResult is not null)
         {
             <p role="status" aria-live="polite">@lastResult</p>
@@ -32,12 +32,12 @@
         {
             <fieldset disabled="@busy">
                 <legend>Device &amp; cloud saves</legend>
-                <p>Signing in never replaces a save. Choose once to enable sync. A changed cloud revision pauses sync until you choose again.</p>
-                <p>@(cloud.AccountStatus.CloudRevision is { } revision ? $"Cloud revision: {revision}" : "Cloud metadata unavailable — refresh before choosing.")</p>
+                <p>Save uploads your current run. Load downloads the cloud run. Your device keeps a backup; conflicting changes need your confirmation.</p>
+                <p>@(cloud.AccountStatus.CloudRevision is null ? "Cloud availability unknown — refresh to check." : cloud.AccountStatus.CloudSaveExists ? "Cloud save available." : "No cloud save yet — save a run to create one.")</p>
                 <button type="button" class="mm-pause-option" @onclick="Refresh">Refresh cloud metadata</button>
                 <button type="button" class="mm-pause-option" disabled="@(cloud.AccountStatus.CloudRevision is null)" @onclick="Upload">Upload device save to cloud</button>
                 <button type="button" class="mm-pause-option" disabled="@(!cloud.AccountStatus.CloudSaveExists)" @onclick="Download">Use cloud save on this device</button>
-                <p>Save the current run first to upload it. Download keeps a backup of the previous device file; select Load saved run afterwards. No timestamp-based or automatic merge.</p>
+                <p>Upload uses the saved device file, not the current unsaved run. Download keeps a device backup; Load then opens the cloud run.</p>
             </fieldset>
             <fieldset disabled="@busy">
                 <legend>Delete game account</legend>
@@ -46,6 +46,15 @@
             </fieldset>
         }
         <p>Online rankings use client-reported scores and are not cheat-proof.</p>
+        @if (confirmation is not null)
+        {
+            <div class="account-confirm" role="alertdialog" aria-modal="true" aria-label="Confirm save action">
+                <h3>Keep your ember safe</h3>
+                <p>@confirmation</p>
+                <button type="button" class="mm-pause-option" @onclick="() => CompleteConfirmation(true)">Confirm</button>
+                <button type="button" class="mm-pause-option" @onclick="() => CompleteConfirmation(false)">Cancel</button>
+            </div>
+        }
     </div>
 }
 
@@ -56,7 +65,25 @@
     private bool busy;
     private string? lastResult;
     private string displayName = string.Empty;
+    private string? confirmation;
+    private TaskCompletionSource<bool>? confirmationResult;
     private ICloudGameSession Cloud => (ICloudGameSession)Session;
+
+    protected override void OnInitialized() => displayName = Cloud.AccountStatus.SignedIn ? Cloud.AccountStatus.Player : string.Empty;
+
+    private async Task<bool> Confirm(string text)
+    {
+        confirmation = text;
+        confirmationResult = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await InvokeAsync(StateHasChanged);
+        return await confirmationResult.Task;
+    }
+
+    private void CompleteConfirmation(bool accepted)
+    {
+        confirmation = null;
+        confirmationResult?.TrySetResult(accepted);
+    }
 
     private async Task Run(Func<Task> action)
     {
@@ -83,19 +110,19 @@
     });
     private Task Upload() => Run(async () =>
     {
-        if (!await JS.InvokeAsync<bool>("confirm", "Replace the displayed cloud revision with this device's saved run? Save your current run first. A concurrent cloud change will be rejected, not overwritten.")) return;
+        if (!await Confirm("Replace the cloud save with the saved device run? Save your current run first. Changes from another device will not be overwritten.")) return;
         lastResult = (await Cloud.ResolveCloudSaveAsync(false)).Message;
         status = Cloud.AccountStatus;
     });
     private Task Download() => Run(async () =>
     {
-        if (!await JS.InvokeAsync<bool>("confirm", "Replace the device save with the displayed cloud save? The previous file is backed up. Your current in-memory run is unchanged until you choose Load saved run.")) return;
+        if (!await Confirm("Copy the cloud run to this device? The previous device file is backed up. Choose Load afterwards to play it.")) return;
         lastResult = (await Cloud.ResolveCloudSaveAsync(true)).Message;
         status = Cloud.AccountStatus;
     });
     private Task Delete() => Run(async () =>
     {
-        if (!await JS.InvokeAsync<bool>("confirm", "Permanently delete your game account's cloud save and ranking profile, device save and backup? This cannot be undone. Your Google account is not deleted.")) return;
+        if (!await Confirm("Permanently delete your game saves and rankings, including device backups? This cannot be undone. Your Google account stays unchanged.")) return;
         status = await Cloud.DeleteAccountAsync();
         if (status.Deleted) await Deleted.InvokeAsync();
     });

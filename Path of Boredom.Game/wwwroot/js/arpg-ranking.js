@@ -10,6 +10,13 @@ import { LEVEL_CARDS } from "./arpg-cards.js";
 import { MASTERY } from "./arpg-engine.js";
 import { SKILL_KEYS, skillName, treeNodeDefinition } from "./arpg-skills.js";
 
+// Mobile starts a separate release board without carrying development kills into its scores.
+export function resetToReleaseRankings(state) {
+    if (state.rankingPatch === "release") return;
+    state.rankingPatch = "release";
+    state.scoreBaseline = state.kills;
+}
+
 // Walks every upgrade "shape" the character has (skill tree nodes, forge upgrades, level-up cards,
 // mastery training) and flattens them into one array of { category, name, rank } entries — the
 // exact shape RankingRules.IsValid on the API expects. Only non-zero ranks are included, since a

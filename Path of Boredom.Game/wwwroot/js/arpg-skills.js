@@ -15,16 +15,28 @@
 // per-node rank caps, so a new node also needs a save version bump and a matching server-side update.
 import { classFor } from "./arpg-classes.js";
 
-export const SKILL_KEYS = ["attack", "nova", "burst", "guard", "dodge", "potion"];
+export const NEW_SKILLS = {
+    chain: { name: "Chain lightning", cooldown: 7, reach: 420, damage: 1.4, color: "#e3d68c", detail: "Strikes the nearest enemy within 420, then jumps to two more within 180 of the previous target. Each jump retains 75% damage. Base hit: 140% weapon damage." },
+    frost: { name: "Frost ring", cooldown: 9, reach: 230, damage: 1.1, color: "#9be5ff", detail: "Hits all enemies within 230 for 110% weapon damage and slows walking by 30% for 1.5s. Boss slow resistance applies; charges are unaffected." },
+    reap: { name: "Reaping arc", cooldown: 5, reach: 190, damage: 1.9, color: "#df9ee9", detail: "Sweeps a 160-degree arc within 190 for 190% weapon damage. Deals 50% more damage to targets below 35% health." },
+    meteor: { name: "Meteor", cooldown: 12, reach: 600, damage: 2.4, color: "#ffad68", detail: "Targets the nearest enemy within 600. Explodes immediately in a 100-radius blast for 240% weapon damage. Useful against packed ranged enemies." },
+    siphon: { name: "Siphon", cooldown: 10, reach: 300, damage: 1.3, color: "#e28296", detail: "Drains up to three enemies within 300 for 130% weapon damage each. Restores 2% maximum health per hit, modified by difficulty; does not consume a flask." },
+    nullwave: { name: "Null wave", cooldown: 14, reach: 220, damage: 0.9, color: "#b6aadf", detail: "Hits all enemies within 220 for 90% weapon damage, pushes ordinary enemies back 45, and destroys enemy projectiles in the same radius. Boss attacks are not interrupted." }
+};
+export const SKILL_KEYS = ["attack", "nova", "burst", "guard", "dodge", "potion", ...Object.keys(NEW_SKILLS)];
 // Only these three skills can be placed into an auto-cast slot (manual-only skills like attack/dodge/potion
 // don't make sense to automate) — matches the slotSkills restriction added in save v10.
-export const SLOTTABLE_SKILLS = ["nova", "burst", "guard"];
+export const SLOTTABLE_SKILLS = ["nova", "burst", "guard", ...Object.keys(NEW_SKILLS)];
 // Guard/ward unlocks later in Endless mode (wave 41) than in campaign (wave 11), since Endless
 // effectively starts players over at a higher baseline difficulty.
 export const wardUnlockWave = state => state.rankingMode === "endless" ? 41 : 11;
-export const skillUnlocked = (state, skill) => skill !== "guard" || state.wave >= wardUnlockWave(state);
+export const skillUnlocked = (state, skill) => true;
+export const skillCapacity = state => 1 + [5, 10, 15].filter(level => state.player.level >= level).length;
+export const selectedSkills = state => state.loadout.auto.filter(key => key !== "none");
+export const needsSkillChoice = state => selectedSkills(state).length < skillCapacity(state);
+export const skillSelected = (state, skill) => !SLOTTABLE_SKILLS.includes(skill) || selectedSkills(state).includes(skill);
 export const wardUnlockHint = state => state.rankingMode === "endless" ? "Unlocks at Echo 11 (third five-wave stage)" : "Unlocks at stage 3 (wave 11)";
-export const AUTO_COOLDOWN = 1.6;
+export const AUTO_COOLDOWN = 1;
 // One skill point earned every 2 levels, capped at 32 total — matches the pointBudget formula in
 // GameSaveEndpoints.cs's ValidSkillProgress for save v12+.
 export const MAX_SKILL_POINTS = 32;
@@ -76,6 +88,19 @@ export const TREE_NODES = {
         renewal: { name: "Renewal", max: 2, icon: "❧", visual: "healing", detail: "After drinking, regenerate 4% maximum health per rank over 2s, subject to difficulty penalties. Another flask refreshes rather than stacks regeneration. Adds a green regeneration aura." }
     }
 };
+for (const [key, skill] of Object.entries(NEW_SKILLS)) {
+    TREE_NODES[key] = {
+        potency: { name: "Empower", max: 3, icon: "✦", visual: key, detail: "+10% skill damage per rank." },
+        reach: { name: "Expand", max: 2, icon: "◎", visual: key, detail: "+10% targeting range and area per rank." },
+        ember: { name: "Keystone", max: 1, icon: "◆", visual: key, detail: key === "chain" ? "Chain lightning jumps to two additional targets."
+            : key === "frost" ? "Frost ring deals 40% more damage to already slowed targets."
+            : key === "reap" ? "Reaping arc bypasses Sentinel resistance."
+            : key === "meteor" ? "Meteor blast radius grows from 100 to 150."
+            : key === "siphon" ? "Siphon heals 3% maximum health per hit instead of 2%."
+            : "Null wave radius increases by another 30%, including projectile clearing." },
+        recovery: { name: "Rhythm", max: 2, icon: "↻", visual: key, detail: "+10% skill cooldown recovery per rank." }
+    };
+}
 // Class-specific manual-only skills for the burst and guard slots — unlike attack/nova/dodge/potion
 // (which every class has an equivalent of), burst and guard are distinct signature abilities per
 // class (e.g. Knight's Flame lance vs Ranger's Piercing rain), each with their own cooldown/reach/damage.
@@ -132,7 +157,7 @@ const CLASS_TREE_EFFECTS = {
 // own attackName/specialName; burst/guard use EXTRA_SKILLS' class-specific names; dodge/potion are
 // the same name for every class).
 export const skillName = (state, key) => key === "attack" ? classFor(state).attackName : key === "nova" ? classFor(state).specialName
-    : key === "dodge" ? "Dodge" : key === "potion" ? "Life flask" : EXTRA_SKILLS[state.heroClass][key].name;
+    : key === "dodge" ? "Dodge" : key === "potion" ? "Life flask" : key === "none" ? "No manual skill" : NEW_SKILLS[key]?.name ?? EXTRA_SKILLS[state.heroClass][key].name;
 // Maps a generic tree slot name (root/left/right/capstone) to the actual node key for a given
 // skill (e.g. treeNodeKey("attack", "root") => "edge").
 export const treeNodeKey = (skill, slot) => Object.keys(TREE_NODES[skill])[TREE_SLOTS.indexOf(slot)];
@@ -183,7 +208,7 @@ export const treePrerequisitesMet = (state, skill, node) => {
 // Whether a specific node can be learned right now: the skill itself must be unlocked, the node
 // must exist, the game must be paused/at camp/won (never mid-combat), there must be a spare skill
 // point, the node isn't already maxed, and its prerequisite is satisfied.
-export const canLearnSkill = (state, skill, node) => SKILL_KEYS.includes(skill) && skillUnlocked(state, skill) && Object.hasOwn(TREE_NODES[skill], node)
+export const canLearnSkill = (state, skill, node) => SKILL_KEYS.includes(skill) && skillSelected(state, skill) && Object.hasOwn(TREE_NODES[skill], node)
     && ["paused", "camp", "won"].includes(state.status) && skillPointsLeft(state) > 0 && state.skillTree[skill][node] < TREE_NODES[skill][node].max
     && treePrerequisitesMet(state, skill, node);
 // Spends one skill point into a node, if allowed. Returns false (no-op) rather than throwing if
@@ -198,14 +223,16 @@ export function learnSkill(state, skill, node) {
 // Validates a proposed manual+auto loadout: the manual skill must be a real slottable skill and
 // unlocked; auto must be exactly 2 slots, each either "none" or a distinct unlocked slottable skill
 // that isn't already the manual skill (no duplicate skills across slots).
-export const validLoadout = (state, manual, auto) => SLOTTABLE_SKILLS.includes(manual) && skillUnlocked(state, manual)
-    && Array.isArray(auto) && auto.length === 2
-    && auto.every(key => key === "none" || SLOTTABLE_SKILLS.includes(key) && skillUnlocked(state, key) && key !== manual)
+export const validLoadout = (state, manual, auto) => manual === "none"
+    && Array.isArray(auto) && auto.length === 4
+    && auto.every((key, index) => key === "none" || SLOTTABLE_SKILLS.includes(key) && index < skillCapacity(state))
+    && auto[0] !== "none"
     && new Set(auto.filter(key => key !== "none")).size === auto.filter(key => key !== "none").length;
 // Applies a new loadout, if valid, and not mid-combat. Also flags wardUnlockSeen once the player
 // has ever actually slotted the guard skill, so the "newly unlocked" UI hint only shows once.
 export function setLoadout(state, manual, auto) {
     if (!["paused", "camp", "won"].includes(state.status) || !validLoadout(state, manual, auto)) return false;
+    if (state.loadout.auto.some((skill, index) => skill !== "none" && auto[index] !== skill)) return false;
     state.loadout = { manual, auto: [...auto] };
     if (manual === "guard" || auto.includes("guard")) state.wardUnlockSeen = 1;
     return true;
@@ -219,6 +246,7 @@ export function setLoadout(state, manual, auto) {
 // arrow count vs cone angle) is different enough per class that it needs its own name/detail
 // entirely rather than just a re-themed description.
 export function treeNodeDefinition(state, skill, node) {
+    if (NEW_SKILLS[skill]) return { ...TREE_NODES[skill][node] };
     const index = Object.keys(TREE_NODES[skill]).indexOf(node);
     const definition = { ...TREE_NODES[skill][node], name: CLASS_TREE_NAMES[state.heroClass][skill][index],
         visual: state.heroClass, ...CLASS_TREE_EFFECTS[state.heroClass][`${skill}.${node}`] };
@@ -237,7 +265,7 @@ export function treeNodeDefinition(state, skill, node) {
 export function treeNodeStatus(state, skill, node) {
     const rank = state.skillTree[skill][node];
     const keys = Object.keys(TREE_NODES[skill]);
-    if (!skillUnlocked(state, skill)) return wardUnlockHint(state);
+    if (!skillSelected(state, skill)) return "Choose this skill for your run to train it";
     if (rank >= TREE_NODES[skill][node].max) return "Fully learned";
     if (!treePrerequisitesMet(state, skill, node)) return node === keys[3]
         ? `Requires ${treeNodeDefinition(state, skill, keys[1]).name} or ${treeNodeDefinition(state, skill, keys[2]).name} rank 1`

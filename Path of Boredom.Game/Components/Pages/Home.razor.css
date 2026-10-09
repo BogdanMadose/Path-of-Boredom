@@ -13,6 +13,24 @@
 .arpg button:disabled { cursor: not-allowed; opacity: .5; }
 .arpg button:focus-visible, .arpg a:focus-visible { outline: 2px solid #f4c989; outline-offset: 4px; }
 .arpg [hidden] { display: none !important; }
+.arpg ::deep .game-confirm,
+.arpg ::deep .account-confirm {
+    padding: 24px;
+    max-width: min(540px, 90vw);
+    max-height: 85dvh;
+    overflow-y: auto;
+    border: 1px solid #c7a56b;
+    border-radius: 16px;
+    background: #132127;
+    color: #ecdfc2;
+    box-shadow: 0 20px 60px #000b;
+}
+.arpg ::deep .game-confirm::backdrop { background: #091318e8; }
+.arpg ::deep .account-confirm { position: fixed; inset: 10% 0 auto; margin: auto; z-index: 100; }
+.arpg ::deep .game-confirm button { min-height: 44px; padding: 10px 24px; margin: 6px; background: #273b36; color: #ecdfc2; border: 1px solid #c7a56b; border-radius: 8px; }
+.run-skill-pool { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.run-skill-pool button { white-space: normal; text-align: left; display: grid; gap: 6px; padding: 12px; }
+.run-skill-pool span { font-size: 12px; line-height: 1.5; }
 .game-header { min-height: 84px; padding: 20px 4%; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid #ffffff0c; }
 .game-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .signed-in-user { display: grid; gap: 3px; max-width: 240px; min-width: 0; }

@@ -1,38 +1,64 @@
 # wwwroot/js — the actual game
 
-This folder is the game. Everything from "what does a Ranger's ricochet do" to "how does a wave of enemies spawn" to "what does the save file look like" lives here as plain ES modules, imported with no bundler and no build step. `Home.razor` on the C# side just does `import("./js/arpg.js")` and hands it a canvas element — from that point on, this code owns the render loop, input handling, combat, and (via `arpg-save.js`) talking back to Blazor to persist progress.
+This folder is the game, shared by the browser and Android hosts. Everything from "what does a Ranger's rebound shot do" to "where does the boss spawn" to "what goes in a save" lives here as plain ES modules.
 
-If you're chasing a gameplay bug (numbers feel wrong, an enemy behaves oddly, a skill doesn't proc right), you almost certainly want a file in here, not a `.razor` file.
+`Home.razor` imports `/_content/PathOfBoredom.Game/js/arpg.js` and calls `createGame(gameRoot, saveBridge)`. The root is the whole game host element, not just the canvas: the UI controller needs the controls and overlays too.
+
+If the combat numbers feel wrong, start here. If the death screen won't scroll, also check `Home.razor.css` and MAUI's `mobile-shell.css`; not every game-looking bug is a simulation bug.
 
 ## The module breakdown
 
-- **`arpg.js`** — the entry point and UI controller. This is what `createGame()` returns. It owns the pause menu, the setup dialog (difficulty/class/loadout pickers), the skills & loadout panel, tooltips, the forge, save/load button wiring (including the retry-on-failure flow when a server save call fails), and the keyboard/mouse input listeners. It calls into `arpg-engine.js` for the actual simulation step and into `arpg-save.js`/`arpg-ranking.js` when it needs to talk to the Blazor bridge. If a UI element on the page doesn't do anything, the wiring for it is missing here, not in the `.razor` file.
-- **`arpg-engine.js`** — the simulation. `createState()` builds a fresh run's state (player stats, wave counters, entity lists), `step()` advances one frame (movement, collisions, skill cooldowns, enemy AI, loot), `spawnWave()`/`finishCheckpoint()` handle wave progression and checkpoint saves, and `useSkill()` dispatches to whatever a class's skill actually does. This is the biggest file and the one most balance/bug work touches. `damageHistory` here is what feeds the death report panel on the game-over screen (last ~12 hits, post-mitigation, in the last 8 seconds).
-- **`arpg-classes.js`** — base stats and identity for the three classes (Ember Knight, Dawn Ranger, Iron Warden): starting health/damage/speed, class-specific skill unlocks, and the flavor text shown in the setup dialog's class preview.
-- **`arpg-skills.js`** — skill trees. `TREE_NODES` is the actual tree data (per-class nodes with effects and prerequisites), `newSkillTree()` builds a fresh tree for a new character, `skillPointsEarned()` computes how many points a level total should have granted (one per 5 levels, capped at 12 — matches the text in `Home.razor`'s controls legend), and `respecTree()` resets spent points so a player can rebuild. If you add a new node, you also need to check `arpg-save.js` can serialize/restore it and that `arpg-ranking.js`'s build snapshot picks it up for the leaderboard.
-- **`arpg-cards.js`** — the level-up draft system: what three boons get offered on level-up, their categories/ranks, and how a chosen card modifies the run. This is what powers the "Choose your next oath" overlay.
-- **`arpg-modifiers.js`** — elite/enemy modifier definitions (the traits that make some enemies hit harder, move faster, explode on death, etc. as the campaign and Endless mode progress). Enemy difficulty scaling generally starts here or in `arpg-engine.js`'s wave/scaling logic.
-- **`arpg-difficulty.js`** — the three difficulty presets (Hard/Nightmare/Inferno) and whatever multipliers they apply to enemy stats, player healing, etc.
-- **`arpg-campaign.js`** — the 30-wave, 6-area campaign structure: which wave belongs to which chapter/area, boss waves, and the flavor text (chapter titles, map descriptions) shown in the HUD.
-- **`arpg-upgrade-preview.js`** — computes the "next rank" preview numbers shown in the forge/upgrade UI, so a player can see what a rank-up actually does before spending points on it.
-- **`arpg-ranking.js`** — `captureRankingBuild()` snapshots the current build (class, upgrades, tree ranks) into the shape `RankingRules` on the server expects, then `arpg.js` hands that to Blazor's `SubmitScore` bridge on a death or milestone.
-- **`arpg-save.js`** — serialization. `captureSnapshot()` turns live engine state into the versioned JSON blob that gets PUT to the API; `restoreSnapshot()` does the reverse when loading, including migrating older save versions forward. **This file's shape has to match `GameSaveEndpoints.cs`'s validation on the server exactly, version for version** — there's no shared schema, you keep them in sync by hand. See the solution root README and the `ApiService` README for why this matters and what happens when it drifts (the `.corrupt` backup mechanism exists because of exactly this kind of mismatch).
-- **`arpg-graphics.js`** — canvas rendering: drawing the player, enemies, projectiles, particles, and HUD overlays each frame. Pure presentation, doesn't mutate game state.
+- **`arpg.js`** — runtime entry point, input, setup flow, HUD updates, trees, forge, overlays, and save/ranking bridge calls. It also contains the main canvas renderer and mob artwork. `createGame()` returns the host-facing game instance.
+- **`arpg-engine.js`** — simulation and balance. `createState()` builds a run, `step()` advances combat, `useSkill()` dispatches attacks/abilities, and wave/checkpoint helpers advance the journey. `damageHistory` feeds the death report: up to 12 post-mitigation hits from the last eight seconds.
+- **`arpg-classes.js`** — the three classes' base stats, regular attack identities, weapon types, and descriptions.
+- **`arpg-skills.js`** — loadout rules, the 27 class combat abilities, tree rank/prerequisite rules, names, icons, and respec behaviour. `TREE_NODES` supplies stable saved rank keys; `treeNodeDefinition()` adds the class-specific presentation and effects.
+- **`arpg-skill-trees.js`** — the 72 named upgrades for the six newer abilities in each class, plus their range bonuses. The original attack/nova/burst/guard/dodge/flask trees are still defined in `arpg-skills.js`.
+- **`arpg-skill-effects.js`** — distinct canvas effects for class abilities. These are presentation, not extra damage checks.
+- **`arpg-cards.js`** — level-up boon definitions and three-card drafts. Skill-only cards are offered only for the selected loadout; old saved offers can be repaired deterministically rather than randomly rerolled.
+- **`arpg-campaign.js`** — the six areas, 30 campaign waves, map flavour, enemy introductions, pickups, and forge catalogue. Endless cycles the areas rather than running out of maps.
+- **`arpg-hazards.js`** — randomized hazard layouts shared by simulation and rendering. Count, position, radius, spawn delay, and activation period vary per wave; circles stay within the arena, avoid one another, and leave the centre clear.
+- **`arpg-modifiers.js`** — elite traits. General enemy/boss scaling and attack behaviour also live in the engine.
+- **`arpg-difficulty.js`** — Hard, Nightmare, and Inferno multipliers.
+- **`arpg-facing.js`** — cosmetic body/weapon turning. The attack is immediate and accurately aimed; the art catches up without making the attack wait.
+- **`arpg-graphics.js`** — reusable hero art, cached orb/body sprites, floor decoration, atmosphere, and loot icons. Not the entire renderer; look in `arpg.js` for enemies and the frame draw order.
+- **`arpg-hud.js`** — the in-canvas mobile HUD.
+- **`arpg-upgrade-preview.js`** — current-to-next forge stat previews.
+- **`arpg-ranking.js`** — snapshots the recorded build and keeps the initial mobile release board separate from development scores.
+- **`arpg-save.js`** — snapshot capture, restore, validation, and old-format migrations. This is the client half of the API save contract.
+
+## The build rules, without the old manual slot
+
+Each class has nine combat choices. Pick one starter, a second at level 5, and a third at level 10; choices are locked for the run. Attack, dodge, and flask have their own trees but never consume one of those three slots. Mobile targets regular attacks and selected combat abilities automatically, while dodge and flask stay manual.
+
+Tree points arrive every two levels, capped at 32. Respeccing a tree refunds its points for gold, but doesn't let you swap the run's chosen ability. The serialized loadout still has an unused fourth auto entry and a manual value of `none` for compatibility. Don't mistake that storage shape for a fourth playable skill slot.
+
+SVGs live in the shared `wwwroot/images/skills/` folder. `skillIcon()` returns an absolute `/_content/PathOfBoredom.Game/...` URL for every skill, including class-specific regular attacks and shared dodge/flask icons. This matters for CSS backgrounds: a relative URL that works in an `<img>` can resolve somewhere else when a stylesheet uses it.
 
 ## The general shape of a frame
 
-`arpg.js`'s render loop calls `arpg-engine.js`'s `step()` with input state and delta time, gets back updated state, then hands that state to `arpg-graphics.js` to draw. Anything that reads as "why did the character take damage they shouldn't have" is a `step()` question; anything that reads as "why does it look wrong on screen" is a `arpg-graphics.js` question — worth separating those two before you start debugging.
+The controller reads input, calls `step(state, input, dt)`, updates the page HUD, and renders the arena from that state. Damage and movement belong to the engine. Draw order, silhouettes, and animation belong to the rendering code. Keep those apart so a prettier weapon turn doesn't accidentally change attack cadence.
 
-## Save version discipline (worth repeating here too)
+Hazard drawing and damage checks both use `arenaHazards()` and `hazardPhase()`. Don't go back to reading the fixed map templates for only one of them, or the player can be hurt by a circle drawn somewhere else.
 
-`CurrentSaveVersion` lives on both this side (`arpg-save.js`) and the API side (`GameSaveEndpoints.cs`), and they are currently at version 14. If you add or change a field in the state that gets captured/restored:
+Hazard layouts are cached per state/wave in a `WeakMap`, not serialized. Loading a save generates a fresh layout with its own activation delay. Cosmetic facing is transient too. If either becomes persisted gameplay state later, that needs an explicit save-contract change rather than sneaking a new property into snapshots.
 
-1. Bump the version constant in both places.
-2. Add a new `if (version >= N)` branch in `restoreSnapshot()` here for backward compatibility with older saves.
-3. Add matching validation in `IsValidState(state, version)` on the API side.
+## Save version discipline (worth repeating)
 
-Skipping any of these three steps is the single most common way this project's save system breaks. If a player reports "save is failing" right after a deploy, this mismatch is the first thing to check.
+The current save format is **16**. Client capture/restore, `GameSaveEndpoints.cs`, and the device version gate in `OfflineGameSession.cs` need to agree.
 
-## No build step, on purpose
+When changing persisted state:
 
-These are plain `<script type="module">`-style ES modules loaded straight by the browser — no webpack, no TypeScript, no minification. That's a deliberate tradeoff for a small project: you edit a `.js` file, refresh the page, done. The cost is there's no compile-time safety net here at all; typos in property names or wrong argument counts fail silently or at runtime in the console, not at build time. Test changes by actually playing through the affected system (start a run, level up, save/load, die) rather than assuming a clean build means it works.
+1. Bump the client capture version and API `CurrentSaveVersion`, and update the device gate.
+2. Keep old saves working through a deliberate `restoreSnapshot()` migration/default path.
+3. Add matching version-gated API validation, including numeric bounds and collection sizes.
+4. Run checkpoint and class-skill save round-trips, not just a syntax check.
+
+An AAB version code, a leaderboard tag, and this format number are different things. Art or CSS changes don't automatically need a new save format; a changed serialized shape does.
+
+## Testing the part C# can't compile for you
+
+Regression tests are under `Path of Boredom.Maui/tests/` even though most exercise these shared modules. Run them from the repository root with Node, for example `node "Path of Boredom.Maui/tests/class-skills.test.mjs"` or `node "Path of Boredom.Maui/tests/checkpoint-saves.test.mjs"`.
+
+There are also browser-backed checks for SVG loading, death-screen scrolling, and ranking columns. They use a separate local Edge profile when Edge is available and say when browser checks are skipped. If one times out, check for a leftover test-profile process before blaming the layout or closing somebody's normal browser.
+
+The modules still have no separate frontend build step. That's deliberate, but it doesn't remove the need to playtest: start a run, pick skills, upgrade, save/load, and die on a short screen. A green .NET build won't catch a wrong asset URL or a clipped restart button.

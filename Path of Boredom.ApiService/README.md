@@ -1,42 +1,64 @@
 # Path of Boredom.ApiService
 
-The API is deliberately boring: two feature areas (saves, rankings), both backed by plain JSON files on disk, both guarded by the shared-secret + Windows-identity scheme described in `Path of Boredom.ServiceDefaults/README.md`. There's no database, no ORM, no migrations tooling — just `System.Text.Json` and a semaphore.
+The API is still meant to be boring, just not file-backed anymore. It handles saves, rankings, and game accounts. Firestore keeps the data; the Android app supplies a Google ID token; the server decides whether that token and the submitted data are actually acceptable.
 
-## `Program.cs`
+It can run on Cloud Run without depending on files surviving inside a container. That's the important difference from the old `App_Data` setup.
 
-Standard minimal-API bootstrap: registers `GameSaveStore` and `RankingStore` as singletons, validates `SaveServiceOptions` on startup, wires the custom auth scheme, and maps the two endpoint groups. Nothing surprising here — if the API won't start, check the `SaveService:ApiKey` validation message first, it's usually that.
+## Startup and configuration
 
-## `SaveServiceAuthenticationHandler.cs`
+`Program.cs` registers `FirestorePersistence`, `GameSaveStore`, and `RankingStore`, wires authentication and rate limiting, then maps the save, ranking, and account endpoints. Cloud Run's `PORT` is honoured, with the listener bound to all interfaces.
 
-Custom `AuthenticationHandler` that:
-1. If there's no `Authorization` header at all, returns `NoResult()` — **not** a failure. This matters: Aspire's health check probes hit `/health` without credentials, and if this returned `Fail()` instead, every health check would log as an authentication failure, which is noisy and misleading. This was a real bug we fixed — see the patch notes if you're wondering why this looks slightly unusual for an auth handler.
-2. If there is a header, it must be `Bearer <64-hex-char-key>` matching the configured secret (constant-time compare via `CryptographicOperations.FixedTimeEquals`, to avoid timing side-channels on the comparison — probably overkill for this app's threat model, but cheap to do right).
-3. Then it reads `X-Windows-User` / `X-Windows-Sid` headers, validates them (length, no control characters, SID format), and builds a `ClaimsPrincipal` from them. The user's "identity" for save/ranking ownership purposes is either `windows-sid:<SID>` or `windows-name:<UPPERCASE NAME>` if no SID was sent — SID is preferred because names can theoretically collide or get renamed, SIDs don't.
+The settings you need are:
 
-## `GameSaveStore.cs` — where saves actually live
+- `Firestore:ProjectId` — the Firestore project, or `Firestore__ProjectId` as an environment variable.
+- `Firestore:DatabaseId` — optional; defaults to `(default)`.
+- `GoogleIdentity:Audience` — the **Web OAuth client ID** used as the audience for Android's ID tokens. Not the Android OAuth client ID.
+- Application Default Credentials with access to the database, or a configured Firestore emulator for local development.
 
-One JSON file per player under `App_Data/saves/windows/<sha256-of-owner-id>.json`, written via write-to-temp-then-atomic-move (`File.Move(..., overwrite: true)`) so a save is never left half-written if the process dies mid-write.
+The checked-in `appsettings.json` doesn't supply those deployment settings. A missing audience or Firestore project is a configuration problem, not a save-format bug.
 
-The one non-obvious piece of behavior here: **before overwriting an existing save, it reads the old one first**, because it needs to check whether the *previous* save had already completed the campaign (to preserve the permanent Endless-mode unlock even if the new submitted state hasn't finished the campaign in this exact save). If that old file turns out to be corrupt JSON, saving used to just blow up with an unhandled exception — which is exactly the bug that prompted the recovery logic that's in there now: on a `JsonException` while reading the old file, it copies the damaged bytes to a uniquely-named `<hash>.json.<timestamp>.<guid>.corrupt` file next to it (so nothing is lost, an admin can inspect it later), then proceeds to write the new, validated save normally. If *that* backup copy fails (e.g., permissions), the whole operation aborts without touching the original file — we'd rather fail loudly than silently lose data.
+The old Windows forwarding scheme is only registered when both the environment is Development and `Authentication:EnableLegacyWindows` is true. That path also needs `SaveService:ApiKey`. Don't enable it as a production workaround: the mobile app must never contain that shared secret.
 
-`LoadAsync` follows the same "don't crash the whole request" philosophy — a corrupt stored file surfaces as a `JsonException` that the endpoint turns into a proper `CorruptStoredSave` error response instead of an ASP.NET Core generic 500 exception page.
+## Identity: two doors, only one for production mobile
 
-## `GameSaveEndpoints.cs` — the validation wall
+`GoogleTokenAuthenticationHandler.cs` verifies the provider-issued token and builds the player identity from its subject. The API doesn't accept a Google-looking name or an owner ID sent in the request body as proof of ownership.
 
-This is the least glamorous, most important file in the API. `PUT /game/save` doesn't trust the client at all: it manually reads the request body up to a 64KB cap (bigger requests get 413, not a buffer overrun), parses it as JSON, then walks the entire expected shape by hand — every field, every array, every numeric range — before it's allowed anywhere near `GameSaveStore`. This is not idiomatic "bind a DTO and let model validation handle it" because the save shape has evolved across 14 versions and different versions have different valid shapes (see `IsValidState(state, version)` and its long chain of `if (version >= N)` checks). It's ugly, but it's ugly on purpose: a save file is basically untrusted user input that then gets deserialized and displayed back to the same or other players (rankings), so being paranoid here is the right call.
+`SaveServiceAuthenticationHandler.cs` is the legacy development door for the Windows Web host. It checks the service secret before trusting `X-Windows-User` and `X-Windows-Sid`. Keep the distinction clear when debugging a 401: a correctly signed-in Windows browser doesn't make its relay request a valid Google request.
 
-Error responses use structured codes (`InvalidSaveEnvelope`, `UnsupportedSaveVersion`, `InvalidSaveState`, `InvalidSaveJson`, `SaveStorageJsonError`, `SaveStorageUnavailable`, `CorruptStoredSave`) rather than bare 400s, specifically so `GameSaveClient` on the Web side can show the player (or an admin) an actionable message instead of "something went wrong." Each error also carries `context.TraceIdentifier` as a `reference` so you can correlate a player's bug report with a specific log line if you've turned on stdout logging (see below).
+Authenticated player requests share a rate limit of 60 requests per minute per identity. `/health` and `/alive` come from ServiceDefaults and are only mapped in Development.
 
-If you're adding a new field to the save shape: bump `CurrentSaveVersion`, add the field's validation gated behind `version >= <new number>`, and mirror the exact same logic in `Path of Boredom.Web/wwwroot/js/arpg-save.js`'s `restoreSnapshot`/`captureSnapshot`. The two are not auto-generated from a shared schema — you have to keep them in sync by hand. This is the single most common source of "save is broken" bugs in this project's history.
+## `FirestorePersistence.cs` — the storage seam
 
-## `RankingEndpoints.cs` / `RankingStore.cs`
+Player document IDs are SHA-256 hashes of the owner identity. The main collections are `saves`, `rankings`, and `accounts`; `displayNames` holds nickname reservations. Save and ranking envelopes are stored as JSON strings so Firestore's map/number conversions don't quietly reshape the JS save contract.
 
-Much simpler than saves, because a ranking row is much smaller and less structurally complex than a full run snapshot. One JSON file per player under `App_Data/saves/rankings/<sha256-of-owner-id>.json`, containing a dictionary of "best score per board key" where a board key is `patch:difficulty:mode:class`. `MigrateClassBests` handles the one-time upgrade from an older key format (`difficulty:mode` or `difficulty:mode:class` without a patch prefix) to the current `patch:difficulty:mode:class` format — this runs lazily on every read/write of a profile, so old profiles self-heal the first time they're touched rather than needing a batch migration script.
+Mutations read the account marker inside their transaction. That serializes writes against deletion and prevents a token issued before deletion from recreating the old account's data. Deletion leaves a minimal hashed-ID marker with a timestamp; it doesn't keep the deleted run or ranking profile.
 
-## Logging in production (IIS)
+## Saves: validation first, transaction second
 
-There is no logging sink beyond the ASP.NET Core default console logger. In IIS, console output is thrown away unless you explicitly turn on stdout capture in `web.config`. See `IIS-LOGGING.md` in this folder for the exact steps — short version: it's disabled by default (`stdoutLogEnabled="false"`) to avoid unbounded log file growth, and you flip it to `true` temporarily when chasing a bug, then flip it back off.
+`GameSaveEndpoints.cs` is still the validation wall. `PUT /game/save` reads at most 64 KiB, checks the envelope, then walks the version-specific state shape before anything reaches storage. The current format is **16**; older supported formats remain accepted.
 
-## App_Data
+`GET /game/save` returns the caller's save and a quoted revision in `ETag`. Google-authenticated writes must send that revision in `If-Match`; revision zero means "create only if there isn't a save yet." A missing revision gets 428, and a stale revision gets 409 with `SaveConflict`. There is no client-clock guessing and no blind last-writer-wins overwrite.
 
-`App_Data/saves` (and its `windows` and `rankings` subfolders) is git-ignored and created on demand. Don't delete it in production without a backup — it's the entire persistence layer for this app. There is currently no automated backup story; if that ever becomes a real concern, that's the first infrastructure gap worth closing.
+`GameSaveStore.cs` performs the write transactionally, increments the revision, and preserves the permanent Endless unlock if either the existing save or incoming run has completed the campaign.
+
+The structured validation errors are worth keeping: `UnsupportedSaveVersion`, `InvalidSaveState`, and `InvalidSaveJson` tell the client more than a bare 400. Some responses include a trace reference for matching a report to server logs. The old disk-store `.corrupt` recovery flow is not the current cloud persistence mechanism; damaged-device-save backups belong to the MAUI host.
+
+If you change persisted game state, update this validator and `Path of Boredom.Game/wwwroot/js/arpg-save.js` together, including migrations. Check the device version gate in `OfflineGameSession.cs` too. An Android version-code bump is not a save-version bump.
+
+## Rankings and player names
+
+`RankingEndpoints.cs` registers profiles, reads boards, and accepts score/build submissions. `RankingStore.cs` keeps a best record under `patch:difficulty:mode:class`, replacing it only when the submitted score is higher. A tie doesn't rewrite the recorded build.
+
+Mobile uses the `release` board; desktop uses `004`, with historical tags kept separate. Older unprefixed board keys are migrated lazily into `pre004`. Scores are client-reported, so these are community rankings, not an anti-cheat system.
+
+`PlayerAccountEndpoints.cs` provides the profile, nickname change, and deletion routes under `/game/account`. Names follow `PlayerDisplayNameRules`: 3–24 letters, numbers, spaces, dots, hyphens, or underscores. A missing custom name falls back to an `Ember-...` alias rather than exposing the Google account's personal name.
+
+Nickname changes reserve a case-insensitive name transactionally and check profiles created before reservations existed. Another player's name returns 409. Renaming releases the previous reservation; account deletion releases the reservation owned by that account. These checks only reach players after this API source is deployed — putting a new AAB on Play doesn't update them.
+
+## Deployment and debugging
+
+`deployment/Prepare-CloudSource.ps1`, run from the repository, creates `Play-Release/pob-cloud-source.zip` with the backend projects and container inputs. It doesn't deploy the archive, and it deliberately excludes Android bundles, signing keys, passwords, and local data. `docs/google-cloud-and-play-guide.md` covers the cloud/Play setup.
+
+Deploy updated source or an updated image to the same Cloud Run service to create a new revision. Restarting a container that still uses the old image won't install the new code. Firestore stays outside the container lifecycle, so a normal backend redeploy doesn't need a new Android version code or reset player saves.
+
+For failures, start with the service logs, the response code, and any trace reference. Then separate token/audience problems, Firestore access problems, revision conflicts, and save-validator drift. They're four different problems that can all look like "Save didn't work" from a phone.

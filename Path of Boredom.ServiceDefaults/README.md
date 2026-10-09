@@ -1,25 +1,35 @@
 # Path of Boredom.ServiceDefaults
 
-Shared library referenced by both `Web` and `ApiService`. Three files, three jobs. This is Aspire's standard "ServiceDefaults" template project, lightly extended with our own save/ranking contracts.
+Shared server plumbing for Web and ApiService. This started from Aspire's standard ServiceDefaults template and still mostly does what you'd expect: telemetry, health checks, service discovery, and HTTP resilience.
 
-## `Extensions.cs` — Aspire boilerplate
+The game DTOs no longer live here. They moved to `Path of Boredom.Contracts` so the shared game and MAUI app can use them without dragging server-hosting infrastructure into an Android package.
 
-`AddServiceDefaults()` wires up OpenTelemetry (traces/metrics), a default health check, service discovery, and resilience handlers on `HttpClient`. `MapDefaultEndpoints()` exposes `/health` and `/alive`, **but only in Development** — there's a comment in there warning that exposing health endpoints in production has security implications, and it's respected: in Production those endpoints simply don't exist. This mostly came straight from the Aspire project template; don't over-think it, it's not game-specific.
+## `Extensions.cs` — the Aspire bits
 
-## `SaveServiceOptions.cs` — the auth contract between Web and ApiService
+`AddServiceDefaults()` sets up OpenTelemetry traces/metrics, health checks, service discovery, and resilient `HttpClient` defaults. `MapDefaultEndpoints()` maps `/health` and `/alive` only in Development. Don't assume those URLs exist on the production Cloud Run service just because Aspire probes them locally.
 
-This is small but it's the thing that actually matters. It defines:
+Most of this is template plumbing, not a place to put game rules. If you're changing how a flask heals, you shouldn't need to edit this project.
 
-- `SectionName` / `AuthenticationScheme` — config section name and the custom auth scheme name used by `SaveServiceAuthenticationHandler` in the API project.
-- `UserNameHeader` / `UserSidHeader` — the two HTTP headers (`X-Windows-User`, `X-Windows-Sid`) that `GameSaveClient` (in Web) sets on every request to the API, carrying the caller's Windows identity across the wire. The API trusts these headers **only** after verifying the bearer token matches the shared secret — so the security model is "if you have the shared secret, we believe whatever identity you tell us," which is fine because only the Web app is supposed to have that secret.
-- `IsValidApiKey()` — just checks the key is 64 hex chars. Both `Program.cs` files validate this on startup (`ValidateOnStart()`), so a misconfigured key fails fast at boot instead of manifesting as mysterious 401s later.
+## `SaveServiceOptions.cs` — the legacy Windows relay contract
 
-If you ever add a third service that needs to call the API, it needs to send the same headers with the same secret — there's no other door in.
+This defines the service-auth scheme, `SaveService` configuration section, the `X-Windows-User` / `X-Windows-Sid` header names, and validation for a 64-character hex API key.
 
-## `RankingModels.cs` — the ranking API's shared vocabulary
+The Web host uses that key before forwarding a Windows identity. The API only registers the corresponding handler when legacy Windows auth is explicitly enabled in Development. Google-token authentication is a separate path, implemented by ApiService, not an alternative value for this shared secret.
 
-DTOs (`ScoreSubmission`, `RankingRow`, `RankingBuild`, `RankingUpgrade`) plus `RankingRules`, a static class that's the single source of truth for what counts as a valid difficulty/mode/class/patch, and what a "reasonable" build snapshot looks like (bounded upgrade counts, bounded ranks, etc. — this exists so a malicious or buggy client can't submit a ranking row with an absurd fake build).
+The distinction matters: a trusted local server can keep the secret private; an installable Android app can't. Don't add `SaveServiceOptions` to a mobile sign-in flow or ship the key in app configuration.
 
-`RankingRules.CurrentPatch` (`"004"`) is the one constant you'll bump when you ship a balance patch that should get its own fresh leaderboard — see the Web project's `PatchNotes.razor` and `Rankings.razor` for how that patch value flows through to the UI. Everything before the current patch value collapses into `"pre004"` on the archive board; there's no per-patch history beyond "current" vs "everything else," by design (see `RankingStore.MigrateClassBests` in the API project).
+## Where the contracts went
 
-`RankingRules.IsValid(ScoreSubmission)` is the actual gate the API applies before persisting a score — if you add a new upgrade category or class, this is where you also need to add it, or valid submissions will get silently rejected.
+Look in `Path of Boredom.Contracts` for:
+
+- `GameSaveResult.cs` — the host-facing save/load result and messages.
+- `RankingModels.cs` — score submissions, ranking rows, build/upgrade snapshots, and `RankingRules`.
+- `PlayerDisplayNameRules.cs` — the nickname normalization and 3–24-character rules shared by the UI and API.
+
+Those types still use the `Path_of_Boredom.ServiceDefaults` namespace for compatibility. Seeing that namespace in a MAUI file doesn't mean the app references this server-plumbing project; check the actual project reference before moving things around.
+
+`RankingRules.CurrentPatch` is `004`; `RankingRules.MobileRelease` is `release`. The accepted tags also include `005` and `pre004`. These board identifiers are separate from Android version codes and save format 16, so don't bump them just because a new AAB is being built.
+
+The ranking build still carries `ManualSkill` in its wire contract for compatibility with older records. Current runs don't have a manual combat slot, and the rankings UI no longer displays that line. Removing a line from a view isn't a reason to break old serialized records.
+
+When changing class keys, upgrade categories, point budgets, or build limits, check `RankingRules` alongside `arpg-ranking.js` and the save validators. A valid-looking client build can still be rejected if only one side got the memo.

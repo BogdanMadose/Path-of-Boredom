@@ -1,47 +1,74 @@
 # Path of Boredom
 
-A small ARPG built as an excuse to poke at .NET Aspire, Blazor Server, and a hand-rolled JavaScript canvas game engine. It's a Diablo-lite: pick a class, fight through a 30-wave campaign across six areas, then keep going forever in Endless mode if you want. Saves live on the server, tied to your Windows login, and there's a rankings page so you can see how your runs stack up.
+A small ARPG that started as an excuse to poke at .NET Aspire, Blazor, and a hand-rolled JavaScript canvas engine. Pick a class, fight through a 30-wave campaign across six areas, then keep going in Endless if you still have something to prove.
 
-This README is the map of the place. If you're new here, read this first, then dive into the project you actually need to touch.
+It now has an Android app too: .NET MAUI hosts the same Blazor components and game engine as the browser version. Mobile play is local-first, with optional Google sign-in for cloud saves and rankings. The browser host still uses Windows sign-in; that older identity path is only supported by the API in an explicitly enabled development setup.
+
+This README is the map of the place. Read this first, then head into the project you actually need to touch.
+
+## What the game looks like now
+
+- Three classes: Ember Knight, Dawn Ranger, and Iron Warden. Each has nine combat abilities, so there are 27 class-specific choices rather than nine skills recoloured three times.
+- Choose one starting automatic skill, another at level 5, and a third at level 10. Those choices stay locked for the run. Regular attacks are automatic on mobile; dodge and flask remain manual and don't use a skill slot.
+- Earn one tree-upgrade point every two levels, up to 32. Forge upgrades, level-up boons, and post-forge training give you other ways to grow the character.
+- Bosses have their own attack patterns and short recovery windows. Arena hazard circles get fresh sizes, positions, counts, and activation timings each wave after hazardous areas begin.
+- Skills and rankings live inside the mobile game. Ranking boards are separate by class, difficulty, and starting mode; expand a record to see its automatic skills and upgrades.
 
 ## The shape of the solution
 
-Four projects, and they talk to each other like this:
+There are seven projects now. The important split is between the shared game and the things that host it:
 
-```
-Path of Boredom.AppHost        → wires everything up for local dev (.NET Aspire)
-Path of Boredom.Web            → the Blazor Server app; also serves the actual game (it's mostly JavaScript)
-Path of Boredom.ApiService     → the save/ranking API; talks to the Web app over HTTP, not directly to browsers
-Path of Boredom.ServiceDefaults→ shared plumbing (health checks, telemetry, the save-service auth contract)
-```
+- `Path of Boredom.Game` — shared Razor pages, session interfaces, canvas engine, CSS, and SVG art.
+- `Path of Boredom.Maui` — the Android Blazor Hybrid app, floating joystick, mobile menus, Google sign-in, and device/cloud save transport.
+- `Path of Boredom.Web` — the Windows-authenticated Blazor Server host and its save/ranking relay.
+- `Path of Boredom.ApiService` — authenticated saves, rankings, player names, and account deletion, backed by Firestore.
+- `Path of Boredom.Contracts` — the small shared DTOs and validation rules used by the hosts and API.
+- `Path of Boredom.ServiceDefaults` — Aspire health checks, telemetry, HTTP plumbing, and the legacy Windows service-auth options.
+- `Path of Boredom.AppHost` — local Aspire orchestration for the Web and API projects. It doesn't launch the Android app or deploy anything.
 
-The important thing to understand up front: **the game itself is not really a Blazor app**. `Home.razor` is basically a thin shell — a `<canvas>`, some HUD markup, and a single JS module import. Almost all gameplay logic (movement, combat, loot, skill trees, enemy AI, rendering) lives in plain JavaScript under `Path of Boredom.Web/wwwroot/js/`. Blazor's job here is authentication, hosting, and being the bridge that lets JavaScript call back into C# to save/load a run and submit rankings. If you're looking for "where does the boss deal damage", you want the JS files, not Razor.
+Almost all gameplay lives under `Path of Boredom.Game/wwwroot/js/`, not under the Web project anymore. If you're looking for where a boss deals damage, start there. `Home.razor` provides the canvas and controls; `IGameSession` lets that same page save through whichever host is running it.
 
 ## Why it's built this way
 
-Early on this used to be closer to a normal Blazor game (component state driving the UI), but a canvas-based real-time ARPG with 60fps combat, particle effects, and physics-ish enemy movement is a much better fit for a JS render loop than for Blazor's diffing. So the split settled into: **JS owns the simulation and rendering, C# owns identity and persistence.** The two talk over a narrow bridge:
+Real-time combat is a better fit for a JS loop than for component diffing. The arrangement is still pretty simple: **JavaScript owns the simulation and rendering; C# owns identity and persistence.**
 
-- Blazor → JS: `createGame(canvasElement, dotNetHelperRef)` (see `Home.razor`'s `OnAfterRenderAsync`)
-- JS → Blazor: `DotNetObjectReference` invokable methods `SaveRun`, `LoadRun`, `SubmitScore` (see `Home.razor`'s `[JSInvokable]` methods)
-- Blazor → API: `GameSaveClient` (HTTP, with a shared-secret + Windows identity header scheme, not cookies)
+`Home.razor` imports `arpg.js` and calls `createGame(gameRoot, saveBridge)`. The engine calls back through `SaveRun`, `LoadRun`, and `SubmitScore`. On Android those calls reach `MobileCloudGameSession`; in the browser they reach `WindowsGameSession` and `GameSaveClient`.
 
-Nothing about saves or rankings touches the browser directly — the API only trusts the Web app, and the Web app only trusts whoever Windows-authenticated the browser session (via Negotiate/Kerberos). That's deliberate: the API's "auth" is really "are you the Web app, and who did you say the user is", not a public-facing scheme.
+The Android app never carries the Web host's shared service secret. It sends a Google ID token, and the API verifies it itself. Cloud saves and rankings live in Firestore, not in the container's filesystem, so replacing a Cloud Run revision doesn't wipe player progress.
 
-## Solution-wide gotchas worth knowing before you change anything
+## Running and checking things
 
-- **The save format has a version number and it matters.** `arpg-save.js` (client) and `GameSaveEndpoints.cs` (server) both hard-code `CurrentSaveVersion` / the version list, and they have to agree byte-for-byte on what a valid save looks like. If you add a field to game state, you bump the version in both places and add a migration branch in `restoreSnapshot()`. Skipping this is how you get save corruption reports. We've been bit by this before — see the "malformed save on the server" incident that led to the `.corrupt` backup mechanism in `GameSaveStore.cs`.
-- **There's no database.** Saves and rankings are JSON files under `App_Data/saves` (and `App_Data/saves/rankings`), one per user, keyed by a SHA-256 hash of their identity. This is fine for a hobby project's player count; it will not scale past "a few dozen people," and there's no locking beyond an in-process semaphore per store. If this ever needs real concurrency (multiple API instances), this is the first thing to replace.
-- **The shared secret is the whole auth story between Web and API.** `SaveServiceOptions.ApiKey` is a 64-char hex string both apps must have identically configured (`SaveService:ApiKey` / `SaveService__ApiKey`). AppHost generates and injects it automatically for local dev. In IIS, you set it by hand in both apps' config — get it wrong and every save silently 401s.
-- **This targets .NET 9** and uses Blazor Server (not WASM) — interactivity is `@rendermode InteractiveServer`, which means the game state technically lives in a SignalR circuit on the server. If that circuit drops, the in-progress run's JS state is gone (there's a warning about this in `GameLayout.razor`'s `#blazor-error-ui`).
+The solution targets .NET 9. Android development needs the MAUI/Android workload and the appropriate Android SDK; the current Play release targets API 36. The web development path also needs the API's Firestore and Google identity configuration, plus the development-only Windows-auth switch if you want Web save calls to work. F5 isn't a substitute for those settings — see the AppHost notes.
+
+For an ordinary compilation check, run `dotnet build "Path of Boredom.sln"` from the repository root. The gameplay and UI regressions are under `Path of Boredom.Maui/tests/`; they use Node and can be run individually, for example `node "Path of Boredom.Maui/tests/checkpoint-saves.test.mjs"`.
+
+There are currently 13 test suites covering skills, saves, combat facing, bosses, menus, rankings, SVG paths, and death-screen scrolling. Some layout checks launch Microsoft Edge when it's available; otherwise they explicitly skip the browser part. A clean C# build alone can't tell you whether a touch menu actually scrolls.
+
+## Releases: three different numbers, not one
+
+The latest locally built Android bundle is `Play-Release/Path-of-Boredom-Internal-Test-v11-API36.aab`: Play version code **11**, display version **0.5.0**, and target API **36**. That is a build artifact, not a claim that it's already uploaded or rolled out.
+
+The save format is still **16**. The mobile leaderboard tag is **`release`**, while the desktop patch board is **`004`**. Building V11 doesn't automatically change either of those, reset rankings, or redeploy the backend.
+
+`deployment/Publish-PlayBundle.ps1` builds and signs an AAB with a supplied version code. `deployment/Prepare-CloudSource.ps1` prepares a backend-only source archive. They're separate on purpose. A new app bundle doesn't install server changes, and restarting an old container doesn't install new code either. Nickname uniqueness, for example, needs the updated API deployed before it works live.
+
+## Things worth knowing before you change anything
+
+- **Keep save validation in step.** `arpg-save.js`, `GameSaveEndpoints.cs`, and the device save version gate must agree. If you change persisted state, update the version, migration, and validation together. Cosmetic facing and stage hazard layouts are transient; they don't add fields to the save.
+- **Local and cloud saves aren't the same file.** Mobile keeps a device save and makes a backup before replacing it with a cloud run. Cloud uploads use revision checks, not whichever device has the newest-looking clock.
+- **Don't ship signing material.** `Play-Release` and `.local-signing` contain local release inputs and artifacts. Keys and passwords belong outside source control and outside the backend archive.
+- **Don't move Blazor-owned DOM nodes around.** The mobile menus lift the existing sections with CSS instead of re-parenting them. Breaking that rule can break both Blazor rendering and the game's event bindings.
+- **JS state lives in the WebView/browser.** Blazor Server needs its circuit for interop, but the simulation isn't running on the server. A dropped circuit can interrupt saving; a reload loses anything that wasn't saved.
 
 ## Where to go next
 
-- Building/running locally, or touching Aspire wiring → `Path of Boredom.AppHost/README.md`
-- Windows auth, the game UI shell, save client plumbing → `Path of Boredom.Web/README.md`
-- Save/ranking storage and validation, IIS deployment → `Path of Boredom.ApiService/README.md`
-- Shared contracts (save auth header scheme, ranking DTOs, Aspire health check wiring) → `Path of Boredom.ServiceDefaults/README.md`
-- The actual game (combat, skills, enemies, rendering) → `Path of Boredom.Web/wwwroot/js/README.md`
+- Local Aspire wiring → `Path of Boredom.AppHost/README.md`
+- Android controls, device/cloud saves, and Play bundles → `Path of Boredom.Maui/README.md`
+- Windows auth and the browser save relay → `Path of Boredom.Web/README.md`
+- Firestore, token validation, account names, and backend deployment → `Path of Boredom.ApiService/README.md`
+- Shared plumbing and where the contracts moved → `Path of Boredom.ServiceDefaults/README.md`
+- Combat, skills, enemies, art, and save migrations → `Path of Boredom.Game/wwwroot/js/README.md`
 
 ## A note on the JS style
 
-The whole game is written as plain ES modules with no build step, no bundler, no TypeScript. That's a conscious tradeoff for a small solo/hobby project — there's nothing to compile, `Home.razor` just does `await JS.InvokeAsync<IJSObjectReference>("import", "./js/arpg.js")` and browsers handle the rest. It also means there's no type-checking safety net in the JS layer; the validation that keeps saves honest lives entirely in `GameSaveEndpoints.cs` on the server and mirrored logic in `arpg-save.js` on the client. If this project ever grows past "one or two people hacking on it," introducing TypeScript or at least JSDoc types for the engine module would pay for itself fast.
+The engine is still plain ES modules: no bundler, no TypeScript, no separate frontend compilation step. Edit a module, reload the host, and the browser handles the import. That keeps a small hobby game approachable, but it also means the regression tests and actual playtesting matter. A typo in a property name won't politely wait for the next C# build to tell you about it.

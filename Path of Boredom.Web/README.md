@@ -1,40 +1,47 @@
 # Path of Boredom.Web
 
-This is the Blazor Server app, but don't expect to find much game logic in the `.razor` files — this project's real jobs are: get the player signed in via Windows auth, render the page shell around a `<canvas>`, and act as the trusted relay between the browser's JS runtime and the API. The actual ARPG lives in `wwwroot/js/` (see that folder's own README).
+This is the Windows-authenticated Blazor Server host. It used to own the game pages and JS files; those now live in `Path of Boredom.Game` so the Android app can use the same game without copying it.
+
+The jobs left here are fairly small: negotiate the browser's Windows identity, host the shared components, and relay saves and rankings to the API through `WindowsGameSession` and `GameSaveClient`.
 
 ## Auth (`Program.cs`)
 
-Straightforward Negotiate (Windows/Kerberos) authentication — `AddAuthentication(NegotiateDefaults.AuthenticationScheme).AddNegotiate()`. Every Razor component route requires authorization (`RequireAuthorization()` on `MapRazorComponents`), so there's no anonymous access to anything, including the rankings page. There's no login page to speak of — `/account/login` just bounces back to `/`, because Negotiate handles the challenge/response at the HTTP level before Blazor ever gets involved. If a user's browser can't or won't do Windows auth (e.g. no domain, wrong browser settings), they'll just get stuck at a 401 — this app assumes an intranet/domain-joined environment, it was never meant to be public-internet facing.
+The browser still signs in through Negotiate, meaning Windows/Kerberos rather than a password form or Google's mobile sign-in. Routed components require authorization, including rankings. `/account/login` is just an authenticated redirect back to `/`; the actual challenge happens at HTTP level.
 
-The `SaveServiceOptions` validation (`ValidateOnStart()`) is also here, same as the API — if the shared secret isn't configured or isn't 64 hex chars, the app refuses to start rather than silently failing every save later.
+This host assumes a Windows/intranet-style environment. It isn't an anonymous public web version of the Android account flow.
 
-## `GameSaveClient.cs` — the only thing allowed to talk to the API
+`SaveService:ApiKey` must be a 64-character hex secret, and `ApiService:BaseUrl` identifies the API. Under Aspire the address can be `https+http://apiservice`; outside Aspire it needs an explicit URL. The API must separately have the matching secret and its development-only legacy Windows authentication enabled. The current public Google-token backend doesn't accept this relay scheme in Production.
 
-Every request to `Path of Boredom.ApiService` goes through this class, and it's intentionally the single choke point. It:
+## `WindowsGameSession.cs` and `GameSaveClient.cs`
 
-- Builds requests with a `Bearer <shared secret>` auth header plus `X-Windows-User` / `X-Windows-Sid` headers pulled off the current `ClaimsPrincipal` — see `CreateRequest` (not shown above but referenced throughout `SendAsync`).
-- Caps outgoing save payloads at 64KB client-side before even sending, matching the API's own cap, so an oversized request fails fast with a clear message instead of a generic error from the server.
-- Translates every API error code (`InvalidSaveEnvelope`, `UnsupportedSaveVersion`, `CorruptStoredSave`, etc. — see `Path of Boredom.ApiService/README.md`) into an actual sentence a player or admin can act on. This is the file to edit if you add a new error code on the API side and want a friendly message instead of the generic fallback.
-- Deliberately does **not** throw on network failure — it catches `HttpRequestException`/timeouts/etc. and returns a `GameSaveResult` with `Success = false` instead, because the JS side needs to keep the run alive and let the player retry rather than getting a Blazor error boundary mid-game.
-- Also has `RegisterPlayerAsync` / `SubmitScoreAsync` for the ranking side, gated through the same request-building path so ranking submissions get the same identity headers as saves.
+`WindowsGameSession` implements the shared `IGameSession` interface. That lets `Home.razor` ask for a save or rankings without knowing it's running in a Windows-authenticated browser rather than an Android WebView.
 
-## `Home.razor` — the page that's mostly not Blazor
+`GameSaveClient` is the HTTP choke point. It attaches the service bearer secret and the current caller's Windows identity headers, bounds save payloads at 64 KiB, and translates API errors into useful `GameSaveResult` messages. Network failures should leave the run alive so the player can retry, not turn into an unhandled component exception.
 
-Almost the entire body is static markup: the canvas, the HUD stat spans (`data-stat="..."` attributes), the level-up draft overlay, the setup dialog (difficulty/class/loadout pickers), the death report panel, and the controls legend. None of it has `@bind` or event handlers wired the Blazor way — JS reaches into this DOM directly by selector (`data-action="save"`, `data-stat="wave"`, etc.) and mutates it in the render loop. This is why the file is long but the `@code` block is tiny.
+Ranking registration and submissions use the same identity path. When changing it, keep the caller lookup fresh for each operation; a session object shouldn't quietly hold on to somebody else's old principal.
 
-The `@code` block itself only handles three things:
-1. **On init**, it grabs the signed-in Windows username (stripped of the domain prefix) and calls `Saves.RegisterPlayerAsync` to warm up the ranking profile.
-2. **On first render**, it imports `./js/arpg.js` as an ES module and calls its exported `createGame(gameRoot, saveBridge)`, handing over the canvas host element and a `DotNetObjectReference` to itself. Everything past this point is the JS engine driving the show.
-3. Three `[JSInvokable]` methods (`SaveRun`, `LoadRun`, `SubmitScore`) that JS calls back into whenever the player saves, loads, or finishes a run. These just forward straight to `GameSaveClient`, re-reading the current `ClaimsPrincipal` each time so a stale identity can never be reused.
+## Where the game pages went
 
-`DisposeAsync` is careful to tear down the JS side (`dispose()` on the game instance) before disposing the module and the `DotNetObjectReference` — if you swap this to a `try/finally` shape, make sure disposal order survives a `JSDisconnectedException` (the circuit can drop mid-teardown, and this already guards for that).
+`Path of Boredom.Game/Components/Pages/Home.razor` contains the canvas, data-attribute-driven controls, setup screens, tree markup, and death report. It imports `/_content/PathOfBoredom.Game/js/arpg.js` and calls `createGame(gameRoot, saveBridge)`.
 
-## Other Razor pages
+The JS engine drives most of that DOM. Blazor supplies the host/session bridge through `SaveRun`, `LoadRun`, and `SubmitScore`, plus the account callbacks used by cloud-capable hosts. The session registration is the reason the same shared page can work in both heads without putting Windows auth into the mobile project.
 
-- `Rankings.razor` — reads the API's rankings endpoint and renders the leaderboard tables (per-class boards plus the archive board for older patches). No game logic, just fetch-and-render.
-- `PatchNotes.razor` — static changelog content, linked from the in-game patch notice banner (`data-patch-notice` in `Home.razor`).
-- `Error.razor` / `GameLayout.razor` — standard Blazor error boundary page and the shared page chrome (nav, the `#blazor-error-ui` banner that warns you if the SignalR circuit drops — worth remembering that if that banner shows up mid-run, the JS game state is gone, because the game state was never persisted anywhere except in that JS module's memory until you hit Save).
+The other shared pages are:
 
-## If you're adding a new page or feature here
+- `Rankings.razor` — class-separated columns of player records, with expandable automatic skills and upgrades. There is no manual-skill line in the build overview anymore.
+- `PatchNotes.razor` — the browser's changelog content. The mobile game currently doesn't expose that page in its menu.
+- `GameLayout.razor` — shared layout and the Blazor connection warning. The Web host's `Error.razor` remains here.
 
-Ask first whether it actually needs Blazor interactivity, or whether it's really a JS/canvas concern that just needs a thin host page like `Home.razor`. Most "game feature" requests (new enemy, new skill, new upgrade) belong entirely in `wwwroot/js/`, not here — this project only grows when you're touching auth, the save/ranking bridge, or genuinely server-rendered content like the rankings table or patch notes.
+Both endpoint routing in `Program.cs` and the component router need to know about the shared game assembly. Fixing only one can leave direct URLs working differently from in-app navigation.
+
+## A circuit is not the game state
+
+The simulation runs in browser-side JavaScript. Interactive Server supplies the circuit needed for component events and .NET interop; it isn't advancing the enemies on the server.
+
+A lost circuit can interrupt save/load calls and UI interactions. It doesn't, by itself, prove the JS state vanished. Reloading the page does discard unsaved in-memory progress, though, so don't tell players a reconnect banner is harmless either.
+
+Disposal still matters: tear down the game instance before releasing its module and `DotNetObjectReference`, and allow for `JSDisconnectedException` during teardown.
+
+## If you're adding a feature
+
+Windows identity or HTTP relay work belongs here. Shared pages and styling belong in `Path of Boredom.Game`. Combat, skills, enemy AI, and canvas art belong in that project's `wwwroot/js/` folder. The folder split is there to avoid fixing a feature for one host and leaving the other with a stale copy.

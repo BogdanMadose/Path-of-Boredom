@@ -1,0 +1,14 @@
+*
+!Dockerfile
+!.dockerignore
+!.gcloudignore
+!Path of Boredom.ApiService/
+!Path of Boredom.ApiService/*.cs
+!Path of Boredom.ApiService/*.csproj
+!Path of Boredom.ApiService/appsettings.json
+!Path of Boredom.ServiceDefaults/
+!Path of Boredom.ServiceDefaults/*.cs
+!Path of Boredom.ServiceDefaults/*.csproj
+!Path of Boredom.Contracts/
+!Path of Boredom.Contracts/*.cs
+!Path of Boredom.Contracts/*.csproj

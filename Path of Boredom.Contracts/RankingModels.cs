@@ -53,14 +53,17 @@ public sealed record RankingUpgrade(string Category, string Name, long Rank);
 /// </summary>
 public static class RankingRules
 {
-    /// <summary>The patch identifier used for scores submitted by the current game build.</summary>
+    /// <summary>The patch identifier used by the desktop game.</summary>
     public const string CurrentPatch = "004";
 
-    /// <summary>True if <paramref name="value"/> is a recognized patch tag ("004" or the legacy "pre004").</summary>
-    public static bool IsPatch(string? value) => value is "004" or "pre004";
+    /// <summary>The initial mobile ranking board, separate from development patch scores.</summary>
+    public const string MobileRelease = "release";
+
+    /// <summary>True if <paramref name="value"/> is a recognized release or historical patch tag.</summary>
+    public static bool IsPatch(string? value) => value is MobileRelease or "005" or "004" or "pre004";
 
     /// <summary>Human-readable label for a patch tag, used as a section heading on the rankings page.</summary>
-    public static string PatchName(string value) => value == CurrentPatch ? "Patch 004 — fresh runs" : "Pre-004 / inherited runs";
+    public static string PatchName(string value) => value == MobileRelease ? "Initial release" : value == CurrentPatch ? "Patch 004 — fresh runs" : value == "005" ? "Development archive" : "Pre-004 / inherited runs";
 
     /// <summary>True if <paramref name="value"/> is one of the three supported difficulties.</summary>
     public static bool IsDifficulty(string? value) => value is "hard" or "nightmare" or "inferno";
@@ -123,8 +126,8 @@ public static class RankingRules
         // Basic shape checks: sane level, not too many entries, manual/auto skill names look like
         // real labels, and the manual skill isn't also duplicated into an auto slot.
         if (build.Level is < 1 or > 9_007_199_254_740_991L
-            || build.Upgrades is null || build.Upgrades.Count > 55
-            || !ValidLabel(build.ManualSkill) || build.AutoSkills is null || build.AutoSkills.Count > 2
+            || build.Upgrades is null || build.Upgrades.Count > 79
+            || !ValidLabel(build.ManualSkill) || build.AutoSkills is null || build.AutoSkills.Count > 4
             || build.AutoSkills.Any(skill => !ValidLabel(skill))
             || build.AutoSkills.Distinct(StringComparer.Ordinal).Count() != build.AutoSkills.Count
             || build.AutoSkills.Contains(build.ManualSkill)) return false;
@@ -158,7 +161,7 @@ public static class RankingRules
         // plus per-category node counts in arpg-skills.js / arpg-cards.js).
         return treePoints <= Math.Min(32, build.Level / 2) && cards <= build.Level - 1
             && training <= 9_007_199_254_740_991L
-            && build.Upgrades.Count(upgrade => upgrade.Category == "tree") <= 24
+            && build.Upgrades.Count(upgrade => upgrade.Category == "tree") <= 48
             && build.Upgrades.Count(upgrade => upgrade.Category == "forge") <= 10
             && build.Upgrades.Count(upgrade => upgrade.Category == "card") <= 14
             && build.Upgrades.Count(upgrade => upgrade.Category == "mastery") <= 7;

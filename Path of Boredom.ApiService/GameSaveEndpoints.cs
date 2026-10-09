@@ -17,7 +17,7 @@ public static class GameSaveEndpoints
     /// version-gated branch below) any time the client-side save shape changes in a way that needs
     /// server-side validation — see the Web project's JS runtime README for the full checklist.
     /// </summary>
-    public const int CurrentSaveVersion = 14;
+    public const int CurrentSaveVersion = 15;
 
     /// <summary>Registers the GET (load) and PUT (save) endpoints under /game/save.</summary>
     public static void MapGameSaves(this WebApplication app)
@@ -270,7 +270,8 @@ public static class GameSaveEndpoints
             // mastery has been spent, forge upgrades must be present at their exact starting values.
             if (total > 0 && (!state.TryGetProperty("upgrades", out var forge) || !Numbers(forge, upgradeKeys)
                 || forge.EnumerateObject().Count() != upgradeKeys.Length
-                || forge.EnumerateObject().Any(item => item.Value.GetDouble() != (item.Name switch { "weapon" => 50, "armor" => 12, "flask" => 5, _ => 8 })))) return false;
+                || forge.EnumerateObject().Any(item => (version < 15 || item.Name is not ("nova" or "burst" or "guard"))
+                    && item.Value.GetDouble() != (item.Name switch { "weapon" => 50, "armor" => 12, "flask" => 5, _ => 8 })))) return false;
         }
         var mode = "campaign";
         var completed = 0d;
@@ -419,20 +420,23 @@ public static class GameSaveEndpoints
     /// </summary>
     private static bool ValidSkillProgress(JsonElement state, JsonElement player, int version)
     {
-        string[] skills = ["attack", "nova", "burst", "guard", "dodge", "potion"];
+        string[] skills = version >= 15
+            ? ["attack", "nova", "burst", "guard", "dodge", "potion", "chain", "frost", "reap", "meteor", "siphon", "nullwave"]
+            : ["attack", "nova", "burst", "guard", "dodge", "potion"];
         // v10 restricted auto-cast slots to only accept combat skills (nova/burst/guard) — before
         // that, any skill could theoretically be slotted into an auto slot.
-        string[] slotSkills = version >= 10 ? ["nova", "burst", "guard"] : skills;
+        string[] slotSkills = version >= 15 ? ["nova", "burst", "guard", "chain", "frost", "reap", "meteor", "siphon", "nullwave"]
+            : version >= 10 ? ["nova", "burst", "guard"] : skills;
         string[] nodes = ["potency", "reach", "ember", "recovery"];
-        if (!Numbers(player, "burst", "guard", "guarding") || !Numbers(state, "resumeDelay", "travelPending")
+        if (!Numbers(player, skills) || !Numbers(player, "guarding") || !Numbers(state, "resumeDelay", "travelPending")
             || state.GetProperty("resumeDelay").GetDouble() is < 0 or > 3
             || !state.GetProperty("travelPending").TryGetInt32(out var travel) || travel is < 0 or > 1
             || player.GetProperty("guarding").GetDouble() is < 0 or > 8
             || skills.Any(key => player.GetProperty(key).GetDouble() is < 0 or > 30)
             || !player.GetProperty("level").TryGetInt64(out var level) || level < 1
             || !state.TryGetProperty("loadout", out var loadout) || loadout.ValueKind != JsonValueKind.Object
-            || !loadout.TryGetProperty("manual", out var manual) || manual.ValueKind != JsonValueKind.String || !slotSkills.Contains(manual.GetString())
-            || !loadout.TryGetProperty("auto", out var auto) || auto.ValueKind != JsonValueKind.Array || auto.GetArrayLength() != (version >= 10 ? 2 : 3)
+            || !loadout.TryGetProperty("manual", out var manual) || manual.ValueKind != JsonValueKind.String || (version >= 15 ? manual.GetString() != "none" : !slotSkills.Contains(manual.GetString()))
+            || !loadout.TryGetProperty("auto", out var auto) || auto.ValueKind != JsonValueKind.Array || auto.GetArrayLength() != (version >= 15 ? 4 : version >= 10 ? 2 : 3)
             || !state.TryGetProperty("skillTree", out var tree) || tree.ValueKind != JsonValueKind.Object || tree.EnumerateObject().Count() != skills.Length) return false;
         // A skill can only be slotted once total across manual+auto — same skill in two slots
         // simultaneously isn't a real loadout the game would ever produce.
@@ -443,6 +447,11 @@ public static class GameSaveEndpoints
             if (item.ValueKind != JsonValueKind.String || item.GetString() is not { } key) return false;
             if (key != "none" && (!slotSkills.Contains(key) || !slotted.Add(key))) return false;
         }
+        if (version >= 15)
+        {
+            var capacity = 1 + (level >= 5 ? 1 : 0) + (level >= 10 ? 1 : 0) + (level >= 15 ? 1 : 0);
+            if (auto[0].GetString() == "none" || auto.EnumerateArray().Skip(capacity).Any(item => item.GetString() != "none")) return false;
+        }
         if (version >= 11)
         {
             // Guard skill unlocks at a later wave in Endless mode than in campaign (wave 41 vs 11) —
@@ -450,7 +459,7 @@ public static class GameSaveEndpoints
             // was actually unlockable for the run's current mode.
             if (!Numbers(state, "wardUnlockSeen") || !state.GetProperty("wardUnlockSeen").TryGetInt32(out var seen) || seen is < 0 or > 1) return false;
             var unlockWave = state.GetProperty("rankingMode").GetString() == "endless" ? 41 : 11;
-            if (state.GetProperty("wave").GetDouble() < unlockWave && (slotted.Contains("guard") || player.GetProperty("guarding").GetDouble() != 0)) return false;
+            if (version < 15 && state.GetProperty("wave").GetDouble() < unlockWave && (slotted.Contains("guard") || player.GetProperty("guarding").GetDouble() != 0)) return false;
         }
         var spent = 0;
 
@@ -465,7 +474,8 @@ public static class GameSaveEndpoints
                 "burst" => ["focus", "aperture", "shatter", "overdrive"],
                 "guard" => ["barrier", "duration", "repulse", "refuge"],
                 "dodge" => ["agility", "distance", "afterstep", "recovery"],
-                _ => ["concentration", "triage", "tonic", "renewal"]
+                "potion" => ["concentration", "triage", "tonic", "renewal"],
+                _ => nodes
             };
             if (!tree.TryGetProperty(skill, out var branch) || !Numbers(branch, branchKeys) || branch.EnumerateObject().Count() != branchKeys.Length) return false;
             

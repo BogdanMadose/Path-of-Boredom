@@ -21,7 +21,7 @@ import { DIFFICULTIES, difficultyFor } from "./arpg-difficulty.js";
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
 import { ELITE_MODIFIERS, enemyDamageSource } from "./arpg-modifiers.js";
 import { SKILL_KEYS, SLOTTABLE_SKILLS, AUTO_COOLDOWN, EXTRA_SKILLS, NEW_SKILLS, combatSkillDefinition, newSkillTree, skillUnlocked, skillSelected, needsSkillChoice } from "./arpg-skills.js";
-import { MAX_WEAPON_TWIST, ATTACK_ALIGNMENT, angleDifference, updateCombatFacing } from "./arpg-facing.js";
+import { updateCombatFacing } from "./arpg-facing.js";
 // Logical canvas resolution (not the real on-screen pixel size — arpg-graphics.js scales this to
 // fit the actual canvas). All position math throughout this file is in these logical units.
 export const WIDTH = 1100;
@@ -620,7 +620,7 @@ export function useSkill(state, skill, automatic = false) {
     if (NEW_SKILLS[skill]) {
         if (!castClassSkill(state, skill)) return false;
     } else if (skill === "attack") {
-        const facing = p.weaponFacing ?? p.facing;
+        const facing = p.attackFacing ?? p.weaponFacing ?? p.facing;
         p.swing = 0.26;
         p.attack = hero.attackCooldown / (1 + state.upgrades.cleave * 0.07) / (1 + nodes.rhythm * 0.06);
         const reach = skillReach(state, "attack");
@@ -1017,14 +1017,14 @@ export function step(state, input, elapsed) {
     const movementAngle = length > 0 ? Math.atan2(dy, dx) : Math.hypot(p.vx, p.vy) > 15 ? Math.atan2(p.vy, p.vx) : undefined;
     let attackTarget;
     if (input.autoAttack) {
-        attackTarget = state.enemies.filter(enemy => {
-            const angle = Math.atan2(enemy.y - p.y, enemy.x - p.x);
-            return enemy.health > 0 && distance(p, enemy) <= skillReach(state, "attack") + enemy.radius
-                && (movementAngle === undefined || Math.abs(angleDifference(movementAngle, angle)) <= MAX_WEAPON_TWIST);
-        }).sort((a, b) => distance(p, a) - distance(p, b))[0];
+        attackTarget = state.enemies.filter(enemy => enemy.health > 0 && distance(p, enemy) <= skillReach(state, "attack") + enemy.radius)
+            .sort((a, b) => distance(p, a) - distance(p, b))[0];
         const targetAngle = attackTarget ? Math.atan2(attackTarget.y - p.y, attackTarget.x - p.x) : undefined;
+        if (targetAngle === undefined) delete p.attackFacing;
+        else p.attackFacing = targetAngle;
         updateCombatFacing(p, movementAngle, targetAngle, dt);
     } else {
+        delete p.attackFacing;
         delete p.weaponFacing;
         if (length > 0) p.facing = Math.atan2(dy, dx);
         if (Number.isFinite(input.faceAngle)) p.facing = input.faceAngle;
@@ -1037,13 +1037,8 @@ export function step(state, input, elapsed) {
         p.facing = facing;
     }
     if (input.potion) useSkill(state, "potion");
-    const forwardWeapon = movementAngle === undefined || Math.abs(angleDifference(movementAngle, p.weaponFacing ?? p.facing)) <= MAX_WEAPON_TWIST;
-    if (input.attack && (!input.autoAttack || forwardWeapon)) useSkill(state, "attack");
-    if (input.autoAttack && !input.attack && p.attack <= 0 && forwardWeapon && attackTarget) {
-        const targetAngle = Math.atan2(attackTarget.y - p.y, attackTarget.x - p.x);
-        const alignment = state.heroClass === "ranger" ? Math.min(ATTACK_ALIGNMENT, Math.atan2(attackTarget.radius, distance(p, attackTarget))) : ATTACK_ALIGNMENT;
-        if (Math.abs(angleDifference(p.weaponFacing, targetAngle)) <= alignment) useSkill(state, "attack");
-    }
+    if (input.attack) useSkill(state, "attack");
+    if (input.autoAttack && !input.attack && p.attack <= 0 && attackTarget) useSkill(state, "attack");
     if (input.manual) useSkill(state, state.loadout.manual);
     autoCast(state);
     if (state.status !== "playing") return;

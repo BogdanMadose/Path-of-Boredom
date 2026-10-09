@@ -33,7 +33,11 @@ public sealed record RankingRow(int Rank, string Player, long Score, DateTimeOff
 /// <param name="Upgrades">Every upgrade the character has taken, across all categories (tree/forge/card/mastery).</param>
 /// <param name="ManualSkill">The skill currently bound to the manual-cast slot (Q).</param>
 /// <param name="AutoSkills">The (up to 2) skills bound to auto-cast slots.</param>
-public sealed record RankingBuild(long Level, IReadOnlyList<RankingUpgrade> Upgrades, string ManualSkill, IReadOnlyList<string> AutoSkills);
+/// <param name="Equipment">Gear and trade-offs at submission time; absent on older records.</param>
+public sealed record RankingBuild(long Level, IReadOnlyList<RankingUpgrade> Upgrades, string ManualSkill, IReadOnlyList<string> AutoSkills, RankingEquipment? Equipment = null);
+
+/// <summary>Equipped gear ratings and styles, separate from forge ranks.</summary>
+public sealed record RankingEquipment(string Weapon, long WeaponRating, string WeaponStyle, string Armor, int ArmorRating, string ArmorStyle);
 
 /// <summary>
 /// A single upgrade entry within a <see cref="RankingBuild"/> — one row of "this skill tree node
@@ -102,6 +106,22 @@ public static class RankingRules
         _ => value
     };
 
+    public static string WeaponStyleName(string value) => value switch
+    {
+        "balanced" => "Balanced — normal damage and recovery",
+        "heavy" => "Heavy edge — +20% damage; -15% cooldown recovery",
+        "swift" => "Quick edge — -15% damage; +20% cooldown recovery",
+        _ => "Unknown style"
+    };
+
+    public static string ArmorStyleName(string value) => value switch
+    {
+        "balanced" => "Balanced — normal armor and movement",
+        "plated" => "Heavy plates — +8 armor; -12% movement speed",
+        "light" => "Light weave — -8 armor; +12% movement speed",
+        _ => "Unknown style"
+    };
+
     /// <summary>Human-readable label for an upgrade category key, used as a grouping heading in the build display.</summary>
     public static string UpgradeCategory(string value) => value switch
     {
@@ -126,11 +146,15 @@ public static class RankingRules
         // Basic shape checks: sane level, not too many entries, manual/auto skill names look like
         // real labels, and the manual skill isn't also duplicated into an auto slot.
         if (build.Level is < 1 or > 9_007_199_254_740_991L
-            || build.Upgrades is null || build.Upgrades.Count > 79
+            || build.Upgrades is null || build.Upgrades.Count > 91
             || !ValidLabel(build.ManualSkill) || build.AutoSkills is null || build.AutoSkills.Count > 4
             || build.AutoSkills.Any(skill => !ValidLabel(skill))
             || build.AutoSkills.Distinct(StringComparer.Ordinal).Count() != build.AutoSkills.Count
-            || build.AutoSkills.Contains(build.ManualSkill)) return false;
+            || build.AutoSkills.Contains(build.ManualSkill)
+            || build.Equipment is { } equipment && (!ValidLabel(equipment.Weapon) || !ValidLabel(equipment.Armor)
+                || equipment.WeaponRating is < 0 or > 9_007_199_254_740_991L || equipment.ArmorRating is < 0 or > 40
+                || equipment.WeaponStyle is not ("balanced" or "heavy" or "swift")
+                || equipment.ArmorStyle is not ("balanced" or "plated" or "light"))) return false;
 
         // Walk every upgrade entry once, rejecting duplicates and out-of-range ranks per category,
         // while accumulating totals (tree points / cards / training) to sanity-check against level below.
@@ -162,8 +186,8 @@ public static class RankingRules
         return treePoints <= Math.Min(32, build.Level / 2) && cards <= build.Level - 1
             && training <= 9_007_199_254_740_991L
             && build.Upgrades.Count(upgrade => upgrade.Category == "tree") <= 48
-            && build.Upgrades.Count(upgrade => upgrade.Category == "forge") <= 10
-            && build.Upgrades.Count(upgrade => upgrade.Category == "card") <= 14
+            && build.Upgrades.Count(upgrade => upgrade.Category == "forge") <= 16
+            && build.Upgrades.Count(upgrade => upgrade.Category == "card") <= 20
             && build.Upgrades.Count(upgrade => upgrade.Category == "mastery") <= 7;
     }
 

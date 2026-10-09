@@ -17,7 +17,7 @@ public static class GameSaveEndpoints
     /// version-gated branch below) any time the client-side save shape changes in a way that needs
     /// server-side validation — see the Web project's JS runtime README for the full checklist.
     /// </summary>
-    public const int CurrentSaveVersion = 16;
+    public const int CurrentSaveVersion = 18;
 
     /// <summary>Registers the GET (load) and PUT (save) endpoints under /game/save.</summary>
     public static void MapGameSaves(this WebApplication app)
@@ -181,7 +181,9 @@ public static class GameSaveEndpoints
         // Which forge-upgrade keys are expected depends on which patch introduced them — crit
         // stats arrived in v8, burst/guard skill upgrades in v9. Older saves simply don't have
         // (and shouldn't have) these keys, so the expected key set has to match the save's own version.
-        string[] upgradeKeys = version >= 9
+        string[] upgradeKeys = version >= 18
+            ? ["weapon", "armor", "cleave", "nova", "dodge", "flask", "critChance", "critDamage", "burst", "guard", "chain", "frost", "reap", "meteor", "siphon", "nullwave"]
+            : version >= 9
             ? ["weapon", "armor", "cleave", "nova", "dodge", "flask", "critChance", "critDamage", "burst", "guard"]
             : version >= 8
             ? ["weapon", "armor", "cleave", "nova", "dodge", "flask", "critChance", "critDamage"]
@@ -270,7 +272,7 @@ public static class GameSaveEndpoints
             // mastery has been spent, forge upgrades must be present at their exact starting values.
             if (total > 0 && (!state.TryGetProperty("upgrades", out var forge) || !Numbers(forge, upgradeKeys)
                 || forge.EnumerateObject().Count() != upgradeKeys.Length
-                || forge.EnumerateObject().Any(item => (version < 15 || item.Name is not ("nova" or "burst" or "guard"))
+                || forge.EnumerateObject().Any(item => (version < 15 || item.Name is not ("nova" or "burst" or "guard" or "chain" or "frost" or "reap" or "meteor" or "siphon" or "nullwave"))
                     && item.Value.GetDouble() != (item.Name switch { "weapon" => 50, "armor" => 12, "flask" => 5, _ => 8 })))) return false;
         }
         var mode = "campaign";
@@ -333,6 +335,7 @@ public static class GameSaveEndpoints
         else if (status.GetString() == "choosing") return false;
 
         if (version >= 9 && !ValidSkillProgress(state, player, version)) return false;
+        if (version >= 17 && !ValidRunSystems(state)) return false;
 
         // Every entity list (enemies/projectiles/loot) is validated per-item via ValidArray, which
         // also enforces the array's own size cap (128 entries) so a save can't smuggle in an
@@ -373,7 +376,9 @@ public static class GameSaveEndpoints
     /// </summary>
     private static bool ValidCardProgress(JsonElement state, JsonElement player, string status, int version)
     {
-        string[] keys = version >= 9
+        string[] keys = version >= 17
+            ? ["edge", "vitality", "bulwark", "stride", "focus", "nova", "cleave", "harvest", "siphon", "fortune", "critChance", "critDamage", "burst", "guard", "chainOath", "frostOath", "reapOath", "meteorOath", "siphonOath", "nullwaveOath"]
+            : version >= 9
             ? ["edge", "vitality", "bulwark", "stride", "focus", "nova", "cleave", "harvest", "siphon", "fortune", "critChance", "critDamage", "burst", "guard"]
             : version >= 8
             ? ["edge", "vitality", "bulwark", "stride", "focus", "nova", "cleave", "harvest", "siphon", "fortune", "critChance", "critDamage"]
@@ -418,6 +423,30 @@ public static class GameSaveEndpoints
     /// looking at (attack/nova/burst/guard/dodge/potion each have their own 4 node keys as of v12),
     /// which is why <c>branchKeys</c> is computed per-skill inside the loop below.
     /// </summary>
+    private static bool ValidRunSystems(JsonElement state)
+    {
+        if (state.TryGetProperty("training", out _)
+            || !state.TryGetProperty("runSystems", out var systems) || systems.ValueKind != JsonValueKind.Object
+            || !systems.TryGetProperty("equipment", out var equipment) || equipment.ValueKind != JsonValueKind.Object
+            || !equipment.TryGetProperty("weapon", out var weapon) || weapon.ValueKind != JsonValueKind.String
+            || weapon.GetString() is not ("balanced" or "heavy" or "swift")
+            || !equipment.TryGetProperty("armor", out var armor) || armor.ValueKind != JsonValueKind.String
+            || armor.GetString() is not ("balanced" or "plated" or "light")
+            || !systems.TryGetProperty("challenge", out var challenge) || !Numbers(challenge, "stage", "elapsed", "damage", "flasks", "resolved")
+            || !challenge.TryGetProperty("key", out var key) || key.ValueKind != JsonValueKind.String
+            || key.GetString() is not ("none" or "unscarred" or "flaskless" or "swift")
+            || !systems.TryGetProperty("summary", out var summary) || !Numbers(summary, "seconds", "flasks", "spent", "stages", "challenges")
+            || !summary.TryGetProperty("damage", out var damage)
+            || !Numbers(damage, "attack", "nova", "burst", "guard", "dodge", "potion", "chain", "frost", "reap", "meteor", "siphon", "nullwave")) return false;
+        foreach (var name in new[] { "stage", "flasks", "resolved" })
+            if (!challenge.GetProperty(name).TryGetInt64(out var value) || value < 0 || value > (name == "resolved" ? 1 : 9_007_199_254_740_991L)) return false;
+        foreach (var name in new[] { "flasks", "spent", "stages", "challenges" })
+            if (!summary.GetProperty(name).TryGetInt64(out var value) || value < 0 || value > 9_007_199_254_740_991L) return false;
+        return challenge.GetProperty("elapsed").GetDouble() >= 0 && challenge.GetProperty("damage").GetDouble() >= 0
+            && summary.GetProperty("seconds").GetDouble() >= 0
+            && damage.EnumerateObject().All(item => item.Value.ValueKind == JsonValueKind.Number && item.Value.TryGetDouble(out var value) && double.IsFinite(value) && value >= 0 && value <= 9_007_199_254_740_991d);
+    }
+
     private static bool ValidSkillProgress(JsonElement state, JsonElement player, int version)
     {
         string[] skills = version >= 15

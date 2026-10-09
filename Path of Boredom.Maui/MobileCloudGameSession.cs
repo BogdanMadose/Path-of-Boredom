@@ -16,6 +16,7 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         Timeout = TimeSpan.FromSeconds(20)
     };
     private string? token;
+    private bool restoreAttempted;
     private long? expectedRevision;
     private JsonElement? observedSave;
     private long? observedRevision;
@@ -53,7 +54,9 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         return response;
     }
 
-    public async Task<CloudAccountStatus> SignInAsync()
+    public Task<CloudAccountStatus> SignInAsync() => SignInAsync(false);
+
+    private async Task<CloudAccountStatus> SignInAsync(bool silent)
     {
         await gate.WaitAsync();
         try
@@ -64,8 +67,10 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
             expectedRevision = null;
             observedSave = null;
             observedRevision = null;
-            var candidate = await NativeGoogleSignIn.SignInAsync(GoogleSignInConfiguration.WebClientId);
-            if (candidate is null) { message = "Sign-in cancelled. Your device save is unchanged."; return AccountStatus; }
+            restoreAttempted = true;
+            var candidate = silent ? await NativeGoogleSignIn.TrySilentSignInAsync(GoogleSignInConfiguration.WebClientId)
+                : await NativeGoogleSignIn.SignInAsync(GoogleSignInConfiguration.WebClientId);
+            if (candidate is null) { if (!silent) message = "Sign-in cancelled. Your device save is unchanged."; return AccountStatus; }
             using var request = new HttpRequestMessage(HttpMethod.Get,
                 GoogleSignInConfiguration.ApiBaseUrl.TrimEnd('/') + "/game/account/");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", candidate);
@@ -77,6 +82,7 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
             token = candidate;
             player = identity.Name;
             await ReadCloudMetadataAsync();
+            expectedRevision = observedRevision;
             using var profile = Request(HttpMethod.Post, "game/rankings/profile");
             using var registered = await SendAsync(profile);
             return AccountStatus;
@@ -171,9 +177,8 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         }
         // Refreshing display metadata MUST NOT advance the write baseline. Otherwise a stale
         // device could silently overwrite a remote change without seeing a conflict.
-        message = expectedRevision is null
-            ? "Choose Upload device save or Use cloud save. Signing in never overwrites either save."
-            : "Cloud metadata refreshed. Device saves sync only against the last acknowledged revision.";
+        message = observedSave is null ? "No cloud save yet. Save a run to create one."
+            : "Cloud save available. Load to continue it, or Save to upload your current run.";
     }
 
     public async Task<GameSaveResult> ResolveCloudSaveAsync(bool useCloud)
@@ -255,8 +260,31 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         return new(true, "Device save uploaded. Future saves sync until sign-out, expiry or a revision conflict.", EndlessUnlocked: receipt.EndlessUnlocked);
     }
 
-    public Task<GameSaveResult> LoadAsync() => local.LoadAsync();
-    public Task<string> GetPlayerNameAsync() => Task.FromResult(player);
+    public async Task<GameSaveResult> LoadAsync()
+    {
+        await gate.WaitAsync();
+        try
+        {
+            if (token is null) return await local.LoadAsync();
+            await ReadCloudMetadataAsync();
+            if (observedSave is not { } save) return new(false, "No cloud save available. Start a run and Save to create one.");
+            await local.BackupAsync();
+            var stored = await local.SaveAsync(save);
+            if (!stored.Success) return stored;
+            expectedRevision = observedRevision;
+            var loaded = await local.LoadAsync();
+            return loaded with { Message = "Loaded from cloud. Previous device save backed up." };
+        }
+        catch (Exception exception) when (IsRecoverable(exception))
+        { return new(false, "Cloud load unavailable. Your current run and device save are unchanged; retry when connected."); }
+        finally { gate.Release(); }
+    }
+
+    public async Task<string> GetPlayerNameAsync()
+    {
+        if (!restoreAttempted) await SignInAsync(true);
+        return player;
+    }
 
     public async Task<bool> RegisterPlayerAsync() => await RankingRequestAsync(HttpMethod.Post, "game/rankings/profile");
     public async Task<bool> SubmitScoreAsync(ScoreSubmission submission) =>

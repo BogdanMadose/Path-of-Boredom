@@ -56,7 +56,7 @@
         meta.dataset.mmMeta = name;
         var close = el("button", "mm-close", "\u2715");
         close.type = "button";
-        var information = name === "rankings" || name === "notes" || name === "account";
+        var information = name !== "pause";
         close.textContent = information ? "\u2190" : "\u2715";
         close.setAttribute("aria-label", information ? "Back to pause menu" : "Close");
         close.addEventListener("click", function () {
@@ -195,6 +195,12 @@
         subtabs.setAttribute("role", "tablist");
         subtabs.setAttribute("aria-label", "Skill categories");
         select(0);
+        panel.syncTabs = function () {
+            trees.forEach(function (tree, index) {
+                tabs[index + 1].hidden = tree.hidden;
+                if (tree.hidden && tabs[index + 1].getAttribute("aria-selected") === "true") select(0);
+            });
+        };
 
         return panel;
     }
@@ -228,7 +234,7 @@
         var root = document.querySelector(".arpg");
         if (root.dataset.saveBusy === "on") return;
         panels[openName].root.classList.remove("mm-open");
-        if (["rankings", "notes", "account"].includes(openName)) panels[openName].root.hidden = true;
+        if (["rankings", "account"].includes(openName)) panels[openName].root.hidden = true;
         var tab = layer.querySelector('[data-mm-tab="' + openName + '"]');
         if (tab) tab.setAttribute("aria-expanded", "false");
         openName = null;
@@ -249,7 +255,12 @@
         var idleAccount = name === "account" && ["ready", "dead", "won"].includes(root.dataset.gameStatus);
         if (!idleAccount && !["playing", "paused", "camp"].includes(root.dataset.gameStatus)) return;
         var shouldResume = openName ? resumeAfterMenu : root.dataset.gameStatus === "playing";
-        if (openName) closePanel(false);
+        if (openName) {
+            panels[openName].root.classList.remove("mm-open");
+            if (["rankings", "account"].includes(openName)) panels[openName].root.hidden = true;
+            var previousTab = layer.querySelector('[data-mm-tab="' + openName + '"]');
+            if (previousTab) previousTab.setAttribute("aria-expanded", "false");
+        }
         root.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: true, information: name === "account" } }));
         if (root.dataset.menuOpen !== "on") return;
         resumeAfterMenu = shouldResume;
@@ -324,14 +335,15 @@
             closePanel(true);
         });
         card.appendChild(resume);
-        var labels = { skills: "Skills & loadout", forge: "Forge & training", rankings: "Rankings", notes: "Patch notes" };
+        var labels = { skills: "Skills & loadout", forge: "Forge & training", rankings: "Rankings", notes: "Patch notes - Coming soon" };
         [{ title: "Character", names: ["skills", "forge"] }, { title: "Community", names: ["rankings", "notes"] }].forEach(function (group) {
             var section = el("section", "mm-menu-group");
             section.appendChild(el("h3", null, group.title));
             group.names.forEach(function (name) {
                 var button = el("button", "mm-pause-option", labels[name]);
                 button.type = "button";
-                button.addEventListener("click", function () { openPanel(name); });
+                if (name === "notes") button.disabled = true;
+                else button.addEventListener("click", function () { openPanel(name); });
                 section.appendChild(button);
             });
             card.appendChild(section);
@@ -372,22 +384,8 @@
 
     function buildInformation(root) {
         var rankings = root.querySelector("[data-game-rankings]");
-        var notes = root.querySelector("[data-game-patch-notes]");
         makePanel("rankings", "Hall of Embers", rankings);
-        makePanel("notes", "Chronicles of the Forge", notes);
         rankings.classList.add("mm-info-panel");
-        notes.classList.add("mm-info-panel");
-
-        notes.addEventListener("click", function (event) {
-            var link = event.target.closest("a");
-            if (!link) return;
-            var href = link.getAttribute("href") || "";
-            if (!href.startsWith("/patch-notes") && !href.startsWith("#")) return;
-            event.preventDefault();
-            var id = href.split("#")[1];
-            var target = id ? notes.querySelector("#" + CSS.escape(id)) : null;
-            if (target) target.scrollIntoView({ block: "start" });
-        });
     }
 
     // ---- Live badges -------------------------------------------------------------------
@@ -401,6 +399,9 @@
         Array.prototype.forEach.call(root.querySelectorAll("[data-mobile-save-action]"), function (button) {
             var original = root.querySelector('[data-action="' + button.dataset.mobileSaveAction + '"]');
             button.disabled = !original || original.disabled;
+            button.textContent = button.dataset.mobileSaveAction === "save"
+                ? root.dataset.cloudSignedIn === "on" ? "Save to cloud" : "Save on device"
+                : root.dataset.cloudSignedIn === "on" ? "Load cloud save" : "Load device save";
         });
         var saveStatus = root.querySelector("[data-save-status]");
         Array.prototype.forEach.call(root.querySelectorAll(".mm-save-status"), function (status) {
@@ -413,6 +414,7 @@
             tab.disabled = root.dataset.saveBusy === "on" || !["playing", "paused", "camp"].includes(root.dataset.gameStatus);
         });
         var points = document.querySelector("[data-stat='skill-points']");
+        panels.skills.syncTabs();
         var loadoutNote = panels.skills.root.querySelector(".mm-loadout-note");
         var feedback = panels.skills.root.querySelector("[data-skill-feedback]");
         var unlock = panels.skills.root.querySelector(".skill-unlock-status");
@@ -428,6 +430,12 @@
         forgeBadge.textContent = "!";
 
         var gold = document.querySelector("[data-stat='forge-gold']");
+        var training = panels.forge.root.querySelector("[data-mastery]");
+        var trainingTab = panels.forge.root.querySelector(".mm-subtabs").children[1];
+        trainingTab.hidden = !training || training.hidden;
+        if (trainingTab.hidden && panels.forge.root.dataset.mobileSection === "training") {
+            panels.forge.root.querySelector(".mm-subtabs").children[0].click();
+        }
         var meta = panels.forge.meta;
         if (gold && meta) meta.textContent = gold.textContent;
 
@@ -442,8 +450,7 @@
         var forge = document.querySelector("[data-forge]");
         var root = document.querySelector(".arpg");
         if (!skills || !forge || !root || layer) return !!layer;
-        if (!root.querySelector("[data-game-rankings]") || !root.querySelector("[data-game-patch-notes]")
-            || !root.querySelector("[data-game-account]")) return false;
+        if (!root.querySelector("[data-game-rankings]") || !root.querySelector("[data-game-account]")) return false;
 
         // Tells arpg.js to auto-fire the regular attack along the character's facing (no mouse to
         // aim with on a phone) and to draw the HUD into the canvas instead of as DOM over it.
@@ -482,7 +489,7 @@
 
         // Android back closes an open panel first.
         window.addEventListener("popstate", function () {
-            if (openName === "rankings" || openName === "notes") openPanel("pause");
+            if (openName === "rankings") openPanel("pause");
             else closePanel(false);
         });
         return true;

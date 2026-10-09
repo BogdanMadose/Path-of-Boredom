@@ -330,7 +330,7 @@
         opacity: .94;
     }
 
-    body.mobile-shell .skill-bar button[data-skill="attack"] {
+    body.mobile-shell .skill-bar button:not([data-skill="dodge"]):not([data-skill="potion"]) {
         display: none;
     }
 

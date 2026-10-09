@@ -7,6 +7,20 @@ public static class NativeGoogleSignIn
     internal const int RequestCode = 7431;
     private static TaskCompletionSource<string?>? pending;
 
+    public static async Task<string?> TrySilentSignInAsync(string webClientId)
+    {
+        var task = await MainThread.InvokeOnMainThreadAsync(() =>
+        {
+            var activity = Platform.CurrentActivity ?? throw new InvalidOperationException("No Android activity.");
+            var options = new Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.Builder(
+                Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.DefaultSignIn).RequestIdToken(webClientId).RequestEmail().Build();
+            return Android.Gms.Auth.Api.SignIn.GoogleSignIn.GetClient(activity, options).SilentSignIn();
+        });
+        for (var attempt = 0; attempt < 100 && !task.IsComplete; attempt++) await Task.Delay(100);
+        return task.IsComplete && task.IsSuccessful && task.Result is Android.Gms.Auth.Api.SignIn.GoogleSignInAccount account
+            ? account.IdToken : null;
+    }
+
     public static async Task<string?> SignInAsync(string webClientId)
     {
         if (pending is not null) throw new InvalidOperationException("Sign-in is already open.");
@@ -50,6 +64,7 @@ public static class NativeGoogleSignIn
                 Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.DefaultSignIn).SignOut();
     });
 #else
+    public static Task<string?> TrySilentSignInAsync(string webClientId) => Task.FromResult<string?>(null);
     public static Task<string?> SignInAsync(string webClientId) =>
         throw new NotSupportedException("Google sign-in is currently available on Android only.");
     public static Task SignOutAsync() => Task.CompletedTask;

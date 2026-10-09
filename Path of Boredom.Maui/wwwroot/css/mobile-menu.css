@@ -1,5 +1,5 @@
 /* Mobile menu shell — MAUI head only.
- *
+/*
  * Replaces the desktop page-section menus (Skills, Forge, and the vitals/toolbar HUD) with a
  * game-style UI layer that sits over the canvas: a bottom tab bar, full-bleed panels sized to the
  * viewport, and NO page scrolling to reach a control.
@@ -123,7 +123,7 @@
         grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr);
         grid-template-rows: 58px 52px minmax(0, 1fr) auto;
         gap: 8px 16px;
-        animation: mm-rise .18s ease-out;
+        animation: none;
     }
 
     body.mobile-shell.mm-panel-open .mm-bar {
@@ -197,11 +197,10 @@
     body.mobile-shell .mm-subtabs {
         grid-column: 1 / -1;
         grid-row: 2;
-        display: grid;
-        grid-template-columns: repeat(7, minmax(0, 1fr));
+        display: flex;
         min-height: 44px;
         gap: 6px;
-        overflow: visible;
+        overflow-x: auto;
         scrollbar-width: none;
         padding: 8px 0 2px;
     }
@@ -308,7 +307,7 @@
         grid-column: 1 / -1;
         align-self: start;
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 10px;
     }
 
@@ -328,7 +327,9 @@
     body.mobile-shell .mm-panel .forge-grid {
         grid-row: 3;
         grid-column: 1 / -1;
-        align-self: start;
+        align-self: stretch;
+        min-height: 0;
+        overflow-y: auto;
         grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: 8px;
     }
@@ -638,7 +639,7 @@
         grid-column: 1 / -1;
         min-height: 0;
         overflow-y: auto;
-        align-self: center;
+        align-self: stretch;
         justify-self: center;
         width: min(620px, 100%);
         padding: 18px;
@@ -683,4 +684,7 @@
     body.mobile-shell .mm-pause-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     body.mobile-shell .mm-save-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     body.mobile-shell .mm-save-actions > :last-child { grid-column: 1 / -1; }
+    body.mobile-shell .mm-subtab[hidden],
+    body.mobile-shell .mm-panel [data-tree-skill][hidden],
+    body.mobile-shell .mm-panel [data-upgrade][hidden] { display: none !important; }
 }

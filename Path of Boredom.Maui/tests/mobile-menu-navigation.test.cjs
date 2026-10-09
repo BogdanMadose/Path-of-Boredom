@@ -8,7 +8,7 @@ const navigation = source.slice(source.indexOf('    function closePanel('), sour
 assert.ok(navigation.includes('function openPanel('));
 const classes = () => ({ add() {}, remove() {} });
 const panel = () => ({ root: { classList: classes(), hidden: true } });
-const panels = { pause: panel(), skills: panel(), forge: panel(), rankings: panel(), notes: panel(), account: panel() };
+const panels = { pause: panel(), skills: panel(), forge: panel(), rankings: panel(), account: panel() };
 const events = [];
 let refreshes = 0;
 panels.rankings.root.querySelector = () => ({ disabled: false, click() { refreshes++; } });
@@ -49,9 +49,8 @@ assert.equal(root.dataset.gameStatus, 'paused');
 assert.equal(panels.rankings.root.hidden, true);
 context.openPanel('notes');
 assert.equal(root.dataset.gameStatus, 'paused');
-context.openPanel('pause');
-assert.equal(root.dataset.gameStatus, 'paused');
-assert.equal(panels.notes.root.hidden, true);
+assert.equal(context.openName, 'pause', 'patch notes must not be accessible during mobile testing');
+assert.doesNotMatch(source, /data-game-patch-notes/);
 assert.ok(events.every(event => !event.resume), 'panel changes must never resume gameplay');
 context.closePanel(true);
 assert.equal(root.dataset.gameStatus, 'playing');
@@ -79,6 +78,16 @@ context.openPanel('account');
 context.openPanel('pause');
 context.closePanel(true);
 assert.equal(root.dataset.gameStatus, 'playing');
+
+const information = source.slice(source.indexOf('    function buildInformation('), source.indexOf('    // ---- Live badges'));
+const informationPanels = [];
+context.makePanel = name => informationPanels.push(name);
+vm.runInContext(information, context);
+context.buildInformation({ querySelector(selector) {
+    assert.equal(selector, '[data-game-rankings]');
+    return { classList: classes() };
+} });
+assert.deepEqual(informationPanels, ['rankings'], 'information menus must initialize without a patch-notes section');
 
 const saveActions = source.slice(source.indexOf('    function addSaveActions('), source.indexOf('    function buildAccount('));
 const element = () => ({
@@ -114,4 +123,15 @@ assert.deepEqual(clicked, ['save', 'load', 'save', 'load']);
 originals.save.disabled = true;
 openingMenu.children[0].children[0].listeners.click();
 assert.equal(clicked.length, 4, 'disabled original controls must not be activated');
+const pauseConstruction = source.slice(source.indexOf('    function buildPause('), source.indexOf('    function addSaveActions('));
+context.el = (tag, className, text) => ({ ...element(), textContent: text });
+vm.runInContext(pauseConstruction, context);
+const pauseHost = element();
+context.buildPause(pauseHost);
+const pauseCard = pauseHost.children[0].children[0];
+const community = pauseCard.children.find(child => child.children[0]?.textContent === 'Community');
+const notesPlaceholder = community.children.find(child => child.textContent === 'Patch notes - Coming soon');
+assert.ok(notesPlaceholder, 'patch notes must remain visible as a coming-soon menu button');
+assert.equal(notesPlaceholder.disabled, true);
+assert.equal(notesPlaceholder.listeners.click, undefined, 'the placeholder must not open patch history');
 console.log('PASS: opening and pause menus expose save/load/sign-in; panel navigation preserves pause and blocks during saves');

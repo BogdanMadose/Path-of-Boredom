@@ -40,7 +40,7 @@ for (const hero of Object.keys(CLASS_SKILLS)) {
             assert.equal(useSkill(state, skill, true), false, 'cooldown prevents recasting');
             assert.ok(hitIndices(state).length || state.playerShots.length, 'ability must deal damage or fire projectiles');
             if (CLASS_SKILLS[hero][skill]) {
-                assert.equal(state.player[skill], combatSkillDefinition(state, skill).cooldown / (1 + state.skillTree[skill].recovery * 0.1));
+                assert.equal(state.player[skill], combatSkillDefinition(state, skill).cooldown / (1 + state.skillTree[skill].recovery * 0.08));
                 assert.equal(treeNodeDefinition(state, skill, 'ember').detail, CLASS_SKILLS[hero][skill].keystone);
             }
             const snapshot = captureSnapshot(state);

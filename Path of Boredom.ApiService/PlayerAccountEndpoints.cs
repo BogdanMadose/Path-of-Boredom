@@ -20,8 +20,9 @@ public static class PlayerAccountEndpoints
             context.Response.Headers.CacheControl = "no-store";
             if (!Path_of_Boredom.ServiceDefaults.PlayerDisplayNameRules.TryNormalize(request.Name, out var name))
                 return Results.BadRequest(new { message = Path_of_Boredom.ServiceDefaults.PlayerDisplayNameRules.Guidance });
-            await store.SetDisplayNameAsync(context.User.FindFirstValue("sub")!, name, context.RequestAborted,
-                GoogleTokenAuthenticationHandler.IssuedAt(context.User));
+            if (!await store.SetDisplayNameAsync(context.User.FindFirstValue("sub")!, name, context.RequestAborted,
+                GoogleTokenAuthenticationHandler.IssuedAt(context.User)))
+                return Results.Conflict(new { message = "That player name is already taken. Choose another nickname." });
             return Results.Ok(new { name });
         }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(1024));
         account.MapDelete("/", async (HttpContext context, FirestorePersistence persistence) =>

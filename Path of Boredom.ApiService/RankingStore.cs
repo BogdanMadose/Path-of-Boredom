@@ -13,14 +13,30 @@ public sealed class RankingStore(FirestorePersistence persistence)
         return profile is { CustomName: true } ? profile.Player : DefaultDisplayName(owner);
     }
 
-    public Task SetDisplayNameAsync(string owner, string name, CancellationToken cancellationToken, long issuedAt) =>
+    public Task<bool> SetDisplayNameAsync(string owner, string name, CancellationToken cancellationToken, long issuedAt) =>
         persistence.Database.RunTransactionAsync(async transaction =>
         {
             await persistence.EnsureActiveAsync(transaction, owner, issuedAt, cancellationToken);
             var reference = persistence.Ranking(owner);
             var profile = FirestorePersistence.Read<RankingProfile>(await transaction.GetSnapshotAsync(reference, cancellationToken))
                 ?? new RankingProfile(DefaultDisplayName(owner), new());
+            var reservation = persistence.DisplayName(name);
+            var claimed = await transaction.GetSnapshotAsync(reservation, cancellationToken);
+            var ownerKey = FirestorePersistence.Key(owner);
+            if (claimed.Exists && claimed.GetValue<string>("owner") != ownerKey) return false;
+            // Include profiles created before name reservations were introduced.
+            var profiles = await transaction.GetSnapshotAsync(persistence.Database.Collection("rankings"), cancellationToken);
+            if (profiles.Documents.Any(document => document.Id != ownerKey
+                && FirestorePersistence.Read<RankingProfile>(document) is { } existing
+                && string.Equals(existing.Player, name, StringComparison.OrdinalIgnoreCase))) return false;
+            var previous = profile.CustomName ? persistence.DisplayName(profile.Player) : null;
+            var previousClaim = previous is not null && previous.Path != reservation.Path
+                ? await transaction.GetSnapshotAsync(previous, cancellationToken) : null;
+            if (previousClaim is { Exists: true } && previousClaim.GetValue<string>("owner") == ownerKey)
+                transaction.Delete(previous!);
+            transaction.Set(reservation, new Dictionary<string, object> { ["owner"] = ownerKey });
             transaction.Set(reference, FirestorePersistence.Write(profile with { Player = name, CustomName = true }));
+            return true;
         }, cancellationToken: cancellationToken);
 
     public Task RegisterAsync(string owner, string name, CancellationToken cancellationToken, long issuedAt = long.MaxValue) =>

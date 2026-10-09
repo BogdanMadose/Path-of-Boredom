@@ -531,7 +531,7 @@
         grid-template-rows: 58px minmax(0, 1fr);
     }
     body.mobile-shell .mm-info-panel[data-mm-panel="notes"].mm-open {
-        grid-template-rows: 58px 66px minmax(0, 1fr);
+        grid-template-rows: 58px minmax(0, 1fr);
     }
     body.mobile-shell .mm-info-panel > .rankings,
     body.mobile-shell .mm-info-panel > .patch-notes {
@@ -543,7 +543,7 @@
         padding: 0;
         background: none;
     }
-    body.mobile-shell .mm-info-panel > .patch-notes { grid-row: 3; }
+    body.mobile-shell .mm-info-panel > .patch-notes { grid-row: 2; }
     body.mobile-shell .mm-info-controls {
         grid-column: 1 / -1;
         grid-row: 2;
@@ -584,7 +584,7 @@
     body.mobile-shell .mm-info-panel .patch-heading { padding: 12px 16px; }
     body.mobile-shell .mm-info-panel .patch-heading h2 { font-size: 20px; margin: 8px 0; }
     body.mobile-shell .mm-info-panel .patch-heading > p { margin: 8px 0; font-size: 13px; line-height: 1.5; }
-    body.mobile-shell .mm-info-panel article:not([data-mobile-topic="overview"]) > .patch-heading { display: none; }
+    body.mobile-shell .mm-info-panel .patch-heading { display: block; }
     body.mobile-shell .mm-info-panel .patch-section { padding: 14px 16px; }
     body.mobile-shell .mm-info-panel .patch-section h3 { font-size: 19px; margin-bottom: 10px; }
     body.mobile-shell .mm-info-panel .patch-section > p,
@@ -600,7 +600,7 @@
         body.mobile-shell .mm-pause-emblem { width: 18px; height: 20px; margin: 0; }
         body.mobile-shell .mm-pause-card h2 { font-size: 22px; }
         body.mobile-shell .mm-info-panel.mm-open { grid-template-rows: 50px minmax(0, 1fr); }
-        body.mobile-shell .mm-info-panel[data-mm-panel="notes"].mm-open { grid-template-rows: 50px 60px minmax(0, 1fr); }
+        body.mobile-shell .mm-info-panel[data-mm-panel="notes"].mm-open { grid-template-rows: 50px minmax(0, 1fr); }
     }
     body.mobile-shell .mm-save-actions {
         grid-column: 1 / -1;
@@ -650,4 +650,37 @@
     body.mobile-shell .mm-account-body h2 { color: #f1d49b; font: 24px Georgia, serif; margin: 0 0 12px; }
     body.mobile-shell .mm-account-body p { color: #bad0c7; font-size: 13px; line-height: 1.5; }
     body.mobile-shell .mm-account-body button { width: 100%; }
+    body.mobile-shell .mm-account-body fieldset {
+        display: grid;
+        gap: 10px;
+        margin: 16px 0;
+        padding: 14px;
+        border: 1px solid #c7a56b44;
+        border-radius: 12px;
+        text-align: left;
+    }
+    body.mobile-shell .mm-account-body legend { color: #f1d49b; font-weight: 700; padding: 0 8px; }
+    body.mobile-shell .mm-account-body fieldset p { margin: 0; }
+    body.mobile-shell .mm-account-body .mm-danger { border-color: #d87777; color: #ffd0cc; }
+    body.mobile-shell .mm-menu-group {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-column: 1 / -1;
+        padding: 10px;
+        border: 1px solid #c7a56b33;
+        border-radius: 10px;
+        background: #102024;
+    }
+    body.mobile-shell .mm-menu-group h3 {
+        grid-column: 1 / -1;
+        margin: 0;
+        color: #c7a56b;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .12em;
+    }
+    body.mobile-shell .mm-pause-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body.mobile-shell .mm-save-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body.mobile-shell .mm-save-actions > :last-child { grid-column: 1 / -1; }
 }

@@ -18,8 +18,8 @@ export const HERO_CLASSES = {
         description: "Reliable melee damage, broad cleaves, and a nova that hits every nearby enemy."
     },
     ranger: {
-        name: "Dawn Ranger", role: "Ranged skirmisher", health: 80, damage: 15, speed: 245, armor: 0,
-        attackCooldown: 0.34, attackReach: 680, specialCooldown: 5.5, specialReach: 680, specialDamage: 1.05, dodgeCooldown: 1.6,
+        name: "Dawn Ranger", role: "Ranged skirmisher", health: 90, damage: 18, speed: 245, armor: 0,
+        attackCooldown: 0.30, attackReach: 680, specialCooldown: 5.5, specialReach: 680, specialDamage: 1.20, dodgeCooldown: 1.6,
         attackName: "Dawn shot", specialName: "Sunburst volley", weapon: "Weathered ash bow", weaponType: "bow", color: "#99d6ad",
         description: "Fast but fragile. Trickshot adds ricochets; Bodkin volley adds piercing. Piercing rain hits a second target by default. Keep moving."
     },

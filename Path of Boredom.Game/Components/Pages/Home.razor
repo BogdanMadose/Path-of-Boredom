@@ -8,10 +8,17 @@
 <PageTitle>Path of Boredom - The Ember Campaign</PageTitle>
 
 <div class="arpg" data-player="@windowsUserName" @ref="gameRoot">
+    @if (Session is ICloudGameSession mobileAccount)
+    {
+        <div class="mobile-account-status" role="status" aria-live="polite">
+            <span>@(mobileAccount.AccountStatus.SignedIn ? "Logged in as" : "Offline · not signed in")</span>
+            @if (mobileAccount.AccountStatus.SignedIn) { <strong>@windowsUserName</strong> }
+        </div>
+    }
     <header class="game-header">
         <a class="brand" href="/" aria-label="Path of Boredom home"><span class="brand-mark">&#9671;</span> PATH <small>OF</small> BOREDOM</a>
         <span class="edition"><span data-stat="mode">THE EMBER CAMPAIGN</span> <span>&middot;</span> <span data-stat="campaign">MAP 1 / 6</span></span>
-        <div class="signed-in-user" title="@windowsUserName"><small>WINDOWS SIGN-IN</small><strong>@windowsUserName</strong></div>
+        <div class="signed-in-user" title="@windowsUserName"><small>@(Session is ICloudGameSession ? "PLAYER ACCOUNT" : "WINDOWS SIGN-IN")</small><strong>@windowsUserName</strong></div>
         <div class="game-actions">
             <a class="quiet-button" href="/rankings" target="_blank" rel="noopener">Rankings ↗</a>
             <a class="quiet-button" href="/patch-notes" target="_blank" rel="noopener">Patch notes ↗</a>
@@ -286,6 +293,12 @@
     <section class="game-information" data-game-patch-notes hidden aria-label="In-game patch notes">
         <PatchNotes Embedded="true" />
     </section>
+    @if (Session is ICloudGameSession)
+    {
+        <section class="game-information mm-info-panel mm-account" data-game-account hidden aria-label="Account and cloud saves">
+            <CloudAccountMenu Changed="AccountChanged" Deleted="AccountDeleted" />
+        </section>
+    }
 </div>
 
 @code {
@@ -305,6 +318,17 @@
     private bool disposed;
     private string windowsUserName = string.Empty;
     private string rankingStatus = "Connecting to the rankings...";
+
+    private async Task AccountChanged()
+    {
+        windowsUserName = await Session.GetPlayerNameAsync();
+        if (game is not null) await game.InvokeVoidAsync("accountChanged");
+    }
+
+    private async Task AccountDeleted()
+    {
+        if (game is not null) await game.InvokeVoidAsync("resetAfterDeletion");
+    }
 
     /// <summary>
     /// Runs once when the component initializes: reads the signed-in Windows username off the
@@ -346,7 +370,7 @@
         await Session.LoadAsync();
 
     /// <summary>
-    /// Fires once, after the component's first render, once the <canvas> and all the static markup
+    /// Fires once, after the component's first render, once the <c>canvas</c> and all the static markup
     /// actually exist in the DOM. This is where the entire JS game gets bootstrapped: import the
     /// module, hand it the root element plus a callback bridge to this component, and let it take
     /// over from there. Runs at most once per page load — Blazor won't call this again on

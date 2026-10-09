@@ -25,9 +25,48 @@
         base.appendChild(knob);
         pad.appendChild(base);
 
-        var RADIUS = 52;        // travel limit of the knob, in CSS px
-        var DEAD_ZONE = 10;     // below this the stick reads as centred
+        if (aiming) {
+            [ ["manual", "Skill"], ["dodge", "Dodge"], ["potion", "Flask"] ].forEach(function (entry) {
+                var action = document.createElement("span");
+                action.className = "joystick-action joystick-action-" + entry[0];
+                action.textContent = entry[1];
+                base.appendChild(action);
+            });
+            pad.setAttribute("aria-label", "Aim: pull farther and hold up for skill, left for dodge, down for flask. Return to centre to re-arm.");
+        }
+        var RADIUS = 38;        // travel limit of the knob, in CSS px
+        var DEAD_ZONE = 8;      // below this the stick reads as centred
         var active = null;      // pointerId currently driving the stick
+        var castTimer = null;
+        var castAction = null;
+        var castLatched = false;
+
+        function cancelCast() {
+            if (castTimer !== null) clearTimeout(castTimer);
+            castTimer = null;
+            castAction = null;
+            delete base.dataset.cast;
+        }
+
+        function selectCast(dx, dy, length) {
+            if (!aiming) return false;
+            if (length < 58) { cancelCast(); castLatched = false; return false; }
+            if (length < 98) { cancelCast(); return false; }
+            var action = Math.abs(dy) > Math.abs(dx) ? dy < 0 ? "manual" : "potion" : dx < 0 ? "dodge" : null;
+            if (!action || castLatched) { cancelCast(); return true; }
+            if (castAction !== action) {
+                cancelCast();
+                castAction = action;
+                base.dataset.cast = action;
+                castTimer = setTimeout(function () {
+                    castTimer = null;
+                    if (active === null || root.dataset.gameStatus !== "playing" || root.dataset.menuOpen === "on") return;
+                    castLatched = true;
+                    root.dispatchEvent(new CustomEvent("mobile-cast", { detail: { action: action } }));
+                }, 220);
+            }
+            return true;
+        }
 
         // Origin of the current gesture, in client coordinates. The stick is FLOATING: it springs
         // into existence wherever the thumb lands rather than living at a fixed spot, so the
@@ -51,11 +90,12 @@
             var dx = event.clientX - originX;
             var dy = event.clientY - originY;
             var length = Math.hypot(dx, dy);
+            var selecting = selectCast(dx, dy, length);
             if (length > RADIUS) { dx = dx / length * RADIUS; dy = dy / length * RADIUS; }
             knob.style.transform = "translate(" + dx + "px," + dy + "px)";
             if (Math.hypot(dx, dy) >= DEAD_ZONE) {
                 if (aiming) {
-                    root.dataset.faceAngle = String(Math.atan2(dy, dx));
+                    if (!selecting) root.dataset.faceAngle = String(Math.atan2(dy, dx));
                 } else {
                     root.dataset.stickX = String(dx / RADIUS);
                     root.dataset.stickY = String(dy / RADIUS);
@@ -70,6 +110,8 @@
             if (active === null || (event && event.pointerId !== active)) return;
             var pointer = active;
             active = null;
+            cancelCast();
+            castLatched = false;
             knob.style.transform = "";
             pad.classList.remove("joystick-visible");
             // Leave the last angle in place: the character keeps facing where it was last aimed,

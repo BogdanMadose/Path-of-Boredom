@@ -42,6 +42,10 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.11" />
   </ItemGroup>
 
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <PackageReference Include="Xamarin.GooglePlayServices.Auth" Version="121.0.0" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Path of Boredom.Game\Path of Boredom.Game.csproj" />
   </ItemGroup>

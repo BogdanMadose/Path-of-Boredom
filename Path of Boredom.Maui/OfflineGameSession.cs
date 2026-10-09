@@ -5,8 +5,8 @@ using Path_of_Boredom.ServiceDefaults;
 namespace Path_of_Boredom.Maui;
 
 /// <summary>
-/// Stores one offline run in the app's private data directory. Online identity and rankings
-/// remain unavailable until provider tokens can be validated by the API.
+/// Stores one offline run in the app's private data directory, including the offline fallback
+/// used by the cloud session. Local files never serve as backend persistence.
 /// </summary>
 /// <remarks>
 /// Deliberately does NOT talk to ApiService. The existing API trusts whatever identity a caller
@@ -20,7 +20,7 @@ public sealed class OfflineGameSession : IGameSession
     private readonly SemaphoreSlim saveLock = new(1, 1);
     private readonly string savePath = Path.Combine(FileSystem.AppDataDirectory, "offline-run.json");
 
-    public Task<string> GetPlayerNameAsync() => Task.FromResult("Mobile preview");
+    public Task<string> GetPlayerNameAsync() => Task.FromResult("Offline player");
 
     public Task<bool> RegisterPlayerAsync() => Task.FromResult(false);
 
@@ -90,6 +90,27 @@ public sealed class OfflineGameSession : IGameSession
                 && completed.TryGetInt32(out var number) && number == 1));
 
     public Task<bool> SubmitScoreAsync(ScoreSubmission submission) => Task.FromResult(false);
+
+    public async Task BackupAsync()
+    {
+        await saveLock.WaitAsync();
+        try
+        {
+            if (File.Exists(savePath)) File.Copy(savePath, savePath + ".before-cloud.json", overwrite: true);
+        }
+        finally { saveLock.Release(); }
+    }
+
+    public async Task ClearAsync()
+    {
+        await saveLock.WaitAsync();
+        try
+        {
+            foreach (var path in new[] { savePath, savePath + ".tmp", savePath + ".before-cloud.json" })
+                if (File.Exists(path)) File.Delete(path);
+        }
+        finally { saveLock.Release(); }
+    }
 
     public Task<IReadOnlyList<RankingRow>?> GetRankingsAsync(string difficulty, string mode, string heroClass = "all", string patch = RankingRules.CurrentPatch) =>
         Task.FromResult<IReadOnlyList<RankingRow>?>(null);

@@ -242,6 +242,7 @@
     }
 
     function openPanel(name) {
+        if (!panels[name]) return;
         var root = document.querySelector(".arpg");
         if (root.dataset.saveBusy === "on") return;
         if (openName === name) { closePanel(); return; }
@@ -323,12 +324,17 @@
             closePanel(true);
         });
         card.appendChild(resume);
-        ["skills", "forge", "rankings", "notes"].forEach(function (name) {
-            var labels = { skills: "Paths of power", forge: "Traveling forge", rankings: "Hall of Embers", notes: "Patch notes" };
-            var button = el("button", "mm-pause-option", labels[name]);
-            button.type = "button";
-            button.addEventListener("click", function () { openPanel(name); });
-            card.appendChild(button);
+        var labels = { skills: "Skills & loadout", forge: "Forge & training", rankings: "Rankings", notes: "Patch notes" };
+        [{ title: "Character", names: ["skills", "forge"] }, { title: "Community", names: ["rankings", "notes"] }].forEach(function (group) {
+            var section = el("section", "mm-menu-group");
+            section.appendChild(el("h3", null, group.title));
+            group.names.forEach(function (name) {
+                var button = el("button", "mm-pause-option", labels[name]);
+                button.type = "button";
+                button.addEventListener("click", function () { openPanel(name); });
+                section.appendChild(button);
+            });
+            card.appendChild(section);
         });
         addSaveActions(card, root);
         section.appendChild(card);
@@ -347,7 +353,7 @@
             });
             actions.appendChild(button);
         });
-        var signIn = el("button", "mm-pause-option", "Sign in · coming soon");
+        var signIn = el("button", "mm-pause-option", "Account & cloud");
         signIn.type = "button";
         signIn.addEventListener("click", function () { openPanel("account"); });
         actions.appendChild(signIn);
@@ -359,19 +365,9 @@
     }
 
     function buildAccount(root) {
-        var section = el("section", "mm-info-panel mm-account");
-        section.hidden = true;
-        root.appendChild(section);
-        makePanel("account", "Your account", section);
-        var body = el("div", "mm-account-body");
-        body.appendChild(el("h2", null, "Keep your ember."));
-        body.appendChild(el("p", null, "Offline saves work now. Google sign-in and cloud sync are coming later."));
-        var google = el("button", "mm-pause-option", "Continue with Google · coming soon");
-        google.type = "button";
-        google.disabled = true;
-        body.appendChild(google);
-        body.appendChild(el("p", null, "Your current save stays on this device. It is not uploaded, and no Google login is requested yet."));
-        section.appendChild(body);
+        var section = root.querySelector("[data-game-account]");
+        if (!section) return;
+        makePanel("account", "Account & cloud saves", section);
     }
 
     function buildInformation(root) {
@@ -382,56 +378,6 @@
         rankings.classList.add("mm-info-panel");
         notes.classList.add("mm-info-panel");
 
-        var controls = el("div", "mm-info-controls");
-        var patchLabel = el("label", null, "Patch");
-        var patchPicker = el("select");
-        patchPicker.setAttribute("aria-label", "Patch version");
-        var topicLabel = el("label", null, "Topic");
-        var topicPicker = el("select");
-        topicPicker.setAttribute("aria-label", "Patch topic");
-        patchLabel.appendChild(patchPicker);
-        topicLabel.appendChild(topicPicker);
-        controls.appendChild(patchLabel);
-        controls.appendChild(topicLabel);
-        notes.appendChild(controls);
-
-        var articles = Array.prototype.slice.call(notes.querySelectorAll(".patch-notes > article"));
-        articles.forEach(function (article, index) {
-            var option = el("option", null, article.querySelector("h2")?.textContent || article.id);
-            option.value = String(index);
-            patchPicker.appendChild(option);
-        });
-
-        function showTopic() {
-            var article = articles[Number(patchPicker.value)];
-            if (!article) return;
-            article.dataset.mobileTopic = topicPicker.value;
-            Array.prototype.forEach.call(article.querySelectorAll(":scope > .patch-section"), function (section, index) {
-                section.classList.toggle("mm-hidden", String(index) !== topicPicker.value);
-            });
-            notes.querySelector(".patch-notes").scrollTop = 0;
-        }
-
-        function showPatch() {
-            var selected = Number(patchPicker.value);
-            articles.forEach(function (article, index) { article.classList.toggle("mm-hidden", index !== selected); });
-            topicPicker.replaceChildren();
-            var overview = el("option", null, "Overview");
-            overview.value = "overview";
-            topicPicker.appendChild(overview);
-            var article = articles[selected];
-            if (article) {
-                Array.prototype.forEach.call(article.querySelectorAll(":scope > .patch-section"), function (section, index) {
-                    var option = el("option", null, section.querySelector("h3")?.textContent || "Changes");
-                    option.value = String(index);
-                    topicPicker.appendChild(option);
-                });
-            }
-            showTopic();
-        }
-
-        patchPicker.addEventListener("change", showPatch);
-        topicPicker.addEventListener("change", showTopic);
         notes.addEventListener("click", function (event) {
             var link = event.target.closest("a");
             if (!link) return;
@@ -439,18 +385,9 @@
             if (!href.startsWith("/patch-notes") && !href.startsWith("#")) return;
             event.preventDefault();
             var id = href.split("#")[1];
-            var target = id ? document.getElementById(id) : null;
-            var article = target?.closest("article");
-            if (!article || articles.indexOf(article) < 0) return;
-            patchPicker.value = String(articles.indexOf(article));
-            showPatch();
-            var section = target.closest(".patch-section");
-            if (section) {
-                topicPicker.value = String(Array.prototype.indexOf.call(article.querySelectorAll(":scope > .patch-section"), section));
-                showTopic();
-            }
+            var target = id ? notes.querySelector("#" + CSS.escape(id)) : null;
+            if (target) target.scrollIntoView({ block: "start" });
         });
-        showPatch();
     }
 
     // ---- Live badges -------------------------------------------------------------------
@@ -505,7 +442,8 @@
         var forge = document.querySelector("[data-forge]");
         var root = document.querySelector(".arpg");
         if (!skills || !forge || !root || layer) return !!layer;
-        if (!root.querySelector("[data-game-rankings]") || !root.querySelector("[data-game-patch-notes]")) return false;
+        if (!root.querySelector("[data-game-rankings]") || !root.querySelector("[data-game-patch-notes]")
+            || !root.querySelector("[data-game-account]")) return false;
 
         // Tells arpg.js to auto-fire the regular attack along the character's facing (no mouse to
         // aim with on a phone) and to draw the HUD into the canvas instead of as DOM over it.
@@ -535,6 +473,10 @@
         syncBadges();
         root.addEventListener("mobile-save-result", function (event) {
             if (event.detail?.success && event.detail.loadingSave && openName) closePanel(false);
+            syncBadges();
+        });
+        root.addEventListener("mobile-account-deleted", function () {
+            closePanel(false);
             syncBadges();
         });
 

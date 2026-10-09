@@ -69,7 +69,10 @@ function bodySprite(hero) {
     const ctx = sprite.getContext("2d"); ctx.scale(2, 2); ctx.translate(32, 36);
     const ranger = hero.weaponType === "bow", warden = hero.weaponType === "hammer";
     const plate = metal(ctx, ranger ? "#ced6a1" : "#f0f2d9", ranger ? "#668c65" : warden ? "#8da7c7" : "#8daead", "#263847");
-    polygon(ctx, [[-12, -10], [12, -10], [15, 7], [8, 15], [-8, 15], [-15, 7]], plate);
+    ctx.fillStyle = plate; ctx.strokeStyle = "#10191f"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-12, -10); ctx.quadraticCurveTo(0, -15, 12, -10);
+    ctx.bezierCurveTo(20, 0, 14, 14, 0, 16); ctx.bezierCurveTo(-14, 14, -20, 0, -12, -10);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
     for (const side of [-1, 1]) {
         polygon(ctx, [[side * 10, -10], [side * 19, -10], [side * 21, -2], [side * 13, 3]], plate);
         ctx.strokeStyle = "#e8dfb388"; ctx.lineWidth = 1;
@@ -81,7 +84,9 @@ function bodySprite(hero) {
     ctx.strokeStyle = "#142b3599"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(-9, -2); ctx.lineTo(-4, 3); ctx.moveTo(9, -2); ctx.lineTo(4, 3); ctx.stroke();
     if (ranger) {
-        polygon(ctx, [[0, -29], [12, -20], [10, -8], [0, -4], [-10, -8], [-12, -20]], "#385d49", "#9ac48a");
+        ctx.fillStyle = metal(ctx, "#86a67b", "#385d49", "#192c29"); ctx.strokeStyle = "#9ac48a";
+        ctx.beginPath(); ctx.moveTo(0, -30); ctx.bezierCurveTo(18, -28, 17, -8, 0, -4);
+        ctx.bezierCurveTo(-17, -8, -18, -28, 0, -30); ctx.closePath(); ctx.fill(); ctx.stroke();
         polygon(ctx, [[-6, -18], [6, -18], [4, -9], [-4, -9]], "#1b2e2c", null);
         ctx.fillStyle = "#e1d7a5"; ctx.fillRect(-5, -16, 3, 2); ctx.fillRect(2, -16, 3, 2);
         ctx.strokeStyle = "#d4c38c"; ctx.lineWidth = 2;
@@ -117,7 +122,11 @@ export function drawHero(ctx, actor, hero, stride, strike, time, reduced) {
     ctx.rotate(actor.facing + Math.PI / 2);
     const flutter = reduced ? 0 : Math.sin(time * 6) * 2 + stride * 2;
     const cloak = metal(ctx, ranger ? "#5a9565" : warden ? "#607c9d" : "#c5784e", ranger ? "#315b42" : warden ? "#344d6e" : "#78382d", "#18232c");
-    polygon(ctx, [[-12, -4], [12, -4], [18 + flutter, 27], [6, 25], [-3, 32], [-18 + flutter, 28]], cloak);
+    ctx.fillStyle = cloak; ctx.strokeStyle = "#10191f"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-12, -4); ctx.quadraticCurveTo(0, -9, 12, -4);
+    ctx.bezierCurveTo(13, 9, 22 + flutter, 18, 18 + flutter, 28);
+    ctx.quadraticCurveTo(8, 24, -2, 33); ctx.quadraticCurveTo(-10, 28, -18 + flutter, 29);
+    ctx.bezierCurveTo(-22 + flutter, 18, -13, 9, -12, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.strokeStyle = hero.color + "55"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(-8, 3); ctx.lineTo(-11 + flutter, 23); ctx.moveTo(8, 3); ctx.lineTo(12 + flutter, 23); ctx.stroke();
     for (const side of [-1, 1]) {
@@ -167,6 +176,16 @@ export function decorateFloor(ctx, map, random, width, height) {
     const light = ctx.createRadialGradient(width * 0.48, height * 0.35, 30, width / 2, height / 2, width * 0.6);
     light.addColorStop(0, map.accent + "0d"); light.addColorStop(0.7, "#14242b00"); light.addColorStop(1, "#050b1455");
     ctx.fillStyle = light; ctx.fillRect(0, 0, width, height);
+    for (let i = 0; i < 22; i++) {
+        const x = 45 + random() * (width - 90);
+        const y = i % 2 ? 38 + random() * 24 : height - 38 - random() * 24;
+        ctx.strokeStyle = map.id === "marsh" ? "#82ad7655" : "#a3a58033";
+        ctx.lineWidth = 1.5; ctx.lineCap = "round";
+        for (let stem = 0; stem < 5; stem++) {
+            const lean = (random() - 0.5) * 30, height = 10 + random() * 20;
+            ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + lean * 0.4, y - height * 0.7, x + lean, y - height); ctx.stroke();
+        }
+    }
     for (let i = 0; i < 34; i++) {
         const x = 55 + random() * (width - 110);
         const y = i % 2 ? 45 + random() * 45 : height - 45 - random() * 45;

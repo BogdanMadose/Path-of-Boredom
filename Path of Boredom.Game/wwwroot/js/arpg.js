@@ -281,17 +281,27 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
         ctx.fillStyle = actor.flash > 0 ? "#fff3d5" : "#568188";
         ctx.beginPath();
         ctx.moveTo(0, -23 + Math.sin(time * 4) * 3);
-        ctx.lineTo(17, 8);
-        ctx.lineTo(7, 17);
-        ctx.lineTo(0, 10);
-        ctx.lineTo(-10, 19);
-        ctx.lineTo(-17, 8);
+        ctx.bezierCurveTo(20, -20, 22, 8, 7, 17);
+        ctx.quadraticCurveTo(2, 8, 0, 10);
+        ctx.quadraticCurveTo(-6, 23, -10, 19);
+        ctx.bezierCurveTo(-24, 9, -20, -18, 0, -23 + Math.sin(time * 4) * 3);
+        ctx.closePath();
         ctx.fill();
         ctx.shadowBlur = 0;
         circle(ctx, -4, -3, 2, "#e9ffe8");
         circle(ctx, 4, -3, 2, "#e9ffe8");
     } else {
         const base = actor.flash > 0 ? "#fce5bf" : boss ? map.accent : actor.kind === "sentinel" ? "#8b6576" : actor.kind === "brute" ? "#787469" : "#747d6c";
+        if (boss) {
+            const mantle = ctx.createLinearGradient(-r, -r, r, r);
+            mantle.addColorStop(0, "#896552"); mantle.addColorStop(1, "#292331");
+            ctx.fillStyle = mantle; ctx.strokeStyle = "#d0ac7266"; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(-r * 0.65, -r);
+            ctx.bezierCurveTo(-r * 1.4, -r * 0.4, -r * 1.2, r, -r * 0.8, r * 1.3);
+            ctx.quadraticCurveTo(0, r, r * 0.8, r * 1.3);
+            ctx.bezierCurveTo(r * 1.2, r, r * 1.4, -r * 0.4, r * 0.65, -r);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
         ctx.fillStyle = boss ? "#403845" : "#43453e";
         ctx.fillRect(-r * 0.6, 2 + stride * 5, r * 0.45, r);
         ctx.fillRect(r * 0.2, 2 - stride * 5, r * 0.45, r);
@@ -686,6 +696,7 @@ function drawCountdown(ctx, state) {
 // returns without blocking — the actual gameplay happens later via the requestAnimationFrame loop
 // defined further down in this function.
 export function createGame(root, saveBridge = null) {
+    const loadingReadyAt = performance.now() + 2500;
     const canvas = root.querySelector("canvas");
     const bestKey = `${BEST_KEY}:${root.dataset.player || "unknown"}`;
     const ctx = canvas.getContext("2d");
@@ -733,7 +744,7 @@ export function createGame(root, saveBridge = null) {
     let saving = false;
     let checkpointSaveFailed = false;
     const retrySave = root.querySelector("[data-retry-save]");
-    let checkingUnlock = !!saveBridge;
+    let checkingUnlock = true;
     let endlessUnlocked = false;
     let checkpointHandled = null;
     let shownDraft = "";
@@ -866,6 +877,7 @@ export function createGame(root, saveBridge = null) {
     const pendingScores = new Map();
     const reportedScores = new Map();
     let reporting = false;
+    let accountGeneration = 0;
     let lastScoreAttempt = 0;
     // Queues (and attempts to flush) the current run's score to the server rankings. Only reports
     // when there's actually an improvement over what's already been successfully reported for this
@@ -888,11 +900,12 @@ export function createGame(root, saveBridge = null) {
         }
         if (reporting || !pendingScores.size) return;
         reporting = true;
+        const generation = accountGeneration;
         lastScoreAttempt = performance.now();
         try {
             for (const [key, submission] of pendingScores) {
                 const success = await saveBridge.invokeMethodAsync("SubmitScore", submission);
-                if (disposed) return;
+                if (disposed || generation !== accountGeneration) return;
                 if (!success) throw new Error("Rankings unavailable");
                 reportedScores.set(key, Math.max(submission.score, reportedScores.get(key) ?? 0));
                 if (pendingScores.get(key) === submission) pendingScores.delete(key);
@@ -1013,7 +1026,7 @@ export function createGame(root, saveBridge = null) {
     // pre-fills the dialog with sensible defaults (the current run's settings when continuing, or
     // fresh defaults for a brand-new run), and always starts back at step 0.
     function openSetup(action) {
-        if (saving || setupAction || state.status === "choosing") return;
+        if (saving || checkingUnlock || setupAction || state.status === "choosing") return;
         if (state.status === "playing") togglePause(state);
         clearInput();
         setupAction = action;
@@ -1287,7 +1300,7 @@ export function createGame(root, saveBridge = null) {
         focusViewButton.disabled = !!setupAction;
         recenterButton.disabled = !!setupAction;
         startButton.hidden = state.mode === "endless" && state.status === "camp";
-        startButton.disabled = saving || choosing || !!setupAction;
+        startButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
         restartButton.disabled = saving || choosing || !!setupAction;
         endlessButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
         endlessButton.hidden = choosing || !(endlessUnlocked || state.status === "won") || (state.mode === "endless" && state.status !== "dead") || state.status === "playing";
@@ -1452,10 +1465,19 @@ export function createGame(root, saveBridge = null) {
         clearInput();
         updateHud();
     });
+    on(root, "mobile-cast", event => {
+        if (saving || setupAction || root.dataset.menuOpen === "on" || state.status !== "playing") return;
+        const action = event.detail?.action;
+        if (!["manual", "dodge", "potion"].includes(action)) return;
+        const angle = Number(root.dataset.faceAngle);
+        if (Number.isFinite(angle)) state.player.facing = angle;
+        useSkill(state, action === "manual" ? state.loadout.manual : action);
+        updateHud();
+    });
     // Handles the primary "Start/Resume" button: resumes if paused, continues the journey if at a
     // checkpoint camp, or opens the setup dialog for a brand-new campaign run otherwise.
     function begin() {
-        if (saving || setupAction || state.status === "choosing") return;
+        if (saving || checkingUnlock || setupAction || state.status === "choosing") return;
         if (state.status === "paused") togglePause(state);
         else if (state.status === "camp") continueJourney(state);
         else {
@@ -1672,7 +1694,10 @@ export function createGame(root, saveBridge = null) {
                 ? "Could not read the local save. Use Load to retry; your saved file has not been changed."
                 : "Could not read the server profile. Reconnect and use Load to recover your run and unlocks.";
         } finally {
-            if (!disposed) { checkingUnlock = false; updateHud(); }
+            // Keep preparation visible for at least 2.5 seconds, but never hide a still-running
+            // save lookup behind a fixed timer. The simulation remains in its ready state.
+            await new Promise(resolve => setTimeout(resolve, Math.max(0, loadingReadyAt - performance.now())));
+            if (!disposed) { checkingUnlock = false; loading.hidden = true; updateHud(); }
         }
     }
     on(window, "keydown", event => {
@@ -1815,12 +1840,40 @@ export function createGame(root, saveBridge = null) {
     const resizeObserver = new ResizeObserver(() => scheduleArenaLayout());
     resizeObserver.observe(combatView);
     fitArena();
-    loading.hidden = true;
-    startButton.disabled = false;
+    loading.hidden = false;
     updateHud();
     // Kick off the render loop and the one-time server unlock check; everything from here on is
     // driven by the animate() loop and the event listeners registered above.
     frame = requestAnimationFrame(animate);
     void readUnlock();
-    return { dispose };
+    return {
+        dispose,
+        accountChanged() {
+            accountGeneration++;
+            // Never replay a previous account's queued score submissions after switching users.
+            pendingScores.clear();
+            reportedScores.clear();
+            rankingStatus.textContent = "Account updated. Rankings use your current verified sign-in.";
+        },
+        resetAfterDeletion() {
+            accountGeneration++;
+            pendingScores.clear();
+            reportedScores.clear();
+            state = createState();
+            endlessUnlocked = false;
+            checkpointHandled = null;
+            checkpointSaveFailed = false;
+            delete root.dataset.hasSave;
+            delete root.dataset.menuOpen;
+            clearInput();
+            shownStatus = "ready";
+            title.innerHTML = "One blade.<br />One last ember.";
+            description.textContent = "Your game account data has been deleted. Begin a new journey to play offline.";
+            startButton.textContent = "Begin a new journey";
+            restartButton.hidden = true;
+            saveStatus.textContent = "Game account deleted. Previous run discarded.";
+            updateHud();
+            root.dispatchEvent(new CustomEvent("mobile-account-deleted"));
+        }
+    };
 }

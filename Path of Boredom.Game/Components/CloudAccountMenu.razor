@@ -1,0 +1,102 @@
+@inject IGameSession Session
+@inject IJSRuntime JS
+
+@if (Session is ICloudGameSession cloud)
+{
+    <div class="mm-account-body">
+        <h2>Keep your ember.</h2>
+        <p role="status" aria-live="polite">@(status?.Message ?? cloud.AccountStatus.Message)</p>
+        @if (lastResult is not null)
+        {
+            <p role="status" aria-live="polite">@lastResult</p>
+        }
+        <fieldset disabled="@busy">
+            <legend>Google account</legend>
+            @if (cloud.AccountStatus.SignedIn)
+            {
+                <p>Signed in as <strong>@cloud.AccountStatus.Player</strong></p>
+                <label class="mm-display-name">Player display name
+                    <input @bind="displayName" maxlength="24" autocomplete="nickname" />
+                </label>
+                <small>@PlayerDisplayNameRules.Guidance Your Google name is not required.</small>
+                <button type="button" class="mm-pause-option" @onclick="Rename">Save player name</button>
+                <button type="button" class="mm-pause-option" @onclick="SignOut">Sign out · keep device save</button>
+            }
+            else
+            {
+                <button type="button" class="mm-pause-option" disabled="@(!cloud.AccountStatus.Configured)" @onclick="SignIn">Continue with Google</button>
+                <p>Offline play needs no account. Only the backend verifies Google identity.</p>
+            }
+        </fieldset>
+        @if (cloud.AccountStatus.SignedIn)
+        {
+            <fieldset disabled="@busy">
+                <legend>Device &amp; cloud saves</legend>
+                <p>Signing in never replaces a save. Choose once to enable sync. A changed cloud revision pauses sync until you choose again.</p>
+                <p>@(cloud.AccountStatus.CloudRevision is { } revision ? $"Cloud revision: {revision}" : "Cloud metadata unavailable — refresh before choosing.")</p>
+                <button type="button" class="mm-pause-option" @onclick="Refresh">Refresh cloud metadata</button>
+                <button type="button" class="mm-pause-option" disabled="@(cloud.AccountStatus.CloudRevision is null)" @onclick="Upload">Upload device save to cloud</button>
+                <button type="button" class="mm-pause-option" disabled="@(!cloud.AccountStatus.CloudSaveExists)" @onclick="Download">Use cloud save on this device</button>
+                <p>Save the current run first to upload it. Download keeps a backup of the previous device file; select Load saved run afterwards. No timestamp-based or automatic merge.</p>
+            </fieldset>
+            <fieldset disabled="@busy">
+                <legend>Delete game account</legend>
+                <p>Deletes this account's cloud save and rankings, and this app's device save/backup. It does not delete your Google account. A minimal hashed-ID deletion marker prevents older tokens restoring deleted data.</p>
+                <button type="button" class="mm-pause-option mm-danger" @onclick="Delete">Delete game account &amp; saves</button>
+            </fieldset>
+        }
+        <p>Online rankings use client-reported scores and are not cheat-proof.</p>
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback Changed { get; set; }
+    [Parameter] public EventCallback Deleted { get; set; }
+    private CloudAccountStatus? status;
+    private bool busy;
+    private string? lastResult;
+    private string displayName = string.Empty;
+    private ICloudGameSession Cloud => (ICloudGameSession)Session;
+
+    private async Task Run(Func<Task> action)
+    {
+        if (busy) return;
+        busy = true;
+        lastResult = null;
+        try { await action(); }
+        catch { lastResult = "This operation could not be completed. Device progress is safe; retry when connected."; }
+        finally { busy = false; }
+        await Changed.InvokeAsync();
+    }
+
+    private Task SignIn() => Run(async () =>
+    {
+        status = await Cloud.SignInAsync();
+        displayName = status.Player;
+    });
+    private Task SignOut() => Run(async () => status = await Cloud.SignOutAsync());
+    private Task Refresh() => Run(async () => status = await Cloud.RefreshCloudAsync());
+    private Task Rename() => Run(async () =>
+    {
+        status = await Cloud.ChangeDisplayNameAsync(displayName);
+        displayName = status.Player;
+    });
+    private Task Upload() => Run(async () =>
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Replace the displayed cloud revision with this device's saved run? Save your current run first. A concurrent cloud change will be rejected, not overwritten.")) return;
+        lastResult = (await Cloud.ResolveCloudSaveAsync(false)).Message;
+        status = Cloud.AccountStatus;
+    });
+    private Task Download() => Run(async () =>
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Replace the device save with the displayed cloud save? The previous file is backed up. Your current in-memory run is unchanged until you choose Load saved run.")) return;
+        lastResult = (await Cloud.ResolveCloudSaveAsync(true)).Message;
+        status = Cloud.AccountStatus;
+    });
+    private Task Delete() => Run(async () =>
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Permanently delete your game account's cloud save and ranking profile, device save and backup? This cannot be undone. Your Google account is not deleted.")) return;
+        status = await Cloud.DeleteAccountAsync();
+        if (status.Deleted) await Deleted.InvokeAsync();
+    });
+}

@@ -19,7 +19,9 @@ public static class MauiProgram
         builder.Services.AddAuthorizationCore();
         builder.Services.AddCascadingAuthenticationState();
         builder.Services.AddSingleton<AuthenticationStateProvider, LocalAuthenticationStateProvider>();
-        builder.Services.AddSingleton<IGameSession, OfflineGameSession>();
+        builder.Services.AddSingleton<OfflineGameSession>();
+        builder.Services.AddSingleton<MobileCloudGameSession>();
+        builder.Services.AddSingleton<IGameSession>(services => services.GetRequiredService<MobileCloudGameSession>());
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();

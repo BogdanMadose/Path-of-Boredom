@@ -398,7 +398,7 @@ function hitEnemy(state, enemy, damage, piercing = false, skill = "attack") {
     if (critical) damage = Math.round(damage * criticalDamage(state));
     if (enemy.kind === "sentinel" && !piercing && !(state.heroClass === "warden" && skill === "attack" && state.skillTree.attack.execution)) damage = Math.round(damage * 0.55);
     enemy.health -= damage;
-    enemy.flash = 0.15;
+    enemy.flash = enemy.kind === "boss" ? 0.06 : 0.15;
     effect(state, "text", enemy.x, enemy.y - enemy.radius - 10, critical ? "#ffd16a" : "#eee0ba", critical ? `CRIT ${damage}` : `${damage}`);
     if (enemy.health <= 0) killEnemy(state, enemy);
     else if (skill === "nova" && state.skillTree.nova.chill > 0) {
@@ -413,12 +413,13 @@ function hitEnemy(state, enemy, damage, piercing = false, skill = "attack") {
     }
 }
 
-// Shoves an enemy directly away from the player by `amount` pixels (bosses pushed only half as far).
+// Shoves ordinary enemies away from the player; bosses retain their position and attack timing.
 // Used by Nova's knockback follow-up (Knight only) and Guard's repulse node.
 function pushEnemy(state, enemy, amount) {
+    if (enemy.kind === "boss") return;
     const p = state.player;
     const d = distance(p, enemy);
-    const push = enemy.kind === "boss" ? amount / 2 : amount;
+    const push = amount;
     enemy.x = clamp(enemy.x + (d ? (enemy.x - p.x) / d : Math.cos(p.facing)) * push, MARGIN, WIDTH - MARGIN);
     enemy.y = clamp(enemy.y + (d ? (enemy.y - p.y) / d : Math.sin(p.facing)) * push, MARGIN, HEIGHT - MARGIN);
 }
@@ -871,6 +872,7 @@ export function step(state, input, elapsed) {
         if (enemy.modifier === "mending") enemy.health = Math.min(enemy.maxHealth, enemy.health + enemy.maxHealth * 0.015 * dt);
         enemy.chilled = Math.max(0, enemy.chilled - dt);
         if (enemy.chilled === 0) enemy.chillStrength = 0;
+        if (enemy.kind === "boss") enemy.chillStrength = Math.min(enemy.chillStrength || 0, 0.2);
         enemy.cooldown = Math.max(-5, enemy.cooldown - dt);
         enemy.flash = Math.max(0, enemy.flash - dt);
         enemy.swing = Math.max(0, (enemy.swing ?? 0) - dt);

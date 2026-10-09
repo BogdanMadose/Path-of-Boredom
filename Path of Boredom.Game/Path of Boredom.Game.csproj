@@ -29,4 +29,9 @@
     <ProjectReference Include="..\Path of Boredom.Contracts\Path of Boredom.Contracts.csproj" />
   </ItemGroup>
 
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <!-- The Razor SDK compiles components and bundles static web assets for the BlazorWebView. -->
+    <Content Update="Components\**;wwwroot\**" ExcludeFromContentCheck="true" />
+  </ItemGroup>
+
 </Project>

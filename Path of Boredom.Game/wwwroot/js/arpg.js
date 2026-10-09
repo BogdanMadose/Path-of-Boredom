@@ -17,9 +17,9 @@ import { captureSnapshot, restoreSnapshot } from "./arpg-save.js";
 import { captureRankingBuild, resetToReleaseRankings } from "./arpg-ranking.js";
 import { upgradePreview } from "./arpg-upgrade-preview.js";
 import { MAPS, LAST_WAVE, UPGRADES, POWER_UPS, threatForWave, mapForWave, mapIndexForWave } from "./arpg-campaign.js";
-import { LEVEL_CARDS } from "./arpg-cards.js";
+import { LEVEL_CARDS, normalizeCardChoices } from "./arpg-cards.js";
 import { DIFFICULTIES } from "./arpg-difficulty.js";
-import { MASTERY, MAX_FLASKS, forgeComplete, masteryCost, buyMastery, chargeLaneEnd } from "./arpg-engine.js";
+import { MASTERY, MAX_FLASKS, forgeSkillSelected, forgeComplete, masteryCost, buyMastery, chargeLaneEnd } from "./arpg-engine.js";
 import { movementSpeed, criticalChance, criticalDamage, skillReach } from "./arpg-engine.js";
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
 import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
@@ -30,6 +30,10 @@ import { drawClassSkillEffect } from "./arpg-skill-effects.js";
 import { drawHud } from "./arpg-hud.js";
 import { arenaHazards, hazardPhase } from "./arpg-hazards.js";
 import { turnToward } from "./arpg-facing.js";
+import { automaticCheckpoint, forgeNotification, bossHudTop } from "./arpg-ui-state.js";
+import { encounterForWave } from "./arpg-encounters.js";
+import { startTraining } from "./arpg-engine.js";
+import { setEquipmentStyle, acceptChallenge, CHALLENGES, runSummary } from "./arpg-run-systems.js";
 
 const mobFacing = new WeakMap();
 
@@ -411,7 +415,7 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
 // corner brazier lights, then loops enemies to draw attack-telegraph shapes/labels before actors and
 // projectiles are drawn later in this function. Kept intentionally simple/flat (no z-sorting beyond
 // draw order) since the arena is a flat top-down view.
-function render(ctx, floor, state) {
+function render(ctx, floor, state, bossTop = 49) {
     const map = mapForWave(state.wave);
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     ctx.drawImage(floor, 0, 0, WIDTH, HEIGHT);
@@ -705,15 +709,15 @@ function render(ctx, floor, state) {
         ctx.textAlign = "center";
         ctx.font = "14px Georgia, serif";
         ctx.fillStyle = "#e4c9a4";
-        ctx.fillText(map.boss.toUpperCase(), WIDTH / 2, 49);
+        ctx.fillText(map.boss.toUpperCase(), WIDTH / 2, bossTop);
         ctx.fillStyle = "#090e11";
-        ctx.fillRect(WIDTH / 2 - 180, 61, 360, 8);
+        ctx.fillRect(WIDTH / 2 - 180, bossTop + 12, 360, 8);
         ctx.fillStyle = "#ae6656";
-        ctx.fillRect(WIDTH / 2 - 180, 61, 360 * boss.health / boss.maxHealth, 8);
-        ctx.fillStyle = "#f0c08b88"; ctx.fillRect(WIDTH / 2 - 180, 61, 360 * boss.health / boss.maxHealth, 2);
-        ctx.strokeStyle = map.accent; ctx.lineWidth = 1; ctx.strokeRect(WIDTH / 2 - 184, 57, 368, 16);
+        ctx.fillRect(WIDTH / 2 - 180, bossTop + 12, 360 * boss.health / boss.maxHealth, 8);
+        ctx.fillStyle = "#f0c08b88"; ctx.fillRect(WIDTH / 2 - 180, bossTop + 12, 360 * boss.health / boss.maxHealth, 2);
+        ctx.strokeStyle = map.accent; ctx.lineWidth = 1; ctx.strokeRect(WIDTH / 2 - 184, bossTop + 8, 368, 16);
         for (const side of [-1, 1]) {
-            ctx.save(); ctx.translate(WIDTH / 2 + side * 190, 65); ctx.rotate(Math.PI / 4);
+            ctx.save(); ctx.translate(WIDTH / 2 + side * 190, bossTop + 16); ctx.rotate(Math.PI / 4);
             ctx.fillStyle = map.accent; ctx.fillRect(-3, -3, 6, 6); ctx.restore();
         }
     }
@@ -722,7 +726,7 @@ function render(ctx, floor, state) {
 // Draws the pulsing full-screen "resumeDelay" countdown overlay shown briefly after unpausing or
 // traveling to a new checkpoint/wave, during which combat is frozen (see step()'s early-return for
 // state.resumeDelay > 0). Purely cosmetic — the actual freeze logic lives in arpg-engine.js.
-function drawCountdown(ctx, state) {
+function drawCountdown(ctx, state, mobile = false) {
     if (state.resumeDelay <= 0 || state.status !== "playing") return;
     ctx.save();
     ctx.fillStyle = `rgba(5, 12, 17, ${reducedMotion.matches ? 0.85 : 0.35 + 0.65 * Math.sin(Math.PI * Math.min(1, state.resumeDelay / 3))})`;
@@ -730,7 +734,7 @@ function drawCountdown(ctx, state) {
     ctx.textAlign = "center"; ctx.fillStyle = "#f5dbab"; ctx.font = "28px Georgia, serif";
     ctx.fillText(state.travelPending ? `Traveling to ${mapForWave(state.wave + 1).name}` : "Find your footing", WIDTH / 2, HEIGHT / 2 - 55);
     ctx.font = "bold 70px Georgia, serif"; ctx.fillText(String(Math.ceil(state.resumeDelay)), WIDTH / 2, HEIGHT / 2 + 25);
-    ctx.font = "16px 'Segoe UI', sans-serif"; ctx.fillText("Combat is frozen · P to pause", WIDTH / 2, HEIGHT / 2 + 70);
+    ctx.font = "16px 'Segoe UI', sans-serif"; ctx.fillText(mobile ? "Combat is frozen" : "Combat is frozen · P to pause", WIDTH / 2, HEIGHT / 2 + 70);
     ctx.restore();
 }
 
@@ -750,6 +754,7 @@ export function createGame(root, saveBridge = null) {
     const releaseRankings = root.dataset.rankingBoard === "release";
     const bestKey = `${BEST_KEY}:${releaseRankings ? "release:" : ""}${root.dataset.player || "unknown"}`;
     const ctx = canvas.getContext("2d");
+    let bossTop = 49;
     const loading = root.querySelector("[data-loading]");
     if (!ctx) {
         loading.textContent = "This game needs a browser with Canvas 2D support.";
@@ -852,7 +857,9 @@ export function createGame(root, saveBridge = null) {
     // actual canvas backing-store resolution in sync with its CSS size and devicePixelRatio so
     // rendering stays crisp regardless of the layout mode.
     function updateCanvasResolution() {
-        const scale = Math.max(1, Math.min(2, canvas.getBoundingClientRect().width / WIDTH * (window.devicePixelRatio || 1)));
+        const bounds = canvas.getBoundingClientRect();
+        bossTop = bossHudTop(bounds, root.querySelector(".mm-bar")?.getBoundingClientRect(), root.dataset.canvasHud === "on", HEIGHT);
+        const scale = Math.max(1, Math.min(2, bounds.width / WIDTH * (window.devicePixelRatio || 1)));
         const width = Math.round(WIDTH * scale), height = Math.round(HEIGHT * scale);
         if (canvas.width !== width || canvas.height !== height) {
             canvas.width = width;
@@ -942,6 +949,7 @@ export function createGame(root, saveBridge = null) {
     // during the same run don't keep resending an unchanged or lower score. On failure, leaves the
     // pending entry queued so the next reportScore() call (e.g. on the next checkpoint/kill) retries automatically.
     async function reportScore() {
+        if (state.training) return;
         if (!saveBridge || disposed || releaseRankings && root.dataset.cloudSignedIn !== "on") return;
         if (state.status !== "ready" && state.rankingMode !== "legacy" && Object.hasOwn(DIFFICULTIES, state.difficulty)) {
             const key = `${state.rankingPatch}:${state.difficulty}:${state.rankingMode}:${state.heroClass}`;
@@ -994,6 +1002,40 @@ export function createGame(root, saveBridge = null) {
         delete root.dataset.stickX;
         delete root.dataset.stickY;
     }
+    let practiceReturn = null;
+    for (const button of root.querySelectorAll("[data-training]")) on(button, "click", () => {
+        if (saving || checkingUnlock || setupAction || state.training || state.status === "choosing") return;
+        if (state.status === "playing") togglePause(state);
+        void reportScore();
+        practiceReturn = state;
+        state = startTraining(Math.random, state.difficulty === "legacy" ? "hard" : state.difficulty, state.heroClass);
+        state.status = "paused";
+        checkpointHandled = null;
+        clearInput();
+        updateHud();
+    });
+    for (const button of root.querySelectorAll("[data-exit-training]")) on(button, "click", () => {
+        if (!practiceReturn || saving) return;
+        state = practiceReturn;
+        practiceReturn = null;
+        checkpointHandled = null;
+        clearInput();
+        last = performance.now();
+        updateHud();
+    });
+    for (const select of root.querySelectorAll("[data-equipment-style]")) on(select, "change", () => {
+        if (!saving && setEquipmentStyle(state, select.dataset.equipmentStyle, select.value)) updateHud();
+    });
+    const challengeSelect = root.querySelector("[data-stage-challenge]");
+    on(challengeSelect, "change", () => { if (!saving) acceptChallenge(state, challengeSelect.value); updateHud(); });
+    const practiceSkill = root.querySelector("[data-training-skill]");
+    on(practiceSkill, "change", () => {
+        if (!state.training || state.status !== "paused" || !SLOTTABLE_SKILLS.includes(practiceSkill.value)) return;
+        const previous = state.loadout.auto[0];
+        state.loadout.auto = state.loadout.auto.map(key => key === practiceSkill.value ? previous : key);
+        state.loadout.auto[0] = practiceSkill.value;
+        updateHud();
+    });
     let promptOpen = false;
     function gameConfirm(message) {
         if (promptOpen) return Promise.resolve(false);
@@ -1124,6 +1166,7 @@ export function createGame(root, saveBridge = null) {
     // pre-fills the dialog with sensible defaults (the current run's settings when continuing, or
     // fresh defaults for a brand-new run), and always starts back at step 0.
     function openSetup(action) {
+        if (state.training) return;
         if (saving || checkingUnlock || setupAction || state.status === "choosing") return;
         if (state.status === "playing") togglePause(state);
         clearInput();
@@ -1246,8 +1289,14 @@ export function createGame(root, saveBridge = null) {
         classSelect.disabled = saving || !setupAction || setupStep !== 0 || setupAction === "continue";
         const critical = state.status === "playing" && state.resumeDelay === 0 && p.health > 0 && p.health <= p.maxHealth * 0.25;
         viewport.classList.toggle("low-health", critical);
-        const warning = critical ? p.potions > 0 ? "LOW HEALTH — E or Life flask to heal" : "LOW HEALTH — no flasks left; evade and seek a pickup" : "";
+        const mobileHud = root.dataset.canvasHud === "on";
+        const warning = critical ? p.potions > 0 ? mobileHud ? "LOW HEALTH — tap flask" : "LOW HEALTH — E or Life flask to heal" : "LOW HEALTH — no flasks; evade" : "";
         if (healthWarning.textContent !== warning) healthWarning.textContent = warning;
+        if (critical && mobileHud) {
+            const rect = canvas.getBoundingClientRect();
+            const menu = root.querySelector(".mm-bar")?.getBoundingClientRect();
+            healthWarning.style.top = `${bossHudTop(rect, menu, true) * rect.height / HEIGHT}px`;
+        } else healthWarning.style.removeProperty("top");
         for (const button of skillButtons) {
             const skill = button.dataset.skill;
             const icon = button.querySelector(".skill-icon"), src = skillIcon(state, skill);
@@ -1298,6 +1347,7 @@ export function createGame(root, saveBridge = null) {
         const traits = Object.entries(ELITE_MODIFIERS).filter(([key]) => key !== "none")
             .map(([key, value]) => [value.name, living.filter(enemy => enemy.modifier === key).length]).filter(([, count]) => count > 0);
         const pressure = state.wave === 0 ? "Threat: awaiting a run" : `Stage ${Math.ceil((state.mode === "endless" ? Math.max(1, state.wave - LAST_WAVE) : state.wave) / 5)} · ${living.length} enemies · ${living.filter(enemy => enemy.elite).length} elites`
+            + ` · ${encounterForWave(state.wave).name}`
             + (boss ? ` · Boss phase ${boss.combat.phase}${boss.combat.rest > 0 ? " — recovery window" : ""}` : "")
             + (traits.length ? ` · ${traits.map(([name, count]) => `${name} ×${count}`).join(" / ")}` : "")
             + (state.player.level > 8 ? " · Level scaling active" : "");
@@ -1307,7 +1357,7 @@ export function createGame(root, saveBridge = null) {
         text("boon-count", acquired.reduce((total, [, rank]) => total + rank, 0));
         text("boons", acquired.length ? acquired.map(([key, rank]) => `${LEVEL_CARDS[key].name} x${rank}`).join(" / ") : "Level up to choose your first lasting boon.");
         const bestScore = releaseRankings ? state.kills - state.scoreBaseline : state.kills;
-        if (bestScore > best) {
+        if (!state.training && bestScore > best) {
             best = bestScore;
             try { localStorage.setItem(bestKey, String(best)); } catch { /* Best score is optional. */ }
         }
@@ -1346,9 +1396,28 @@ export function createGame(root, saveBridge = null) {
         xpMeter.value = p.xp;
         const choosing = state.status === "choosing";
         const draftClosing = (draftVisible || draft.classList.contains("level-draft-exit")) && !choosing;
-        overlay.hidden = !!setupAction || state.status === "playing" && !draftClosing;
+        const checkpointInBackground = automaticCheckpoint(state, checkpointSaveFailed);
+        overlay.hidden = !!setupAction || (state.status === "playing" || checkpointInBackground) && !draftClosing;
         const active = ["playing", "paused", "camp", "won", "choosing"].includes(state.status);
         const canForge = !setupAction && ["paused", "camp", "won"].includes(state.status);
+        for (const select of root.querySelectorAll("[data-equipment-style]")) {
+            select.value = state.runSystems.equipment[select.dataset.equipmentStyle];
+            select.disabled = saving || !canForge;
+        }
+        challengeSelect.disabled = saving || !canForge || state.training || state.wave % 5 !== 0 || state.enemies.length > 0;
+        challengeSelect.value = state.runSystems.challenge.resolved ? "none" : state.runSystems.challenge.key;
+        const challenge = state.runSystems.challenge;
+        root.querySelector("[data-challenge-status]").textContent = `${CHALLENGES[challenge.key]}${challenge.key === "none" ? "" : ` · stage ${challenge.stage} · ${Math.floor(challenge.elapsed)}s · ${challenge.flasks} flasks · ${Math.round(challenge.damage)} health lost${challenge.resolved ? " · resolved" : ""}`}`;
+        const summary = runSummary(state, key => skillName(state, key));
+        root.querySelector("[data-summary-text]").textContent = summary;
+        root.querySelector("[data-run-summary]").hidden = state.status === "ready";
+        root.querySelector("[data-forge-summary]").textContent = summary;
+        for (const button of root.querySelectorAll("[data-training]")) { button.hidden = !!state.training; button.disabled = saving || checkingUnlock || !!setupAction || choosing; }
+        for (const button of root.querySelectorAll("[data-exit-training]")) button.hidden = !state.training;
+        root.querySelector("[data-training-picker]").hidden = !state.training;
+        practiceSkill.disabled = state.status !== "paused";
+        practiceSkill.value = state.loadout.auto[0];
+        for (const option of practiceSkill.options) option.textContent = skillName(state, option.value);
         retrySave.hidden = !checkpointSaveFailed || !["camp", "won"].includes(state.status) || !!setupAction;
         retrySave.disabled = saving || checkingUnlock || !saveBridge;
         retrySave.textContent = saving ? "Retrying checkpoint save…" : "Retry checkpoint save";
@@ -1415,9 +1484,9 @@ export function createGame(root, saveBridge = null) {
         focusViewButton.disabled = !!setupAction;
         recenterButton.disabled = !!setupAction;
         startButton.hidden = state.mode === "endless" && state.status === "camp";
-        startButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
-        restartButton.disabled = saving || choosing || !!setupAction;
-        endlessButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
+        startButton.disabled = saving || checkingUnlock || choosing || !!setupAction || !!state.training;
+        restartButton.disabled = saving || choosing || !!setupAction || !!state.training;
+        endlessButton.disabled = saving || checkingUnlock || choosing || !!setupAction || !!state.training;
         endlessButton.hidden = choosing || !(endlessUnlocked || state.status === "won") || (state.mode === "endless" && state.status !== "dead") || state.status === "playing";
         endlessButton.textContent = state.status === "won" ? "Continue into the Endless Watch" : "New Endless Watch run";
         launchEndless.disabled = endlessButton.disabled || !(endlessUnlocked || state.campaignComplete === 1);
@@ -1426,11 +1495,15 @@ export function createGame(root, saveBridge = null) {
         forgeButton.disabled = saving || !active || choosing || !!setupAction;
         const completedForge = forgeComplete(state);
         const cheapestTraining = Math.min(...Object.keys(MASTERY).map(key => masteryCost(state, key)));
-        const affordable = completedForge ? state.gold >= cheapestTraining
-            : Object.entries(UPGRADES).some(([key, upgrade]) => skillUnlocked(state, key) && state.upgrades[key] < upgrade.max && state.gold >= upgradeCost(state, key));
-        forgeNudge.hidden = state.status !== "playing" || state.resumeDelay > 0 || draftClosing || !!setupAction || !affordable || !skillUnlockNotice.hidden;
-        forgeButton.classList.toggle("forge-available", active && !choosing && !setupAction && affordable);
-        root.dataset.forgeAvailable = active && !choosing && !setupAction && affordable ? "on" : "off";
+        const offers = completedForge ? Object.keys(MASTERY)
+            .filter(key => state.gold >= masteryCost(state, key) && Number.isFinite(masteryCost(state, key)) && !upgradePreview(state, key, true).capped)
+            .map(key => ({ key: `mastery:${key}`, rank: state.mastery[key] }))
+            : Object.entries(UPGRADES).filter(([key, upgrade]) => forgeSkillSelected(state, key) && state.upgrades[key] < upgrade.max && state.gold >= upgradeCost(state, key))
+                .map(([key]) => ({ key: `forge:${key}`, rank: state.upgrades[key] }));
+        const notifyForge = forgeNotification(state, offers, root.dataset.menuPanel === "forge");
+        forgeNudge.hidden = state.status !== "playing" || state.resumeDelay > 0 || draftClosing || !!setupAction || !notifyForge || !skillUnlockNotice.hidden;
+        forgeButton.classList.toggle("forge-available", active && !choosing && !setupAction && notifyForge);
+        root.dataset.forgeAvailable = active && !choosing && !setupAction && notifyForge ? "on" : "off";
         root.querySelector("[data-open-forge]").disabled = forgeButton.disabled;
         text("forge-hint", completedForge ? `Stat training from ${cheapestTraining.toLocaleString()} gold.` : "Forge upgrade available!");
         masteryPanel.hidden = !completedForge;
@@ -1463,9 +1536,10 @@ export function createGame(root, saveBridge = null) {
                 }, 320);
             }
         }
-        runMenu.hidden = choosing || draftClosing || !!setupAction;
+        runMenu.hidden = choosing || draftClosing || !!setupAction || checkpointInBackground;
         for (const button of cardButtons) button.disabled = saving || !choosing;
         if (choosing) {
+            normalizeCardChoices(state);
             text("draft-level", `LEVEL ${state.player.level - state.pendingChoices + 1} / AN OATH FOR THE JOURNEY`);
             text("draft-pending", state.pendingChoices > 1 ? `${state.pendingChoices} level-up choices queued. Select one card for each level.` : "Choose one card. Its bonus stays with this character and save.");
             const signature = `${state.pendingChoices}:${state.cardChoices.join(",")}`;
@@ -1474,13 +1548,14 @@ export function createGame(root, saveBridge = null) {
                     const key = state.cardChoices[index];
                     const card = LEVEL_CARDS[key];
                     button.dataset.cardId = key;
-                    button.querySelector("[data-card-category]").textContent = card.category;
-                    button.querySelector("[data-card-name]").textContent = card.name;
+                    button.querySelector("[data-card-category]").textContent = ["nova", "burst", "guard"].includes(key)
+                        ? skillName(state, key).toUpperCase() : key === "cleave" ? "REGULAR ATTACK" : card.category;
+                    button.querySelector("[data-card-name]").textContent = card.skill ? `${skillName(state, card.skill)} oath` : card.name;
                     button.querySelector("[data-card-description]").textContent = key === "cleave"
                         ? `+6 ${hero.attackName} ${ranged ? "arrow range" : "reach"} per rank, up to +60.`
                         : key === "nova" ? `+10 ${hero.specialName} ${ranged ? "arrow range" : "radius"} per rank, up to +100.`
                         : key === "burst" ? `+6% ${skillName(state, "burst")} damage per rank, up to +60%.`
-                        : key === "guard" ? `+0.15 seconds of ${skillName(state, "guard")} protection per rank. Reduces incoming damage by 40% before tree upgrades.` : card.description;
+                        : key === "guard" ? `+0.15 seconds of ${skillName(state, "guard")} protection per rank. Reduces incoming damage by 40% before tree upgrades.` : card.skill ? `+6% ${skillName(state, card.skill)} damage per rank, up to +60%. Only affects this ability.` : card.description;
                     button.querySelector("[data-card-rank]").textContent = `Rank ${state.boons[key]} to ${state.boons[key] + 1}${card.max < Number.MAX_SAFE_INTEGER ? ` / Max ${card.max}` : " / Stacking"}`;
                 });
                 if (!saving) { shownDraft = signature; cardButtons[0].focus({ preventScroll: true }); }
@@ -1488,7 +1563,10 @@ export function createGame(root, saveBridge = null) {
         } else shownDraft = "";
         for (const button of upgradeButtons) {
             const key = button.dataset.upgrade;
-            button.hidden = !skillSelected(state, key);
+            const selected = forgeSkillSelected(state, key);
+            button.hidden = !selected;
+            if (["cleave", "nova", "burst", "guard"].includes(key) || NEW_SKILLS[key])
+                button.querySelector("strong").textContent = `${skillName(state, key === "cleave" ? "attack" : key)} upgrades`;
             const rank = state.upgrades[key];
             const max = UPGRADES[key].max;
             const cost = upgradeCost(state, key);
@@ -1497,19 +1575,19 @@ export function createGame(root, saveBridge = null) {
             if (element.textContent !== label) element.textContent = label;
             button.title = key === "cleave" ? `Improves ${hero.attackName}: damage, range and attack speed.`
                 : key === "nova" ? `Improves ${hero.specialName}: damage, range and recovery.` : UPGRADES[key].detail;
-            button.disabled = saving || !canForge || !skillUnlocked(state, key) || rank >= max || state.gold < cost;
+            button.disabled = saving || !canForge || !selected || rank >= max || state.gold < cost;
             if (!skillUnlocked(state, key)) button.title = wardUnlockHint(state);
-            if (canForge && skillUnlocked(state, key) && rank < max) showUpgradePreview(button, key);
+            if (canForge && selected && rank < max) showUpgradePreview(button, key);
             else if (button.querySelector("[data-upgrade-preview]")) button.querySelector("[data-upgrade-preview]").textContent = rank >= max ? "Fully forged" : "";
         }
-        if (saveButton) saveButton.disabled = saving || checkingUnlock || !saveBridge || !active || !!setupAction;
+        if (saveButton) saveButton.disabled = saving || checkingUnlock || !saveBridge || !active || !!setupAction || !!state.training;
         const choosingSkill = active && !choosing && !setupAction && needsSkillChoice(state);
         skillChoice.hidden = !choosingSkill || root.dataset.menuOpen === "on";
         for (const button of skillChoice.querySelectorAll("[data-choose-run-skill]")) {
             button.hidden = selectedSkills(state).includes(button.dataset.chooseRunSkill);
             button.disabled = saving || !choosingSkill;
         }
-        if (loadButton) loadButton.disabled = saving || checkingUnlock || !saveBridge || !!setupAction;
+        if (loadButton) loadButton.disabled = saving || checkingUnlock || !saveBridge || !!setupAction || !!state.training;
         pauseButton.firstChild.textContent = state.status === "paused" ? "Resume " : "Pause ";
         if (state.status !== shownStatus) {
             const report = root.querySelector("[data-death-report]");
@@ -1530,7 +1608,7 @@ export function createGame(root, saveBridge = null) {
             if (state.status === "playing" && shownStatus !== "choosing") scheduleArenaLayout(true);
             if (["paused", "camp", "won", "dead"].includes(state.status)) void reportScore();
             shownStatus = state.status;
-            overlay.hidden = !!setupAction || state.status === "playing" && !draftClosing;
+            overlay.hidden = !!setupAction || (state.status === "playing" || checkpointInBackground) && !draftClosing;
             restartButton.hidden = !["paused", "camp"].includes(state.status);
             if (state.status !== "playing") {
                 clearInput();
@@ -1582,8 +1660,10 @@ export function createGame(root, saveBridge = null) {
             if (saving || setupAction || (!idleInformation && !["playing", "paused", "camp"].includes(state.status))) return;
             if (state.status === "playing") togglePause(state);
             root.dataset.menuOpen = "on";
+            root.dataset.menuPanel = event.detail?.panel ?? "";
         } else {
             delete root.dataset.menuOpen;
+            delete root.dataset.menuPanel;
             if (event.detail?.resume && state.status === "paused" && !saving && !setupAction) togglePause(state);
         }
         clearInput();
@@ -1694,6 +1774,9 @@ export function createGame(root, saveBridge = null) {
     on(forgeButton, "click", () => {
         if (saving || setupAction || state.status === "choosing") return;
         if (state.status === "playing") pause();
+        root.dataset.menuPanel = "forge";
+        updateHud();
+        if (root.dataset.menuOpen !== "on") delete root.dataset.menuPanel;
         alignArena = false;
         reveal(root.querySelector("[data-forge]"), true);
     });
@@ -1733,6 +1816,7 @@ export function createGame(root, saveBridge = null) {
     // Any failure (network error, invalid save shape) leaves the current in-memory run completely
     // unchanged — nothing here can lose progress, only fail to persist it.
     async function persist(loadingSave, automatic = false) {
+        if (state.training) return;
         if (saving || checkingUnlock || setupAction) return;
         if (!saveBridge) {
             checkpointSaveFailed = ["camp", "won"].includes(state.status);
@@ -1942,12 +2026,13 @@ export function createGame(root, saveBridge = null) {
             checkpointHandled = `${state.mode}:${state.wave}`;
             void persist(false, true);
         }
-        render(ctx, floors[mapIndexForWave(state.wave)], state);
-        drawCountdown(ctx, state);
+        render(ctx, floors[mapIndexForWave(state.wave)], state, bossTop);
+        drawCountdown(ctx, state, root.dataset.canvasHud === "on");
         // Hosts without room for a DOM HUD (the mobile shell) draw it into the canvas instead, so
         // it scales with the playfield and cannot intercept touches. Opt-in: desktop keeps the
         // DOM HUD and is unaffected.
-        if (root.dataset.canvasHud === "on") drawHud(ctx, state, { maxFlasks: MAX_FLASKS });
+        if (root.dataset.canvasHud === "on") drawHud(ctx, state, { maxFlasks: MAX_FLASKS,
+            checkpoint: automaticCheckpoint(state, checkpointSaveFailed) ? "Stage cleared · saving checkpoint…" : "" });
         if (now - hudTime > 100 || state.status !== shownStatus) { updateHud(); hudTime = now; }
         frame = requestAnimationFrame(animate);
     }

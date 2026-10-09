@@ -19,6 +19,7 @@ import { MASTERY, MAX_FLASKS } from "./arpg-engine.js";
 import { HERO_CLASSES } from "./arpg-classes.js";
 import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
 import { SKILL_KEYS, SLOTTABLE_SKILLS, TREE_NODES, NEW_SKILLS, skillCapacity, skillPointsLeft, skillUnlocked, validLoadout } from "./arpg-skills.js";
+import { EQUIPMENT_STYLES, CHALLENGES } from "./arpg-run-systems.js";
 
 // Field-name lists used with numbers() below, grouped by the kind of save-state object they belong
 // to — kept as flat arrays so each numbers() call site doesn't need to spell out every field name inline.
@@ -77,7 +78,7 @@ function integer(value, min, max) {
 // the actual migration mechanism — it supplies a sensible default for saves older than the version
 // that introduced a given field, rather than requiring every historical save to be rewritten.
 export function restoreSnapshot(snapshot, random = Math.random) {
-    require([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].includes(snapshot?.version));
+    require([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].includes(snapshot?.version));
     const saved = snapshot.state;
     const state = createState(random);
     state.rankingPatch = snapshot.version < 13 ? "pre004" : saved.rankingPatch;
@@ -124,14 +125,14 @@ export function restoreSnapshot(snapshot, random = Math.random) {
     const completedOldForge = snapshot.version >= 2 && snapshot.version < 9
         && oldUpgradeKeys.every(key => saved.upgrades?.[key] === UPGRADES[key].max);
     for (const [key, upgrade] of Object.entries(UPGRADES)) {
-        const isNew = snapshot.version < 8 && ["critChance", "critDamage"].includes(key) || snapshot.version < 9 && ["burst", "guard"].includes(key);
+        const isNew = snapshot.version < 8 && ["critChance", "critDamage"].includes(key) || snapshot.version < 9 && ["burst", "guard"].includes(key) || snapshot.version < 18 && NEW_SKILLS[key];
         const rank = snapshot.version === 1 ? 0 : isNew
-            ? completedOldForge ? upgrade.max : 0 : saved.upgrades?.[key];
+            ? completedOldForge && !NEW_SKILLS[key] ? upgrade.max : 0 : saved.upgrades?.[key];
         integer(rank, 0, upgrade.max);
         state.upgrades[key] = rank;
     }
     require(!Object.values(state.mastery).some(rank => rank > 0) || Object.entries(UPGRADES)
-        .filter(([key]) => snapshot.version < 15 || !["nova", "burst", "guard"].includes(key)).every(([key, value]) => state.upgrades[key] === value.max));
+        .filter(([key]) => (!NEW_SKILLS[key] || snapshot.version >= 18) && (snapshot.version < 15 || !["nova", "burst", "guard"].includes(key) && !NEW_SKILLS[key])).every(([key, value]) => state.upgrades[key] === value.max));
     for (const power of POWER_UPS) {
         const remaining = snapshot.version < 3 ? 0 : saved.buffs?.[power.key];
         require(typeof remaining === "number" && Number.isFinite(remaining) && remaining >= 0 && remaining <= power.duration);
@@ -206,7 +207,7 @@ export function restoreSnapshot(snapshot, random = Math.random) {
     require(p.health > 0 && p.health <= p.maxHealth && p.radius > 0 && p.radius <= 50);
     integer(p.level, 1, Number.MAX_SAFE_INTEGER);
     if (snapshot.version >= 4) {
-        const cardKeys = Object.keys(LEVEL_CARDS).filter(key => (snapshot.version >= 8 || !["critChance", "critDamage"].includes(key)) && (snapshot.version >= 9 || !["burst", "guard"].includes(key)));
+        const cardKeys = Object.keys(LEVEL_CARDS).filter(key => (snapshot.version >= 17 || !LEVEL_CARDS[key].skill) && (snapshot.version >= 8 || !["critChance", "critDamage"].includes(key)) && (snapshot.version >= 9 || !["burst", "guard"].includes(key)));
         Object.assign(state.boons, numbers(saved.boons, cardKeys));
         for (const [key, card] of Object.entries(LEVEL_CARDS)) integer(state.boons[key], 0, card.max);
         state.pendingChoices = saved.pendingChoices;
@@ -292,6 +293,28 @@ export function restoreSnapshot(snapshot, random = Math.random) {
         state.wardUnlockSeen = 1;
     }
     normalizeCardChoices(state);
+    if (snapshot.version >= 17) {
+        const systems = saved.runSystems;
+        require(systems && systems.equipment && systems.challenge && systems.summary);
+        for (const slot of ["weapon", "armor"]) {
+            require(Object.hasOwn(EQUIPMENT_STYLES[slot], systems.equipment[slot]));
+            state.runSystems.equipment[slot] = systems.equipment[slot];
+        }
+        const challenge = numbers(systems.challenge, ["stage", "elapsed", "damage", "flasks", "resolved"]);
+        require(Object.hasOwn(CHALLENGES, systems.challenge.key));
+        challenge.key = systems.challenge.key;
+        integer(challenge.stage, 0, Number.MAX_SAFE_INTEGER);
+        integer(challenge.flasks, 0, Number.MAX_SAFE_INTEGER);
+        integer(challenge.resolved, 0, 1);
+        require(challenge.elapsed >= 0 && challenge.damage >= 0);
+        const summary = numbers(systems.summary, ["seconds", "flasks", "spent", "stages", "challenges"]);
+        require(summary.seconds >= 0);
+        for (const key of ["flasks", "spent", "stages", "challenges"]) integer(summary[key], 0, Number.MAX_SAFE_INTEGER);
+        summary.damage = numbers(systems.summary.damage, SKILL_KEYS);
+        require(Object.values(summary.damage).every(value => value >= 0));
+        state.runSystems.challenge = challenge;
+        state.runSystems.summary = summary;
+    }
     state.status = ["camp", "won", "choosing"].includes(saved.status) ? saved.status : "paused";
     return state;
 }
@@ -305,8 +328,9 @@ export function restoreSnapshot(snapshot, random = Math.random) {
 // the server would reject anyway. Also enforces the same 64KB payload cap the API enforces, so an
 // oversized save is caught client-side with time to react rather than failing after a network round trip.
 export function captureSnapshot(state) {
+    require(!state.training);
     require(["playing", "paused", "camp", "won", "choosing"].includes(state.status));
-    const restored = restoreSnapshot({ version: 16, state: {
+    const restored = restoreSnapshot({ version: 18, state: {
         ...state,
         playerShots: state.playerShots.filter(shot => shot.life > 0),
         enemies: state.enemies.filter(enemy => enemy.health > 0),
@@ -314,7 +338,7 @@ export function captureSnapshot(state) {
         loot: state.loot.filter(drop => drop.life > 0)
     } });
     const { random, effects, damageHistory, ...saved } = restored;
-    const snapshot = { version: 16, state: saved };
+    const snapshot = { version: 18, state: saved };
     require(new TextEncoder().encode(JSON.stringify(snapshot)).length <= 64 * 1024);
     return snapshot;
 }

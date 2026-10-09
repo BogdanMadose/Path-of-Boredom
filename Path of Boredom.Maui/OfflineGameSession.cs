@@ -18,7 +18,7 @@ namespace Path_of_Boredom.Maui;
 /// </remarks>
 public sealed class OfflineGameSession : IGameSession
 {
-    private const int CurrentSaveVersion = 16;
+    private const int CurrentSaveVersion = 18;
     private const int MaximumSaveBytes = 128 * 1024;
     private readonly SemaphoreSlim saveLock = new(1, 1);
     private readonly string savePath = Path.Combine(FileSystem.AppDataDirectory, "offline-run.json");

@@ -14,7 +14,7 @@
 // IMPORTANT: this file's state shape is exactly what arpg-save.js serializes/validates and what
 // GameSaveEndpoints.cs re-validates on the server. Adding/removing/renaming a field on `state` or
 // `state.player` generally requires updating arpg-save.js (and bumping the save version) too.
-import { LAST_WAVE, WAVES_PER_MAP, UPGRADES, POWER_UPS, mapForWave, mapIndexForWave, enemyKindForWave } from "./arpg-campaign.js";
+import { LAST_WAVE, WAVES_PER_MAP, UPGRADES, POWER_UPS, mapForWave, mapIndexForWave } from "./arpg-campaign.js";
 export { LAST_WAVE } from "./arpg-campaign.js";
 import { LEVEL_CARDS, drawLevelCards, levelCardAvailable } from "./arpg-cards.js";
 import { DIFFICULTIES, difficultyFor } from "./arpg-difficulty.js";
@@ -24,6 +24,8 @@ import { SKILL_KEYS, SLOTTABLE_SKILLS, AUTO_COOLDOWN, EXTRA_SKILLS, NEW_SKILLS, 
 import { updateCombatFacing } from "./arpg-facing.js";
 import { skillRangeBonus } from "./arpg-skill-trees.js";
 import { arenaHazards, hazardPhase } from "./arpg-hazards.js";
+import { encounterForWave, encounterKind, encounterElite } from "./arpg-encounters.js";
+import { newRunSystems, equipmentStyle, resolveChallenge } from "./arpg-run-systems.js";
 // Logical canvas resolution (not the real on-screen pixel size — arpg-graphics.js scales this to
 // fit the actual canvas). All position math throughout this file is in these logical units.
 export const WIDTH = 1100;
@@ -74,6 +76,7 @@ export function createState(random = Math.random) {
         random, status: "ready", time: 0, wave: 0, intermission: 0.8,
         mode: "campaign", campaignComplete: 0, difficulty: "hard", rankingMode: "campaign", scoreBaseline: 0,
         rankingPatch: "004", damageHistory: [], volleySequence: 2,
+        runSystems: newRunSystems(),
         mastery: Object.fromEntries(Object.keys(MASTERY).map(key => [key, 0])),
         upgrades: Object.fromEntries(Object.keys(UPGRADES).map(key => [key, 0])),
         buffs: Object.fromEntries(POWER_UPS.map(power => [power.key, 0])),
@@ -107,13 +110,13 @@ export function createState(random = Math.random) {
 // forge/boon percentage bonuses and the Fury power-up.
 export const weaponDamage = state => Math.round((state.player.damage + state.mastery.might * 2
     + 60 * (Math.sqrt(1 + state.player.weaponBonus / 30) - 1) + state.upgrades.weapon * 3)
-    * (1 + state.upgrades.weapon * 0.025 + state.boons.edge * 0.04) * (state.buffs.fury > 0 ? 1.5 : 1));
+    * (1 + state.upgrades.weapon * 0.025 + state.boons.edge * 0.04) * (state.buffs.fury > 0 ? 1.5 : 1) * equipmentStyle(state, "weapon").damage);
 // Damage reduction rating, capped at 60% — combines class base armor, equipped armor rarity, forge
 // armor rank, and the Unbroken vow boon.
-export const armorRating = state => Math.min(60, classFor(state).armor + state.player.armorBonus * 0.6 + state.upgrades.armor * 3 + state.boons.bulwark * 1.5);
+export const armorRating = state => clamp(classFor(state).armor + state.player.armorBonus * 0.6 + state.upgrades.armor * 3 + state.boons.bulwark * 1.5 + equipmentStyle(state, "armor").armor, 0, 60);
 // Current movement speed: class base speed, boosted by the Haste power-up, Wayfarer's instinct
 // boon, Endless stride mastery, and the dodge tree's "afterstep" burst-of-speed window.
-export const movementSpeed = state => classFor(state).speed * (state.buffs.haste > 0 ? 1.35 : 1) * (1 + state.boons.stride * 0.04 + state.mastery.speed * 0.01) * (state.player.afterstep > 0 ? 1.2 : 1);
+export const movementSpeed = state => classFor(state).speed * (state.buffs.haste > 0 ? 1.35 : 1) * (1 + state.boons.stride * 0.04 + state.mastery.speed * 0.01) * (state.player.afterstep > 0 ? 1.2 : 1) * equipmentStyle(state, "armor").speed;
 // Chance (0-0.75) that any given hit is a critical, from a base 5% plus card/forge/mastery ranks.
 export const criticalChance = state => Math.min(0.75, 0.05 + state.boons.critChance * 0.02 + state.upgrades.critChance * 0.02 + state.mastery.critChance * 0.005);
 // Damage multiplier applied on a critical hit, starting at 150% and growing with card/forge/mastery ranks.
@@ -121,7 +124,7 @@ export const criticalDamage = state => 1.5 + state.boons.critDamage * 0.1 + stat
 // Effective range of a given skill, capped per class/skill and boosted by forge/card ranks,
 // Widening ember mastery, and relevant skill tree nodes.
 export const skillReach = (state, skill) => NEW_SKILLS[skill]
-    ? combatSkillDefinition(state, skill).reach + skillRangeBonus(state, skill)
+    ? combatSkillDefinition(state, skill).reach + skillRangeBonus(state, skill) + state.upgrades[skill] * 8
     : Math.min(state.heroClass === "ranger" ? 1000 : skill === "attack" ? 220 : skill === "burst" ? 500 : 340, (skill === "attack"
     ? classFor(state).attackReach + state.upgrades.cleave * 6 + state.boons.cleave * 6
     : skill === "nova" ? classFor(state).specialReach + state.upgrades.nova * 10 + state.boons.nova * 10
@@ -134,7 +137,9 @@ const goldReward = (value, fortune = 0) => Math.round(value * 1.1 * (1 + fortune
 export const upgradeCost = (state, key) => UPGRADES[key] ? Math.round(UPGRADES[key].base * (1 + state.upgrades[key] * 0.7 + state.upgrades[key] ** 2 * 0.12)) : Infinity;
 // True once every forge upgrade is at its max rank — the gate that unlocks mastery training
 // (buyMastery below) so gold always has somewhere useful to go even after the forge is exhausted.
-export const forgeSkillSelected = (state, key) => skillSelected(state, key);
+const FORGE_SKILLS = { cleave: "attack", nova: "nova", burst: "burst", guard: "guard", dodge: "dodge", flask: "potion", ...Object.fromEntries(Object.keys(NEW_SKILLS).map(skill => [skill, skill])) };
+export const forgeSkillSelected = (state, key) => Object.hasOwn(UPGRADES, key)
+    && (!FORGE_SKILLS[key] || skillSelected(state, FORGE_SKILLS[key]));
 export const forgeComplete = state => Object.entries(UPGRADES).filter(([key]) => forgeSkillSelected(state, key)).every(([key, value]) => state.upgrades[key] >= value.max);
 // Gold price of the next rank of a mastery stat — starts at 1000 and grows by 100 per rank already
 // owned. Falls back to Infinity for unrecognized keys or if the cost would overflow safe-integer
@@ -149,7 +154,7 @@ export const masteryCost = (state, key) => {
 export const flaskHealing = state => Math.max(30, Math.round(state.player.maxHealth * (0.22 + state.upgrades.flask * 0.06))) * difficultyFor(state).healing;
 // Multiplier applied to skill cooldown countdown-per-second (capped at 2x) — combines the Haste
 // power-up, Quiet flame boon, and Battle rhythm mastery.
-export const cooldownRecovery = state => Math.min(2, (state.buffs.haste > 0 ? 1.4 : 1) * (1 + state.boons.focus * 0.05 + state.mastery.recovery * 0.005));
+export const cooldownRecovery = state => Math.min(2, (state.buffs.haste > 0 ? 1.4 : 1) * (1 + state.boons.focus * 0.05 + state.mastery.recovery * 0.005) * equipmentStyle(state, "weapon").recovery);
 
 // Spends gold for one rank of a mastery stat, only available once the forge is fully upgraded and
 // only while not mid-combat. Vitality mastery immediately grants +5 max health and +5 current health.
@@ -159,6 +164,7 @@ export function buyMastery(state, key) {
     if (!Number.isFinite(cost) || state.gold < cost) return false;
     state.gold -= cost;
     state.mastery[key]++;
+    state.runSystems.summary.spent += cost;
     if (key === "vitality") {
         state.player.maxHealth += 5;
         state.player.health = Math.min(state.player.maxHealth, state.player.health + 5);
@@ -176,7 +182,18 @@ export function buyUpgrade(state, key) {
     if (state.gold < cost) return false;
     state.gold -= cost;
     grantUpgrade(state, key);
+    state.runSystems.summary.spent += cost;
     return true;
+}
+
+export function startTraining(random = Math.random, difficulty = "hard", heroClass = "knight") {
+    const state = startRun(random, difficulty, heroClass);
+    state.training = true;
+    state.player.level = 10;
+    state.player.maxHealth = state.player.health = classFor(state).health + 72;
+    state.loadout.auto = ["nova", "burst", "guard", "none"];
+    state.journal = "Training: repeatable waves, fatal hits restore health, no loot, XP, saves or rankings. Exit to return to your run.";
+    return state;
 }
 
 // Actually increments a forge upgrade's rank and applies one-off side effects (armor grants bonus
@@ -185,11 +202,12 @@ export function buyUpgrade(state, key) {
 // instead of being wasted.
 function grantUpgrade(state, key) {
     const upgrade = UPGRADES[key];
-    if (state.upgrades[key] >= upgrade.max) { state.gold += goldReward(50); return; }
+    if (!forgeSkillSelected(state, key) || state.upgrades[key] >= upgrade.max) { state.gold += goldReward(50); return false; }
     state.upgrades[key]++;
     if (key === "armor") { state.player.maxHealth += 12; state.player.health = Math.min(state.player.maxHealth, state.player.health + 12); }
     if (key === "flask") state.player.potions = MAX_FLASKS;
     state.journal = `${upgrade.name} forged to rank ${state.upgrades[key]}. ${upgrade.detail}.`;
+    return true;
 }
 
 // Applies the chosen level-up boon card, incrementing its rank (vitality grants immediate health).
@@ -314,6 +332,8 @@ function hurtPlayer(state, damage, source = "Unknown attack") {
         * (player.guarding > 0 ? 0.6 - state.skillTree.guard.barrier * 0.05 : 1) * (player.flaskWard > 0 ? 0.75 : 1)));
     const taken = Math.min(player.health, damage);
     player.health = Math.max(0, player.health - damage);
+    state.runSystems.challenge.damage += taken;
+    if (state.training && player.health === 0) player.health = player.maxHealth;
     state.damageHistory.push({ source, damage: taken, age: 0, lethal: player.health === 0 });
     if (state.damageHistory.length > 12) state.damageHistory.shift();
     player.invulnerable = 0.3;
@@ -353,6 +373,7 @@ function gainExperience(state, amount) {
 // random-chance triggers). Loot list is hard-capped at 64 — if exceeded, auto-collects everything.
 function killEnemy(state, enemy) {
     state.kills++;
+    if (state.training) return;
     if (enemy.elite || enemy.kind === "boss") {
         state.player.health = Math.min(state.player.maxHealth, state.player.health + state.boons.siphon * 0.8 * difficultyFor(state).healing);
     }
@@ -375,7 +396,7 @@ function killEnemy(state, enemy) {
     }
     if ((enemy.kind === "boss" && state.random() < 0.3) || (enemy.elite && state.random() < 0.04)) {
         const keys = Object.keys(UPGRADES);
-        const available = keys.filter(key => skillUnlocked(state, key) && state.upgrades[key] < UPGRADES[key].max);
+        const available = keys.filter(key => forgeSkillSelected(state, key) && state.upgrades[key] < UPGRADES[key].max);
         const key = available[Math.floor(state.random() * available.length)];
         state.loot.push({ kind: key ? "upgrade" : "gold", x: enemy.x - 20, y: enemy.y - 10, value: key ? keys.indexOf(key) : 50, life: 30 });
     }
@@ -391,6 +412,7 @@ function killEnemy(state, enemy) {
 // chill/knockback follow-up if that skill tree node is taken.
 function hitEnemy(state, enemy, damage, piercing = false, skill = "attack") {
     if (enemy.health <= 0) return;
+    if (NEW_SKILLS[skill]) damage = Math.round(damage * (1 + state.boons[`${skill}Oath`] * 0.06 + state.upgrades[skill] * 0.1));
     if (enemy.modifier === "armored") damage = Math.max(1, Math.round(damage * 0.8));
     const finishing = skill === "attack" && state.skillTree.attack.execution > 0
         && (state.heroClass === "knight" ? enemy.health <= enemy.maxHealth * 0.35 : state.heroClass === "warden" && enemy.kind === "sentinel");
@@ -404,6 +426,7 @@ function hitEnemy(state, enemy, damage, piercing = false, skill = "attack") {
     const critical = state.random() < Math.min(0.75, criticalChance(state) + (skill === "burst" && state.heroClass !== "warden" ? state.skillTree.burst.overdrive * 0.1 : 0));
     if (critical) damage = Math.round(damage * criticalDamage(state));
     if (enemy.kind === "sentinel" && !piercing && !(state.heroClass === "warden" && skill === "attack" && state.skillTree.attack.execution)) damage = Math.round(damage * 0.55);
+    state.runSystems.summary.damage[skill] += Math.min(enemy.health, damage);
     enemy.health -= damage;
     enemy.flash = enemy.kind === "boss" ? 0.06 : 0.15;
     effect(state, "text", enemy.x, enemy.y - enemy.radius - 10, critical ? "#ffd16a" : "#eee0ba", critical ? `CRIT ${damage}` : `${damage}`);
@@ -613,7 +636,7 @@ function castClassSkill(state, skill) {
         }
     }
     if (!hits) return false;
-    p[skill] = definition.cooldown / (1 + nodes.recovery * 0.08);
+    p[skill] = definition.cooldown / (1 + nodes.recovery * 0.08) / (1 + state.upgrades[skill] * 0.08);
     p.casting = 0.4;
     return true;
 }
@@ -734,6 +757,8 @@ export function useSkill(state, skill, automatic = false) {
         if (p.potions <= 0 || p.health >= p.maxHealth) return false;
         p.potion = 0.7;
         p.potions--;
+        state.runSystems.summary.flasks++;
+        state.runSystems.challenge.flasks++;
         const emergency = p.health <= p.maxHealth * 0.35;
         p.health = Math.min(p.maxHealth, p.health + flaskHealing(state) * (1 + nodes.concentration * 0.1 + (emergency ? nodes.triage * 0.12 : 0)));
         if (nodes.tonic) p.flaskWard = 2;
@@ -886,15 +911,17 @@ function spawnWave(state) {
     const levelPressure = Math.max(0, state.player.level - 8);
     const scaling = (1 + act * 0.22) * (1 + depth * 0.055 + (depth / 60) ** 1.4)
         * (1 + levelPressure * 0.055) ** 1.15;
-    const count = Math.min(40, (bossWave ? 10 + act * 3 : 5 + localWave * 3 + act * 3) + Math.floor(depth / 4) + difficulty.extra);
+    const encounter = encounterForWave(state.wave);
+    const baseCount = (bossWave ? 10 + act * 3 : 5 + localWave * 3 + act * 3) + Math.floor(depth / 4) + difficulty.extra;
+    const count = Math.min(40, Math.max(5, Math.round(baseCount * (state.wave >= 6 ? encounter.count : 1))));
     for (let i = 0; i < count; i++) {
         const boss = bossWave && i === 0;
-        const kind = boss ? "boss" : enemyKindForWave(state.wave, i);
+        const kind = boss ? "boss" : encounterKind(state.wave, i);
         const side = Math.floor(state.random() * 4);
         const t = 0.08 + state.random() * 0.84;
         const x = side === 0 ? MARGIN : side === 1 ? WIDTH - MARGIN : WIDTH * t;
         const y = side === 2 ? MARGIN : side === 3 ? HEIGHT - MARGIN : HEIGHT * t;
-        const elite = !boss && state.wave >= 6 && i % (depth ? 3 : 5) === 0 ? 1 : 0;
+        const elite = boss ? 0 : encounterElite(state.wave, i, depth);
         const health = Math.round((boss ? (680 + act * 380) * 1.5 : (kind === "brute" || kind === "sentinel" ? 75 : kind === "runner" ? 20 : 32) + Math.min(state.wave, LAST_WAVE) * 10) * scaling * (elite ? 1.7 : 1));
         state.enemies.push({
             kind, x, y, health, maxHealth: health, elite, charging: 0, chargeX: 0, chargeY: 0,
@@ -916,7 +943,7 @@ function spawnWave(state) {
     state.journal = bossWave ? `${map.boss} awakens. Escape the slam${act ? " and its projectile volley" : ""}!`
         : localWave === 1 && act > 0 ? `${map.name}. The next stage begins. ${map.description}`
         : state.wave === 3 ? "Ash runners join the hunt. Fast but fragile: cleave before they surround you."
-        : `Wave ${state.wave}. ${count} enemies emerge in ${map.name}.`;
+        : `Wave ${state.wave} · ${encounter.name}. ${count} enemies emerge in ${map.name}.`;
 }
 
 // Spawns a fan of enemy projectiles centered on `angle` with the given angular `offsets` and speed
@@ -962,20 +989,20 @@ function collectLoot(state, dt, collectAll = false) {
             effect(state, "text", p.x, p.y - 50, power.color, power.name.toUpperCase());
         } else if (drop.kind === "upgrade") {
             const key = Object.keys(UPGRADES)[drop.value];
-            grantUpgrade(state, key);
-            effect(state, "text", p.x, p.y - 50, "#eed0ff", `${UPGRADES[key].name.toUpperCase()} +1`);
+            const upgraded = grantUpgrade(state, key);
+            effect(state, "text", p.x, p.y - 50, "#eed0ff", upgraded ? `${UPGRADES[key].name.toUpperCase()} +1` : "SCROLL SALVAGED");
         } else if (drop.kind === "armor") {
             if (drop.value > p.armorBonus) {
                 p.armorBonus = drop.value;
                 p.armor = drop.value >= 30 ? "Starwoven mantle" : drop.value >= 15 ? "Warden's mail" : "Ashguard leather";
                 state.journal = `${p.armor} equipped. ${(drop.value * 0.6).toFixed(1)} armor from equipment. Forge bonuses are retained.`;
-                effect(state, "text", p.x, p.y - 45, "#b5b9f2", "ARMOR UPGRADED");
+                effect(state, "text", p.x, p.y - 45, "#b5b9f2", "ARMOR EQUIPPED · NOT A FORGE RANK");
             } else state.gold += goldReward(10);
         } else if (drop.value > p.weaponBonus) {
             p.weaponBonus = drop.value;
             p.weapon = `${drop.value >= 54 ? "Cinder crown" : drop.value >= 33 ? "Mireglass" : drop.value >= 18 ? "Ashen sovereign" : drop.value >= 9 ? "Emberforged" : "Tempered hollow"} ${classFor(state).weaponType}`;
             state.journal = `${p.weapon} equipped. Relic rating ${drop.value}; +${Math.round(60 * (Math.sqrt(1 + drop.value / 30) - 1))} weapon damage.`;
-            effect(state, "text", p.x, p.y - 45, "#a8d5cf", "WEAPON UPGRADED");
+            effect(state, "text", p.x, p.y - 45, "#a8d5cf", "WEAPON EQUIPPED · NOT A FORGE RANK");
         } else state.gold += goldReward(10);
     }
     state.loot = state.loot.filter(drop => drop.life > 0);
@@ -986,6 +1013,8 @@ function collectLoot(state, dt, collectAll = false) {
 // in-between-maps checkpoint to rest, shop the forge, and choose to continue).
 function finishCheckpoint(state) {
     const p = state.player;
+    state.runSystems.summary.stages++;
+    const challengeReward = resolveChallenge(state);
     collectLoot(state, 0, true);
     state.projectiles = [];
     state.playerShots = [];
@@ -994,6 +1023,7 @@ function finishCheckpoint(state) {
     state.status = state.mode === "campaign" && state.wave === LAST_WAVE ? "won" : "camp";
     if (state.status === "won") state.campaignComplete = 1;
     state.journal = state.mode === "endless" ? "Stage cleared. All loot collected, partial healing and two flask charges granted. Saving before the next watch." : mapForWave(state.wave).ending;
+    if (challengeReward) state.journal += ` Challenge complete: +${challengeReward} gold.`;
 }
 
 // The single per-frame simulation entry point, called once per animation frame by arpg.js's render
@@ -1014,6 +1044,8 @@ export function step(state, input, elapsed) {
         return;
     }
     state.time = (state.time + dt) % 3600;
+    state.runSystems.summary.seconds += dt;
+    if (state.runSystems.challenge.key !== "none" && !state.runSystems.challenge.resolved) state.runSystems.challenge.elapsed += dt;
     for (const hit of state.damageHistory) hit.age += dt;
     state.damageHistory = state.damageHistory.filter(hit => hit.age <= 8);
     const p = state.player;
@@ -1290,6 +1322,7 @@ export function step(state, input, elapsed) {
         } else {
             state.intermission -= dt;
             if (state.intermission <= 0) {
+                if (state.training) { state.wave = 0; state.player.potions = MAX_FLASKS; }
                 spawnWave(state);
                 state.intermission = 3.5;
             }

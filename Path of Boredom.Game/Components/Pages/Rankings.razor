@@ -62,7 +62,7 @@
     {
         <p class="notice">New runs compete on Patch 004. Older saves and records stay on their archive boards, including when continued into Endless. Rankings are separate by patch, class, difficulty and starting mode.</p>
     }
-    <p class="notice">Build details are captured when a higher score is submitted; later upgrades or tied scores do not rewrite that record.</p>
+    <p class="notice">Build details and equipment trade-offs are captured when a higher score is submitted; later upgrades, equipment changes or tied scores do not rewrite that record.</p>
     @if (busy)
     {
         <p role="status">Gathering the names of the watch...</p>
@@ -100,6 +100,19 @@
                                     <details class="build-details">
                                         <summary>Level @build.Level · Build details</summary>
                                         <p><strong>Automatic skills:</strong> @(build.AutoSkills.Count == 0 ? "None" : string.Join(", ", build.AutoSkills))</p>
+                                        @if (build.Equipment is { } equipment)
+                                        {
+                                            <section class="build-equipment" aria-label="Equipment and trade-offs">
+                                                <h3>Equipment &amp; trade-offs</h3>
+                                                <p><strong>Weapon:</strong> @equipment.Weapon · equipment rating @equipment.WeaponRating.ToString("N0")<br />@RankingRules.WeaponStyleName(equipment.WeaponStyle)</p>
+                                                <p><strong>Armor:</strong> @equipment.Armor · equipment rating @equipment.ArmorRating.ToString("N0")<br />@RankingRules.ArmorStyleName(equipment.ArmorStyle)</p>
+                                                <small>Equipment ratings are separate from the Forge ranks below.</small>
+                                            </section>
+                                        }
+                                        else
+                                        {
+                                            <p class="build-unavailable">Equipment was not recorded for this older build.</p>
+                                        }
                                         @if (build.Upgrades.Count == 0)
                                         {
                                             <p>No upgrades taken yet.</p>

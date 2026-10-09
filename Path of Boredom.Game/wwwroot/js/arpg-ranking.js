@@ -34,13 +34,21 @@ export function captureRankingBuild(state) {
         ["mastery", state.mastery, MASTERY]
     ]) {
         for (const [key, rank] of Object.entries(ranks)) {
-            if (rank > 0) upgrades.push({ category, name: definitions[key].name, rank });
+            const definition = definitions[key];
+            const name = definition.skill ? `${skillName(state, definition.skill)} ${category === "forge" ? "upgrades" : "oath"}` : definition.name;
+            if (rank > 0) upgrades.push({ category, name, rank });
         }
     }
     return {
         level: state.player.level,
         upgrades,
         manualSkill: skillName(state, state.loadout.manual),
-        autoSkills: state.loadout.auto.filter(skill => skill !== "none").map(skill => skillName(state, skill))
+        autoSkills: state.loadout.auto.filter(skill => skill !== "none").map(skill => skillName(state, skill)),
+        equipment: {
+            weapon: state.player.weapon, weaponRating: state.player.weaponBonus,
+            weaponStyle: state.runSystems.equipment.weapon,
+            armor: state.player.armor, armorRating: state.player.armorBonus,
+            armorStyle: state.runSystems.equipment.armor
+        }
     };
 }

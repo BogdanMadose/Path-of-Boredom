@@ -14,7 +14,7 @@
 //
 // This module only DRAWS. It never mutates state and never reads the DOM, so it is safe to call
 // from the render loop every frame.
-import { WIDTH } from "./arpg-engine.js";
+import { WIDTH, HEIGHT } from "./arpg-engine.js";
 
 const PAD = 14;
 const BAR_W = 300;
@@ -140,6 +140,12 @@ export function drawHud(ctx, state, options = {}) {
         ctx.font = "600 9px system-ui, sans-serif";
         ctx.fillStyle = "#e0bd84";
         ctx.fillText(options.buffs.toUpperCase(), WIDTH / 2, top + BAR_H + 22);
+    }
+    if (options.checkpoint) {
+        ctx.textAlign = "center";
+        ctx.font = "600 13px system-ui, sans-serif";
+        ctx.fillStyle = "#ead5a8";
+        ctx.fillText(options.checkpoint, WIDTH / 2, HEIGHT - 24);
     }
 
     ctx.restore();

@@ -37,6 +37,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="tests\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.110" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="9.0.110" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.11" />

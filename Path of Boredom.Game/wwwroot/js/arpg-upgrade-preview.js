@@ -8,7 +8,7 @@
 // stats it touches) and make sure values() actually computes something meaningful for it.
 import { weaponDamage, armorRating, movementSpeed, criticalChance, criticalDamage, skillReach, flaskHealing, cooldownRecovery } from "./arpg-engine.js";
 import { classFor } from "./arpg-classes.js";
-import { EXTRA_SKILLS, AUTO_COOLDOWN } from "./arpg-skills.js";
+import { EXTRA_SKILLS, NEW_SKILLS, combatSkillDefinition, AUTO_COOLDOWN, skillSelected } from "./arpg-skills.js";
 
 // Computes the full set of derived, human-relevant combat stats for a given state snapshot — this
 // mirrors (and must stay consistent with) the actual formulas used in arpg-engine.js's combat code,
@@ -37,7 +37,15 @@ function values(state) {
         protection: Math.min(8, 3 + forge.guard * 0.2 + state.boons.guard * 0.15 + tree.guard.duration * 0.6),
         healing: flaskHealing(state) * (1 + tree.potion.concentration * 0.1 + (p.health <= p.maxHealth * 0.35 ? tree.potion.triage * 0.12 : 0)),
         attackReach: skillReach(state, "attack"), specialReach: skillReach(state, "nova"),
-        burstReach: skillReach(state, "burst"), guardReach: skillReach(state, "guard")
+        burstReach: skillReach(state, "burst"), guardReach: skillReach(state, "guard"),
+        ...Object.fromEntries(Object.keys(NEW_SKILLS).flatMap(skill => {
+            const definition = combatSkillDefinition(state, skill), nodes = tree[skill];
+            return [
+                [`${skill}Hit`, Math.round(Math.round(damage * definition.damage * (1 + nodes.potency * 0.1)) * (1 + state.boons[`${skill}Oath`] * 0.06 + forge[skill] * 0.1))],
+                [`${skill}Interval`, interval(definition.cooldown / (1 + nodes.recovery * 0.08) / (1 + forge[skill] * 0.08), skill)],
+                [`${skill}Reach`, skillReach(state, skill)]
+            ];
+        }))
     };
 }
 // Maps each forge/mastery upgrade key to which of the derived stats (from values() above) it
@@ -47,7 +55,8 @@ const fields = {
     nova: ["specialHit", "specialInterval", "specialReach"], burst: ["burstHit", "burstInterval", "burstReach"],
     guard: ["guardHit", "guardInterval", "guardReach", "protection"], dodge: ["dodgeInterval", "immunity"], flask: ["healing"],
     critChance: ["crit"], critDamage: ["critDamage"], might: ["damage"], vitality: ["health"],
-    recovery: ["recovery", "specialInterval"], area: ["attackReach", "specialReach", "burstReach", "guardReach"], speed: ["speed"]
+    recovery: ["recovery", "specialInterval", ...Object.keys(NEW_SKILLS).map(skill => `${skill}Interval`)], area: ["attackReach", "specialReach", "burstReach", "guardReach"], speed: ["speed"],
+    ...Object.fromEntries(Object.keys(NEW_SKILLS).map(skill => [skill, [`${skill}Hit`, `${skill}Interval`, `${skill}Reach`]]))
 };
 // Human-readable labels for each derived stat, used to build the preview text.
 const labels = {
@@ -55,7 +64,14 @@ const labels = {
     attackHit: "Attack hit", specialHit: "Special hit / arrow", burstHit: "Burst hit / arrow", guardHit: "Ward pulse",
     attackInterval: "Attack interval s", specialInterval: "Special recharge s", burstInterval: "Burst recharge s", guardInterval: "Ward recharge s",
     dodgeInterval: "Dodge recharge s", immunity: "Dodge immunity s", protection: "Ward duration s", healing: "Flask heal at current health",
-    attackReach: "Attack reach", specialReach: "Special reach", burstReach: "Burst reach", guardReach: "Ward radius"
+    attackReach: "Attack reach", specialReach: "Special reach", burstReach: "Burst reach", guardReach: "Ward radius",
+    ...Object.fromEntries(Object.keys(NEW_SKILLS).flatMap(skill => [[`${skill}Hit`, "Skill hit"], [`${skill}Interval`, "Skill recharge s"], [`${skill}Reach`, "Skill reach"]]))
+};
+const metricSkills = {
+    specialHit: "nova", specialInterval: "nova", specialReach: "nova",
+    burstHit: "burst", burstInterval: "burst", burstReach: "burst",
+    guardHit: "guard", guardInterval: "guard", guardReach: "guard", protection: "guard",
+    ...Object.fromEntries(Object.keys(NEW_SKILLS).flatMap(skill => ["Hit", "Interval", "Reach"].map(metric => [`${skill}${metric}`, skill])))
 };
 
 // Builds the preview text shown in the forge UI for buying one more rank of `key` (a forge upgrade,
@@ -75,7 +91,7 @@ export function upgradePreview(state, key, mastery = false) {
     const ranged = state.heroClass === "ranger";
     const caps = { armor: 60, crit: 75, recovery: 200, protection: 8, attackReach: ranged ? 1000 : 220,
         specialReach: ranged ? 1000 : 340, burstReach: ranged ? 1000 : 500, guardReach: ranged ? 1000 : 340 };
-    const metrics = fields[key] ?? [];
+    const metrics = (fields[key] ?? []).filter(metric => !metricSkills[metric] || skillSelected(state, metricSkills[metric]));
     const format = value => Number(value.toFixed(2)).toLocaleString();
     const capped = metrics.every(metric => Math.abs(after[metric] - before[metric]) < 1e-9);
     let text = metrics.map(metric => `${labels[metric]}: ${format(before[metric])} → ${format(after[metric])}${after[metric] >= (caps[metric] ?? Infinity) ? " (CAPPED)" : ""}`).join(" · ");

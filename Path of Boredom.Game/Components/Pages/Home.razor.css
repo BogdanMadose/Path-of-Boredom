@@ -120,6 +120,10 @@
 .arena-viewport { position: relative; background: #161d1e; width: 100%; aspect-ratio: 1100 / 650; margin-inline: auto; overflow: clip; }
 .health-warning { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 90%; z-index: 1; margin: 0; padding: 7px 12px; background: #341b1bf2; border: 1px solid #f3947c; border-radius: 4px; color: #ffd3bf; font-size: 11px; text-align: center; pointer-events: none; }
 .health-warning:empty { display: none; }
+.run-options { margin-block: 16px; padding: 14px; border: 1px solid #c7a56b55; border-radius: 8px; }
+.run-options label { display: grid; gap: 6px; margin-block: 12px; }
+.run-options select { max-width: 100%; padding: 8px; background: #152126; color: #f3e5c7; }
+.run-options p { margin-block: 10px; font-size: 12px; line-height: 1.5; }
 .arena-viewport.low-health::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 25px #c94b3440; border: 2px solid #c9634a; pointer-events: none; }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
 canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }

@@ -94,6 +94,13 @@
                             <button type="button" class="ember-button" data-action="start" disabled>Begin the journey <span>&rarr;</span></button>
                             <button type="button" class="ember-button endless-button" data-action="endless" hidden>Enter the Endless Watch &rarr;</button>
                             <button type="button" class="quiet-button restart-button" data-action="restart" hidden>Abandon run &amp; restart</button>
+                            <button type="button" class="quiet-button restart-button" data-training>Training arena (keeps your run)</button>
+                            <button type="button" class="quiet-button restart-button" data-exit-training hidden>Exit training &amp; return to run</button>
+                            <section class="death-report" data-run-summary hidden>
+                                <h3>Run summary</h3>
+                                <p data-summary-text></p>
+                                <small>Older saves track statistics from the time they are loaded into this version.</small>
+                            </section>
                             <small class="unlock-note" data-stat="unlock">Complete the campaign to permanently unlock Endless Watch.</small>
                             <small class="checkpoint-note" data-stat="checkpoint-save"></small>
                             <button type="button" class="ember-button checkpoint-retry" data-retry-save hidden>Retry checkpoint save</button>
@@ -270,6 +277,44 @@
                     <button type="button" class="ember-button" data-resume-combat disabled>Return to battle</button>
                     <p class="forge-hint">Gold is your main upgrade source: select Forge to pause and buy ranks. Scrolls are rare elite/boss drops. Max every forge item to unlock unlimited stat training. Purchases at checkpoints autosave; elsewhere, use Save.</p>
                     <p class="forge-hint">Previews show effective current → next values with your present buffs and loadout. Damage is a normal hit before enemy defenses or conditional bonuses; arrow repeats and critical hits are separate. CAPPED means further ranks cannot improve that stat. A capped forge purchase may still be needed to unlock training.</p>
+                    <section class="run-options">
+                        <h3>Equipment trade-offs</h3>
+                        <p>Gear pickups improve equipment rating, not Forge ranks. Forge scrolls grant a free rank. Choose a style while resting; changing style is free and retains both ratings and ranks.</p>
+                        <label>Weapon style
+                            <select data-equipment-style="weapon">
+                                <option value="balanced">Balanced — normal damage and recovery</option>
+                                <option value="heavy">Heavy — +20% damage, -15% cooldown recovery</option>
+                                <option value="swift">Quick — -15% damage, +20% cooldown recovery</option>
+                            </select>
+                        </label>
+                        <label>Armor style
+                            <select data-equipment-style="armor">
+                                <option value="balanced">Balanced — normal armor and speed</option>
+                                <option value="plated">Heavy plates — +8 armor, -12% movement speed</option>
+                                <option value="light">Light weave — -8 armor, +12% movement speed</option>
+                            </select>
+                        </label>
+                        <h3>Optional stage challenge</h3>
+                        <p>Opt in before the first wave or at a checkpoint. Success earns 100 + 50 per stage gold. Skipping or failing costs nothing.</p>
+                        <select data-stage-challenge aria-label="Optional stage challenge">
+                            <option value="none">No challenge</option>
+                            <option value="unscarred">Take no health damage</option>
+                            <option value="flaskless">Use no flasks</option>
+                            <option value="swift">Clear within 180 combat seconds</option>
+                        </select>
+                        <p data-challenge-status role="status"></p>
+                        <p data-forge-summary></p>
+                        <button type="button" class="quiet-button" data-training>Open training arena (keeps your run)</button>
+                        <button type="button" class="quiet-button" data-exit-training hidden>Exit training &amp; return to run</button>
+                        <label data-training-picker hidden>Practice ability (first slot)
+                            <select data-training-skill>
+                                @foreach (var skill in CombatSkills)
+                                {
+                                    <option value="@skill">@skill</option>
+                                }
+                            </select>
+                        </label>
+                    </section>
                     <div class="forge-grid">
                         <button type="button" data-upgrade="weapon" disabled><strong>Sunsteel edge</strong><span>Weapon damage</span><small data-upgrade-label="weapon">Rank 0 / 50</small></button>
                         <button type="button" data-upgrade="armor" disabled><strong>Dawnplate</strong><span>Armor + max health</span><small data-upgrade-label="armor">Rank 0 / 12</small></button>
@@ -281,6 +326,10 @@
                         <button type="button" data-upgrade="critDamage" disabled><strong>Ruin's edge</strong><span>+10 percentage points critical damage</span><small data-upgrade-label="critDamage">Rank 0 / 8</small></button>
                         <button type="button" data-upgrade="burst" disabled><strong>Breaking dawn</strong><span data-stat="forge-burst">Class burst damage, range and recovery</span><small data-upgrade-label="burst">Rank 0 / 8</small></button>
                         <button type="button" data-upgrade="guard" disabled><strong>Last sanctuary</strong><span data-stat="forge-guard">Class ward damage, radius, duration and recovery</span><small data-upgrade-label="guard">Rank 0 / 8</small></button>
+                        @foreach (var skill in new[] { "chain", "frost", "reap", "meteor", "siphon", "nullwave" })
+                        {
+                            <button type="button" data-upgrade="@skill" disabled hidden><strong>@skill upgrades</strong><span>Skill damage, reach and recovery</span><small data-upgrade-label="@skill">Rank 0 / 8</small></button>
+                        }
                     </div>
                     <p class="forge-feedback" data-forge-feedback role="status" aria-live="polite">Every coin is a choice. Damage, survival, or skills?</p>
                     <section class="mastery-panel" data-mastery hidden aria-labelledby="mastery-title">

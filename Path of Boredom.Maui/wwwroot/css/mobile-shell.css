@@ -501,6 +501,15 @@
         max-width: none;
         width: 100%;
     }
+    body.mobile-shell .health-warning {
+        z-index: 8;
+        width: fit-content;
+        max-width: calc(100% - 32px);
+        box-sizing: border-box;
+        white-space: normal;
+        font-size: 11px;
+        padding: 5px 8px;
+    }
 
     /* ---- Setup / new campaign ------------------------------------------- */
 

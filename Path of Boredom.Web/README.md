@@ -28,7 +28,7 @@ The JS engine drives most of that DOM. Blazor supplies the host/session bridge t
 
 The other shared pages are:
 
-- `Rankings.razor` — class-separated columns of player records, with expandable automatic skills and upgrades. There is no manual-skill line in the build overview anymore.
+- `Rankings.razor` — class-separated columns of player records, with expandable automatic skills, upgrades, and equipment names, ratings, and styles captured at the achieved score. There is no manual-skill line in the build overview anymore; older records without equipment details aren't reconstructed from current gear.
 - `PatchNotes.razor` — the browser's changelog content. The mobile game currently doesn't expose that page in its menu.
 - `GameLayout.razor` — shared layout and the Blazor connection warning. The Web host's `Error.razor` remains here.
 

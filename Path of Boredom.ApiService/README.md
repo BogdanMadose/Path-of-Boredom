@@ -35,7 +35,7 @@ Mutations read the account marker inside their transaction. That serializes writ
 
 ## Saves: validation first, transaction second
 
-`GameSaveEndpoints.cs` is still the validation wall. `PUT /game/save` reads at most 64 KiB, checks the envelope, then walks the version-specific state shape before anything reaches storage. The current format is **16**; older supported formats remain accepted.
+`GameSaveEndpoints.cs` is still the validation wall. `PUT /game/save` reads at most 64 KiB, checks the envelope, then walks the version-specific state shape before anything reaches storage. The current format is **18**; older supported formats remain accepted. Format 17 adds equipment styles, stage challenges, run summaries, and chosen-skill cards; format 18 adds the six newer Forge tracks. Deploy this validator before expecting format 18 app saves to upload successfully.
 
 `GET /game/save` returns the caller's save and a quoted revision in `ETag`. Google-authenticated writes must send that revision in `If-Match`; revision zero means "create only if there isn't a save yet." A missing revision gets 428, and a stale revision gets 409 with `SaveConflict`. There is no client-clock guessing and no blind last-writer-wins overwrite.
 
@@ -48,6 +48,8 @@ If you change persisted game state, update this validator and `Path of Boredom.G
 ## Rankings and player names
 
 `RankingEndpoints.cs` registers profiles, reads boards, and accepts score/build submissions. `RankingStore.cs` keeps a best record under `patch:difficulty:mode:class`, replacing it only when the submitted score is higher. A tie doesn't rewrite the recorded build.
+
+New build snapshots include weapon/armor names, ratings, and equipment styles alongside skills and upgrades. These describe the equipment at the achieved score, not the player's later gear; older records without equipment details remain older snapshots rather than being reconstructed from a current save.
 
 Mobile uses the `release` board; desktop uses `004`, with historical tags kept separate. Older unprefixed board keys are migrated lazily into `pre004`. Scores are client-reported, so these are community rankings, not an anti-cheat system.
 

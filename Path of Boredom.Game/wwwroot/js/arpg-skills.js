@@ -207,6 +207,7 @@ export function respecTree(state, skill) {
     if (!canRespecTree(state, skill)) return false;
     const points = treePointsSpent(state, skill), cost = treeRespecCost(state, skill);
     state.gold -= cost;
+    state.runSystems.summary.spent += cost;
     state.skillTree[skill] = newSkillTree()[skill];
     state.playerShots = state.playerShots.filter(shot => shot.skill !== skill);
     state.effects = [];

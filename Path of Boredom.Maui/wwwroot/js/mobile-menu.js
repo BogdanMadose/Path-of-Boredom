@@ -232,12 +232,12 @@
         markHelp(source, [".forge-hint", ".mastery-panel > p"]);
         addHelpToggle(panel.body, "How the forge works");
         var tabs = el("div", "mm-subtabs");
-        ["Upgrades", "Training"].forEach(function (name, index) {
+        ["Upgrades", "Mastery", "Run options"].forEach(function (name, index) {
             var button = el("button", "mm-subtab", name);
             button.type = "button";
             button.setAttribute("aria-selected", String(index === 0));
             button.addEventListener("click", function () {
-                source.dataset.mobileSection = index === 0 ? "upgrades" : "training";
+                source.dataset.mobileSection = ["upgrades", "training", "systems"][index];
                 Array.prototype.forEach.call(tabs.children, function (tab) {
                     tab.setAttribute("aria-selected", String(tab === button));
                 });
@@ -283,12 +283,13 @@
             var previousTab = layer.querySelector('[data-mm-tab="' + openName + '"]');
             if (previousTab) previousTab.setAttribute("aria-expanded", "false");
         }
-        root.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: true, information: name === "account" } }));
+        root.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: true, panel: name, information: name === "account" } }));
         if (root.dataset.menuOpen !== "on") return;
         resumeAfterMenu = shouldResume;
 
         openName = name;
         panels[name].root.hidden = false;
+        syncBadges();
         if (panels[name].syncTabs) panels[name].syncTabs();
         panels[name].root.classList.add("mm-open");
         var tab = layer.querySelector('[data-mm-tab="' + name + '"]');
@@ -372,6 +373,21 @@
             card.appendChild(section);
         });
         addSaveActions(card, root);
+        ["training", "exit-training"].forEach(function (action) {
+            var button = el("button", "mm-pause-option", action === "training" ? "Training arena (keeps your run)" : "Exit training & return to run");
+            button.type = "button";
+            button.dataset.practiceProxy = action;
+            button.addEventListener("click", function () {
+                var original = root.querySelector("[data-" + action + "]");
+                if (!original || original.disabled || original.hidden) return;
+                closePanel(false);
+                original.click();
+            });
+            card.appendChild(button);
+        });
+        var summary = el("p", "mm-save-status");
+        summary.dataset.mobileRunSummary = "";
+        card.appendChild(summary);
         section.appendChild(card);
     }
 
@@ -428,8 +444,20 @@
         });
         var saveStatus = root.querySelector("[data-save-status]");
         Array.prototype.forEach.call(root.querySelectorAll(".mm-save-status"), function (status) {
+            if (status.hasAttribute("data-mobile-run-summary")) return;
             var text = saveStatus?.textContent || "Offline play · saves stay on this device.";
             if (status.textContent !== text) status.textContent = text;
+        });
+        Array.prototype.forEach.call(root.querySelectorAll("[data-practice-proxy]"), function (button) {
+            var original = root.querySelector("[data-" + button.dataset.practiceProxy + "]");
+            button.hidden = !original || original.hidden;
+            button.disabled = !original || original.disabled || root.dataset.saveBusy === "on";
+        });
+        var summary = root.querySelector("[data-summary-text]");
+        Array.prototype.forEach.call(root.querySelectorAll("[data-mobile-run-summary]"), function (status) {
+            var text = summary?.textContent || "";
+            if (status.textContent !== text) status.textContent = text;
+            status.hidden = !text;
         });
         var resume = root.querySelector(".mm-resume");
         if (resume) resume.disabled = root.dataset.saveBusy === "on";

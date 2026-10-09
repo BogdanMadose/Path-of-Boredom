@@ -94,7 +94,11 @@ export const UPGRADES = {
     critChance: { name: "Keen ember", max: 8, base: 60, detail: "+2 percentage points critical chance per rank; total chance capped at 75%" },
     critDamage: { name: "Ruin's edge", max: 8, base: 65, detail: "+10 percentage points critical damage per rank" },
     burst: { name: "Breaking dawn", max: 8, base: 70, detail: "Improves your class burst: +10% damage, +8 range and +8% cooldown recovery per rank" },
-    guard: { name: "Last sanctuary", max: 8, base: 65, detail: "Improves your class ward: +8% damage, +8 radius, +0.2s protection and +8% cooldown recovery per rank" }
+    guard: { name: "Last sanctuary", max: 8, base: 65, detail: "Improves your class ward: +8% damage, +8 radius, +0.2s protection and +8% cooldown recovery per rank" },
+    ...Object.fromEntries(["chain", "frost", "reap", "meteor", "siphon", "nullwave"].map(skill => [skill, {
+        name: `${skill[0].toUpperCase()}${skill.slice(1)} forging`, skill, max: 8, base: 70,
+        detail: "+10% damage, +8 reach and +8% cooldown recovery per rank for this chosen skill"
+    }]))
 };
 
 // Returns the HUD "combat pressure" warning text for the given wave — tells the player what new

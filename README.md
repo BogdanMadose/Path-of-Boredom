@@ -11,8 +11,12 @@ This README is the map of the place. Read this first, then head into the project
 - Three classes: Ember Knight, Dawn Ranger, and Iron Warden. Each has nine combat abilities, so there are 27 class-specific choices rather than nine skills recoloured three times.
 - Choose one starting automatic skill, another at level 5, and a third at level 10. Those choices stay locked for the run. Regular attacks are automatic on mobile; dodge and flask remain manual and don't use a skill slot.
 - Earn one tree-upgrade point every two levels, up to 32. Forge upgrades, level-up boons, and post-forge training give you other ways to grow the character.
-- Bosses have their own attack patterns and short recovery windows. Arena hazard circles get fresh sizes, positions, counts, and activation timings each wave after hazardous areas begin.
+- Non-boss waves alternate swarms, elite pressure, ranged pressure, and mixed assaults. Bosses keep their own attack patterns and short recovery windows. Arena hazard circles get fresh sizes, positions, counts, and activation timings each wave after hazardous areas begin.
 - Skills and rankings live inside the mobile game. Ranking boards are separate by class, difficulty, and starting mode; expand a record to see its automatic skills and upgrades.
+- Skill-specific boons and upgrade scrolls follow the chosen loadout. Forge reminders acknowledge affordable offers, mobile boss/countdown displays stay clear of touch controls, and Endless checkpoints save in the background with a retry path on failure.
+- The six newer abilities per class each have a chosen-skill card (+6% damage per rank, ten ranks) and a Forge track (+10% damage, +8 reach, and +8% cooldown recovery per rank, eight ranks). Weapon forging now reaches 50 ranks and armor 12; only selected skill tracks count toward unlocking post-forge training.
+- Gear pickups improve equipment ratings, not Forge ranks; better gear equips automatically and weaker gear becomes gold. Free weapon and armor styles trade damage for recovery or armor for movement without losing ratings or Forge upgrades. Ranking build snapshots retain equipment names, ratings, and styles.
+- Optional stage challenges reward avoiding health damage, skipping flasks, or finishing within 180 combat seconds. A separate training arena keeps the real run intact and grants no loot, XP, saves, or ranking scores. Run summaries track combat time, stages, flask use, gold spent, challenges, and damage by skill.
 
 ## The shape of the solution
 
@@ -42,13 +46,15 @@ The solution targets .NET 9. Android development needs the MAUI/Android workload
 
 For an ordinary compilation check, run `dotnet build "Path of Boredom.sln"` from the repository root. The gameplay and UI regressions are under `Path of Boredom.Maui/tests/`; they use Node and can be run individually, for example `node "Path of Boredom.Maui/tests/checkpoint-saves.test.mjs"`.
 
-There are currently 13 test suites covering skills, saves, combat facing, bosses, menus, rankings, SVG paths, and death-screen scrolling. Some layout checks launch Microsoft Edge when it's available; otherwise they explicitly skip the browser part. A clean C# build alone can't tell you whether a touch menu actually scrolls.
+There are currently 14 test suites covering skills, saves, combat facing, bosses, encounters, menus, rankings, SVG paths, and death-screen scrolling. Some layout checks launch Microsoft Edge when it's available; otherwise they explicitly skip the browser part. A clean C# build alone can't tell you whether a touch menu actually scrolls.
 
 ## Releases: three different numbers, not one
 
-The latest locally built Android bundle is `Play-Release/Path-of-Boredom-Internal-Test-v11-API36.aab`: Play version code **11**, display version **0.5.0**, and target API **36**. That is a build artifact, not a claim that it's already uploaded or rolled out.
+The latest local Android bundle is `Play-Release/Path-of-Boredom-Internal-Test-v12-API36.aab`: Play version code **12**, display version **0.5.0**, and target API **36**. That is a build artifact, not a claim that it's already validated, uploaded, or rolled out.
 
-The save format is still **16**. The mobile leaderboard tag is **`release`**, while the desktop patch board is **`004`**. Building V11 doesn't automatically change either of those, reset rankings, or redeploy the backend.
+The current source uses save format **18**, including run systems, chosen-skill cards, and the newer Forge tracks; earlier supported saves remain loadable. The mobile leaderboard tag is **`release`**, while the desktop patch board is **`004`**. Building an app bundle doesn't automatically change these tags, reset rankings, or redeploy the backend. Deploy an API that accepts format 18 before relying on cloud saves from this source.
+
+The current testing track is **closed testing**. The local bundle's `Internal-Test` filename is an artifact name, not its Play track or proof that it includes every current source change.
 
 `deployment/Publish-PlayBundle.ps1` builds and signs an AAB with a supplied version code. `deployment/Prepare-CloudSource.ps1` prepares a backend-only source archive. They're separate on purpose. A new app bundle doesn't install server changes, and restarting an old container doesn't install new code either. Nickname uniqueness, for example, needs the updated API deployed before it works live.
 

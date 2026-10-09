@@ -1,0 +1,670 @@
+/* Mobile game shell — MAUI head only.
+ *
+ * Loaded only by Path of Boredom.Maui/wwwroot/index.html, after the scoped-CSS bundle. The
+ * browser build never sees this file, so the desktop page is untouched.
+ *
+ * WHY THIS FILE EXISTS
+ * The game markup was written for a desktop page: header, patch banner, two status paragraphs,
+ * a chapter heading, a 300px lore sidebar and a footer, all scrolling around a fixed 1100x650
+ * arena. On a phone that reads as "a web page with a small canvas in it". This collapses that
+ * chrome so the arena fills the screen and the existing touch controls become a real HUD.
+ *
+ * WHY EVERY SELECTOR STARTS WITH `body.mobile-shell`
+ * Home.razor.css is Blazor *scoped* CSS: `.arena-viewport { ... }` is rewritten by the build to
+ * `.arena-viewport[b-xxxxxxxxxx]`, which is specificity (0,2,0). A plain `.arena-viewport` rule
+ * here is (0,1,0) and would silently lose every single conflict, no matter that this file loads
+ * last. Prefixing with `body.mobile-shell` buys back one class so these rules at least tie, and
+ * ties are won by whichever sheet loads last — which is this one. Where the base sheet is itself
+ * compound (e.g. `.focus-view .vitals`) `!important` is used instead of stacking more selectors.
+ *
+ * The class is set on <body> in index.html rather than via @media alone so that the rules are
+ * also inspectable/toggleable while debugging in the WebView.
+ */
+
+@media (pointer: coarse) {
+
+    /* ---- Fullscreen shell ------------------------------------------------ */
+
+    html, body.mobile-shell {
+        height: 100%;
+        /* The arena is sized to the viewport; nothing should scroll behind it. Without this the
+           WebView rubber-bands while the player is dragging the D-pad. */
+        overflow: hidden;
+        overscroll-behavior: none;
+    }
+
+    body.mobile-shell .arpg {
+        height: 100dvh;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    /* Page chrome that only means something in a browser tab. Nothing unique is lost: run state
+       lives in the HUD, and the panels below stay in the DOM so the game's JS can keep writing
+       to them. */
+    /* The vitals bar, level medallion and power-up strip are now DRAWN INTO THE CANVAS by
+       arpg-hud.js, so the DOM versions are removed entirely rather than floated on top. This is
+       what stops the HUD scaling independently of the playfield and intercepting touches. */
+    body.mobile-shell .vitals,
+    body.mobile-shell .game-header,
+    body.mobile-shell .patch-notice,
+    body.mobile-shell .save-status,
+    body.mobile-shell .chapter-heading,
+    body.mobile-shell .game-footer,
+    body.mobile-shell .arena-topline,
+    body.mobile-shell .combat-pressure,
+    body.mobile-shell .power-strip,
+    body.mobile-shell .arena-caption {
+        display: none !important;
+    }
+
+    /* The toolbar is NOT hidden: it holds the only buttons that open Skills & loadout, the forge
+       and Endless, so removing it would strand those panels entirely. Instead it becomes a
+       compact row of floating chips under the vitals. */
+    body.mobile-shell .arena-toolbar {
+        display: none !important;
+        position: absolute;
+        top: 30px;
+        left: 0;
+        right: 0;
+        z-index: 7;
+        justify-content: center;
+        gap: 6px;
+        padding: 0 8px;
+        border-bottom: 0;
+        background: none;
+    }
+
+    /* "Scroll protected during combat · Pause to browse" describes desktop scrolling. */
+    body.mobile-shell .arena-toolbar > span {
+        display: none;
+    }
+
+    /* Focus view and Recenter only manage a scrolling page; this shell does not scroll. Skills
+       and Pause now live on the menu tab bar (mobile-menu.css), so the chips are redundant —
+       leaving Endless, which has no other entry point. */
+    body.mobile-shell .arena-toolbar [data-focus-view],
+    body.mobile-shell .arena-toolbar [data-recenter],
+    body.mobile-shell .arena-toolbar [data-open-skills],
+    body.mobile-shell .arena-toolbar [data-combat-pause] {
+        display: none;
+    }
+
+    body.mobile-shell .arena-toolbar .quiet-button {
+        min-height: 36px;
+        padding: 6px 12px;
+        font-size: 11px;
+        border-radius: 18px;
+        background: #121a1ce0;
+    }
+
+    body.mobile-shell .game-shell {
+        flex: 1;
+        min-height: 0;
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Single column. The base sheet also sets `align-items: start`, which would let the arena
+       section collapse to its content height instead of filling the screen — that is what pushed
+       the absolutely-positioned D-pad and skill bar up to the top of the page. */
+    body.mobile-shell .game-grid {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) !important;
+        grid-template-rows: minmax(0, 1fr);
+        align-items: stretch !important;
+        gap: 0;
+    }
+
+    /* The journal/lore/equipment sidebar is reference material, not a combat surface. Kept
+       mounted (the engine writes into it) but off-screen. `.focus-view .journey-panel` sets
+       `display: grid`, hence !important. */
+    body.mobile-shell .journey-panel {
+        display: none !important;
+    }
+
+    /* Compact mobile setup; game menus are styled in mobile-menu.css. */
+    body.mobile-shell .setup-overlay .overlay-card > p:not(.eyebrow),
+    body.mobile-shell .setup-overlay small,
+    body.mobile-shell .class-preview small,
+    body.mobile-shell [data-setup-loadout] > p:not(.forge-feedback) {
+        display: none;
+    }
+
+    /* Sizing of the relocated skill-tree and forge controls now lives in mobile-menu.css, which
+       owns the menu layer they were moved into. */
+
+    /* Edge-to-edge: the framed card look fights a fullscreen game. */
+    body.mobile-shell .arena-section {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    /* Positioning context for the HUD, D-pad, skill bar and arena, which are all siblings here. */
+    body.mobile-shell .combat-view {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* ---- Arena ----------------------------------------------------------- */
+
+    /* The arena keeps its 1100:650 ratio and is centred in the space left between the HUD bands.
+     *
+     * Deliberately sized via the VIEWPORT BOX, not object-fit on the canvas. arpg.js's point()
+     * converts a touch to arena coordinates with canvas.getBoundingClientRect(), which always
+     * reports the full element box. Letterboxing the bitmap inside a larger box would leave that
+     * rect unchanged, so every tap would land offset from where the player aimed. Sizing the box
+     * keeps the rect and the drawn pixels in agreement.
+     *
+     * Portrait binds WIDTH: the arena is 1100:650 (landscape), so width is the limiting axis.
+     * Only one axis may be constrained at a time — with `aspect-ratio` the ratio is honoured only
+     * while the other axis is auto, so setting both width and max-height would let max-height
+     * clamp the height while width stayed put, silently distorting the playfield. The landscape
+     * rule at the end of this file flips which axis is bound.
+     *
+     * max-width is !important because the "focus view" toggle writes an inline max-width on this
+     * element, and inline styles beat everything short of !important. */
+    body.mobile-shell .arena-viewport {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        aspect-ratio: auto;
+        max-width: none !important;
+        margin: 0;
+    }
+
+    /* The HUD is inside the canvas now, so only the bottom bands (skill bar + menu tab bar) need
+       reserving. The toolbar overlays the top of the arena harmlessly. */
+    body.mobile-shell .combat-view {
+        padding: 0;
+    }
+
+    /* ---- Touch controls -------------------------------------------------- */
+
+    /* D-pad, bottom-left. arpg.js already captures pointers on [data-move] with multi-touch
+       support, so this only reveals and enlarges the buttons that are already wired up.
+       The base sheet hides it outside coarse-pointer screens. */
+    body.mobile-shell .touch-movement {
+        display: block;
+        position: absolute;
+        bottom: max(10px, env(safe-area-inset-bottom));
+        left: max(10px, env(safe-area-inset-left));
+        z-index: 6;
+        padding: 0;
+        text-align: center;
+        opacity: .92;
+    }
+
+    /* The movement control is a touch ZONE, not a button cluster: the left-hand portion of the
+       arena. Touching anywhere in it summons the stick at that exact point. It is transparent and
+       sits above the canvas, so it does intercept taps on the left — an accepted trade, since
+       that half is the movement hand. Aiming/attacking happens on the right. */
+    body.mobile-shell .touch-movement {
+        display: block;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 50%;
+        z-index: 6;
+        padding: 0;
+        background: none;
+        touch-action: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* The four arrow buttons stay in the DOM — the engine's pointer handlers are bound to them
+       and the joystick drives them with synthetic events — but they are never shown. Using
+       opacity/size rather than display:none so they keep a layout box: dispatching events at a
+       display:none element is far more fragile. */
+    body.mobile-shell .touch-movement button[data-move] {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: 0;
+        padding: 0;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    body.mobile-shell .touch-movement > div {
+        position: absolute;
+    }
+
+    /* Thumbstick, injected by js/mobile-shell.js. Positioned by the script at the touch point;
+       the translate(-50%,-50%) centres it on that point. */
+    body.mobile-shell .joystick-base {
+        position: absolute;
+        width: 132px;
+        height: 132px;
+        margin: 0;
+        border-radius: 50%;
+        background: radial-gradient(circle, #1b242699 0%, #10181acc 70%);
+        border: 1px solid #c7a56b55;
+        box-shadow: inset 0 0 22px #0008;
+        transform: translate(-50%, -50%);
+        pointer-events: none; /* the pad owns the gesture; the stick is purely visual */
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity .12s ease;
+    }
+
+    body.mobile-shell .touch-movement.joystick-visible .joystick-base {
+        opacity: .92;
+        visibility: visible;
+    }
+    body.mobile-shell .touch-aim {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 50%;
+        z-index: 6;
+        touch-action: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+    body.mobile-shell .touch-aim.joystick-visible .joystick-base {
+        opacity: .92;
+        visibility: visible;
+        border-color: #80bcd0;
+        background: radial-gradient(circle, #28434d99, #101c24cc 70%);
+    }
+    body.mobile-shell .touch-aim .joystick-knob {
+        background: radial-gradient(circle at 35% 30%, #739eac, #203a49);
+        border-color: #a9dce5;
+    }
+    body.mobile-shell .arpg:not([data-game-status="playing"]) .touch-aim,
+    body.mobile-shell .arpg[data-menu-open="on"] .touch-aim,
+    body.mobile-shell .forge-nudge {
+        display: none !important;
+    }
+
+    body.mobile-shell .joystick-knob {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 58px;
+        height: 58px;
+        margin: -29px 0 0 -29px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, #5d6f66, #1d2729);
+        border: 1px solid #e0c08e88;
+        box-shadow: 0 3px 10px #000a;
+        pointer-events: none;
+    }
+
+    /* Skill bar, bottom-right: round buttons instead of a six-column grid of labelled cards. */
+    /* Skill bar sits above the menu tab bar (mobile-menu.css owns that), hence the raised offset.
+       Regular attack is automatic on touch, so that button is hidden: the remaining five are the
+       ones worth a deliberate tap. */
+    body.mobile-shell .skill-bar {
+        position: absolute;
+        bottom: max(12px, env(safe-area-inset-bottom));
+        right: max(10px, env(safe-area-inset-right));
+        z-index: 8;
+        display: flex;
+        flex-wrap: wrap-reverse;
+        justify-content: flex-end;
+        align-content: flex-end;
+        gap: 8px;
+        padding: 0 !important;
+        max-width: 148px;
+        opacity: .94;
+    }
+
+    body.mobile-shell .skill-bar button[data-skill="attack"] {
+        display: none;
+    }
+
+    body.mobile-shell .skill-bar button {
+        position: relative;
+        isolation: isolate;
+        width: 64px;
+        height: 64px;
+        min-height: 0;
+        padding: 0;
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        text-align: center;
+        background: radial-gradient(#2a3330e0, #151d1fe8);
+        border: 1px solid #a08a6188;
+        touch-action: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body.mobile-shell .skill-bar button:active:not(:disabled) {
+        border-color: #f0c98d;
+        background: radial-gradient(#415049f0, #1d2628f0);
+    }
+
+    /* The .skill-icon glyph is hardcoded to the same "✧" for all six skills in the markup — on
+       desktop they are told apart by the name and status text beside it. So the icon must NOT be
+       the only thing shown here, or every button looks identical. Show the NAME instead and drop
+       only the keyboard hint and the cooldown/status line, which do not fit a round button. */
+    body.mobile-shell .skill-bar kbd {
+        display: none;
+    }
+    body.mobile-shell .skill-bar .skill-icon {
+        display: block;
+        width: 22px;
+        height: 22px;
+        border-radius: 5px;
+        margin-bottom: 2px;
+        background-position: center;
+        background-size: cover;
+        font-size: 0;
+    }
+
+    body.mobile-shell .skill-bar button small {
+        display: block;
+        margin-top: 4px;
+        font-size: 9px;
+        font-variant-numeric: tabular-nums;
+        color: #a8dbdf;
+    }
+
+    body.mobile-shell .skill-bar button::before {
+        content: "";
+        position: absolute;
+        inset: -2px;
+        z-index: -1;
+        border-radius: 50%;
+        background: conic-gradient(#78b6ca var(--cooldown-turn, 0turn), #c7a56b44 0);
+        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0);
+        mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 0);
+        pointer-events: none;
+    }
+
+    body.mobile-shell .skill-bar button.skill-cooling {
+        background: radial-gradient(#213943, #101c25);
+        border-color: #78b6ca;
+    }
+
+    body.mobile-shell .skill-bar button[data-skill-mode="auto"]::after {
+        content: "AUTO";
+        position: absolute;
+        top: -5px;
+        font: 600 7px system-ui, sans-serif;
+        letter-spacing: .6px;
+        padding: 2px 5px;
+        border-radius: 5px;
+        color: #b4e4dc;
+        background: #193932;
+        border: 1px solid #6caaa088;
+    }
+
+    body.mobile-shell .skill-bar button > span:last-child {
+        display: block;
+        font-size: 10px;
+        line-height: 1.15;
+        letter-spacing: .2px;
+        text-transform: capitalize;
+        color: #ecd7ab;
+        overflow-wrap: anywhere;
+        padding: 0 4px;
+    }
+
+    /* Cooldown/unavailable state must stay legible: the base sheet dims disabled buttons. */
+    body.mobile-shell .skill-bar button:disabled {
+        opacity: .72;
+    }
+
+    body.mobile-shell .skill-bar button[data-skill-mode="locked"],
+    body.mobile-shell .skill-bar button[data-skill-mode="unslotted"] {
+        opacity: .4;
+    }
+
+    /* ---- Overlays -------------------------------------------------------- */
+
+    /* Pause, level-up draft, forge, skills and setup all render inside .arena-overlay. On a phone
+       these read better as fullscreen sheets than as cards floating in a page. */
+    body.mobile-shell .arena-overlay {
+        z-index: 20;
+        padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+        overflow: hidden;
+        background: #0b1519f5;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    body.mobile-shell .overlay-card {
+        max-width: none;
+        width: 100%;
+    }
+
+    /* ---- Setup / new campaign ------------------------------------------- */
+
+    /* "Begin the journey" walks through difficulty, class and loadout. At desktop sizes each step
+       is a tall column of explanation with the controls at the bottom, so on a phone you had to
+       scroll to find the actual choice. Stripping the prose (above) and tightening the controls
+       turns each step into a screenful of options. */
+    body.mobile-shell .setup-overlay .overlay-card {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        max-height: 100%;
+        max-width: 720px;
+        overflow: hidden;
+        overscroll-behavior: contain;
+    }
+
+    body.mobile-shell .setup-overlay h2,
+    body.mobile-shell .overlay-card h2 {
+        font-size: 22px;
+        margin-bottom: 4px;
+    }
+
+    body.mobile-shell .sigil {
+        font-size: 38px;
+        margin-bottom: 4px;
+    }
+
+    /* Difficulty / class pickers: label above a full-width control, nothing else competing. */
+    body.mobile-shell .difficulty-picker {
+        display: grid;
+        gap: 5px;
+        margin: 0;
+        text-align: left;
+        font-size: 12px;
+    }
+
+    body.mobile-shell .difficulty-picker select {
+        width: 100%;
+        min-height: 46px;
+        font-size: 14px;
+    }
+
+    /* The per-difficulty / per-class blurbs are the single biggest source of scrolling in setup,
+       but unlike pure flavour text these describe what you are picking — so they are kept and
+       clamped to a few lines instead of being removed. */
+    body.mobile-shell [data-difficulty-description],
+    body.mobile-shell [data-class-description],
+    body.mobile-shell [data-class-stats],
+    body.mobile-shell [data-class-skills] {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        font-size: 11px;
+        line-height: 1.5;
+        margin: 0;
+    }
+
+    body.mobile-shell .class-preview {
+        padding: 8px 10px;
+        margin: 0;
+        text-align: left;
+    }
+
+    body.mobile-shell .class-preview h3 {
+        font-size: 14px;
+        margin: 0 0 4px;
+    }
+
+    /* Keep the primary action reachable without scrolling. */
+    body.mobile-shell .setup-overlay [data-setup-next] {
+        position: sticky;
+        bottom: 0;
+        margin-top: auto;
+    }
+
+    body.mobile-shell .death-report {
+        max-height: 34vh;
+        overflow-y: auto;
+        text-align: left;
+    }
+
+    /* The forge, mastery and loadout controls were sized for a mouse; 44px is the minimum
+       comfortable touch target. */
+    body.mobile-shell .arena-overlay button,
+    body.mobile-shell .arena-overlay select {
+        min-height: 44px;
+    }
+
+    body.mobile-shell .level-card-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    body.mobile-shell .arpg:not([data-game-status="playing"]) .touch-movement,
+    body.mobile-shell .arpg:not([data-game-status="playing"]) .skill-bar,
+    body.mobile-shell .arpg[data-menu-open="on"] .arena-overlay {
+        display: none !important;
+    }
+
+    body.mobile-shell .arena-overlay[hidden],
+    body.mobile-shell .arena-overlay [hidden] {
+        display: none !important;
+    }
+
+    body.mobile-shell .setup-overlay .eyebrow,
+    body.mobile-shell .setup-overlay h2,
+    body.mobile-shell .setup-overlay [data-setup-next],
+    body.mobile-shell .setup-overlay [data-setup-cancel] {
+        grid-column: 1 / -1;
+        margin: 0;
+    }
+
+    body.mobile-shell .setup-overlay .class-preview,
+    body.mobile-shell .setup-overlay [data-setup-skip],
+    body.mobile-shell .setup-overlay [data-setup-loadout],
+    body.mobile-shell .setup-overlay [data-difficulty-description] {
+        display: none !important;
+    }
+
+    body.mobile-shell [data-run-menu] {
+        max-width: 640px;
+        max-height: 100%;
+    }
+
+    body.mobile-shell [data-run-menu] > p:not(.eyebrow),
+    body.mobile-shell [data-run-menu] > .unlock-note,
+    body.mobile-shell .draft-description,
+    body.mobile-shell .level-draft > small,
+    body.mobile-shell .card-pick {
+        display: none;
+    }
+
+    body.mobile-shell .level-draft {
+        width: 100%;
+        max-width: 1100px;
+        max-height: 100%;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    body.mobile-shell .level-draft h2 {
+        font-size: 22px;
+        margin: 4px 0 10px;
+    }
+
+    body.mobile-shell .level-card {
+        min-height: 44px;
+        padding: 12px;
+        gap: 8px;
+    }
+
+    body.mobile-shell .card-category {
+        font-size: 10px;
+        letter-spacing: 1px;
+    }
+
+    body.mobile-shell .level-card strong {
+        font-size: clamp(16px, 2vw, 22px);
+        line-height: 1.2;
+    }
+
+    body.mobile-shell .card-description {
+        font-size: 12px;
+        line-height: 1.4;
+    }
+
+    body.mobile-shell .draft-footer,
+    body.mobile-shell .level-card small {
+        font-size: 11px;
+        margin: 6px 0 0;
+    }
+}
+
+/* Landscape / short screens: HEIGHT becomes the binding constraint, so bind height and release
+   width (the mirror of the portrait rule above). Keeping width:100% here would overflow the
+   screen horizontally once aspect-ratio derived the height. */
+@media (pointer: coarse) and (min-aspect-ratio: 1100 / 650) {
+    body.mobile-shell .arena-viewport {
+        width: 100%;
+        height: 100%;
+        max-width: none !important;
+    }
+}
+
+/* Landscape phones are short. Trim the HUD so the arena keeps as much height as possible. */
+@media (pointer: coarse) and (max-height: 480px) {
+
+    body.mobile-shell .vitals {
+        padding: 4px 8px !important;
+        transform: scale(.85);
+        transform-origin: top left;
+    }
+
+    body.mobile-shell .joystick-base {
+        width: 108px;
+        height: 108px;
+    }
+
+    body.mobile-shell .joystick-knob {
+        width: 48px;
+        height: 48px;
+        margin: -24px 0 0 -24px;
+    }
+
+    body.mobile-shell .skill-bar button {
+        width: 54px;
+        height: 54px;
+    }
+
+    body.mobile-shell .skill-bar {
+        max-width: 124px;
+    }
+}

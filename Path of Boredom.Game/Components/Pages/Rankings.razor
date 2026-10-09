@@ -4,9 +4,12 @@
 @using Path_of_Boredom.ServiceDefaults
 @inject IGameSession Session
 
-<PageTitle>Hall of Embers · Path of Boredom</PageTitle>
+@if (!Embedded)
+{
+    <PageTitle>Hall of Embers · Path of Boredom</PageTitle>
+}
 
-<main class="rankings">
+<main class="rankings @(Embedded ? "embedded" : null)">
     <header>
         <a href="/">◇ PATH OF BOREDOM</a>
         <a href="/patch-notes">Patch notes</a>
@@ -46,7 +49,7 @@
                 <option value="warden">Iron Warden</option>
             </select>
         </label>
-        <button type="button" @onclick="RefreshAsync" disabled="@busy">Refresh rankings</button>
+        <button type="button" data-rankings-refresh @onclick="RefreshAsync" disabled="@busy">Refresh</button>
     </div>
     <p class="notice">Ranks and ties are calculated within each patch and class. New campaigns and fresh veteran Endless runs qualify for Patch 004. Saves from before patch tracking stay on the archive boards, including when continued into Endless, so inherited power cannot compete with fresh builds. Existing records are preserved. Legacy unranked saves remain unranked.</p>
     <p class="notice">Build details are captured when a higher score is submitted; later upgrades or tied scores do not rewrite that record. Older records keep their recorded class, but upgrades and discarded scores from other classes cannot be recovered.</p>
@@ -60,7 +63,7 @@
     }
     else if (rows.Count == 0)
     {
-        <p>No players yet. Begin your journey to leave a mark.</p>
+        <p class="ranking-status">@(Embedded && !loaded ? "Refresh to load the online boards. Your current game stays paused." : "No players yet. Begin your journey to leave a mark.")</p>
     }
     else
     {
@@ -68,6 +71,44 @@
         {
             <section class="class-board" @key="board.Key" aria-label="@RankingRules.ClassName(board.Key)">
                 <h2>@RankingRules.ClassName(board.Key)</h2>
+                @if (Embedded)
+                {
+                    <div class="ranking-cards">
+                        @foreach (var row in board)
+                        {
+                            <article class="ranking-card @(row.IsCurrentUser ? "current" : null)">
+                                <div class="record-heading">
+                                    <span class="rank">#@row.Rank</span>
+                                    <strong>@row.Player @if (row.IsCurrentUser) { <small>YOU</small> }</strong>
+                                    <span class="score">@row.Score.ToString("N0")</span>
+                                </div>
+                                @if (row.Build is { } build)
+                                {
+                                    <details class="build-details">
+                                        <summary>Level @build.Level · Build details</summary>
+                                        <p><strong>Manual:</strong> @build.ManualSkill<br /><strong>Auto:</strong> @(build.AutoSkills.Count == 0 ? "None" : string.Join(", ", build.AutoSkills))</p>
+                                        @foreach (var group in build.Upgrades.GroupBy(upgrade => upgrade.Category))
+                                        {
+                                            <h3>@RankingRules.UpgradeCategory(group.Key)</h3>
+                                            <ul>
+                                                @foreach (var upgrade in group)
+                                                {
+                                                    <li>@upgrade.Name <strong>rank @upgrade.Rank.ToString("N0")</strong></li>
+                                                }
+                                            </ul>
+                                        }
+                                    </details>
+                                }
+                                else
+                                {
+                                    <span class="build-unavailable">Build not recorded</span>
+                                }
+                            </article>
+                        }
+                    </div>
+                }
+                else
+                {
                 <div class="table-scroll" role="region" aria-label="@(RankingRules.ClassName(board.Key) + " rankings")" tabindex="0">
                     <table>
                         <caption>@RankingRules.PatchName(patch) · @RankingRules.DifficultyName(difficulty) · @(mode == "campaign" ? "CAMPAIGN JOURNEY" : mode == "ascended" ? "ENDLESS AFTER CAMPAIGN" : "VETERAN ENDLESS") · @board.Count() players</caption>
@@ -112,6 +153,7 @@
                         </tbody>
                     </table>
                 </div>
+                }
             </section>
         }
     }
@@ -119,6 +161,8 @@
 </main>
 
 @code {
+    [Parameter] public bool Embedded { get; set; }
+    private bool loaded;
     // Filter state bound directly to the <select> elements above via @bind:after — changing any
     // filter immediately triggers RefreshAsync rather than needing a separate "apply" step.
     private string difficulty = "hard";
@@ -130,7 +174,7 @@
     private IReadOnlyList<RankingRow> rows = [];
 
     /// <summary>Loads the default (Hard / Campaign / All classes / current patch) leaderboard on first render.</summary>
-    protected override Task OnInitializedAsync() => RefreshAsync();
+    protected override Task OnInitializedAsync() => Embedded ? Task.CompletedTask : RefreshAsync();
 
     /// <summary>
     /// Re-registers the player's ranking profile (cheap, idempotent — also doubles as a
@@ -147,12 +191,18 @@
         {
             if (!await Session.RegisterPlayerAsync())
             {
-                error = "Rankings are unavailable. Please try Refresh again shortly.";
+                error = Embedded
+                    ? "Online rankings are unavailable. The mobile offline preview does not connect to the leaderboard yet; your current game remains paused."
+                    : "Rankings are unavailable. Please try Refresh again shortly.";
                 return;
             }
             var result = await Session.GetRankingsAsync(difficulty, mode, heroClass, patch);
             if (result is null) error = "Could not load rankings. Please try again shortly.";
-            else rows = result;
+            else { rows = result; loaded = true; }
+        }
+        catch
+        {
+            error = "Could not reach the rankings service. You can return to your game and try again later.";
         }
         finally { busy = false; }
     }

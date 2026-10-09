@@ -829,10 +829,16 @@ export function step(state, input, elapsed) {
         dy /= length;
         p.facing = Math.atan2(dy, dx);
     }
+    // Touch steering retains the last heading after the finger lifts.
+    if (Number.isFinite(input.faceAngle)) p.facing = input.faceAngle;
     if (input.aim) p.facing = Math.atan2(input.aim.y - p.y, input.aim.x - p.x);
     if (input.dodge) useSkill(state, "dodge");
     if (input.potion) useSkill(state, "potion");
     if (input.attack) useSkill(state, "attack");
+    // Mobile regular attacks follow the player's heading, without target snapping.
+    if (input.autoAttack && !input.attack && p.attack <= 0) {
+        useSkill(state, "attack");
+    }
     if (input.manual) useSkill(state, state.loadout.manual);
     autoCast(state);
     if (state.status !== "playing") return;

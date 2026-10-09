@@ -2,9 +2,12 @@
 @layout GameLayout
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 
-<PageTitle>Patch Notes · Path of Boredom</PageTitle>
+@if (!Embedded)
+{
+    <PageTitle>Patch Notes · Path of Boredom</PageTitle>
+}
 
-<main class="patch-notes">
+<main class="patch-notes @(Embedded ? "embedded" : null)">
     <header class="page-header">
         <a class="brand" href="/">◇ PATH OF BOREDOM</a>
         <nav aria-label="Game navigation"><a href="/">Game</a><a href="/rankings">Rankings</a><a href="/patch-notes" aria-current="page">Patch notes</a></nav>
@@ -463,3 +466,7 @@
     </article>
     <footer><span>Developed by MadBone | LIT MES TSR</span><a href="/patch-notes#patch-001" target="_self">Back to patch summary ↑</a></footer>
 </main>
+
+@code {
+    [Parameter] public bool Embedded { get; set; }
+}

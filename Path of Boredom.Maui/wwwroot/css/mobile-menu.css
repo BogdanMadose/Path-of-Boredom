@@ -1,0 +1,653 @@
+/* Mobile menu shell — MAUI head only.
+ *
+ * Replaces the desktop page-section menus (Skills, Forge, and the vitals/toolbar HUD) with a
+ * game-style UI layer that sits over the canvas: a bottom tab bar, full-bleed panels sized to the
+ * viewport, and NO page scrolling to reach a control.
+ *
+ * Relationship to mobile-shell.css: that file collapses the desktop page chrome. This file owns
+ * the menu layer built by js/mobile-menu.js. They are loaded together and both scoped to
+ * `body.mobile-shell` for the specificity reasons documented in mobile-shell.css.
+ */
+
+@media (pointer: coarse) {
+
+    /* ---- Menu layer ------------------------------------------------------ */
+
+    /* Covers the whole app. Transparent and click-through by default so combat is unaffected;
+       only the bar and an open panel take input. */
+    body.mobile-shell .mm-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        pointer-events: none;
+    }
+
+    /* ---- Bottom tab bar -------------------------------------------------- */
+
+    body.mobile-shell .mm-bar {
+        display: flex;
+        align-self: flex-end;
+        width: min(300px, 45vw);
+        align-items: stretch;
+        gap: 4px;
+        padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 6px 6px;
+        background: none;
+        pointer-events: auto;
+    }
+
+    body.mobile-shell .mm-tab {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        min-height: 44px;
+        padding: 4px 2px;
+        border: 1px solid #c7a56b33;
+        border-radius: 10px;
+        background: #141d20d9;
+        color: #d8c9a8;
+        font: 500 10px/1 system-ui, sans-serif;
+        letter-spacing: .3px;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body.mobile-shell .mm-tab .mm-glyph {
+        font-size: 17px;
+        line-height: 1;
+        color: #e0bd84;
+    }
+
+    body.mobile-shell .mm-tab[aria-expanded="true"] {
+        border-color: #f0c98d;
+        background: #27332fe8;
+        color: #f6e7c6;
+    }
+
+    body.mobile-shell .mm-tab:disabled {
+        opacity: .4;
+    }
+
+    /* A count badge (unspent skill points / affordable forge ranks) so the player knows there is
+       something to do without opening the panel. */
+    body.mobile-shell .mm-tab .mm-badge {
+        position: absolute;
+        top: 3px;
+        right: 8px;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        border-radius: 8px;
+        background: #b4452f;
+        color: #fff;
+        font-size: 9px;
+        line-height: 16px;
+        text-align: center;
+    }
+
+    body.mobile-shell .mm-tab {
+        position: relative;
+    }
+
+    body.mobile-shell .mm-badge[hidden] {
+        display: none;
+    }
+
+    /* ---- Panels ---------------------------------------------------------- */
+
+    /* A panel IS the original Blazor section (.skills-panel / .forge-panel), left exactly where it
+       was rendered and lifted over the canvas with position:fixed. Nothing is re-parented — see
+       the header comment in js/mobile-menu.js for why that matters. */
+    body.mobile-shell .mm-panel {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: none;
+        flex-direction: column;
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+        background: #0e1619;
+        overflow: hidden;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        padding: 0 12px calc(12px + env(safe-area-inset-bottom));
+    }
+
+    body.mobile-shell .mm-panel.mm-open {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr);
+        grid-template-rows: 58px 52px minmax(0, 1fr) auto;
+        gap: 8px 16px;
+        animation: mm-rise .18s ease-out;
+    }
+
+    body.mobile-shell.mm-panel-open .mm-bar {
+        display: none !important;
+    }
+
+    @keyframes mm-rise {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        body.mobile-shell .mm-panel.mm-open { animation: none; }
+    }
+
+    /* The header and sub-tabs are appended last (appending avoids reordering Blazor's children),
+       so flex `order` is what actually puts them at the top. Everything Blazor rendered keeps the
+       default order of 0 and therefore follows them. */
+    body.mobile-shell .mm-head {
+        grid-column: 1 / -1;
+        grid-row: 1;
+        min-height: 0;
+        order: -2;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 -12px;
+        padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+        background: #0e1619f2;
+        border-bottom: 1px solid #c7a56b33;
+    }
+
+    body.mobile-shell .mm-subtabs {
+        order: -1;
+    }
+
+    /* The section's own desktop heading duplicates our panel header. */
+    body.mobile-shell .mm-panel > .forge-heading {
+        display: none;
+    }
+
+    body.mobile-shell .mm-head h2 {
+        flex: 1;
+        margin: 0;
+        font: 400 17px Georgia, serif;
+        color: #f1e5cc;
+    }
+
+    body.mobile-shell .mm-head .mm-meta {
+        font-size: 12px;
+        color: #e3c277;
+        white-space: nowrap;
+    }
+
+    body.mobile-shell .mm-close {
+        width: 44px;
+        height: 44px;
+        border: 1px solid #c7a56b44;
+        border-radius: 50%;
+        background: #161f22;
+        color: #e8d7ae;
+        font-size: 17px;
+        line-height: 1;
+    }
+
+    /* Sub-tabs, used by Skills to switch between Loadout and each skill tree without scrolling
+       through all six trees stacked vertically. */
+    body.mobile-shell .mm-subtabs {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        min-height: 44px;
+        gap: 6px;
+        overflow: visible;
+        scrollbar-width: none;
+        padding: 8px 0 2px;
+    }
+
+    body.mobile-shell .mm-subtabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    body.mobile-shell .mm-subtab {
+        flex: 0 0 auto;
+        min-height: 44px;
+        padding: 6px 4px;
+        border: 1px solid #c7a56b33;
+        border-radius: 17px;
+        background: #141d20;
+        color: #cbbd9e;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    body.mobile-shell .mm-subtab[aria-selected="true"] {
+        border-color: #f0c98d;
+        background: #2b3a35;
+        color: #f6e7c6;
+    }
+
+    /* Sub-tab visibility. Applied to nodes Blazor rendered, so it must be a class toggle — the
+       nodes are never re-parented (see js/mobile-menu.js). */
+    body.mobile-shell .mm-hidden {
+        display: none !important;
+    }
+
+    /* Long-form explanation stays exactly where Blazor put it and is collapsed by default,
+       revealed by the injected .mm-help-toggle button. */
+    body.mobile-shell .mm-help-text {
+        display: none;
+    }
+
+    body.mobile-shell .mm-help-shown .mm-help-text {
+        display: block;
+        color: #9fb0ad;
+        font-size: 11px;
+        line-height: 1.6;
+    }
+
+    body.mobile-shell .mm-help-toggle {
+        grid-column: 1 / -1;
+        grid-row: 4;
+        width: 100%;
+        margin-top: 0;
+        min-height: 38px;
+        border: 1px solid #c7a56b33;
+        border-radius: 8px;
+        background: #141d20;
+        color: #d9c69c;
+        font-size: 12px;
+    }
+
+    /* ---- Moved content --------------------------------------------------- */
+
+    /* The original page sections become plain containers once their content lives in a panel. */
+    body.mobile-shell .skills-panel,
+    body.mobile-shell .forge-panel {
+        padding: 0 12px calc(12px + env(safe-area-inset-bottom));
+        border: 0;
+        background: #0e1619;
+    }
+
+    /* One tree fills the panel, so it can be large and legible rather than shrunk to fit six. */
+    body.mobile-shell .mm-panel .skill-tree-map {
+        position: relative;
+        height: clamp(160px, calc(100dvh - 260px), 240px);
+        margin: 0;
+        border-radius: 18px;
+        background: radial-gradient(ellipse, #34524966, #0b1519 75%);
+    }
+
+    body.mobile-shell .mm-panel .skill-tree {
+        position: relative;
+        padding: 0;
+        border: 0;
+        background: none;
+    }
+
+    body.mobile-shell .mm-panel .tree-node,
+    body.mobile-shell .mm-panel .tree-node button {
+        width: 64px;
+    }
+
+    body.mobile-shell .mm-panel .tree-node button {
+        height: 64px;
+        border-radius: 16px;
+        padding: 4px;
+        background: linear-gradient(145deg, #223730, #101c22);
+    }
+
+    /* Tooltips are hover-oriented on desktop; on touch they must not be clipped by the panel. */
+    body.mobile-shell .mm-panel .tree-tooltip {
+        display: none !important;
+    }
+
+    body.mobile-shell .mm-panel .loadout-grid {
+        grid-row: 3;
+        grid-column: 1 / -1;
+        align-self: start;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    body.mobile-shell .mm-panel .loadout-grid label {
+        display: grid;
+        gap: 5px;
+        font-size: 12px;
+        color: #c9bb9c;
+    }
+
+    body.mobile-shell .mm-panel select {
+        width: 100%;
+        min-height: 46px;
+        font-size: 14px;
+    }
+
+    body.mobile-shell .mm-panel .forge-grid {
+        grid-row: 3;
+        grid-column: 1 / -1;
+        align-self: start;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    body.mobile-shell .mm-panel .forge-grid button {
+        min-height: 62px;
+        padding: 10px 9px;
+        gap: 3px;
+    }
+    body.mobile-shell .mm-panel > [data-resume-combat],
+    body.mobile-shell .mm-panel > .elite-guide,
+    body.mobile-shell .mm-panel > p,
+    body.mobile-shell .mm-panel .skill-tree > p {
+        display: none !important;
+    }
+    body.mobile-shell .mm-panel .skill-tree-grid {
+        grid-column: 1;
+        grid-row: 3;
+        display: block;
+        min-height: 0;
+        overflow-y: auto;
+        margin: 0;
+    }
+    body.mobile-shell .mm-panel .skill-tree h3 {
+        margin: 0 0 4px;
+        font-size: 17px;
+        color: #edd5a2;
+    }
+    body.mobile-shell .mm-panel .tree-respec {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: auto;
+        min-height: 32px;
+        padding: 4px 10px;
+        font-size: 10px;
+    }
+    body.mobile-shell .mm-panel .tree-node-root { top: 16%; }
+    body.mobile-shell .mm-panel .tree-node-capstone { top: 84%; }
+    body.mobile-shell .mm-panel .tree-node button strong { font-size: 10px; }
+    body.mobile-shell .mm-panel .tree-node-icon { font-size: 18px; }
+    body.mobile-shell .mm-panel .tree-node button.available {
+        box-shadow: 0 0 18px #e8b45955, inset 0 0 12px #e8b45915;
+    }
+    body.mobile-shell .mm-detail {
+        grid-column: 2;
+        grid-row: 3;
+        min-height: 0;
+        padding: 16px;
+        overflow-y: auto;
+        border: 1px solid #c7a56b44;
+        border-radius: 14px;
+        background: linear-gradient(145deg, #263530, #111e24);
+        font-size: 13px;
+        line-height: 1.5;
+        color: #c4d2cd;
+    }
+    body.mobile-shell .mm-detail h3 { margin: 0 0 10px; color: #f1d59e; font: 20px Georgia, serif; }
+    body.mobile-shell .mm-detail p { margin: 8px 0; }
+    body.mobile-shell .mm-detail strong { color: #edc581; }
+    body.mobile-shell .mm-loadout-note {
+        grid-row: 3;
+        grid-column: 1 / -1;
+        align-self: end;
+        padding: 10px 14px;
+        border: 1px solid #c7a56b33;
+        border-radius: 10px;
+        background: #192b2a;
+        color: #bed5cc;
+        font-size: 12px;
+        line-height: 1.4;
+        max-height: 40%;
+        overflow-y: auto;
+    }
+    body.mobile-shell .mm-hidden { display: none !important; }
+    body.mobile-shell .forge-panel .mm-subtabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body.mobile-shell .forge-panel[data-mobile-section="training"] > .forge-grid,
+    body.mobile-shell .forge-panel[data-mobile-section="upgrades"] > .mastery-panel { display: none; }
+    body.mobile-shell .mm-panel .mastery-panel { grid-row: 3; grid-column: 1 / -1; overflow-y: auto; min-height: 0; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    body.mobile-shell .mm-panel .forge-grid span:not([data-upgrade-preview]) { display: none; }
+    body.mobile-shell .mm-panel .forge-grid .upgrade-preview { font-size: 10px; line-height: 1.3; }
+    body.mobile-shell .mm-help-view {
+        grid-row: 3;
+        grid-column: 1 / -1;
+        z-index: 3;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: #132027;
+        color: #bbcbc4;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+    body.mobile-shell .mm-head .mm-help-toggle {
+        width: 36px;
+        min-height: 36px;
+        height: 36px;
+        margin: 0;
+        border-radius: 50%;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+    body.mobile-shell .mm-subtab {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+    }
+    body.mobile-shell .mm-skill-art { width: 24px; height: 24px; border-radius: 6px; }
+    body.mobile-shell .mm-panel .tree-node-icon {
+        display: block;
+        width: 24px;
+        height: 24px;
+        margin-inline: auto;
+        border-radius: 5px;
+        background: var(--skill-art) center / cover;
+        font-size: 0 !important;
+    }
+    body.mobile-shell .mm-pause-tab {
+        border-color: #d4b37a88;
+        background: linear-gradient(135deg, #625039, #252e30 75%);
+        box-shadow: inset 0 1px 0 #ffe3ac33, 0 3px 12px #0006;
+    }
+    body.mobile-shell .mm-pause-glyph,
+    body.mobile-shell .mm-pause-emblem {
+        display: block;
+        width: 18px;
+        height: 18px;
+        background: linear-gradient(to right, #f1d49b 0 33%, transparent 33% 66%, #f1d49b 66%);
+    }
+    body.mobile-shell .mm-pause-screen.mm-open {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(ellipse at center, #233532, #091318 75%);
+    }
+    body.mobile-shell .mm-pause-screen .mm-head { display: none; }
+    body.mobile-shell .mm-pause-card {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        width: min(540px, 90vw);
+        padding: 24px;
+        border: 1px solid #c7a56b66;
+        border-radius: 20px;
+        background: linear-gradient(145deg, #273b36, #101c22);
+        box-shadow: 0 20px 60px #0008, inset 0 1px 0 #ffe3ac22;
+        text-align: center;
+    }
+    body.mobile-shell .mm-pause-emblem {
+        grid-column: 1 / -1;
+        justify-self: center;
+        width: 28px;
+        height: 30px;
+        margin-bottom: 4px;
+    }
+    body.mobile-shell .mm-pause-card h2,
+    body.mobile-shell .mm-pause-card p,
+    body.mobile-shell .mm-resume { grid-column: 1 / -1; margin: 0; }
+    body.mobile-shell .mm-pause-card h2 { color: #f1d49b; font: 26px Georgia, serif; }
+    body.mobile-shell .mm-pause-card p { color: #b5c8c2; font-size: 12px; }
+    body.mobile-shell .mm-resume,
+    body.mobile-shell .mm-pause-option {
+        min-height: 44px;
+        border-radius: 10px;
+        border: 1px solid #c7a56b55;
+        color: #ecdfc2;
+        background: #15262a;
+    }
+    body.mobile-shell .mm-resume {
+        background: linear-gradient(135deg, #946435, #56391f);
+        border-color: #e0b878;
+    }
+    @media (max-height: 360px) {
+        body.mobile-shell .mm-panel.mm-open {
+            grid-template-rows: 50px 44px minmax(0, 1fr) auto;
+            gap: 6px 12px;
+        }
+        body.mobile-shell .mm-panel .skill-tree-map { height: 120px; }
+        body.mobile-shell .mm-panel .tree-node,
+        body.mobile-shell .mm-panel .tree-node button { width: 48px; }
+        body.mobile-shell .mm-panel .tree-node button { height: 48px; }
+        body.mobile-shell .mm-panel .tree-node-icon { font-size: 12px; }
+        body.mobile-shell .mm-panel .tree-node button strong { font-size: 8px; }
+        body.mobile-shell .mm-detail { padding: 10px; font-size: 12px; }
+    }
+
+    /* Hide the remaining on-screen controls while a panel is open: the panel is the whole screen.
+       (.vitals is not listed — it no longer exists as DOM; the HUD is drawn into the canvas.) */
+    body.mobile-shell.mm-panel-open .arena-toolbar,
+    body.mobile-shell.mm-panel-open .skill-bar,
+    body.mobile-shell.mm-panel-open .touch-movement {
+        display: none !important;
+    }
+    body.mobile-shell.mm-panel-open .touch-aim { display: none !important; }
+    body.mobile-shell .mm-info-panel.mm-open {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: 58px minmax(0, 1fr);
+    }
+    body.mobile-shell .mm-info-panel[data-mm-panel="notes"].mm-open {
+        grid-template-rows: 58px 66px minmax(0, 1fr);
+    }
+    body.mobile-shell .mm-info-panel > .rankings,
+    body.mobile-shell .mm-info-panel > .patch-notes {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 0;
+        background: none;
+    }
+    body.mobile-shell .mm-info-panel > .patch-notes { grid-row: 3; }
+    body.mobile-shell .mm-info-controls {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+        gap: 10px;
+        align-items: start;
+    }
+    body.mobile-shell .mm-info-controls label {
+        display: grid;
+        gap: 4px;
+        color: #d4bd91;
+        font-size: 10px;
+        min-width: 0;
+    }
+    body.mobile-shell .mm-info-controls select {
+        width: 100%;
+        min-width: 0;
+        min-height: 44px;
+        padding: 8px;
+        border: 1px solid #c7a56b55;
+        border-radius: 8px;
+        color: #ecdfc2;
+        background: #17292d;
+        font-size: 12px;
+    }
+    body.mobile-shell .mm-info-panel .patch-notes > .page-header,
+    body.mobile-shell .mm-info-panel .patch-notes > .page-heading,
+    body.mobile-shell .mm-info-panel .patch-notes > footer,
+    body.mobile-shell .mm-info-panel .patch-notes .contents,
+    body.mobile-shell .mm-info-panel .patch-meta > a {
+        display: none;
+    }
+    body.mobile-shell .mm-info-panel .patch-notes article {
+        box-shadow: none;
+        border-radius: 12px;
+    }
+    body.mobile-shell .mm-info-panel .patch-heading { padding: 12px 16px; }
+    body.mobile-shell .mm-info-panel .patch-heading h2 { font-size: 20px; margin: 8px 0; }
+    body.mobile-shell .mm-info-panel .patch-heading > p { margin: 8px 0; font-size: 13px; line-height: 1.5; }
+    body.mobile-shell .mm-info-panel article:not([data-mobile-topic="overview"]) > .patch-heading { display: none; }
+    body.mobile-shell .mm-info-panel .patch-section { padding: 14px 16px; }
+    body.mobile-shell .mm-info-panel .patch-section h3 { font-size: 19px; margin-bottom: 10px; }
+    body.mobile-shell .mm-info-panel .patch-section > p,
+    body.mobile-shell .mm-info-panel .patch-section li { font-size: 13px; line-height: 1.5; }
+    body.mobile-shell .mm-info-panel .table-scroll { margin: 12px 0; }
+    body.mobile-shell .mm-info-panel th,
+    body.mobile-shell .mm-info-panel td { min-width: 0; padding: 8px; font-size: 12px; }
+    body.mobile-shell .mm-info-panel .stat-grid { gap: 8px; margin-top: 12px; }
+    body.mobile-shell .mm-info-panel .stat-grid section { padding: 10px; }
+    body.mobile-shell .mm-info-panel .stat-grid h4 { font-size: 16px; }
+    @media (max-height: 360px) {
+        body.mobile-shell .mm-pause-card { padding: 12px 18px; gap: 6px; }
+        body.mobile-shell .mm-pause-emblem { width: 18px; height: 20px; margin: 0; }
+        body.mobile-shell .mm-pause-card h2 { font-size: 22px; }
+        body.mobile-shell .mm-info-panel.mm-open { grid-template-rows: 50px minmax(0, 1fr); }
+        body.mobile-shell .mm-info-panel[data-mm-panel="notes"].mm-open { grid-template-rows: 50px 60px minmax(0, 1fr); }
+    }
+    body.mobile-shell .mm-save-actions {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 8px;
+    }
+    body.mobile-shell .mm-save-actions button {
+        min-height: 44px;
+        padding: 6px 8px;
+        font-size: 12px;
+    }
+    body.mobile-shell .mm-save-status {
+        grid-column: 1 / -1;
+        margin: 8px 0 0;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: #102024;
+        color: #b8d6cb;
+        font-size: 11px;
+        line-height: 1.4;
+    }
+    body.mobile-shell .mm-pause-card {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: min(720px, 94vw);
+        max-height: calc(100dvh - 20px);
+        overflow-y: auto;
+    }
+    body.mobile-shell .mm-pause-card .mm-pause-option { font-size: 12px; }
+    body.mobile-shell .mm-pause-card .mm-save-actions { margin: 0; }
+    body.mobile-shell .mm-pause-card .mm-save-status { margin: 0; }
+    body.mobile-shell .mm-account-body {
+        grid-row: 2;
+        grid-column: 1 / -1;
+        min-height: 0;
+        overflow-y: auto;
+        align-self: center;
+        justify-self: center;
+        width: min(620px, 100%);
+        padding: 18px;
+        border: 1px solid #c7a56b44;
+        border-radius: 14px;
+        background: linear-gradient(145deg, #263a34, #132127);
+        text-align: center;
+    }
+    body.mobile-shell .mm-account-body h2 { color: #f1d49b; font: 24px Georgia, serif; margin: 0 0 12px; }
+    body.mobile-shell .mm-account-body p { color: #bad0c7; font-size: 13px; line-height: 1.5; }
+    body.mobile-shell .mm-account-body button { width: 100%; }
+}

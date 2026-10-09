@@ -26,6 +26,7 @@ import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
 import { treePointsSpent, treeRespecCost, canRespecTree, respecTree } from "./arpg-skills.js";
 import { SKILL_KEYS, SLOTTABLE_SKILLS, EXTRA_SKILLS, MAX_SKILL_POINTS, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
 import { drawHero, drawOrb, decorateFloor, drawAtmosphere, drawLootIcon } from "./arpg-graphics.js";
+import { drawHud } from "./arpg-hud.js";
 
 // Respects the OS/browser-level "prefers-reduced-motion" setting so screen shake and other purely
 // cosmetic motion effects can be toggled off for players sensitive to it.
@@ -757,6 +758,7 @@ export function createGame(root, saveBridge = null) {
     const combatPause = root.querySelector("[data-combat-pause]");
     const healthWarning = root.querySelector("[data-health-warning]");
     const skillButtons = [...root.querySelectorAll("[data-skill]")];
+    const cooldownPeaks = new WeakMap();
     const launchEndless = root.querySelector("[data-launch-endless]");
     const openSkills = root.querySelector("[data-open-skills]");
     const loadoutSelects = [...root.querySelectorAll("[data-loadout-slot]")];
@@ -798,6 +800,11 @@ export function createGame(root, saveBridge = null) {
     // off) based on however much vertical space is actually available around the game's other UI,
     // then resyncs canvas resolution to match the new size.
     function fitArena() {
+        if (root.dataset.canvasHud === "on") {
+            viewport.style.maxWidth = "";
+            updateCanvasResolution();
+            return;
+        }
         root.classList.toggle("focus-view", focusView);
         focusViewButton.setAttribute("aria-pressed", String(focusView));
         focusViewButton.textContent = focusView ? "Focus view: On" : "Focus view: Off";
@@ -914,6 +921,8 @@ export function createGame(root, saveBridge = null) {
         keys.clear();
         pointers.clear();
         aim = null;
+        delete root.dataset.stickX;
+        delete root.dataset.stickY;
     }
     // Refreshes the setup dialog's class-preview panel text to match whichever class is currently
     // selected in the dropdown, so players can compare stats before starting a run.
@@ -972,10 +981,11 @@ export function createGame(root, saveBridge = null) {
     // setupSkip), and the final step is the skill-loadout picker gating the actual "start"/"confirm"
     // button. Sets focus to the most relevant control at each step for keyboard/screen-reader users.
     function showSetupStep() {
+        const mobile = root.dataset.canvasHud === "on";
         const choosingDifficulty = setupStep === 0;
         const choosingLoadout = setupStep === tutorial.length + 1;
         root.querySelector("[data-class-picker]").hidden = !choosingDifficulty || setupAction === "continue";
-        classPreview.hidden = !choosingDifficulty;
+        classPreview.hidden = !choosingDifficulty || mobile;
         classSelect.disabled = !choosingDifficulty || setupAction === "continue";
         updateClassPreview();
         updateDifficultyDescription();
@@ -992,8 +1002,8 @@ export function createGame(root, saveBridge = null) {
         root.querySelector("[data-setup-difficulty]").hidden = !choosingDifficulty;
         difficultySelect.disabled = !choosingDifficulty;
         setupSkip.hidden = choosingDifficulty || choosingLoadout;
-        setupLoadoutPanel.hidden = !choosingLoadout;
-        setupNext.textContent = choosingLoadout ? setupAction === "campaign" ? "Confirm slots & begin" : "Confirm slots & enter Endless" : "Next";
+        setupLoadoutPanel.hidden = mobile || !choosingLoadout;
+        setupNext.textContent = mobile ? "Start adventure" : choosingLoadout ? setupAction === "campaign" ? "Confirm slots & begin" : "Confirm slots & enter Endless" : "Next";
         setupNext.disabled = saving;
         if (choosingLoadout) updateSetupLoadout();
         (choosingDifficulty ? difficultySelect : choosingLoadout ? setupSlots[0] : setupNext).focus({ preventScroll: true });
@@ -1051,6 +1061,11 @@ export function createGame(root, saveBridge = null) {
         (state.status === "won" ? endlessButton : startButton).focus({ preventScroll: true });
     }
     on(setupNext, "click", () => {
+        if (root.dataset.canvasHud === "on") {
+            setupStep = tutorial.length + 1;
+            finishSetup();
+            return;
+        }
         if (setupStep === tutorial.length + 1) finishSetup();
         else { setupStep = setupAction === "continue" ? tutorial.length + 1 : setupStep + 1; showSetupStep(); }
     });
@@ -1070,6 +1085,8 @@ export function createGame(root, saveBridge = null) {
     // loop() function below) as well as immediately after any state-changing action (setup, pause,
     // skill purchase, etc.) so the UI never lags a frame behind the actual game state.
     function updateHud() {
+        root.dataset.gameStatus = setupAction ? "setup" : state.status;
+        root.dataset.saveBusy = saving || checkingUnlock ? "on" : "off";
         const p = state.player;
         const map = mapForWave(state.wave);
         const hero = classFor(state);
@@ -1125,6 +1142,14 @@ export function createGame(root, saveBridge = null) {
             const slotLabel = locked ? "STAGE 3" : skill === "attack" ? "J / CLICK" : skill === "dodge" ? "SPACE" : skill === "potion" ? "E" : manual ? "Q" : automatic ? "AUTO ×1.6" : "UNSLOTTED";
             if (button.querySelector("[data-slot-label]").textContent !== slotLabel) button.querySelector("[data-slot-label]").textContent = slotLabel;
             button.classList.toggle("skill-cooling", p[skill] > 0);
+            if (root.dataset.canvasHud === "on") {
+                const remaining = Math.max(0, p[skill]);
+                const peak = remaining > 0 ? Math.max(remaining, cooldownPeaks.get(button) || 0) : 0;
+                cooldownPeaks.set(button, peak);
+                button.style.setProperty("--cooldown-turn", `${peak > 0 ? remaining / peak : 0}turn`);
+                button.dataset.skillMode = locked ? "locked" : automatic ? "auto" : manual ? "manual" : "unslotted";
+                button.setAttribute("aria-label", `${skillName(state, skill)}: ${locked ? "Locked" : remaining > 0 ? `${remaining.toFixed(1)} seconds` : "Ready"}${automatic ? ", automatic" : ""}`);
+            }
             button.classList.toggle("flask-needed", skill === "potion" && critical && p.potions > 0 && p.potion === 0 && !setupAction && !saving);
             button.title = locked ? wardUnlockHint(state) : !manual ? automatic ? "Automatic casting: 60% longer cooldown" : "Assign a slot in Skills & loadout" : unavailable ? "Combat is paused or counting down" : cannotHeal ? p.potions === 0 ? "No flask charges left" : "Health is already full"
                 : p[skill] > 0 ? `Recovering: ${p[skill].toFixed(1)}s` : "Ready";
@@ -1175,7 +1200,8 @@ export function createGame(root, saveBridge = null) {
         text("checkpoint-save", ["camp", "won"].includes(state.status) ? saveStatus.textContent : "");
         text("weapon", p.weapon);
         text("weapon-detail", `Relic rating ${p.weaponBonus} (+${Math.round(60 * (Math.sqrt(1 + p.weaponBonus / 30) - 1))} damage) / Forge rank ${state.upgrades.weapon}`);
-        text("unlock", checkingUnlock ? "Checking server unlock..." : endlessUnlocked ? "Endless Watch permanently unlocked on this server profile." : state.status === "won" ? (saving ? "Saving your permanent Endless unlock..." : "Endless is available now. Save successfully to keep the unlock permanently.") : "Complete the campaign to permanently unlock Endless Watch.");
+        const localSaves = root.dataset.localSaves === "on";
+        text("unlock", checkingUnlock ? localSaves ? "Checking local save..." : "Checking server unlock..." : endlessUnlocked ? localSaves ? "Endless Watch permanently unlocked on this device." : "Endless Watch permanently unlocked on this server profile." : state.status === "won" ? (saving ? "Saving your permanent Endless unlock..." : "Endless is available now. Save successfully to keep the unlock permanently.") : "Complete the campaign to permanently unlock Endless Watch.");
         const activePowers = POWER_UPS.filter(power => state.buffs[power.key] > 0);
         text("buffs", activePowers.length ? activePowers.map(power => `${power.name}: ${Math.ceil(state.buffs[power.key])}s`).join(" / ") : "No active power-ups");
         text("journal", state.journal);
@@ -1276,6 +1302,7 @@ export function createGame(root, saveBridge = null) {
             : Object.entries(UPGRADES).some(([key, upgrade]) => skillUnlocked(state, key) && state.upgrades[key] < upgrade.max && state.gold >= upgradeCost(state, key));
         forgeNudge.hidden = state.status !== "playing" || state.resumeDelay > 0 || draftClosing || !!setupAction || !affordable || !skillUnlockNotice.hidden;
         forgeButton.classList.toggle("forge-available", active && !choosing && !setupAction && affordable);
+        root.dataset.forgeAvailable = active && !choosing && !setupAction && affordable ? "on" : "off";
         root.querySelector("[data-open-forge]").disabled = forgeButton.disabled;
         text("forge-hint", completedForge ? `Stat training from ${cheapestTraining.toLocaleString()} gold.` : "Forge upgrade available!");
         masteryPanel.hidden = !completedForge;
@@ -1405,12 +1432,26 @@ export function createGame(root, saveBridge = null) {
     // Toggles pause via the engine, syncing input state and focus. Guarded against firing while a
     // save is in flight or the setup dialog is open, since pausing mid-save or mid-dialog would be confusing.
     function pause() {
-        if (saving || setupAction) return;
+        if (saving || setupAction || root.dataset.menuOpen === "on") return;
         togglePause(state);
         clearInput();
         updateHud();
         if (state.status === "playing") canvas.focus({ preventScroll: true });
     }
+    on(root, "mobile-menu", event => {
+        const opening = event.detail?.open === true;
+        if (opening) {
+            const idleInformation = event.detail?.information && ["ready", "dead", "won"].includes(state.status);
+            if (saving || setupAction || (!idleInformation && !["playing", "paused", "camp"].includes(state.status))) return;
+            if (state.status === "playing") togglePause(state);
+            root.dataset.menuOpen = "on";
+        } else {
+            delete root.dataset.menuOpen;
+            if (event.detail?.resume && state.status === "paused" && !saving && !setupAction) togglePause(state);
+        }
+        clearInput();
+        updateHud();
+    });
     // Handles the primary "Start/Resume" button: resumes if paused, continues the journey if at a
     // checkpoint camp, or opens the setup dialog for a brand-new campaign run otherwise.
     function begin() {
@@ -1545,18 +1586,26 @@ export function createGame(root, saveBridge = null) {
             return;
         }
         if (loadingSave && ["playing", "paused", "camp", "won", "choosing"].includes(state.status)
-            && !window.confirm("Replace this run with your last server save? Unsaved progress will be lost.")) return;
+            && !window.confirm(root.dataset.localSaves === "on"
+                ? "Replace this run with your saved run from this device? Unsaved progress will be lost."
+                : "Replace this run with your last server save? Unsaved progress will be lost.")) return;
         if (state.status === "playing") pause();
         clearInput();
         saving = true;
         let advanceEndless = false;
-        saveStatus.textContent = loadingSave ? "Loading from the server..." : automatic ? "Autosaving checkpoint to the server..." : "Saving to the server...";
+        let operationSucceeded = false;
+        const local = root.dataset.localSaves === "on";
+        saveStatus.textContent = loadingSave ? local ? "Loading from this device..." : "Loading from the server..."
+            : automatic ? local ? "Saving checkpoint on this device..." : "Autosaving checkpoint to the server..."
+            : local ? "Saving on this device..." : "Saving to the server...";
         updateHud();
         try {
             const result = loadingSave
                 ? await saveBridge.invokeMethodAsync("LoadRun")
                 : await saveBridge.invokeMethodAsync("SaveRun", captureSnapshot(state));
             if (disposed) return;
+            operationSucceeded = result.success;
+            if (result.success) root.dataset.hasSave = "on";
             if (result.success) endlessUnlocked = endlessUnlocked || result.endlessUnlocked || result.save?.endlessUnlocked || result.save?.state?.campaignComplete === 1;
             if (!loadingSave && ["camp", "won"].includes(state.status)) checkpointSaveFailed = !result.success;
             if (result.success && loadingSave) {
@@ -1576,11 +1625,14 @@ export function createGame(root, saveBridge = null) {
             }
             advanceEndless = result.success && !loadingSave && state.mode === "endless" && state.status === "camp";
             saveStatus.textContent = automatic
-                ? result.success ? `Checkpoint ${state.wave} saved on the server.${endlessUnlocked ? " Endless Watch remains permanently unlocked." : ""}` : `Checkpoint autosave failed. ${result.message} Select Save to retry before leaving.`
+                ? result.success ? `Checkpoint ${state.wave} saved ${local ? "on this device" : "on the server"}.${endlessUnlocked ? " Endless Watch remains permanently unlocked." : ""}` : `Checkpoint autosave failed. ${result.message} Select Save to retry before leaving.`
                 : result.message;
         } catch {
+            operationSucceeded = false;
             if (!loadingSave && ["camp", "won"].includes(state.status)) checkpointSaveFailed = true;
-            if (!disposed) saveStatus.textContent = automatic ? "Checkpoint autosave failed. Stay here, reconnect, then select Save to retry." : "Save/load failed: the connection was lost or the save was invalid. Your current run is unchanged; reconnect and try again.";
+            if (!disposed) saveStatus.textContent = local
+                ? "Local save/load failed or the save was invalid. Your current run is unchanged."
+                : automatic ? "Checkpoint autosave failed. Stay here, reconnect, then select Save to retry." : "Save/load failed: the connection was lost or the save was invalid. Your current run is unchanged; reconnect and try again.";
         } finally {
             if (!disposed) {
                 saving = false;
@@ -1592,6 +1644,7 @@ export function createGame(root, saveBridge = null) {
                     else canvas.focus({ preventScroll: true });
                 }
                 updateHud();
+                root.dispatchEvent(new CustomEvent("mobile-save-result", { detail: { success: operationSucceeded, loadingSave } }));
             }
         }
     }
@@ -1607,11 +1660,17 @@ export function createGame(root, saveBridge = null) {
             if (saveBridge) {
                 const result = await saveBridge.invokeMethodAsync("LoadRun");
                 if (disposed) return;
-                if (result.success) endlessUnlocked = !!(result.endlessUnlocked || result.save?.endlessUnlocked || result.save?.state?.campaignComplete === 1);
-                else saveStatus.textContent = `${result.message} Load can retry the server profile check.`;
+                if (result.success) {
+                    endlessUnlocked = !!(result.endlessUnlocked || result.save?.endlessUnlocked || result.save?.state?.campaignComplete === 1);
+                    root.dataset.hasSave = "on";
+                    if (root.dataset.localSaves === "on") saveStatus.textContent = "Local save found. Choose Load to restore it.";
+                }
+                else saveStatus.textContent = root.dataset.localSaves === "on" ? result.message : `${result.message} Load can retry the server profile check.`;
             }
         } catch {
-            if (!disposed) saveStatus.textContent = "Could not read the server profile. Reconnect and use Load to recover your run and unlocks.";
+            if (!disposed) saveStatus.textContent = root.dataset.localSaves === "on"
+                ? "Could not read the local save. Use Load to retry; your saved file has not been changed."
+                : "Could not read the server profile. Reconnect and use Load to recover your run and unlocks.";
         } finally {
             if (!disposed) { checkingUnlock = false; updateHud(); }
         }
@@ -1687,10 +1746,17 @@ export function createGame(root, saveBridge = null) {
         const held = new Set(pointers.values());
         for (const key of keys) held.add(movementKeys[key] || skillKeys[key]);
         return {
-            x: Number(held.has("right")) - Number(held.has("left")),
-            y: Number(held.has("down")) - Number(held.has("up")),
-            aim, attack: held.has("attack"), manual: held.has("manual") || held.has(state.loadout.manual),
-            dodge: held.has("dodge"), potion: held.has("potion")
+            x: Number(root.dataset.stickX || 0) || Number(held.has("right")) - Number(held.has("left")),
+            y: Number(root.dataset.stickY || 0) || Number(held.has("down")) - Number(held.has("up")),
+            aim: root.dataset.autoAttack === "on" ? null : aim,
+            attack: held.has("attack"), manual: held.has("manual") || held.has(state.loadout.manual),
+            dodge: held.has("dodge"), potion: held.has("potion"),
+            // Opt-in, set by hosts that have no mouse (the MAUI mobile shell sets
+            // data-auto-attack on the game root). Desktop leaves it undefined and is unaffected.
+            autoAttack: root.dataset.autoAttack === "on",
+            // Continuous facing from an on-screen thumbstick, in radians. Hosts publish it as
+            // data-face-angle on the game root; absent on desktop, where the mouse sets aim.
+            faceAngle: root.dataset.faceAngle === undefined ? undefined : Number(root.dataset.faceAngle)
         };
     }
     // The main requestAnimationFrame loop: advances the simulation via step(), periodically retries
@@ -1705,6 +1771,7 @@ export function createGame(root, saveBridge = null) {
         if (disposed) return;
         if (!root.isConnected) { dispose(); return; }
         step(state, input(), last ? (now - last) / 1000 : 0);
+        root.dataset.gameStatus = setupAction ? "setup" : state.status;
         last = now;
         if (now - lastScoreAttempt >= 15000) {
             lastScoreAttempt = now;
@@ -1716,6 +1783,10 @@ export function createGame(root, saveBridge = null) {
         }
         render(ctx, floors[mapIndexForWave(state.wave)], state);
         drawCountdown(ctx, state);
+        // Hosts without room for a DOM HUD (the mobile shell) draw it into the canvas instead, so
+        // it scales with the playfield and cannot intercept touches. Opt-in: desktop keeps the
+        // DOM HUD and is unaffected.
+        if (root.dataset.canvasHud === "on") drawHud(ctx, state, { maxFlasks: MAX_FLASKS });
         if (now - hudTime > 100 || state.status !== shownStatus) { updateHud(); hudTime = now; }
         frame = requestAnimationFrame(animate);
     }

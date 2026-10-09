@@ -192,7 +192,9 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
             using var response = await SendAsync(request);
             if (!response.IsSuccessStatusCode)
             {
-                if (response.StatusCode != HttpStatusCode.Unauthorized)
+                if (response.StatusCode == HttpStatusCode.Conflict)
+                    message = "That player name is already taken. Choose another nickname.";
+                else if (response.StatusCode != HttpStatusCode.Unauthorized)
                     message = "Player name was not changed. Check the connection and that the latest backend is deployed.";
                 return AccountStatus;
             }

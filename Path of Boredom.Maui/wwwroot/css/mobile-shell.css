@@ -652,8 +652,14 @@
     }
 
     body.mobile-shell [data-run-menu] {
+        box-sizing: border-box;
+        min-height: 0;
         max-width: 640px;
         max-height: 100%;
+        overflow-y: auto;
+        touch-action: pan-y;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
     }
 
     body.mobile-shell [data-run-menu] > p:not(.eyebrow),

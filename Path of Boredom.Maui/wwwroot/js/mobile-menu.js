@@ -41,6 +41,13 @@
         return node;
     }
 
+    function treeArt(tree) {
+        if (tree.dataset.skillIcon) return tree.dataset.skillIcon;
+        var skill = tree.dataset.treeSkill;
+        return ["dodge", "potion"].includes(skill) ? "/_content/PathOfBoredom.Game/images/skills/" + skill + ".svg"
+            : "/_content/PathOfBoredom.Game/images/skills/" + (tree.dataset.heroClass || "knight") + "/" + skill + ".svg";
+    }
+
     // ---- Panel construction ------------------------------------------------------------
     //
     // A "panel" is the existing Blazor section, tagged with .mm-panel so CSS can lift it over the
@@ -107,6 +114,8 @@
                 help.replaceChildren();
                 if (shown) {
                     Array.prototype.forEach.call(host.querySelectorAll(".mm-help-text"), function (text) {
+                        var tree = text.closest("[data-tree-skill]");
+                        if (tree && tree.hidden) return;
                         help.appendChild(el("p", null, text.textContent));
                     });
                 }
@@ -155,6 +164,7 @@
         });
 
         function select(index) {
+            if (index > 0 && trees[index - 1].hidden) index = 0;
             source.classList.remove("mm-help-shown");
             source.querySelector(".mm-help-view").classList.add("mm-hidden");
             var helpToggle = source.querySelector(".mm-help-toggle");
@@ -172,10 +182,11 @@
         }
 
         function addTab(label, index) {
-            var tab = el("button", "mm-subtab", label);
+            var tab = el("button", "mm-subtab");
+            tab.appendChild(el("span", "mm-subtab-label", label));
             if (index > 0) {
                 var image = el("img", "mm-skill-art");
-                image.src = "images/skills/" + trees[index - 1].dataset.treeSkill + ".svg";
+                image.src = treeArt(trees[index - 1]);
                 image.alt = "";
                 tab.prepend(image);
             }
@@ -197,10 +208,21 @@
         select(0);
         panel.syncTabs = function () {
             trees.forEach(function (tree, index) {
-                tabs[index + 1].hidden = tree.hidden;
-                if (tree.hidden && tabs[index + 1].getAttribute("aria-selected") === "true") select(0);
+                var tab = tabs[index + 1];
+                var heading = tree.querySelector("[data-skill-name]");
+                var name = heading ? heading.textContent : tree.dataset.treeSkill;
+                var label = tab.querySelector(".mm-subtab-label");
+                if (label.textContent !== name) label.textContent = name;
+                var image = tab.querySelector(".mm-skill-art"), art = treeArt(tree);
+                if (image && image.getAttribute("src") !== art) image.src = art;
+                tree.style.setProperty("--skill-art", "url('" + art + "')");
+                tab.setAttribute("aria-label", name + " skill tree");
+                tab.hidden = tree.hidden;
+                tab.classList.toggle("mm-hidden", tree.hidden);
+                if (tree.hidden && tab.getAttribute("aria-selected") === "true") select(0);
             });
         };
+        panel.syncTabs();
 
         return panel;
     }
@@ -267,6 +289,7 @@
 
         openName = name;
         panels[name].root.hidden = false;
+        if (panels[name].syncTabs) panels[name].syncTabs();
         panels[name].root.classList.add("mm-open");
         var tab = layer.querySelector('[data-mm-tab="' + name + '"]');
         if (tab) tab.setAttribute("aria-expanded", "true");
@@ -470,10 +493,11 @@
         addSaveActions(root.querySelector("[data-run-menu]"), root);
         buildBar();
         Array.prototype.forEach.call(root.querySelectorAll(".skill-bar [data-skill]"), function (button) {
-            button.querySelector(".skill-icon").style.backgroundImage = "url('images/skills/" + button.dataset.skill + ".svg')";
+            var art = button.dataset.skillIcon || treeArt(root.querySelector('[data-tree-skill="' + button.dataset.skill + '"]'));
+            button.querySelector(".skill-icon").style.backgroundImage = "url('" + art + "')";
         });
         Array.prototype.forEach.call(root.querySelectorAll("[data-tree-skill]"), function (tree) {
-            tree.style.setProperty("--skill-art", "url('images/skills/" + tree.dataset.treeSkill + ".svg')");
+            tree.style.setProperty("--skill-art", "url('" + treeArt(tree) + "')");
         });
 
         setInterval(syncBadges, 500);

@@ -34,6 +34,7 @@ class CustomEvent {
 }
 const context = vm.createContext({
     panels, document, CustomEvent,
+    syncBadges() {},
     layer: { querySelector() { return { setAttribute() {} }; } },
     openName: null, resumeAfterMenu: false
 });

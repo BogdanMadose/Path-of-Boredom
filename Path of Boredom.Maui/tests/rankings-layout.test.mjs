@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { spawnSync } from 'node:child_process';
+import { dumpBrowserDom } from './browser-dom.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const page = fs.readFileSync(path.join(root, 'Path of Boredom.Game/Components/Pages/Rankings.razor'), 'utf8');
@@ -11,6 +11,10 @@ assert.match(page, /class="class-boards"/);
 assert.match(page, /rows\.GroupBy\(row => row\.HeroClass\)/);
 assert.match(page, /data-hero-class="@board.Key"/);
 assert.match(page, /Automatic skills:<\/strong>/);
+assert.match(page, /build\.Equipment is \{ \} equipment/);
+assert.match(page, /RankingRules\.WeaponStyleName\(equipment\.WeaponStyle\)/);
+assert.match(page, /RankingRules\.ArmorStyleName\(equipment\.ArmorStyle\)/);
+assert.match(page, /Equipment was not recorded for this older build/);
 assert.ok(!page.includes('build.ManualSkill'), 'manual skill is omitted from every build overview');
 assert.match(page, /row\.AchievedAt/);
 assert.match(page, /row\.IsCurrentUser/);
@@ -28,7 +32,12 @@ if (edge && fs.existsSync(edge)) {
         ${[1, 2].map(rank => `<article class="ranking-card"><div class="record-heading"><span class="rank">#${rank}</span>
             <strong>VeryLongPlayerNickname24<small>YOU</small></strong><span class="record-score"><span class="score">123,456</span><small>BEST KILLS</small></span></div>
             <p class="record-date">2026-01-01 12:00 UTC</p><details class="build-details" open><summary>Level 32 · Build details</summary>
-            <p><strong>Automatic skills:</strong> Cinder relay, Execution arc, Sun spear</p><h3>Skill upgrades</h3>
+            <p><strong>Automatic skills:</strong> Cinder relay, Execution arc, Sun spear</p>
+            ${rank === 1 ? `<section class="build-equipment" aria-label="Equipment and trade-offs"><h3>Equipment &amp; trade-offs</h3>
+                <p><strong>Weapon:</strong> VeryLongEquipmentNameThatNeedsWrapping · equipment rating 600<br />Heavy edge — +20% damage; -15% cooldown recovery</p>
+                <p><strong>Armor:</strong> Starwoven mantle · equipment rating 40<br />Light weave — -8 armor; +12% movement speed</p>
+                <small>Equipment ratings are separate from the Forge ranks below.</small></section>`
+                : '<p class="build-unavailable">Equipment was not recorded for this older build.</p>'}<h3>Skill upgrades</h3>
             <ul><li>VeryLongUpgradeNameThatNeedsWrapping <strong>rank 3</strong></li></ul></details></article>`).join('')}
         </div></section>`).join('');
     const checks = `
@@ -53,11 +62,8 @@ if (edge && fs.existsSync(edge)) {
             <main class="rankings ${embedded ? 'embedded' : ''}"><div class="class-boards">${boards}</div></main>
             <script>try { ${checks}; document.body.dataset.result = 'PASS'; } catch (error) { document.body.dataset.result = error.message; }</script></body></html>`);
         for (const width of [390, 740, 1280]) {
-            const result = spawnSync(edge, ['--headless', '--disable-gpu', '--dump-dom', '--virtual-time-budget=1000', `--window-size=${width},800`,
-                `--user-data-dir=${path.join(folder, `rankings-layout-browser-${embedded}-${width}`)}`, `${pathToFileURL(fixture).href}?check=${Date.now()}`], { encoding: 'utf8', timeout: 30000 });
-            assert.ifError(result.error);
-            assert.equal(result.status, 0, result.stderr);
-            assert.equal(result.stdout.match(/data-result="([^"]*)"/)?.[1], 'PASS', `width ${width}, embedded ${embedded}`);
+            const output = await dumpBrowserDom(edge, ['--virtual-time-budget=1000', `--window-size=${width},800`, `${pathToFileURL(fixture).href}?check=${Date.now()}`]);
+            assert.equal(output.match(/data-result="([^"]*)"/)?.[1], 'PASS', `width ${width}, embedded ${embedded}`);
         }
     }
     console.log('PASS: browser-verified responsive class columns, single-class width, stacked player records and expanded builds at 390/740/1280px');

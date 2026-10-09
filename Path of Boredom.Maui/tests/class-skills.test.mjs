@@ -44,7 +44,7 @@ for (const hero of Object.keys(CLASS_SKILLS)) {
                 assert.equal(treeNodeDefinition(state, skill, 'ember').detail, CLASS_SKILLS[hero][skill].keystone);
             }
             const snapshot = captureSnapshot(state);
-            assert.equal(snapshot.version, 16);
+            assert.equal(snapshot.version, 18);
             const restored = restoreSnapshot(snapshot);
             assert.deepEqual(restored.loadout, state.loadout);
             assert.equal(restored.player.afterstep, state.player.afterstep);

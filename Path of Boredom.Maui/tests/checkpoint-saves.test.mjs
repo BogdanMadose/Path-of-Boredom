@@ -22,7 +22,7 @@ for (const hero of ['knight', 'ranger', 'warden']) {
                 step(state, {}, 0.05);
                 assert.equal(state.status, !endless && wave === 30 ? 'won' : 'camp');
                 const snapshot = captureSnapshot(state);
-                assert.equal(snapshot.version, 16);
+                assert.equal(snapshot.version, 18);
                 const restored = restoreSnapshot(snapshot);
                 assert.equal(restored.status, state.status);
                 assert.deepEqual(restored.loadout, state.loadout);

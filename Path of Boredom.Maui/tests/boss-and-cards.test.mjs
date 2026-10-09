@@ -130,4 +130,4 @@ assert.ok(telegraph.boss.winding > 0 && telegraph.boss.combat.rest === 0, 'phase
 captureSnapshot(telegraph.state);
 
 if (process.argv[2]) fs.writeFileSync(process.argv[2], JSON.stringify(fixtures));
-console.log('PASS: selected-skill drafts, deterministic legacy offer repair, tougher bosses, short recovery, concurrent attack timers, and valid v16 saves');
+console.log('PASS: selected-skill drafts, deterministic legacy offer repair, tougher bosses, short recovery, concurrent attack timers, and valid current saves');

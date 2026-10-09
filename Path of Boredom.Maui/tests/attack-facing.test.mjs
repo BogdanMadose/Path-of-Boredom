@@ -47,7 +47,7 @@ for (const hero of ['knight', 'ranger', 'warden']) {
     assert.ok(idle.enemies[0].health < 10000);
 
     const saved = captureSnapshot(idle);
-    assert.equal(saved.version, 16);
+    assert.equal(saved.version, 18);
     assert.equal('weaponFacing' in saved.state.player, false, 'animation-only facing must not change saves');
     assert.equal('attackFacing' in saved.state.player, false);
     assert.equal('weaponFacing' in restoreSnapshot(saved).player, false);
@@ -124,4 +124,4 @@ for (const hero of Object.values(HERO_CLASSES)) {
     assert.ok(rotations.includes(0.5 * 0.45), 'torso follows aim partially');
     assert.ok(rotations.includes(0.5), 'weapon follows its attack heading');
 }
-console.log('PASS: immediate accurate attacks in every direction, unchanged attack cadence, quick cosmetic turning, dodge, desktop aiming, and unchanged v16 saves');
+console.log('PASS: immediate accurate attacks in every direction, unchanged attack cadence, quick cosmetic turning, dodge, desktop aiming, and valid current saves');

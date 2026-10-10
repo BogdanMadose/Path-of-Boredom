@@ -33,11 +33,11 @@ for (const hero of Object.keys(CLASS_SKILLS)) {
         }
     }
 }
-assert.equal(iconGeometry.length, 27);
-assert.equal(new Set(iconGeometry).size, 27, 'icons must differ in shape, not just color or title');
-assert.equal(new Set(effects).size, 27, 'all class combat skills have different rendered geometry');
-assert.equal(names.length, 72);
-assert.equal(new Set(names).size, 72, 'new abilities have uniquely named upgrades');
+assert.equal(iconGeometry.length, 36);
+assert.equal(new Set(iconGeometry).size, 36, 'icons must differ in shape, not just color or title');
+assert.equal(new Set(effects).size, 36, 'all class combat skills have different rendered geometry');
+assert.equal(names.length, 96);
+assert.equal(new Set(names).size, 96, 'new abilities have uniquely named upgrades');
 
 function arena(hero, skill, offsets = [[60, 0], [160, 0]]) {
     const state = startEndlessRun(() => 0.99, 'hard', hero);

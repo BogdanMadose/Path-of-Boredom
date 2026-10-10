@@ -173,6 +173,23 @@ const deniedContext = createGameAudio(denied.environment);
 await deniedContext.unlock(); deniedContext.update(state); deniedContext.dispose();
 
 const controller = fs.readFileSync(new URL('../../Path of Boredom.Game/wwwroot/js/arpg.js', import.meta.url), 'utf8');
+const arenaMusic = [];
+for (let area = 0; area < 6; area++) {
+    const test = harness(), music = createGameAudio(test.environment);
+    const run = startRun(() => 0.99, 'hard', 'sorcerer');
+    run.resumeDelay = 0;
+    music.update(run, area);
+    await music.unlock();
+    assert.equal(test.timers.size, 1);
+    arenaMusic.push(JSON.stringify(test.contexts[0].sources.map(source => source.frequency.values)));
+    run.status = 'paused';
+    music.update(run, area);
+    assert.equal(test.timers.size, 1, 'paused menus retain music');
+    music.update(run, area, false, true);
+    assert.equal(test.timers.size, 1, 'main menu has music');
+    music.dispose();
+}
+assert.equal(new Set(arenaMusic).size, 6, 'all six arenas schedule distinct music');
 assert.match(controller, /event\.isTrusted/);
 assert.match(controller, /audio\.update\(state/);
 assert.match(controller, /audio\.dispose\(\)/);

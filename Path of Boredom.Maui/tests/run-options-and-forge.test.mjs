@@ -15,7 +15,7 @@ const skills = Object.keys(NEW_SKILLS);
 for (const hero of ['knight', 'ranger', 'warden']) {
     for (const skill of skills) {
         const state = startRun(() => 0.99, 'hard', hero);
-        state.player.level = 12;
+        state.player.level = 20;
         state.loadout.auto = [skill, 'nova', 'guard', 'none'];
         state.status = 'paused'; state.gold = 100000;
         assert.equal(forgeSkillSelected(state, skill), true);
@@ -46,7 +46,7 @@ for (const hero of ['knight', 'ranger', 'warden']) {
 
 function arena(hero, rank = 0) {
     const state = startEndlessRun(() => 0.99, 'hard', hero);
-    state.player.level = 12;
+    state.player.level = 20;
     state.loadout.auto = ['chain', 'nova', 'guard', 'none'];
     state.resumeDelay = 0;
     const enemy = state.enemies[0];
@@ -90,7 +90,7 @@ for (const version of [16, 17]) {
     }
     const restored = restoreSnapshot(legacy);
     for (const key of skills) assert.equal(restored.upgrades[key], 0);
-    assert.equal(captureSnapshot(restored).version, 18);
+    assert.equal(captureSnapshot(restored).version, 20);
 }
 const invalid = structuredClone(current);
 invalid.state.upgrades.chain = 9;
@@ -176,7 +176,8 @@ if (fs.existsSync(edge)) {
             panel.classList.add('mm-panel', 'mm-open');
             const head = document.createElement('div'); head.className = 'mm-head'; head.textContent = 'Run options'; panel.appendChild(head);
             const check = (condition, message) => { if (!condition) throw new Error(message); };
-            for (const [width, height] of [[390,740],[740,360]]) {
+            for (const scale of [1, 1.3]) for (const [width, height] of [[320,480],[360,640],[390,740],[430,932],[480,320],[640,360],[740,360],[800,1280],[1024,768],[1280,800]]) {
+                document.documentElement.style.fontSize = (16 * scale) + 'px';
                 panel.style.width = width + 'px'; panel.style.height = height + 'px';
                 panel.classList.add('mm-open'); forgePanel.classList.remove('mm-open');
                 check(!panel.querySelector('[data-equipment-style]') && !panel.querySelector('[data-challenge-choice]'), 'options must be separate from equipment and challenges');
@@ -196,7 +197,7 @@ if (fs.existsSync(edge)) {
                     const rect = button.getBoundingClientRect();
                     check(rect.width > 0 && rect.left >= bounds.left && rect.right <= bounds.right + 1, 'practice buttons fit within Run options');
                 }
-                options.scrollTop = options.scrollHeight;
+                options.scrollTop += options.querySelector('[data-exit-training]').getBoundingClientRect().top - options.getBoundingClientRect().top;
                 const exit = options.querySelector('[data-exit-training]').getBoundingClientRect();
                 check(exit.top >= bounds.top - 1 && exit.bottom <= bounds.bottom + 1, 'exit training must be reachable');
                 check(panel.getBoundingClientRect().height === height, 'training setup must not expand the panel');
@@ -217,8 +218,8 @@ if (fs.existsSync(edge)) {
     const server = http.createServer((request, response) => { response.setHeader('Content-Type', 'text/html'); response.end(html); });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     try {
-        const output = await dumpBrowserDom(edge, ['--virtual-time-budget=5000', '--window-size=900,900', `http://127.0.0.1:${server.address().port}/`]);
+        const output = await dumpBrowserDom(edge, ['--virtual-time-budget=5000', '--window-size=1400,1400', `http://127.0.0.1:${server.address().port}/`]);
         assert.equal(output.match(/data-result="([^"]*)"/)?.[1], 'PASS', 'Run options browser geometry');
-        console.log('PASS: browser-verified Run options scrolling, reachable practice action and tab isolation at portrait and short landscape sizes');
+        console.log('PASS: Run options and Forge geometry at 10 phone/tablet panel sizes and two root text scales, including 320px phones and short landscape');
     } finally { await new Promise(resolve => server.close(resolve)); }
 } else console.log('SKIP: Run options browser geometry checks require Microsoft Edge');

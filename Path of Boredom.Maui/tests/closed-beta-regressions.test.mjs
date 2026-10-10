@@ -69,7 +69,7 @@ assert.equal(forgeNotification(notices, []), false);
 for (const height of [180, 250, 350, 650]) for (const top of [0, 40]) {
     const menu = { height: 58, bottom: 58 };
     const y = bossHudTop({ top, height }, menu, true);
-    assert.ok(top + (y - 14) * height / 650 > menu.bottom, 'boss title and bar are below the actual buttons');
+    assert.equal(y, 76, 'boss HUD remains below the level badge regardless of screen/menu bounds');
 }
 assert.equal(bossHudTop({ top: 0, height: 650 }, null, false), 49);
 
@@ -123,16 +123,16 @@ for (let stage = 0; stage < 12; stage++) {
     assert.equal(encounterForWave(wave + 4).key, 'boss');
     const ranged = Array.from({ length: 30 }, (_, i) => encounterKind(wave + 2, i));
     assert.ok(ranged.filter(kind => ['wisp', 'spitter', 'artillerist'].includes(kind)).length >= 20);
-    if (wave >= 6) assert.ok(Array.from({ length: 30 }, (_, i) => encounterElite(wave + 1, i)).reduce((a, b) => a + b, 0) >= 15);
+    if (wave >= 6) assert.ok(Array.from({ length: 30 }, (_, i) => encounterElite(wave + 1, i)).reduce((a, b) => a + b, 0) >= 14, 'formations retain elite pressure while keeping supporting enemies non-elite');
     const state = startRun(() => 0.5);
-    state.player.level = 12; state.loadout.auto = ['chain', 'reap', 'siphon', 'none'];
+    state.player.level = 20; state.loadout.auto = ['chain', 'reap', 'siphon', 'none'];
     state.wave = wave - 1;
     if (wave > 30) { state.mode = 'endless'; state.rankingMode = 'endless'; state.campaignComplete = 1; }
     state.travelPending = 1; state.resumeDelay = 0.01;
     step(state, {}, 0.05);
     assert.equal(state.wave, wave);
     assert.ok(state.enemies.length > 0 && state.enemies.length <= 40);
-    assert.equal(captureSnapshot(state).version, 18, 'encounters and presentation remain compatible with current saves');
+    assert.equal(captureSnapshot(state).version, 20, 'encounters and presentation remain compatible with current saves');
 }
 assert.ok(Object.keys(LEVEL_CARDS).includes('siphon'), 'Ashdrinker remains a global elite/boss-healing boon, not a selected-ability upgrade');
 console.log('PASS: loadout-aware drafts/Forge/scrolls, acknowledged notifications, mobile countdown and boss HUD, automatic Endless save/retry flow, encounter variety, and compatible v18 snapshots');

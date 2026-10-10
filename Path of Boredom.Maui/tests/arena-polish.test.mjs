@@ -8,6 +8,7 @@ import { HERO_CLASSES } from '../../Path of Boredom.Game/wwwroot/js/arpg-classes
 import { drawHero, drawOrb } from '../../Path of Boredom.Game/wwwroot/js/arpg-graphics.js';
 import { turnToward } from '../../Path of Boredom.Game/wwwroot/js/arpg-facing.js';
 import { drawBoss } from '../../Path of Boredom.Game/wwwroot/js/arpg-bosses.js';
+import { enemyDefense } from '../../Path of Boredom.Game/wwwroot/js/arpg-damage.js';
 
 for (let run = 0; run < 40; run++) {
     const state = createState(() => run / 40);
@@ -67,7 +68,7 @@ function context() {
 globalThis.document = { createElement: () => ({ getContext: () => context() }) };
 const source = fs.readFileSync(new URL('../../Path of Boredom.Game/wwwroot/js/arpg.js', import.meta.url), 'utf8');
 const actorCode = source.slice(source.indexOf('function drawActor('), source.indexOf('// The main per-frame draw call:'));
-const sandbox = { reducedMotion: { matches: false }, mobFacing: new WeakMap(), turnToward, drawHero, drawOrb, drawBoss,
+const sandbox = { reducedMotion: { matches: false }, mobFacing: new WeakMap(), turnToward, drawHero, drawOrb, drawBoss, enemyDefense,
     HERO_CLASSES, circle: (ctx, x, y, radius) => ctx.arc(x, y, radius, 0, Math.PI * 2) };
 vm.createContext(sandbox);
 vm.runInContext(`${actorCode}\nthis.drawActor = drawActor;`, sandbox);

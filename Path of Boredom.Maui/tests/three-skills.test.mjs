@@ -8,28 +8,28 @@ assert.equal(STARTER_SKILLS.length, 3);
 assert.ok(STARTER_SKILLS.length < SLOTTABLE_SKILLS.length);
 assert.ok(STARTER_SKILLS.every(key => SLOTTABLE_SKILLS.includes(key)));
 for (const start of [startRun, startEndlessRun]) {
-    for (const hero of ['knight', 'ranger', 'warden']) {
+    for (const hero of ['knight', 'ranger', 'warden', 'sorcerer']) {
         for (const starter of STARTER_SKILLS) {
             const state = start(() => 0.5, 'hard', hero);
             state.loadout.auto = [starter, 'none', 'none', 'none'];
-            for (const [level, capacity] of [[1, 1], [4, 1], [5, 2], [9, 2], [10, 3], [15, 3], [100, 3]]) {
+            for (const [level, capacity] of [[1, 1], [5, 1], [9, 1], [10, 2], [19, 2], [20, 3], [100, 3]]) {
                 state.player.level = level;
                 assert.equal(skillCapacity(state), capacity);
             }
-            state.player.level = 5;
+            state.player.level = 10;
             step(state, {}, 0.01);
             assert.equal(state.status, 'paused');
             assert.equal(needsSkillChoice(state), true);
             const other = SLOTTABLE_SKILLS.filter(key => key !== starter);
             assert.equal(setLoadout(state, 'none', [starter, other[0], 'none', 'none']), true);
             assert.equal(needsSkillChoice(state), false);
-            state.player.level = 10;
+            state.player.level = 20;
             assert.equal(needsSkillChoice(state), true);
             assert.equal(setLoadout(state, 'none', [starter, other[0], other[1], 'none']), true);
             assert.equal(selectedSkills(state).length, 3);
             assert.equal(setLoadout(state, 'none', [starter, other[0], other[2], 'none']), false, 'choices remain locked');
-            state.player.level = 15;
-            assert.equal(needsSkillChoice(state), false, 'level 15 must not offer a fourth skill');
+            state.player.level = 25;
+            assert.equal(needsSkillChoice(state), false, 'level 25 must not offer a fourth skill');
             assert.equal(validLoadout(state, 'none', [starter, other[0], other[1], other[2]]), false);
             assert.deepEqual(restoreSnapshot(captureSnapshot(state)).loadout, state.loadout);
         }
@@ -39,6 +39,7 @@ for (const start of [startRun, startEndlessRun]) {
 const state = startRun(() => 0.5, 'hard', 'knight');
 state.status = 'paused';
 state.player.level = 15;
+state.skillSchedule = 'legacy';
 state.loadout.auto = ['nova', 'chain', 'reap', 'none'];
 const old = captureSnapshot(state);
 old.version = 15;

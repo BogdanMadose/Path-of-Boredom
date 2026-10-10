@@ -34,7 +34,7 @@ public sealed record RankingRow(int Rank, string Player, long Score, DateTimeOff
 /// <param name="ManualSkill">The skill currently bound to the manual-cast slot (Q).</param>
 /// <param name="AutoSkills">The (up to 2) skills bound to auto-cast slots.</param>
 /// <param name="Equipment">Gear and trade-offs at submission time; absent on older records.</param>
-public sealed record RankingBuild(long Level, IReadOnlyList<RankingUpgrade> Upgrades, string ManualSkill, IReadOnlyList<string> AutoSkills, RankingEquipment? Equipment = null);
+public sealed record RankingBuild(long Level, IReadOnlyList<RankingUpgrade> Upgrades, string ManualSkill, IReadOnlyList<string> AutoSkills, RankingEquipment? Equipment = null, IReadOnlyList<string>? Relics = null, double? PhysicalArmor = null, double? SpellResistance = null);
 
 /// <summary>Equipped gear ratings and styles, separate from forge ranks.</summary>
 public sealed record RankingEquipment(string Weapon, long WeaponRating, string WeaponStyle, string Armor, int ArmorRating, string ArmorStyle);
@@ -147,6 +147,9 @@ public static class RankingRules
         // Basic shape checks: sane level, not too many entries, manual/auto skill names look like
         // real labels, and the manual skill isn't also duplicated into an auto slot.
         if (build.Level is < 1 or > 9_007_199_254_740_991L
+            || build.PhysicalArmor is { } physical && (!double.IsFinite(physical) || physical is < 0 or > 60)
+            || build.SpellResistance is { } magical && (!double.IsFinite(magical) || magical is < 0 or > 60)
+            || build.Relics is { } relics && (relics.Count > 6 || relics.Any(relic => !ValidLabel(relic)) || relics.Distinct(StringComparer.Ordinal).Count() != relics.Count)
             || build.Upgrades is null || build.Upgrades.Count > 91
             || !ValidLabel(build.ManualSkill) || build.AutoSkills is null || build.AutoSkills.Count > 4
             || build.AutoSkills.Any(skill => !ValidLabel(skill))

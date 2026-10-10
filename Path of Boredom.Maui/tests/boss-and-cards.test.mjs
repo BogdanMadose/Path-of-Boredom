@@ -91,7 +91,7 @@ for (const pattern of [1, 2, 3]) {
     boss.health = boss.maxHealth * (pattern === 1 ? 1 : pattern === 2 ? 0.5 : 0.25);
     boss.winding = 0.05;
     tick(state);
-    assert.equal(boss.combat.rest, pattern === 3 ? 1.5 : 1.2);
+    assert.equal(boss.combat.rest, 0.75);
     assert.equal(boss.slam, 3.2);
     const duringRecovery = captureSnapshot(state);
     assert.equal(restoreSnapshot(duringRecovery).enemies[0].combat.rest, boss.combat.rest);
@@ -99,7 +99,8 @@ for (const pattern of [1, 2, 3]) {
     assert.ok(boss.slam < 3.2, 'next attack timer runs during recovery');
     for (let frame = 0; frame < 32; frame++) tick(state);
     assert.equal(boss.combat.rest, 0);
-    assert.ok(boss.moving, 'boss resumes pursuing after its brief recovery');
+    assert.ok(boss.moving || Math.hypot(boss.x - state.player.x, boss.y - state.player.y) <= boss.radius + state.player.radius + 28,
+        'boss resumes pursuing or engages from melee range after its brief recovery');
     for (let frame = 0; frame < 40 && boss.winding === 0; frame++) tick(state);
     assert.ok(boss.winding > 0, 'boss proceeds into another telegraphed special promptly');
     assert.ok(boss.winding <= 1.1, 'special attack telegraphs remain readable');

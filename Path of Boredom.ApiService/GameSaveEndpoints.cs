@@ -576,10 +576,10 @@ public static class GameSaveEndpoints
     private static bool ValidEnemyCombat(JsonElement item, long sequence)
     {
         // Only bosses have multiple combat phases (up to 3); regular enemies are always phase 1.
-        // "pattern" (which specific attack pattern is active) can't exceed the current phase number.
+        // Bosses alternate all three patterns independently of their health phase.
         if (!item.TryGetProperty("combat", out var combat) || !Numbers(combat, "phase", "rest", "pattern")
             || !combat.GetProperty("phase").TryGetInt32(out var phase) || phase < 1 || phase > (Kind(item, "boss") ? 3 : 1)
-            || !combat.GetProperty("pattern").TryGetInt32(out var pattern) || pattern < 1 || pattern > phase
+            || !combat.GetProperty("pattern").TryGetInt32(out var pattern) || pattern < 1 || pattern > (Kind(item, "boss") ? 3 : 1)
             // Only bosses get a rest/breather period between phases; regular enemies never rest.
             || combat.GetProperty("rest").GetDouble() < 0 || combat.GetProperty("rest").GetDouble() > (Kind(item, "boss") ? 2 : 0)
             // While resting, an enemy can't simultaneously be winding up an attack.

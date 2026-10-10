@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { startRun, useSkill } from '../../Path of Boredom.Game/wwwroot/js/arpg-engine.js';
+import { drawClassSkillEffect } from '../../Path of Boredom.Game/wwwroot/js/arpg-skill-effects.js';
+const state = startRun(() => 0.99, 'hard', 'sorcerer');
+state.resumeDelay = 0;
+state.enemies = [80, 140].map(offset => ({ kind: 'husk', x: state.player.x + offset, y: state.player.y, radius: 15, health: 1000, maxHealth: 1000, modifier: 'none', elite: 0, chilled: 0 }));
+assert.equal(useSkill(state, 'attack'), true);
+assert.ok(state.enemies[0].health < 1000);
+assert.equal(state.enemies[1].health, 1000, 'basic bolt is single target, not an AoE');
+const visual = state.effects.find(item => item.kind === 'class-skill' && item.skill === 'attack');
+assert.equal(visual.radius, 80, 'visual ends at struck target rather than maximum range');
+const arcs = [];
+let balance = 0;
+const ctx = new Proxy({}, { get: (_, key) => (...args) => {
+    if (key === 'save') balance++;
+    if (key === 'restore') balance--;
+    if (key === 'arc') arcs.push(args[2]);
+}, set: () => true });
+drawClassSkillEffect(ctx, visual, 0.5);
+assert.equal(balance, 0);
+assert.ok(arcs.every(radius => radius <= 3), 'basic attack never draws a large ring');
+const menus = fs.readFileSync(new URL('../wwwroot/js/mobile-menu.js', import.meta.url), 'utf8');
+assert.ok(menus.includes('Back to main menu') && menus.includes('if (returnToMain)'));
+console.log('PASS: Sorcerer single-target basic damage, target-length bolt visual, no misleading AoE ring, balanced canvas context and origin-aware back navigation');

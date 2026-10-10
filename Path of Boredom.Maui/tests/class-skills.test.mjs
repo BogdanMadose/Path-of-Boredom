@@ -25,8 +25,8 @@ function arena(hero, skill, offsets = [[60, 0], [160, 0], [300, 0], [150, 120], 
 }
 const hitIndices = state => state.enemies.flatMap((enemy, index) => enemy.health < 10000 ? [index] : []);
 const names = Object.keys(CLASS_SKILLS).flatMap(hero => SLOTTABLE_SKILLS.map(skill => skillName({ heroClass: hero }, skill)));
-assert.equal(names.length, 27);
-assert.equal(new Set(names).size, 27, 'all combat abilities have distinct names');
+assert.equal(names.length, 36);
+assert.equal(new Set(names).size, 36, 'all combat abilities have distinct names');
 const fixtures = [];
 for (const hero of Object.keys(CLASS_SKILLS)) {
     assert.equal(Object.keys(CLASS_SKILLS[hero]).length + 3, 9);
@@ -44,7 +44,7 @@ for (const hero of Object.keys(CLASS_SKILLS)) {
                 assert.equal(treeNodeDefinition(state, skill, 'ember').detail, CLASS_SKILLS[hero][skill].keystone);
             }
             const snapshot = captureSnapshot(state);
-            assert.equal(snapshot.version, 18);
+            assert.equal(snapshot.version, 20);
             const restored = restoreSnapshot(snapshot);
             assert.deepEqual(restored.loadout, state.loadout);
             assert.equal(restored.player.afterstep, state.player.afterstep);
@@ -56,12 +56,16 @@ for (const hero of Object.keys(CLASS_SKILLS)) {
 }
 
 // Shared save keys must resolve to genuinely different targeting and secondary effects.
-const chainResults = Object.keys(CLASS_SKILLS).map(hero => {
+const chainResults = Object.fromEntries(Object.keys(CLASS_SKILLS).map(hero => {
     const state = arena(hero, 'chain');
     useSkill(state, 'chain', true);
-    return hitIndices(state);
-});
-assert.deepEqual(chainResults, [[0, 1, 3], [0, 3], [0, 1, 4, 5]]);
+    return [hero, hitIndices(state)];
+}));
+assert.deepEqual(chainResults, { sorcerer: [0, 1, 3], knight: [0, 1, 3], ranger: [0, 3], warden: [0, 1, 4, 5] });
+const rime = arena('sorcerer', 'frost', [[200, 0], [240, 40], [-80, 0]]);
+assert.equal(useSkill(rime, 'frost', true), true);
+assert.deepEqual(hitIndices(rime), [2], 'Rime sphere bursts around the nearest enemy');
+assert.equal(rime.enemies[2].chillStrength, 0.35);
 const knightCross = arena('knight', 'frost', [[100, 0], [0, 100], [100, 100]]);
 useSkill(knightCross, 'frost', true);
 assert.deepEqual(hitIndices(knightCross), [0, 1]);
@@ -119,6 +123,11 @@ breaker.projectiles = [{ x: 500, y: 325 }, { x: 300, y: 325 }];
 useSkill(breaker, 'nullwave', true);
 assert.deepEqual(hitIndices(breaker), [0]);
 assert.deepEqual(breaker.projectiles, [{ x: 300, y: 325 }]);
+const spellbreak = arena('sorcerer', 'nullwave', [[60, 0], [-60, 0]]);
+spellbreak.projectiles = [{ x: 500, y: 325 }, { x: 300, y: 325 }, { x: 900, y: 325 }];
+assert.equal(useSkill(spellbreak, 'nullwave', true), true);
+assert.deepEqual(hitIndices(spellbreak), [0, 1], 'Spellbreak strikes nearby enemies in every direction');
+assert.deepEqual(spellbreak.projectiles, [{ x: 900, y: 325 }], 'Spellbreak removes only nearby projectiles');
 
 const quake = arena('warden', 'nova', [[50, 0], [150, 0]]);
 useSkill(quake, 'nova', true);
@@ -138,4 +147,4 @@ invalidSlow.state.enemies[0].chilled = 4;
 assert.throws(() => restoreSnapshot(invalidSlow), 'slow duration stays bounded');
 
 if (process.argv[2]) fs.writeFileSync(process.argv[2], JSON.stringify(fixtures));
-console.log(`PASS: 27 unique class abilities, ${fixtures.length} base/upgraded active-combat save round-trips, distinct targeting and class effects`);
+console.log(`PASS: ${names.length} unique class abilities, ${fixtures.length} base/upgraded active-combat save round-trips, distinct targeting and class effects`);

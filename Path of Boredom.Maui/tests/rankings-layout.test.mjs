@@ -27,7 +27,7 @@ if (edge && fs.existsSync(edge)) {
     const folder = path.join(root, '.copilot-validation');
     fs.mkdirSync(folder, { recursive: true });
     const fixture = path.join(folder, 'rankings-layout.html');
-    const boards = ['knight', 'ranger', 'warden'].map(hero => `<section class="class-board" data-hero-class="${hero}">
+    const boards = ['knight', 'ranger', 'warden', 'sorcerer'].map(hero => `<section class="class-board" data-hero-class="${hero}">
         <div class="class-heading"><h2>${hero}</h2><span>2 players</span></div><div class="ranking-cards">
         ${[1, 2].map(rank => `<article class="ranking-card"><div class="record-heading"><span class="rank">#${rank}</span>
             <strong>VeryLongPlayerNickname24<small>YOU</small></strong><span class="record-score"><span class="score">123,456</span><small>BEST KILLS</small></span></div>
@@ -45,8 +45,12 @@ if (edge && fs.existsSync(edge)) {
         const boards = [...document.querySelectorAll('.class-board')];
         const positions = boards.map(board => board.getBoundingClientRect());
         const wide = window.innerWidth > 650;
-        check(wide ? positions.every(position => Math.abs(position.top - positions[0].top) < 1)
-            : positions[1].top >= positions[0].bottom, 'class positions at ' + window.innerWidth + 'px: ' + positions.map(position => position.x + ',' + position.y).join(';'));
+        check(wide ? positions[1].left > positions[0].left && Math.abs(positions[1].top - positions[0].top) < 1
+            : positions[1].top >= positions[0].bottom, 'responsive class columns at ' + window.innerWidth + 'px');
+        for (let i = 0; i < positions.length; i++) for (let j = i + 1; j < positions.length; j++) {
+            const a = positions[i], b = positions[j];
+            check(a.right <= b.left + 1 || b.right <= a.left + 1 || a.bottom <= b.top + 1 || b.bottom <= a.top + 1, 'class boards must not overlap');
+        }
         check(boards.every(board => board.scrollWidth <= board.clientWidth), 'class content must stay inside its column');
         check(document.documentElement.scrollWidth <= window.innerWidth, 'page must not overflow horizontally');
         for (const board of boards) {
@@ -61,12 +65,12 @@ if (edge && fs.existsSync(edge)) {
         fs.writeFileSync(fixture, `<html><head><meta charset="utf-8"><style>html,body{margin:0}${css}</style></head><body>
             <main class="rankings ${embedded ? 'embedded' : ''}"><div class="class-boards">${boards}</div></main>
             <script>try { ${checks}; document.body.dataset.result = 'PASS'; } catch (error) { document.body.dataset.result = error.message; }</script></body></html>`);
-        for (const width of [390, 740, 1280]) {
+        for (const width of [320, 360, 390, 430, 640, 740, 800, 1024, 1280]) {
             const output = await dumpBrowserDom(edge, ['--virtual-time-budget=1000', `--window-size=${width},800`, `${pathToFileURL(fixture).href}?check=${Date.now()}`]);
             assert.equal(output.match(/data-result="([^"]*)"/)?.[1], 'PASS', `width ${width}, embedded ${embedded}`);
         }
     }
-    console.log('PASS: browser-verified responsive class columns, single-class width, stacked player records and expanded builds at 390/740/1280px');
+    console.log('PASS: four-class rankings, single-class filtering and expanded builds at nine widths from 320px phones to 1280px tablets');
 } else {
     console.log('SKIP: browser geometry checks require Microsoft Edge');
 }

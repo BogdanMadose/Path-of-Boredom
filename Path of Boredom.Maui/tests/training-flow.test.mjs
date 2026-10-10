@@ -24,6 +24,7 @@ const context = vm.createContext({
     CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail; } },
     root: {
         dataset: {},
+        addEventListener() {},
         querySelectorAll(selector) { return ({ '[data-training]': [setup], '[data-exit-training]': [exit], '[data-training-skill]': skills, '[data-equipment-style]': [] })[selector] ?? []; },
         querySelector(selector) { return selector === '[data-start-training]' ? start : button({}); },
         dispatchEvent(event) { events.push(event); }

@@ -7,11 +7,11 @@ const source = fs.readFileSync(path.join(__dirname, '../wwwroot/js/mobile-menu.j
 const navigation = source.slice(source.indexOf('    function closePanel('), source.indexOf('    // ---- Tab bar'));
 assert.ok(navigation.includes('function openPanel('));
 const classes = () => ({ add() {}, remove() {} });
-const panel = () => ({ root: { classList: classes(), hidden: true } });
+const panel = () => ({ root: { classList: classes(), hidden: true, querySelector() { return null; } } });
 const panels = { pause: panel(), skills: panel(), forge: panel(), rankings: panel(), account: panel() };
 const events = [];
 let refreshes = 0;
-panels.rankings.root.querySelector = () => ({ disabled: false, click() { refreshes++; } });
+panels.rankings.root.querySelector = selector => selector === '.mm-close' ? null : ({ disabled: false, click() { refreshes++; } });
 const root = {
     dataset: { gameStatus: 'playing' },
     dispatchEvent(event) {
@@ -36,7 +36,7 @@ const context = vm.createContext({
     panels, document, CustomEvent,
     syncBadges() {},
     layer: { querySelector() { return { setAttribute() {} }; } },
-    openName: null, resumeAfterMenu: false
+    openName: null, resumeAfterMenu: false, returnToMain: false
 });
 vm.runInContext(navigation, context);
 context.openPanel('pause');
@@ -67,6 +67,11 @@ assert.equal(context.openName, 'account', 'future sign-in is available from the 
 assert.equal(root.dataset.gameStatus, 'ready');
 context.closePanel(false);
 assert.equal(root.dataset.gameStatus, 'ready', 'leaving sign-in must not start a run');
+context.openPanel('rankings');
+assert.equal(context.openName, 'rankings', 'rankings are available before starting a run');
+assert.equal(root.dataset.gameStatus, 'ready');
+context.closePanel(false);
+assert.equal(root.dataset.gameStatus, 'ready', 'leaving rankings must not start a run');
 root.dataset.gameStatus = 'playing';
 context.openPanel('pause');
 root.dataset.saveBusy = 'on';
@@ -102,13 +107,19 @@ const originals = {
     save: { disabled: false, click() { clicked.push('save'); } },
     load: { disabled: false, click() { clicked.push('load'); } }
 };
-const actionRoot = { querySelector(selector) { return originals[selector.includes('"save"') ? 'save' : 'load']; } };
+const actionRoot = { dataset: { mainMenu: 'off' }, querySelector(selector) { return originals[selector.includes('"save"') ? 'save' : 'load']; } };
 context.el = element;
 vm.runInContext(saveActions, context);
 const openingMenu = element();
 const pauseMenu = element();
 context.addSaveActions(openingMenu, actionRoot);
 context.addSaveActions(pauseMenu, actionRoot);
+const mainMenu = element();
+mainMenu.matches = selector => selector === '.main-menu-card';
+context.addSaveActions(mainMenu, actionRoot);
+assert.equal(mainMenu.children[0].children.length, 2, 'main menu adds Save and Account only; its existing Load button is retained');
+assert.equal(mainMenu.children[0].children[0].dataset.mobileSaveAction, 'save');
+assert.equal(mainMenu.children[0].children[1].dataset.mobileSaveAction, undefined);
 for (const host of [openingMenu, pauseMenu]) {
     const [save, load, signIn] = host.children[0].children;
     assert.equal(save.dataset.mobileSaveAction, 'save');
@@ -121,6 +132,9 @@ for (const host of [openingMenu, pauseMenu]) {
     context.closePanel(false);
 }
 assert.deepEqual(clicked, ['save', 'load', 'save', 'load']);
+assert.ok(source.includes('addSaveActions(mainCard, root)'), 'actual main menu includes account/save actions');
+assert.ok(source.includes('skillsShortcut.hidden = !badge || badge.hidden'), 'Skills shortcut only appears for notifications');
+assert.ok(source.includes('forgeShortcut.hidden = forgeBadge.hidden'), 'Forge shortcut only appears for notifications');
 originals.save.disabled = true;
 openingMenu.children[0].children[0].listeners.click();
 assert.equal(clicked.length, 4, 'disabled original controls must not be activated');

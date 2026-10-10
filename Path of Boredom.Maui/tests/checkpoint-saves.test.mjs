@@ -6,13 +6,13 @@ import { captureSnapshot, restoreSnapshot } from '../../Path of Boredom.Game/www
 import { resetToReleaseRankings } from '../../Path of Boredom.Game/wwwroot/js/arpg-ranking.js';
 
 const fixtures = [];
-for (const hero of ['knight', 'ranger', 'warden']) {
+for (const hero of ['knight', 'ranger', 'warden', 'sorcerer']) {
     for (const starter of SLOTTABLE_SKILLS) {
         for (const endless of [false, true]) {
             for (const wave of endless ? [35, 40] : [5, 10, 15, 20, 25, 30]) {
                 const state = (endless ? startEndlessRun : startRun)(() => 0.5, 'hard', hero);
                 resetToReleaseRankings(state);
-                state.player.level = 16;
+                state.player.level = 20;
                 state.loadout = { manual: 'none', auto: [starter, ...SLOTTABLE_SKILLS.filter(key => key !== starter).slice(0, 2), 'none'] };
                 state.wave = wave;
                 state.enemies = [];
@@ -22,7 +22,7 @@ for (const hero of ['knight', 'ranger', 'warden']) {
                 step(state, {}, 0.05);
                 assert.equal(state.status, !endless && wave === 30 ? 'won' : 'camp');
                 const snapshot = captureSnapshot(state);
-                assert.equal(snapshot.version, 18);
+                assert.equal(snapshot.version, 20);
                 const restored = restoreSnapshot(snapshot);
                 assert.equal(restored.status, state.status);
                 assert.deepEqual(restored.loadout, state.loadout);

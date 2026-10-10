@@ -27,7 +27,7 @@ for (const [index, profile] of BOSS_PROFILES.entries()) {
         state.enemies = [boss];
         state.projectiles = [];
         step(state, {}, 0.02);
-        assert.equal(boss.combat.rest, profile.recovery + (pattern === 3 ? 0.3 : 0));
+        assert.equal(boss.combat.rest, profile.recovery);
         assert.equal(state.projectiles.length, pattern === 1 ? 0 : pattern === 2 ? profile.fan.length : profile.rays);
         assert.equal(restoreSnapshot(captureSnapshot(state)).enemies[0].combat.rest, boss.combat.rest);
     }

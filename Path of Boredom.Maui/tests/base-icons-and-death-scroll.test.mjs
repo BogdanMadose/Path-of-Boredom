@@ -18,7 +18,7 @@ for (const heroClass of Object.keys(HERO_CLASSES)) for (const skill of SKILL_KEY
     assert.ok(svg.includes(`<title>${skillName({ heroClass }, skill)}</title>`));
     assets.set(url, svg);
 }
-assert.equal(new Set(Object.keys(HERO_CLASSES).map(heroClass => skillIcon({ heroClass }, 'attack'))).size, 3);
+assert.equal(new Set(Object.keys(HERO_CLASSES).map(heroClass => skillIcon({ heroClass }, 'attack'))).size, 4);
 const menu = read('Path of Boredom.Maui/wwwroot/js/mobile-menu.js');
 const treeArt = vm.runInNewContext(`(${menu.slice(menu.indexOf('function treeArt('), menu.indexOf('    // ---- Panel construction'))})`);
 for (const heroClass of Object.keys(HERO_CLASSES)) for (const skill of SKILL_KEYS) {

@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { startRun, startTraining } from '../../Path of Boredom.Game/wwwroot/js/arpg-engine.js';
+import { acceptChallenge, resolveChallenge } from '../../Path of Boredom.Game/wwwroot/js/arpg-run-systems.js';
+const home = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/Home.razor', import.meta.url), 'utf8');
+const forge = home.slice(home.indexOf('<section class="forge-panel"'), home.indexOf('<section class="options-panel"'));
+const options = home.slice(home.indexOf('<section class="options-panel"'), home.indexOf('<section class="challenges-panel"'));
+const challenges = home.slice(home.indexOf('<section class="challenges-panel"'), home.indexOf('<aside class="journey-panel"'));
+assert.ok(forge.includes('data-equipment-style'));
+assert.ok(!forge.includes('data-audio-mute') && !forge.includes('data-training') && !forge.includes('data-challenge-choice'));
+assert.ok(options.includes('data-audio-mute') && options.includes('data-training'));
+assert.ok(!options.includes('data-equipment-style') && !options.includes('data-challenge-choice'));
+for (const key of ['none', 'unscarred', 'flaskless', 'swift']) assert.ok(challenges.includes(`data-challenge-choice="${key}"`));
+const menu = fs.readFileSync(new URL('../wwwroot/js/mobile-menu.js', import.meta.url), 'utf8');
+assert.ok(menu.includes('challenges: "Stage challenges — bonus gold"'), 'Pause must label the Challenges menu clearly');
+assert.ok(menu.includes('names: ["skills", "forge", "challenges", "options"]'), 'Pause must expose Challenges alongside character menus');
+assert.ok(menu.includes('makePanel("challenges",'), 'Challenges must have its own panel');
+assert.match(menu, /options: "Run options — sound & practice"/);
+for (const key of ['unscarred', 'flaskless', 'swift']) {
+    const state = startRun(() => 0.99);
+    state.status = 'paused';
+    assert.equal(acceptChallenge(state, key), true);
+    state.wave = 5;
+    assert.equal(resolveChallenge(state), 150);
+    assert.equal(resolveChallenge(state), 0);
+    state.enemies = [{}];
+    assert.equal(acceptChallenge(state, key), false);
+    state.enemies = [];
+    assert.equal(acceptChallenge(state, key), true);
+    state.runSystems.challenge.elapsed = 1;
+    assert.equal(acceptChallenge(state, 'none'), false);
+}
+const practice = startTraining(() => 0.99);
+practice.status = 'paused';
+assert.equal(acceptChallenge(practice, 'unscarred'), false);
+console.log('PASS: independent Forge/Options/Challenges markup, visible challenge navigation, rewards and selection guards');

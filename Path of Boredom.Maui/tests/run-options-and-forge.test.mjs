@@ -153,40 +153,66 @@ assert.equal(mirroredSummary.textContent, summary.textContent);
 
 const css = fs.readFileSync(new URL('../wwwroot/css/mobile-menu.css', import.meta.url), 'utf8');
 assert.match(css, /forge-panel \.mm-subtabs \{ grid-template-columns: repeat\(3,/);
-assert.match(css, /forge-panel:not\(\[data-mobile-section="systems"\]\) > \.run-options \{ display: none;/);
-assert.match(css, /\.mm-panel \.run-options \{[^}]*grid-row: 3;[^}]*min-height: 0;[^}]*overflow-y: auto;/);
+assert.match(css, /forge-panel:not\(\[data-mobile-section="systems"\]\) > \.equipment-options \{ display: none;/);
+assert.match(css, /\.mm-panel \.run-options,[^}]*min-height: 0;[^}]*overflow-y: auto;/);
 console.log('PASS: selected-skill Forge/card availability, real combat bonuses, previews, scrolls, mastery gating, v16/v17 migration, training save isolation and synchronized mobile Pause options');
 
 const edge = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
 if (fs.existsSync(edge)) {
     const home = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/Home.razor', import.meta.url), 'utf8');
-    const optionsMarkup = home.slice(home.indexOf('<section class="run-options">'), home.indexOf('<div class="forge-grid">'));
+    const optionsMarkup = home.slice(home.indexOf('<section class="options-panel"'), home.indexOf('<section class="challenges-panel"'))
+        .replace(/@foreach \(var skill in CombatSkills\)\s*\{([\s\S]*?)\}/g, (_, markup) =>
+            ['nova', 'burst', 'guard', ...skills].map(skill => markup.replaceAll('@skill', skill)).join(''));
+    const equipmentMarkup = home.slice(home.indexOf('<section class="equipment-options">'), home.indexOf('<div class="forge-grid">'));
     const baseCss = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/Home.razor.css', import.meta.url), 'utf8');
     const shellCss = fs.readFileSync(new URL('../wwwroot/css/mobile-shell.css', import.meta.url), 'utf8');
     const html = `<html><head><style>html,body{margin:0}*{box-sizing:border-box}[hidden]{display:none!important}${baseCss}${shellCss.replace('@media (pointer: coarse)', '@media all')}${css.replace('@media (pointer: coarse)', '@media all')}</style></head>
-        <body class="mobile-shell"><div class="arpg"><section class="forge-panel mm-panel mm-open" data-mobile-section="systems">
-        ${optionsMarkup}<div class="forge-grid"><button>Skill forging</button></div><section class="mastery-panel">Mastery</section>
-        <div class="mm-head">Forge</div><div class="mm-subtabs"><button>Upgrades</button><button>Mastery</button><button>Run options</button></div>
+        <body class="mobile-shell"><div class="arpg">${optionsMarkup}<section class="forge-panel mm-panel" data-mobile-section="systems">
+        ${equipmentMarkup}<div class="forge-grid"><button>Skill forging</button></div><section class="mastery-panel">Mastery</section>
+        <div class="mm-head">Forge</div><div class="mm-subtabs"><button>Upgrades</button><button>Mastery</button><button>Equipment</button></div>
         </section></div><script>
         try {
-            const panel = document.querySelector('.forge-panel'), options = document.querySelector('.run-options'), forge = document.querySelector('.forge-grid'), mastery = document.querySelector('.mastery-panel');
+            const panel = document.querySelector('.options-panel'), forgePanel = document.querySelector('.forge-panel'), options = document.querySelector('.run-options'), equipment = document.querySelector('.equipment-options'), forge = document.querySelector('.forge-grid'), mastery = document.querySelector('.mastery-panel');
+            panel.classList.add('mm-panel', 'mm-open');
+            const head = document.createElement('div'); head.className = 'mm-head'; head.textContent = 'Run options'; panel.appendChild(head);
             const check = (condition, message) => { if (!condition) throw new Error(message); };
             for (const [width, height] of [[390,740],[740,360]]) {
                 panel.style.width = width + 'px'; panel.style.height = height + 'px';
-                panel.dataset.mobileSection = 'systems';
-                check(getComputedStyle(forge).display === 'none' && getComputedStyle(mastery).display === 'none', 'other tabs must be hidden');
+                panel.classList.add('mm-open'); forgePanel.classList.remove('mm-open');
+                check(!panel.querySelector('[data-equipment-style]') && !panel.querySelector('[data-challenge-choice]'), 'options must be separate from equipment and challenges');
                 check(options.clientHeight > 0 && getComputedStyle(options).overflowY === 'auto', 'Run options must have a usable scrolling container');
                 if (height === 360) check(options.scrollHeight > options.clientHeight, 'short landscape options must scroll');
                 const bounds = options.getBoundingClientRect();
-                check(bounds.bottom <= panel.getBoundingClientRect().bottom && bounds.top >= 90, 'Run options must fit below the tabs');
+                check(bounds.bottom <= panel.getBoundingClientRect().bottom && bounds.top >= 58, 'Run options must fit below the header');
                 for (const select of options.querySelectorAll('select')) check(select.getBoundingClientRect().right <= bounds.right + 1, 'select must not overflow');
                 options.scrollTop = options.scrollHeight;
                 const training = options.querySelector('[data-training]').getBoundingClientRect();
                 check(training.top >= bounds.top - 1 && training.bottom <= bounds.bottom + 1, 'training action must be reachable by scrolling');
-                panel.dataset.mobileSection = 'upgrades';
-                check(getComputedStyle(options).display === 'none' && getComputedStyle(forge).display !== 'none' && getComputedStyle(mastery).display === 'none', 'Upgrades tab isolation');
-                panel.dataset.mobileSection = 'training';
-                check(getComputedStyle(options).display === 'none' && getComputedStyle(forge).display === 'none' && getComputedStyle(mastery).display !== 'none', 'Mastery tab isolation');
+                const picker = options.querySelector('[data-training-picker]');
+                picker.hidden = false;
+                options.querySelector('[data-training]').hidden = true;
+                options.querySelector('[data-exit-training]').hidden = false;
+                check(!picker.querySelector('select'), 'practice abilities must not open a native dropdown');
+                check(picker.querySelectorAll('[data-training-skill]').length === 9, 'all nine abilities available inline');
+                for (const button of picker.querySelectorAll('[data-training-skill]')) {
+                    const rect = button.getBoundingClientRect();
+                    check(rect.width > 0 && rect.left >= bounds.left && rect.right <= bounds.right + 1, 'practice buttons fit within Run options');
+                }
+                options.scrollTop = options.scrollHeight;
+                const exit = options.querySelector('[data-exit-training]').getBoundingClientRect();
+                check(exit.top >= bounds.top - 1 && exit.bottom <= bounds.bottom + 1, 'exit training must be reachable');
+                check(panel.getBoundingClientRect().height === height, 'training setup must not expand the panel');
+                picker.hidden = true;
+                options.querySelector('[data-training]').hidden = false;
+                options.querySelector('[data-exit-training]').hidden = true;
+                panel.classList.remove('mm-open'); forgePanel.classList.add('mm-open');
+                forgePanel.style.width = width + 'px'; forgePanel.style.height = height + 'px';
+                forgePanel.dataset.mobileSection = 'systems';
+                check(getComputedStyle(equipment).display !== 'none' && getComputedStyle(forge).display === 'none' && getComputedStyle(mastery).display === 'none', 'Equipment tab isolation');
+                forgePanel.dataset.mobileSection = 'upgrades';
+                check(getComputedStyle(equipment).display === 'none' && getComputedStyle(forge).display !== 'none' && getComputedStyle(mastery).display === 'none', 'Upgrades tab isolation');
+                forgePanel.dataset.mobileSection = 'training';
+                check(getComputedStyle(equipment).display === 'none' && getComputedStyle(forge).display === 'none' && getComputedStyle(mastery).display !== 'none', 'Mastery tab isolation');
             }
             document.body.dataset.result = 'PASS';
         } catch (error) { document.body.dataset.result = error.message; }

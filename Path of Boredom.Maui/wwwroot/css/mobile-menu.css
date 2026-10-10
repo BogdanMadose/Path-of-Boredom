@@ -41,14 +41,17 @@
     body.mobile-shell .mm-bar {
         display: flex;
         align-self: flex-end;
-        width: min(180px, 34vw);
-        margin-top: max(56px, 9vh);
+        width: auto;
+        margin-top: max(var(--menu-shortcuts-top, 56px), env(safe-area-inset-top));
         align-items: stretch;
         gap: 3px;
-        padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 6px 6px;
+        padding: 0 max(8px, env(safe-area-inset-right)) 6px 6px;
         background: none;
         pointer-events: auto;
     }
+    body.mobile-shell .mm-tab[hidden] { display: none; }
+    body.mobile-shell .mm-tab { min-width: 48px; }
+    body.mobile-shell .campaign-lore-return { display: none; }
 
     body.mobile-shell .mm-tab {
         flex: 1;
@@ -72,6 +75,28 @@
         font-size: 17px;
         line-height: 1;
         color: #e0bd84;
+    }
+    body.mobile-shell .mm-pause-tab {
+        position: fixed;
+        top: max(var(--pause-hud-top, 76px), env(safe-area-inset-top));
+        left: max(var(--pause-hud-left, 12px), env(safe-area-inset-left));
+        width: 48px;
+        height: 44px;
+        min-width: 48px;
+        min-height: 44px;
+        background: #141d2066;
+        border-color: #c7a56b55;
+        color: #f6e7c6;
+    }
+    body.mobile-shell .main-menu-return {
+        width: 48px;
+        min-height: 44px;
+        padding: 4px;
+        font: 500 10px/1.2 system-ui, sans-serif;
+        background: #141d2066;
+    }
+    body.mobile-shell .arpg:is([data-game-status="playing"], [data-game-status="paused"], [data-game-status="camp"]) .main-menu-return {
+        display: none;
     }
 
     body.mobile-shell .mm-tab[aria-expanded="true"] {
@@ -101,7 +126,7 @@
         text-align: center;
     }
 
-    body.mobile-shell .mm-tab {
+    body.mobile-shell .mm-tab:not(.mm-pause-tab) {
         position: relative;
     }
 

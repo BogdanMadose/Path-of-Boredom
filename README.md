@@ -8,12 +8,21 @@ This README is the map of the place. Read this first, then head into the project
 
 ## What the game looks like now
 
+Each boss now alternates three positioning-based attacks from its first phase, with shared telegraph/hit geometry and later-phase projectile pressure. Elite formations deliberately pair frontline anchors with ranged or support enemies without stacking traits. Eight optional, small build synergies support control, defense, movement, recovery, and finishing playstyles. Boss introductions briefly reveal a title during combat and use area-specific musical motifs. Forge equipment previews and checkpoint reports show actual alternatives and outcomes.
+
+`Path of Boredom.Maui/tests/full-run-balance.mjs` compares 108 seeded campaign runs across four classes, three difficulties, three builds, and three seeds. The current automated policy completed 9/9 Hard runs per class, 3–5/9 Nightmare runs per class, and no Inferno runs. It measures recorded post-mitigation damage, survival, and boss-clear times using real progression without forced kills or invulnerability. This is reproducible balance evidence, not a substitute for human/on-device playtesting; Inferno boss balance remains unmeasured by this policy.
+
+The deeper `Path of Boredom.Maui/tests/inferno-skilled-runs.mjs` comparison covers 320 Inferno campaigns: 80 baseline runs and 240 skilled-controller runs across three builds and 20 seeds per class. The skilled controller predicts projectiles and enemy-specific threats, repositions every 150 ms, spends earned tree points and gold through normal menus, and avoids wasting flask healing. It completed 240/240 campaigns versus 0/80 baseline completions, with mean boss-clear times of 7.8–10.6 seconds across classes. Results are in `Path of Boredom.Maui/tests/inferno-skilled-results.json`. Precise state access and optimal pausing exceed typical human execution; these results show the old controller was inadequate, not that human Inferno balance is established. No gameplay difficulty or class stats were changed for this comparison.
+
 Campaign bosses now have six distinct silhouettes: an oathbound shield knight, a reed-crowned mire creature, a furnace tyrant, a crystalline regent, a floating archive, and a void entity. Their slam sizes, projectile fans/rings, speeds, and recovery rhythms differ by area. The Chapter lore reader introduces each area automatically, pauses combat, and shows its story, boss backstory, and tactical hints. Reopen it during the campaign; defeated-boss endings are available at checkpoints. Lore acknowledgement is session-only and does not change the save format.
 
 The main menu offers Continue, New campaign, Load, sound/options, Training grounds, and Quit. Opening it freezes the current in-memory run; quitting warns about unsaved progress. Android closes its task through a native bridge, while browsers explain that the tab must be closed manually. Training has a single launch button in the main menu. Touch movement spans the arena (except interactive controls), and compact menu buttons sit below the XP row. Audio uses quieter, rate-limited effects, evolving map arrangements, and a separate main-menu theme; existing saved volume preferences are retained.
 
-- Three classes: Ember Knight, Dawn Ranger, and Iron Warden. Each has nine combat abilities, so there are 27 class-specific choices rather than nine skills recoloured three times.
-- Choose one starting automatic skill, another at level 5, and a third at level 10. Those choices stay locked for the run. Regular attacks are automatic on mobile; dodge and flask remain manual and don't use a skill slot.
+- Four classes: Ember Knight, Dawn Ranger, Iron Warden, and Sorcerer. Each has nine combat abilities, for 36 class-specific choices with shared SVG coverage.
+- Choose one starting automatic skill, another at level 10, and a third at level 20. Older saves retain their level 5/10 unlock schedule. Choices stay locked for the run. Regular attacks are automatic on mobile; dodge and flask remain manual and don't use a skill slot.
+- Physical damage is reduced by armor; magical damage is reduced by spell resistance. Enemies and arena hazards have explicit damage types, and enemy defense indicators remain subtle.
+- Boss relics, optional checkpoint events, build synergies, a discovered-chapter codex, and checkpoint reports add campaign progression and build context.
+- Device-local controls and readability options include joystick size, dead zone and sensitivity, text scale, damage-number density, screen shake, high contrast, and combat-button side.
 - Earn one tree-upgrade point every two levels, up to 32. Forge upgrades, level-up boons, and post-forge training give you other ways to grow the character.
 - Non-boss waves alternate swarms, elite pressure, ranged pressure, and mixed assaults. Bosses keep their own attack patterns and short recovery windows. Arena hazard circles get fresh sizes, positions, counts, and activation timings each wave after hazardous areas begin.
 - Skills and rankings live inside the mobile game. Ranking boards are separate by class, difficulty, and starting mode; expand a record to see its automatic skills and upgrades.
@@ -56,9 +65,9 @@ The test suites cover skills, saves, combat facing, bosses, encounters, menus, r
 
 ## Releases: three different numbers, not one
 
-The latest local Android bundle is `Play-Release/Path-of-Boredom-Internal-Test-v12-API36.aab`: Play version code **12**, display version **0.5.0**, and target API **36**. That is a build artifact, not a claim that it's already validated, uploaded, or rolled out.
+The latest local Android bundle is `Play-Release/Path-of-Boredom-Internal-Test-v13-API36.aab`: Play version code **13** and target API **36**. That is a build artifact, not a claim that it includes every current source change, is validated, uploaded, or rolled out.
 
-The current source uses save format **18**, including run systems, chosen-skill cards, and the newer Forge tracks; earlier supported saves remain loadable. The mobile leaderboard tag is **`release`**, while the desktop patch board is **`004`**. Building an app bundle doesn't automatically change these tags, reset rankings, or redeploy the backend. Deploy an API that accepts format 18 before relying on cloud saves from this source.
+The current source uses save format **20**, including the skill-unlock schedule and adventure progress; earlier supported saves remain loadable. The mobile leaderboard tag is **`release`**, while the desktop patch board is **`004`**. Building an app bundle doesn't automatically change these tags, reset rankings, or redeploy the backend. Deploy an API that accepts format 20 before relying on cloud saves from this source.
 
 The current testing track is **closed testing**. The local bundle's `Internal-Test` filename is an artifact name, not its Play track or proof that it includes every current source change.
 

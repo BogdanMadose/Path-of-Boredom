@@ -33,6 +33,7 @@
     var panels = {};
     var openName = null;
     var resumeAfterMenu = false;
+    var returnToMain = false;
 
     function el(tag, className, text) {
         var node = document.createElement(tag);
@@ -67,7 +68,12 @@
         close.textContent = information ? "\u2190" : "\u2715";
         close.setAttribute("aria-label", information ? "Back to pause menu" : "Close");
         close.addEventListener("click", function () {
-            if (name === "account" && ["ready", "dead", "won"].includes(document.querySelector(".arpg").dataset.gameStatus)) closePanel(false);
+            if (returnToMain) {
+                closePanel(false);
+                document.querySelector('.arpg [data-open-main-menu]').click();
+                returnToMain = false;
+            }
+            else if (name === "account" && ["ready", "dead", "won"].includes(document.querySelector(".arpg").dataset.gameStatus)) closePanel(false);
             else if (information) openPanel("pause");
             else closePanel();
         });
@@ -274,16 +280,17 @@
         var root = document.querySelector(".arpg");
         if (root.dataset.saveBusy === "on") return;
         if (openName === name) { closePanel(); return; }
-        var idleAccount = ["account", "options"].includes(name) && ["ready", "dead", "won"].includes(root.dataset.gameStatus);
+        var idleAccount = ["account", "options", "rankings"].includes(name) && ["ready", "dead", "won"].includes(root.dataset.gameStatus);
         if (!idleAccount && !["playing", "paused", "camp"].includes(root.dataset.gameStatus)) return;
         var shouldResume = openName ? resumeAfterMenu : root.dataset.gameStatus === "playing";
+        if (!openName && root.dataset.mainMenu === 'on') returnToMain = true;
         if (openName) {
             panels[openName].root.classList.remove("mm-open");
             if (["rankings", "account"].includes(openName)) panels[openName].root.hidden = true;
             var previousTab = layer.querySelector('[data-mm-tab="' + openName + '"]');
             if (previousTab) previousTab.setAttribute("aria-expanded", "false");
         }
-        root.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: true, panel: name, information: ["account", "options"].includes(name) } }));
+        root.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: true, panel: name, information: ["account", "options", "rankings"].includes(name) } }));
         if (root.dataset.menuOpen !== "on") return;
         resumeAfterMenu = shouldResume;
 
@@ -292,6 +299,8 @@
         syncBadges();
         if (panels[name].syncTabs) panels[name].syncTabs();
         panels[name].root.classList.add("mm-open");
+        var back = panels[name].root.querySelector('.mm-close');
+        if (back) back.setAttribute('aria-label', returnToMain ? 'Back to main menu' : name === 'pause' ? 'Close' : 'Back to pause menu');
         var tab = layer.querySelector('[data-mm-tab="' + name + '"]');
         if (tab) tab.setAttribute("aria-expanded", "true");
         document.body.classList.add("mm-panel-open");
@@ -378,6 +387,16 @@
             card.appendChild(section);
         });
         addSaveActions(card, root);
+        var lore = el('button', 'mm-pause-option', 'Chapter lore');
+        lore.type = 'button';
+        lore.dataset.mobileLore = '';
+        lore.addEventListener('click', function () {
+            var original = root.querySelector('[data-open-lore]');
+            if (!original || original.hidden || original.disabled) return;
+            closePanel(false);
+            original.click();
+        });
+        card.appendChild(lore);
         ["exit-training"].forEach(function (action) {
             var button = el("button", "mm-pause-option", action === "training" ? "Set up practice — keeps your run" : "Exit training — return to my run");
             button.type = "button";
@@ -398,6 +417,7 @@
     function addSaveActions(host, root) {
         var actions = el("div", "mm-save-actions");
         ["save", "load"].forEach(function (action) {
+            if (action === 'load' && host.matches?.('.main-menu-card')) return;
             var button = el("button", "mm-pause-option", action === "save" ? "Save on device" : "Load saved run");
             button.type = "button";
             button.dataset.mobileSaveAction = action;
@@ -410,7 +430,10 @@
         });
         var signIn = el("button", "mm-pause-option", "Account & cloud");
         signIn.type = "button";
-        signIn.addEventListener("click", function () { openPanel("account"); });
+        signIn.addEventListener("click", function () {
+            if (root.dataset.mainMenu === 'on') root.dispatchEvent(new CustomEvent('open-main-panel', { detail: { panel: 'account' } }));
+            openPanel("account");
+        });
         actions.appendChild(signIn);
         host.appendChild(actions);
         var status = el("p", "mm-save-status");
@@ -439,6 +462,17 @@
     function syncBadges() {
         var root = document.querySelector(".arpg");
         if (!root || !root.isConnected) return;
+        var canvas = root.querySelector('.arena-viewport canvas');
+        var bar = layer.querySelector('.mm-bar');
+        var pause = layer.querySelector('[data-mm-tab="pause"]');
+        if (canvas && bar) {
+            var bounds = canvas.getBoundingClientRect();
+            bar.style.setProperty('--menu-shortcuts-top', (bounds.top + bounds.height * 48 / 650 + 4) + 'px');
+            if (pause) {
+                pause.style.setProperty('--pause-hud-top', (bounds.top + bounds.height * 66 / 650 + 6) + 'px');
+                pause.style.setProperty('--pause-hud-left', (bounds.left + bounds.width * 14 / 1100) + 'px');
+            }
+        }
         Array.prototype.forEach.call(root.querySelectorAll("[data-mobile-save-action]"), function (button) {
             var original = root.querySelector('[data-action="' + button.dataset.mobileSaveAction + '"]');
             button.disabled = !original || original.disabled;
@@ -465,6 +499,17 @@
         });
         var resume = root.querySelector(".mm-resume");
         if (resume) resume.disabled = root.dataset.saveBusy === "on";
+        var lore = root.querySelector('[data-mobile-lore]');
+        var loreSource = root.querySelector('[data-open-lore]');
+        if (lore) {
+            lore.hidden = !loreSource || loreSource.hidden;
+            lore.disabled = !loreSource || loreSource.disabled || root.dataset.saveBusy === 'on';
+        }
+        Array.prototype.forEach.call(root.querySelectorAll('[data-main-panel]'), function (button) {
+            var allowed = ['playing', 'paused', 'camp'].includes(root.dataset.gameStatus)
+                || button.dataset.mainPanel === 'rankings' && ['ready', 'dead', 'won'].includes(root.dataset.gameStatus);
+            button.disabled = root.dataset.saveBusy === 'on' || !allowed;
+        });
         var practicing = root.dataset.training === "on";
         var practiceHeading = root.querySelector("[data-practice-heading]");
         var practiceExplanation = root.querySelector("[data-practice-explanation]");
@@ -476,6 +521,7 @@
         if (practiceResume) practiceResume.textContent = practicing ? "Resume practice" : "Return to battle";
         Array.prototype.forEach.call(layer.querySelectorAll(".mm-tab"), function (tab) {
             tab.disabled = root.dataset.saveBusy === "on" || !["playing", "paused", "camp"].includes(root.dataset.gameStatus);
+            if (tab.dataset.mmTab === 'pause') tab.hidden = root.dataset.mainMenu === 'on' || !['playing', 'paused', 'camp'].includes(root.dataset.gameStatus);
         });
         var points = document.querySelector("[data-stat='skill-points']");
         panels.skills.syncTabs();
@@ -489,9 +535,13 @@
             badge.hidden = count === "0";
             badge.textContent = count;
         }
+        var skillsShortcut = layer.querySelector('[data-mm-tab="skills"]');
+        if (skillsShortcut) skillsShortcut.hidden = !badge || badge.hidden || root.dataset.mainMenu === "on";
         var forgeBadge = layer.querySelector("[data-mm-badge='forge']");
         forgeBadge.hidden = root.dataset.forgeAvailable !== "on";
         forgeBadge.textContent = "!";
+        var forgeShortcut = layer.querySelector('[data-mm-tab="forge"]');
+        if (forgeShortcut) forgeShortcut.hidden = forgeBadge.hidden || root.dataset.mainMenu === "on";
 
         var gold = document.querySelector("[data-stat='forge-gold']");
         var training = panels.forge.root.querySelector("[data-mastery]");
@@ -534,6 +584,18 @@
         buildAccount(root);
         buildPause(root);
         addSaveActions(root.querySelector("[data-run-menu]"), root);
+        var mainCard = root.querySelector('.main-menu-card');
+        addSaveActions(mainCard, root);
+        ['skills', 'forge', 'challenges', 'rankings'].forEach(function (name) {
+            var button = el('button', 'mm-pause-option', { skills: 'Skills & loadout', forge: 'Forge & equipment', challenges: 'Stage challenges', rankings: 'Rankings' }[name]);
+            button.type = 'button';
+            button.dataset.mainPanel = name;
+            button.addEventListener('click', function () {
+                root.dispatchEvent(new CustomEvent('open-main-panel', { detail: { panel: name } }));
+                openPanel(name);
+            });
+            mainCard.appendChild(button);
+        });
         buildBar();
         Array.prototype.forEach.call(root.querySelectorAll(".skill-bar [data-skill]"), function (button) {
             var art = button.dataset.skillIcon || treeArt(root.querySelector('[data-tree-skill="' + button.dataset.skill + '"]'));
@@ -549,8 +611,9 @@
         main.type = "button";
         main.addEventListener("click", function () { closePanel(false); root.querySelector("[data-open-main-menu]").click(); });
         panels.pause.root.querySelector(".mm-pause-card").appendChild(main);
-        root.addEventListener("main-menu-open", function () { closePanel(false); });
-        root.addEventListener("open-run-options", function () { openPanel("options"); });
+        root.addEventListener("main-menu-open", function () { closePanel(false); returnToMain = false; });
+        root.addEventListener('open-main-panel', function () { returnToMain = true; });
+        root.addEventListener("open-run-options", function (event) { returnToMain = event.detail?.fromMain === true; openPanel("options"); });
         root.addEventListener("training-menu", function (event) {
             if (event.detail?.action === "setup") {
                 if (openName !== "options") openPanel("options");
@@ -578,7 +641,12 @@
 
         // Android back closes an open panel first.
         window.addEventListener("popstate", function () {
-            if (openName === "rankings") openPanel("pause");
+            if (returnToMain && openName) {
+                closePanel(false);
+                root.querySelector('[data-open-main-menu]').click();
+                returnToMain = false;
+            }
+            else if (openName === "rankings") openPanel("pause");
             else closePanel(false);
         });
         return true;

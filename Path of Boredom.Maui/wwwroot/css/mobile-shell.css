@@ -253,8 +253,8 @@
        the translate(-50%,-50%) centres it on that point. */
     body.mobile-shell .joystick-base {
         position: absolute;
-        width: 96px;
-        height: 96px;
+        width: calc(var(--joystick-radius, 38px) * 2 + 20px);
+        height: calc(var(--joystick-radius, 38px) * 2 + 20px);
         margin: 0;
         border-radius: 50%;
         background: radial-gradient(circle, #1b242633 0%, #10181a66 70%);
@@ -326,9 +326,10 @@
         align-content: flex-end;
         gap: 8px;
         padding: 0 !important;
-        max-width: 148px;
+        max-width: 164px;
         opacity: .94;
     }
+    body.mobile-shell .arpg[data-button-side="left"] .skill-bar { right: auto; left: max(10px, env(safe-area-inset-left)); }
 
     body.mobile-shell .skill-bar button:not([data-skill="dodge"]):not([data-skill="potion"]) {
         display: none;
@@ -337,8 +338,8 @@
     body.mobile-shell .skill-bar button {
         position: relative;
         isolation: isolate;
-        width: 64px;
-        height: 64px;
+        width: 72px;
+        height: 72px;
         min-height: 0;
         padding: 0;
         border-radius: 50%;
@@ -368,8 +369,8 @@
     }
     body.mobile-shell .skill-bar .skill-icon {
         display: block;
-        width: 22px;
-        height: 22px;
+        width: 26px;
+        height: 26px;
         border-radius: 5px;
         margin-bottom: 2px;
         background-position: center;
@@ -380,10 +381,15 @@
     body.mobile-shell .skill-bar button small {
         display: block;
         margin-top: 4px;
-        font-size: 9px;
+        font-size: 10px;
+        font-weight: 600;
         font-variant-numeric: tabular-nums;
         color: #a8dbdf;
     }
+    body.mobile-shell .skill-bar button[data-control-state="ready"] { border-color: #a8ddbd; }
+    body.mobile-shell .skill-bar button[data-control-state="empty"] { border-color: #b78278; }
+    body.mobile-shell .skill-bar button[data-control-state="empty"] small { color: #ffb6a8; }
+    body.mobile-shell .skill-bar button:is([data-control-state="full"], [data-control-state="paused"]) small { color: #c4c7c5; }
 
     body.mobile-shell .skill-bar button::before {
         content: "";
@@ -503,8 +509,9 @@
     }
     body.mobile-shell .health-warning {
         z-index: 8;
+        transform: none;
         width: fit-content;
-        max-width: calc(100% - 32px);
+        max-width: min(180px, calc(50% - 70px));
         box-sizing: border-box;
         white-space: normal;
         font-size: 11px;

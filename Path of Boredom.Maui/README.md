@@ -35,7 +35,7 @@ The big rule is still **don't re-parent Blazor-rendered nodes**. The menu layer 
 
 ## Sound and music
 
-The shared `arpg-audio.js` synthesizes combat/UI sounds, ordinary menu-button clicks, and original ambient/boss loops through the WebView's Web Audio API. There are no external audio files to package. Open **Pause → Run options → Sound & music** for mute and separate music/effects volumes. Preferences stay on the device in WebView local storage and do not change save format 18 or cloud revisions.
+The shared `arpg-audio.js` synthesizes combat/UI sounds, ordinary menu-button clicks, and original ambient/boss loops through the WebView's Web Audio API. There are no external audio files to package. Open **Pause → Run options → Sound & music** for mute and separate music/effects volumes. Preferences stay on the device in WebView local storage and do not change the run save format or cloud revisions.
 
 Audio begins after a trusted touch/key gesture and stops when the page loses focus or becomes hidden. `App.xaml.cs` forwards the Android window-stop event through `MainPage.SuspendGame()` as `game-background`, pausing gameplay and suspending audio even if the WebView doesn't emit a visibility event. Returning doesn't automatically resume combat or suspended audio; interact to resume. Disposal stops voices/timers and closes the context.
 
@@ -43,7 +43,7 @@ Audio begins after a trusted touch/key gesture and stops when the page loses foc
 
 ## Device first, cloud second
 
-`OfflineGameSession.cs` keeps `offline-run.json` in the app's private data directory. Writes go through a temporary file and replacement move, malformed old saves are preserved before replacement, and downloading a cloud run keeps a `.before-cloud.json` backup. The current accepted save version is 18; earlier supported saves remain loadable.
+`OfflineGameSession.cs` keeps `offline-run.json` in the app's private data directory. Writes go through a temporary file and replacement move, malformed old saves are preserved before replacement, and downloading a cloud run keeps a `.before-cloud.json` backup. The current accepted save version is 20; earlier supported saves remain loadable.
 
 `MobileCloudGameSession.cs` handles Google-authenticated HTTP calls and cloud revision tracking. Tokens stay in memory; the persisted preference only records permission to restore the native sign-in session.
 
@@ -66,7 +66,7 @@ The server retains a minimal deletion marker to reject tokens issued before dele
 
 ## Building a closed-test bundle
 
-The release entry point is `deployment/Publish-PlayBundle.ps1` at the repository root. Call it with an unused Play version code, for example `& './deployment/Publish-PlayBundle.ps1' -VersionCode 13` for the next bundle after V12.
+The release entry point is `deployment/Publish-PlayBundle.ps1` at the repository root. Call it with an unused Play version code, for example `& './deployment/Publish-PlayBundle.ps1' -VersionCode 14` for the next bundle after V13.
 
 The script retains `Internal-Test` in bundle filenames. That name doesn't select a Play track: upload the intended bundle to the closed-testing release, and verify which source changes it contains.
 
@@ -79,17 +79,17 @@ It expects local inputs that aren't part of a clean clone:
 
 The script clears generated Android Release outputs, publishes an AAB, signs it, verifies the signature, and refuses to overwrite an existing named bundle. The cleanup is intentional: stale resource designers previously produced an app that built successfully but crashed on startup.
 
-The latest local artifact is `Play-Release/Path-of-Boredom-Internal-Test-v12-API36.aab`, with version code **12**, display version **0.5.0**, and target API **36**. Current internal-test coverage includes loadout-specific boons and scroll rewards, Forge reminder acknowledgement, mobile boss/countdown placement, background Endless checkpoint saves and retries, and varied encounters, alongside the earlier SVG, death-scroll, and ranking-layout fixes.
+The latest local artifact is `Play-Release/Path-of-Boredom-Internal-Test-v13-API36.aab`, with version code **13** and target API **36**. Its presence does not establish that it includes every current source change. Current regression coverage includes four-class combat, typed damage, adventure progress, loadout-specific boons and scroll rewards, Forge reminder acknowledgement, mobile boss/countdown placement, background Endless checkpoint saves and retries, and varied encounters, alongside SVG, death-scroll, and ranking-layout fixes.
 
-The current .NET 9 Android toolchain reports an API 35 compile-target/API 36 target warning during publishing. Verify the generated bundle's manifest, not just the filename. V11 passed signature and bundle validation; verify V12 separately and test the Play-delivered update on a device before wider rollout.
+The current .NET 9 Android toolchain reports an API 35 compile-target/API 36 target warning during publishing. Verify the generated bundle's manifest, not just the filename. Verify each release bundle separately and test the Play-delivered update on a device before wider rollout.
 
-Building the bundle doesn't upload it, create a Play release, or deploy the API. Current source writes save format 18; deploy a matching API before testing cloud uploads. The `release` ranking tag is unchanged, so this update doesn't itself reset the boards.
+Building the bundle doesn't upload it, create a Play release, or deploy the API. Current source writes save format 20; deploy a matching API before testing cloud uploads. The `release` ranking tag is unchanged, so this update doesn't itself reset the boards.
 
 ## Checking changes
 
 The suites in `tests/` cover the shared engine as well as this shell, including procedural audio. Run individual tests with Node, for example `node 'Path of Boredom.Maui/tests/base-icons-and-death-scroll.test.mjs'` from the repository root. The browser layout tests use Microsoft Edge when available and explicitly skip that part when it isn't. `closed-beta-regressions.test.mjs` checks loadout-specific offers and scroll rewards, Forge notification acknowledgement, mobile boss/countdown placement, automatic Endless save/retry flow, and encounter variety.
 
-Also test the actual app: start a run, release the joystick, pick skills at levels 5 and 10, scroll the death screen, expand a ranking build, save/load offline, and sign in/out. Headless browser geometry is useful, but it isn't the same thing as an Android WebView under somebody's thumb.
+Also test the actual app: start a run with each of the four classes, release the joystick, pick skills at levels 10 and 20 (5 and 10 for legacy saves), adjust control/readability preferences, scroll the death screen, expand a ranking build, save/load offline, and sign in/out. Headless browser geometry is useful, but it isn't the same thing as an Android WebView under somebody's thumb.
 
 `run-options-and-forge.test.mjs` covers chosen-skill cards and Forge bonuses, previews, scrolls, Mastery gating, older-save migration, training isolation, and Run options scrolling. `equipment-rankings.test.mjs` checks equipment snapshots across all class/style combinations, save round-trips, and later gear changes. On-device checks should also exercise all three Forge tabs, equipment styles, challenge rewards, and entering/exiting training without replacing the real run.
 

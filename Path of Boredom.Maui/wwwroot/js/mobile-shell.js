@@ -50,15 +50,18 @@
             }
             var dx = event.clientX - originX;
             var dy = event.clientY - originY;
+            var radius = Number(root.dataset.joystickSize || RADIUS);
+            var deadZone = Number(root.dataset.deadZone || DEAD_ZONE);
+            var sensitivity = Number(root.dataset.sensitivity || 1);
             var length = Math.hypot(dx, dy);
-            if (length > RADIUS) { dx = dx / length * RADIUS; dy = dy / length * RADIUS; }
+            if (length > radius) { dx = dx / length * radius; dy = dy / length * radius; }
             knob.style.transform = "translate(" + dx + "px," + dy + "px)";
-            if (Math.hypot(dx, dy) >= DEAD_ZONE) {
+            if (Math.hypot(dx, dy) >= deadZone) {
                 if (aiming) {
                     root.dataset.faceAngle = String(Math.atan2(dy, dx));
                 } else {
-                    root.dataset.stickX = String(dx / RADIUS);
-                    root.dataset.stickY = String(dy / RADIUS);
+                    root.dataset.stickX = String(Math.max(-1, Math.min(1, dx / radius * sensitivity)));
+                    root.dataset.stickY = String(Math.max(-1, Math.min(1, dy / radius * sensitivity)));
                 }
             } else if (!aiming) {
                 delete root.dataset.stickX;

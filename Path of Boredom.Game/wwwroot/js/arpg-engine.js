@@ -26,6 +26,7 @@ import { skillRangeBonus } from "./arpg-skill-trees.js";
 import { arenaHazards, hazardPhase } from "./arpg-hazards.js";
 import { encounterForWave, encounterKind, encounterElite } from "./arpg-encounters.js";
 import { newRunSystems, equipmentStyle, resolveChallenge } from "./arpg-run-systems.js";
+import { bossProfile } from "./arpg-bosses.js";
 // Logical canvas resolution (not the real on-screen pixel size — arpg-graphics.js scales this to
 // fit the actual canvas). All position math throughout this file is in these logical units.
 export const WIDTH = 1100;
@@ -1196,16 +1197,17 @@ export function step(state, input, elapsed) {
         }
         if (enemy.kind === "boss") {
             const combat = enemy.combat;
+            const identity = bossProfile(state.wave);
             const phase = enemy.health <= enemy.maxHealth / 3 ? 3 : enemy.health <= enemy.maxHealth * 2 / 3 ? 2 : 1;
             if (phase > combat.phase && enemy.winding <= 0) {
                 combat.phase = phase;
-                combat.rest = Math.min(combat.rest || 0.35, 0.35);
+                combat.rest = identity.recovery;
                 enemy.attackWindup = 0;
                 effect(state, "text", enemy.x, enemy.y - 60, "#ffd18d", `PHASE ${phase}`);
             }
             if (combat.rest > 0) {
-                combat.rest = Math.max(0, Math.min(combat.rest, 0.65) - dt);
-                enemy.slam = Math.max(0, Math.min(enemy.slam, 2.4) - dt);
+                combat.rest = Math.max(0, combat.rest - dt);
+                enemy.slam = Math.max(0, enemy.slam - dt);
                 continue;
             }
             if (enemy.winding > 0) {
@@ -1213,15 +1215,15 @@ export function step(state, input, elapsed) {
                 if (enemy.winding === 0) {
                     const angle = Math.atan2(enemy.attackY - enemy.y, enemy.attackX - enemy.x);
                     if (combat.pattern === 1) {
-                        effect(state, "ring", enemy.x, enemy.y, "#ff775c", "", 135);
-                        if (d < 135 + p.radius) hurtPlayer(state, Math.round(enemy.damage * 1.5), enemyDamageSource(enemy, "slam"));
+                        effect(state, "ring", enemy.x, enemy.y, mapForWave(state.wave).accent, "", identity.radius);
+                        if (d < identity.radius + p.radius) hurtPlayer(state, Math.round(enemy.damage * 1.5), enemyDamageSource(enemy, "slam"));
                     } else if (combat.pattern === 2) {
-                        fireVolley(state, enemy, angle, [-0.6, -0.3, 0, 0.3, 0.6], 190);
+                        fireVolley(state, enemy, angle, identity.fan, identity.speed);
                     } else {
-                        fireVolley(state, enemy, angle, Array.from({ length: 8 }, (_, i) => i * Math.PI / 4), 155);
+                        fireVolley(state, enemy, angle, Array.from({ length: identity.rays }, (_, i) => i * Math.PI * 2 / identity.rays), identity.speed * 0.85);
                     }
-                    combat.rest = combat.pattern === 3 ? 0.65 : 0.45;
-                    enemy.slam = 2.4;
+                    combat.rest = identity.recovery + (combat.pattern === 3 ? 0.3 : 0);
+                    enemy.slam = identity.interval;
                     enemy.cooldown = Math.max(enemy.cooldown, 1);
                 }
                 continue;

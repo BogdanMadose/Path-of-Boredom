@@ -82,6 +82,7 @@ for (const hero of ['knight', 'ranger', 'warden']) {
     context.finish();
 }
 for (const skill of ['nova', 'burst', 'guard', 'chain', 'frost', 'reap', 'meteor', 'siphon', 'nullwave']) {
+    context.currentTime += 1;
     const before = context.sources.length;
     audio.play('skill', 'ranger', skill);
     assert.equal(context.sources.length - before, 2);
@@ -91,7 +92,7 @@ context.currentTime += 1;
 const beforeSpam = context.sources.length;
 for (let i = 0; i < 100; i++) audio.play('hit');
 assert.equal(context.sources.length - beforeSpam, 1, 'impact spam is throttled');
-for (let i = 0; i < 100; i++) { context.currentTime += 0.2; audio.play('hit'); }
+for (let i = 0; i < 100; i++) { context.currentTime += 0.5; audio.play('hit'); }
 assert.equal(context.sources.length - beforeSpam, 16, 'effects have a hard overlapping voice limit');
 context.finish();
 
@@ -110,7 +111,7 @@ replacement.player.level = 20;
 replacement.gold = 1000;
 audio.update(replacement);
 assert.equal(context.sources.length, beforeReplacement, 'loading/replacing a state does not replay rewards');
-assert.equal(fixture.timers.size, 0, 'paused music stops');
+assert.equal(fixture.timers.size, 1, 'paused menus retain ambient music');
 
 replacement.status = 'playing'; replacement.resumeDelay = 0;
 replacement.enemies = [{ kind: 'boss', health: 100, winding: 0, combat: { phase: 1 } }];

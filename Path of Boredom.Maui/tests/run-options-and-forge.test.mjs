@@ -186,11 +186,9 @@ if (fs.existsSync(edge)) {
                 check(bounds.bottom <= panel.getBoundingClientRect().bottom && bounds.top >= 58, 'Run options must fit below the header');
                 for (const select of options.querySelectorAll('select')) check(select.getBoundingClientRect().right <= bounds.right + 1, 'select must not overflow');
                 options.scrollTop = options.scrollHeight;
-                const training = options.querySelector('[data-training]').getBoundingClientRect();
-                check(training.top >= bounds.top - 1 && training.bottom <= bounds.bottom + 1, 'training action must be reachable by scrolling');
+                check(!options.querySelector('[data-training]'), 'training must start only from main menu');
                 const picker = options.querySelector('[data-training-picker]');
                 picker.hidden = false;
-                options.querySelector('[data-training]').hidden = true;
                 options.querySelector('[data-exit-training]').hidden = false;
                 check(!picker.querySelector('select'), 'practice abilities must not open a native dropdown');
                 check(picker.querySelectorAll('[data-training-skill]').length === 9, 'all nine abilities available inline');
@@ -203,7 +201,6 @@ if (fs.existsSync(edge)) {
                 check(exit.top >= bounds.top - 1 && exit.bottom <= bounds.bottom + 1, 'exit training must be reachable');
                 check(panel.getBoundingClientRect().height === height, 'training setup must not expand the panel');
                 picker.hidden = true;
-                options.querySelector('[data-training]').hidden = false;
                 options.querySelector('[data-exit-training]').hidden = true;
                 panel.classList.remove('mm-open'); forgePanel.classList.add('mm-open');
                 forgePanel.style.width = width + 'px'; forgePanel.style.height = height + 'px';

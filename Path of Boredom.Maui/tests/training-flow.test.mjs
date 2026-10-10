@@ -17,11 +17,13 @@ const events = [];
 const context = vm.createContext({
     state: original, saving: false, checkingUnlock: false, setupAction: null,
     checkpointHandled: 'campaign:5', shownStatus: 'paused', last: 0,
+    begin() {}, openSetup() {}, gameConfirm() {}, loadButton: { click() {} }, saveBridge: null,
     startTraining, togglePause, SLOTTABLE_SKILLS, Math, performance: { now: () => 500 },
     reportScore() {}, clearInput() {}, updateHud() {}, canvas: { focus() {} },
     setEquipmentStyle() {}, acceptChallenge() {},
     CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail; } },
     root: {
+        dataset: {},
         querySelectorAll(selector) { return ({ '[data-training]': [setup], '[data-exit-training]': [exit], '[data-training-skill]': skills, '[data-equipment-style]': [] })[selector] ?? []; },
         querySelector(selector) { return selector === '[data-start-training]' ? start : button({}); },
         dispatchEvent(event) { events.push(event); }

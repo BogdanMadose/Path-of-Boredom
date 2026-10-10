@@ -274,7 +274,7 @@
         var root = document.querySelector(".arpg");
         if (root.dataset.saveBusy === "on") return;
         if (openName === name) { closePanel(); return; }
-        var idleAccount = name === "account" && ["ready", "dead", "won"].includes(root.dataset.gameStatus);
+        var idleAccount = ["account", "options"].includes(name) && ["ready", "dead", "won"].includes(root.dataset.gameStatus);
         if (!idleAccount && !["playing", "paused", "camp"].includes(root.dataset.gameStatus)) return;
         var shouldResume = openName ? resumeAfterMenu : root.dataset.gameStatus === "playing";
         if (openName) {
@@ -283,7 +283,7 @@
             var previousTab = layer.querySelector('[data-mm-tab="' + openName + '"]');
             if (previousTab) previousTab.setAttribute("aria-expanded", "false");
         }
-        root.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: true, panel: name, information: name === "account" } }));
+        root.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: true, panel: name, information: ["account", "options"].includes(name) } }));
         if (root.dataset.menuOpen !== "on") return;
         resumeAfterMenu = shouldResume;
 
@@ -378,7 +378,7 @@
             card.appendChild(section);
         });
         addSaveActions(card, root);
-        ["training", "exit-training"].forEach(function (action) {
+        ["exit-training"].forEach(function (action) {
             var button = el("button", "mm-pause-option", action === "training" ? "Set up practice — keeps your run" : "Exit training — return to my run");
             button.type = "button";
             button.dataset.practiceProxy = action;
@@ -545,6 +545,12 @@
 
         setInterval(syncBadges, 500);
         syncBadges();
+        var main = el("button", "mm-pause-option", "Main menu");
+        main.type = "button";
+        main.addEventListener("click", function () { closePanel(false); root.querySelector("[data-open-main-menu]").click(); });
+        panels.pause.root.querySelector(".mm-pause-card").appendChild(main);
+        root.addEventListener("main-menu-open", function () { closePanel(false); });
+        root.addEventListener("open-run-options", function () { openPanel("options"); });
         root.addEventListener("training-menu", function (event) {
             if (event.detail?.action === "setup") {
                 if (openName !== "options") openPanel("options");

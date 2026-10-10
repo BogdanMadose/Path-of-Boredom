@@ -1,5 +1,5 @@
 const SETTINGS_KEY = "path-of-boredom.audio.v1";
-export const DEFAULT_AUDIO_SETTINGS = Object.freeze({ muted: false, music: 0.25, effects: 0.55 });
+export const DEFAULT_AUDIO_SETTINGS = Object.freeze({ muted: false, music: 0.25, effects: 0.35 });
 const volume = (value, fallback) => typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
 export function audioSettings(value) {
     return {
@@ -20,7 +20,8 @@ export function createGameAudio(environment = globalThis) {
     let settings = { ...DEFAULT_AUDIO_SETTINGS };
     try { settings = audioSettings(JSON.parse(environment.localStorage?.getItem(SETTINGS_KEY) ?? "null")); } catch { /* Audio preferences are optional. */ }
     let context, musicGain, effectsGain, master, noise;
-    let disposed = false, failed = false, background = false, active = false, boss = false, area = 0;
+    let disposed = false, failed = false, background = false, active = false, boss = false, area = 0, menu = false;
+    let effectWindow = 0, effectCount = 0;
     let timer = null, nextNote = 0, beat = 0, previous = null, previousState = null;
     const voices = new Set();
     const lastCue = new Map();
@@ -76,11 +77,12 @@ export function createGameAudio(environment = globalThis) {
         if (!context || context.state !== "running") return;
         const now = context.currentTime;
         if (nextNote < now) nextNote = now + 0.04;
-        const spacing = boss ? 0.3 : 0.65;
+        const spacing = boss ? 0.38 : menu ? 0.8 : 0.62 + area * 0.025;
         while (nextNote < now + 0.25) {
-            const root = 45 + area;
-            const melody = boss ? [0, 7, 3, 10, 0, 5, 2, 7] : melodies[area];
-            const note = frequency(root + 12 + melody[beat % melody.length]);
+            const progression = menu ? [0, 5, 3, 7] : [0, 3, 5, -2];
+            const root = (menu ? 48 : 45 + area) + progression[Math.floor(beat / 16) % 4];
+            const melody = boss ? [0, 7, 3, 10, 0, 5, 2, 7] : menu ? [0, 7, 12, 14, 10, 7, 5, 3] : melodies[area];
+            const note = frequency(root + 12 + melody[(beat + Math.floor(beat / 32) * 2) % melody.length]);
             voice("music", nextNote, boss ? 0.24 : 1.4, note, note, boss ? 0.075 : 0.055, boss ? "triangle" : "sine");
             if (beat % 4 === 0) {
                 const bass = frequency(root - 12);
@@ -91,6 +93,10 @@ export function createGameAudio(environment = globalThis) {
                 }
             }
             if (boss && beat % 2 === 0) voice("music", nextNote, 0.12, 110, 35, 0.1);
+            if (beat % 8 === 6) {
+                const counter = frequency(root + 24 + melody[(beat + 3) % melody.length]);
+                voice("music", nextNote + spacing / 2, 0.9, counter, counter, 0.018);
+            }
             nextNote += spacing;
             beat++;
         }
@@ -139,7 +145,10 @@ export function createGameAudio(environment = globalThis) {
         if (!context || context.state !== "running" || background || settings.muted || disposed || failed) return;
         const now = context.currentTime;
         const key = cue === "skill" ? `${cue}:${skill}` : cue;
-        if (now - (lastCue.get(key) ?? -Infinity) < (cue === "hit" || cue === "loot" ? 0.16 : 0.09)) return;
+        const interval = cue === "attack" ? 0.55 : cue === "hit" ? 0.4 : cue === "loot" ? 0.65 : cue === "skill" ? 0.35 : 0.12;
+        if (now - (lastCue.get(key) ?? -Infinity) < interval) return;
+        if (now - effectWindow >= 1) { effectWindow = now; effectCount = 0; }
+        if (["attack", "hit", "loot", "skill"].includes(cue) && effectCount++ >= 6) return;
         lastCue.set(key, now);
         try {
             const tone = (pitch, end, duration, level = 0.1, type = "sine", delay = 0) => voice("effects", now + delay, duration, pitch, end, level, type);
@@ -170,14 +179,15 @@ export function createGameAudio(environment = globalThis) {
             }
         } catch { /* A failed sound must not interrupt combat. */ }
     }
-    function update(state, mapIndex = 0, blocked = false) {
+    function update(state, mapIndex = 0, blocked = false, mainMenu = false) {
         if (disposed) return;
-        const nextBoss = state.enemies.some(enemy => enemy.kind === "boss" && enemy.health > 0);
+        const nextBoss = !mainMenu && state.enemies.some(enemy => enemy.kind === "boss" && enemy.health > 0);
         const nextArea = Math.max(0, Math.min(5, mapIndex));
-        if (nextBoss !== boss || nextArea !== area) stopMusic();
+        if (nextBoss !== boss || nextArea !== area || menu !== mainMenu) stopMusic();
+        menu = mainMenu;
         boss = nextBoss;
         area = nextArea;
-        active = !blocked && state.status === "playing" && !state.resumeDelay;
+        active = !blocked && (mainMenu || state.status === "ready" || state.status === "playing" && !state.resumeDelay || state.status === "paused");
         syncMusic();
         const current = {
             status: state.status, health: state.player.health, level: state.player.level, gold: state.gold,

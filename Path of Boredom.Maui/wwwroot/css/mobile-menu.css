@@ -41,9 +41,10 @@
     body.mobile-shell .mm-bar {
         display: flex;
         align-self: flex-end;
-        width: min(360px, 58vw);
+        width: min(180px, 34vw);
+        margin-top: max(56px, 9vh);
         align-items: stretch;
-        gap: 4px;
+        gap: 3px;
         padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 6px 6px;
         background: none;
         pointer-events: auto;
@@ -62,7 +63,7 @@
         border-radius: 10px;
         background: #141d20d9;
         color: #d8c9a8;
-        font: 500 10px/1 system-ui, sans-serif;
+        font: 500 9px/1 system-ui, sans-serif;
         letter-spacing: .3px;
         -webkit-tap-highlight-color: transparent;
     }

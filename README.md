@@ -8,6 +8,10 @@ This README is the map of the place. Read this first, then head into the project
 
 ## What the game looks like now
 
+Campaign bosses now have six distinct silhouettes: an oathbound shield knight, a reed-crowned mire creature, a furnace tyrant, a crystalline regent, a floating archive, and a void entity. Their slam sizes, projectile fans/rings, speeds, and recovery rhythms differ by area. The Chapter lore reader introduces each area automatically, pauses combat, and shows its story, boss backstory, and tactical hints. Reopen it during the campaign; defeated-boss endings are available at checkpoints. Lore acknowledgement is session-only and does not change the save format.
+
+The main menu offers Continue, New campaign, Load, sound/options, Training grounds, and Quit. Opening it freezes the current in-memory run; quitting warns about unsaved progress. Android closes its task through a native bridge, while browsers explain that the tab must be closed manually. Training has a single launch button in the main menu. Touch movement spans the arena (except interactive controls), and compact menu buttons sit below the XP row. Audio uses quieter, rate-limited effects, evolving map arrangements, and a separate main-menu theme; existing saved volume preferences are retained.
+
 - Three classes: Ember Knight, Dawn Ranger, and Iron Warden. Each has nine combat abilities, so there are 27 class-specific choices rather than nine skills recoloured three times.
 - Choose one starting automatic skill, another at level 5, and a third at level 10. Those choices stay locked for the run. Regular attacks are automatic on mobile; dodge and flask remain manual and don't use a skill slot.
 - Earn one tree-upgrade point every two levels, up to 32. Forge upgrades, level-up boons, and post-forge training give you other ways to grow the character.

@@ -8,6 +8,8 @@ If the combat numbers feel wrong, start here. If the death screen won't scroll, 
 
 ## The module breakdown
 
+- **`arpg-bosses.js`** — six boss lore/art profiles and attack parameters. Simulation and warning rendering share these profiles so slam radii and projectile patterns agree. Boss identity follows the current map, including Endless cycles, without adding serialized fields.
+
 - **`arpg.js`** — runtime entry point, input, setup flow, HUD updates, trees, forge, overlays, and save/ranking bridge calls. It also contains the main canvas renderer and mob artwork. `createGame()` returns the host-facing game instance.
 - **`arpg-engine.js`** — simulation and balance. `createState()` builds a run, `step()` advances combat, `useSkill()` dispatches attacks/abilities, and wave/checkpoint helpers advance the journey. `damageHistory` feeds the death report: up to 12 post-mitigation hits from the last eight seconds.
 - **`arpg-classes.js`** — the three classes' base stats, regular attack identities, weapon types, and descriptions.
@@ -39,6 +41,8 @@ Tree points arrive every two levels, capped at 32. Respeccing a tree refunds its
 SVGs live in the shared `wwwroot/images/skills/` folder. `skillIcon()` returns an absolute `/_content/PathOfBoredom.Game/...` URL for every skill, including class-specific regular attacks and shared dodge/flask icons. This matters for CSS backgrounds: a relative URL that works in an `<img>` can resolve somewhere else when a stylesheet uses it.
 
 ## Cards, Forge, and equipment
+
+The campaign's Chapter lore reader is owned by `arpg.js` and `Home.razor`. New-area introductions pause combat and can be dismissed immediately; the reader can be reopened, and completed-stage endings are shown only after victory. A per-state `WeakMap` tracks introductions for this session; loading a run can show its chapter again. Main menus, input, and automatic checkpoint travel cannot advance the simulation behind the reader. `boss-identities.test.mjs` exercises all six drawing paths, projectile profiles, recovery values, and save round-trips.
 
 Level-ups draft three distinct available cards. Skill-specific cards require the chosen loadout and respect rank caps; saved unavailable offers are replaced deterministically. Each newer ability has a `${skill}Oath` card giving +6% damage per rank, capped at ten. General boons remain separate from tree points and Forge ranks.
 

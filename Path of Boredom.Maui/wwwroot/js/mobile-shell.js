@@ -115,7 +115,7 @@
         if (!movement || !host) return false;
         root.dataset.autoAttack = "on";
         delete root.dataset.faceAngle;
-        movement.setAttribute("aria-label", "Move with your left thumb. Attacks and skills target automatically. Dodge and flask use the right buttons.");
+        movement.setAttribute("aria-label", "Touch anywhere on the arena to move. Attacks and skills target automatically. Dodge and flask keep their own buttons.");
         return buildJoystick(movement, false);
     }
 

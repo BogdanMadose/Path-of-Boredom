@@ -12,6 +12,8 @@ Android is the shipping target, with a minimum API of 24 and release target API 
 
 ## The mobile shell
 
+The shared main menu is available from the persistent Main menu button and Pause. It freezes the current run in memory, offers the single Training grounds entry, and warns before quitting. `GameApplicationControl` closes the Android task through the optional shared `IGameApplicationControl` bridge. Save before quitting: in-memory progress is not a device save. The floating joystick now covers the whole arena rather than only its left half; interactive buttons and menus retain their own input. Compact Skills/Forge/Pause controls are placed below the XP bar.
+
 - `wwwroot/js/mobile-shell.js` owns the floating left-thumb joystick. It appears where the touch begins and disappears on release, cancellation, or leaving combat.
 - `wwwroot/js/mobile-menu.js` builds the Skills, Forge, Pause, Rankings, and Account menu layer. It hides trees for unselected combat skills while keeping attack, dodge, and flask available.
 - `wwwroot/css/mobile-shell.css` handles the full-screen arena, controls, and overlays, including a scrollable run/death card.

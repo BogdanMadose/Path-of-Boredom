@@ -91,13 +91,13 @@ for (const pattern of [1, 2, 3]) {
     boss.health = boss.maxHealth * (pattern === 1 ? 1 : pattern === 2 ? 0.5 : 0.25);
     boss.winding = 0.05;
     tick(state);
-    assert.equal(boss.combat.rest, pattern === 3 ? 0.65 : 0.45);
-    assert.equal(boss.slam, 2.4);
+    assert.equal(boss.combat.rest, pattern === 3 ? 1.5 : 1.2);
+    assert.equal(boss.slam, 3.2);
     const duringRecovery = captureSnapshot(state);
     assert.equal(restoreSnapshot(duringRecovery).enemies[0].combat.rest, boss.combat.rest);
     tick(state);
-    assert.ok(boss.slam < 2.4, 'next attack timer runs during recovery');
-    for (let frame = 0; frame < 14; frame++) tick(state);
+    assert.ok(boss.slam < 3.2, 'next attack timer runs during recovery');
+    for (let frame = 0; frame < 32; frame++) tick(state);
     assert.equal(boss.combat.rest, 0);
     assert.ok(boss.moving, 'boss resumes pursuing after its brief recovery');
     for (let frame = 0; frame < 40 && boss.winding === 0; frame++) tick(state);
@@ -111,8 +111,8 @@ phaseChange.boss.combat.rest = 1.5;
 phaseChange.boss.health = phaseChange.boss.maxHealth * 0.25;
 tick(phaseChange.state);
 assert.equal(phaseChange.boss.combat.phase, 3, 'burst damage skips directly to the correct phase');
-assert.ok(phaseChange.boss.combat.rest <= 0.35, 'phase change cannot stack a long stagger onto recovery');
-for (let frame = 0; frame < 8; frame++) tick(phaseChange.state);
+assert.ok(phaseChange.boss.combat.rest <= 1.2, 'phase change uses the boss profile recovery without stacking');
+for (let frame = 0; frame < 26; frame++) tick(phaseChange.state);
 assert.equal(phaseChange.boss.combat.rest, 0);
 
 const loadedRecovery = isolatedBoss();
@@ -120,7 +120,7 @@ loadedRecovery.boss.combat.rest = 2;
 const reloaded = restoreSnapshot(captureSnapshot(loadedRecovery.state));
 reloaded.status = 'playing';
 tick(reloaded);
-assert.ok(reloaded.enemies[0].combat.rest <= 0.65, 'legacy long recoveries are shortened after loading');
+assert.ok(reloaded.enemies[0].combat.rest < 2, 'saved recoveries continue counting down after loading');
 
 const telegraph = isolatedBoss();
 telegraph.boss.health = telegraph.boss.maxHealth * 0.25;

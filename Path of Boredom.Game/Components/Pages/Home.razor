@@ -3,11 +3,40 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject IGameSession Session
+@inject IServiceProvider Services
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 
 <PageTitle>Path of Boredom - The Ember Campaign</PageTitle>
 
 <div class="arpg" data-player="@windowsUserName" data-ranking-board="@(Session is ICloudGameSession ? Path_of_Boredom.ServiceDefaults.RankingRules.MobileRelease : Path_of_Boredom.ServiceDefaults.RankingRules.CurrentPatch)" data-cloud-signed-in="@(Session is ICloudGameSession account && account.AccountStatus.SignedIn ? "on" : "off")" @ref="gameRoot">
+    <section class="main-menu" data-main-menu aria-labelledby="main-menu-title">
+        <div class="main-menu-card">
+            <h1 id="main-menu-title">Path of Boredom</h1>
+            <p>Your run stays paused while this menu is open. Save before quitting or closing the app.</p>
+            <button type="button" class="ember-button" data-main-resume>Continue run</button>
+            <button type="button" class="quiet-button" data-main-new>New campaign</button>
+            <button type="button" class="quiet-button" data-main-load>Load saved run</button>
+            <button type="button" class="quiet-button" data-training>Training grounds — separate practice</button>
+            <button type="button" class="quiet-button" data-main-options>Sound &amp; options</button>
+            <button type="button" class="quiet-button" data-main-quit>Quit</button>
+            <p data-main-status role="status"></p>
+        </div>
+    </section>
+    <button type="button" class="quiet-button main-menu-return" data-open-main-menu>Main menu</button>
+    <button type="button" class="quiet-button campaign-lore-return" data-open-lore>Chapter lore</button>
+    <section class="campaign-lore" data-lore-reader hidden role="dialog" aria-modal="true" aria-labelledby="lore-title">
+        <article class="campaign-lore-card">
+            <p class="eyebrow" data-lore-chapter></p>
+            <h2 id="lore-title" data-lore-title></h2>
+            <p data-lore-story></p>
+            <h3 data-lore-boss></h3>
+            <p data-lore-boss-story></p>
+            <p data-lore-tactics></p>
+            <p data-lore-ending></p>
+            <small>Combat is paused while reading. Read at your own pace, or continue now. Chapter lore can be reopened during the campaign.</small>
+            <button type="button" class="ember-button" data-close-lore>Continue campaign</button>
+        </article>
+    </section>
     <header class="game-header">
         <a class="brand" href="/" aria-label="Path of Boredom home"><span class="brand-mark">&#9671;</span> PATH <small>OF</small> BOREDOM</a>
         <span class="edition"><span data-stat="mode">THE EMBER CAMPAIGN</span> <span>&middot;</span> <span data-stat="campaign">MAP 1 / 6</span></span>
@@ -340,7 +369,6 @@
                         <section class="training-card" aria-labelledby="training-title">
                             <h3 id="training-title">Training arena</h3>
                             <p>Try your class's abilities in a separate practice arena. Your real run stays paused and unchanged. No XP, loot, saves, or ranking scores are earned; fatal hits restore health.</p>
-                            <button type="button" class="quiet-button" data-training>Set up practice</button>
                             <section data-training-picker hidden aria-label="Practice setup">
                                 <p>Choose an ability below, then select Start practice. It replaces the first automatic skill; the other two remain active. Pause to change it again.</p>
                                 <div class="training-skill-grid" role="group" aria-label="Choose practice ability">
@@ -353,7 +381,7 @@
                                 <button type="button" class="ember-button" data-start-training>Start practice</button>
                             </section>
                             <button type="button" class="quiet-button" data-exit-training hidden>Exit training — return to my run</button>
-                            <small>During practice, open Pause → Run options to change abilities or exit. Your original run returns paused; resume when ready. Closing the app still loses unsaved real-run progress.</small>
+                            <small>Training starts only from Main menu. During practice, use Run options to change abilities or Exit training to return. Closing the app still loses unsaved real-run progress.</small>
                         </section>
                         <p data-forge-summary></p>
                     </div>
@@ -475,6 +503,14 @@
     [JSInvokable]
     public async Task<GameSaveResult> LoadRun() =>
         await Session.LoadAsync();
+
+    [JSInvokable]
+    public bool QuitApplication()
+    {
+        if (Services.GetService(typeof(IGameApplicationControl)) is not IGameApplicationControl control) return false;
+        control.Quit();
+        return true;
+    }
 
     /// <summary>
     /// Fires once, after the component's first render, once the <c>canvas</c> and all the static markup

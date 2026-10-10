@@ -36,6 +36,7 @@ import { startTraining } from "./arpg-engine.js";
 import { setEquipmentStyle, acceptChallenge, CHALLENGES, runSummary } from "./arpg-run-systems.js";
 import { createGameAudio } from "./arpg-audio.js";
 import { bindButtonFeedback } from "./arpg-button-feedback.js";
+import { bossProfile, drawBoss } from "./arpg-bosses.js";
 
 const mobFacing = new WeakMap();
 
@@ -236,6 +237,8 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
     }
     if (hero) {
         drawHero(ctx, actor, HERO_CLASSES[heroClass], stride, strike, time, reducedMotion.matches);
+    } else if (boss) {
+        drawBoss(ctx, actor, map, time);
     } else if (actor.kind === "duelist") {
         ctx.rotate(facing);
         drawOrb(ctx, 0, 0, 15, actor.flash > 0 ? "#fff4d6" : "#357a89");
@@ -478,22 +481,24 @@ function render(ctx, floor, state, bossTop = 49) {
         if (enemy.kind === "boss") {
             ctx.save();
             const pattern = enemy.combat.pattern;
+            const identity = bossProfile(state.wave);
             const angle = Math.atan2(enemy.attackY - enemy.y, enemy.attackX - enemy.x);
             const color = pattern === 1 ? "#ff956f" : pattern === 2 ? "#ffdc86" : "#d6adff";
             ctx.strokeStyle = color; ctx.fillStyle = color + "33"; ctx.lineWidth = 3;
             if (pattern === 1) {
-                ctx.beginPath(); ctx.arc(enemy.x, enemy.y, 135, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                ctx.beginPath(); ctx.arc(enemy.x, enemy.y, identity.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
             } else if (pattern === 2) {
-                ctx.beginPath(); ctx.moveTo(enemy.x, enemy.y); ctx.arc(enemy.x, enemy.y, 210, angle - 0.65, angle + 0.65); ctx.closePath(); ctx.fill(); ctx.stroke();
+                const spread = Math.max(...identity.fan.map(Math.abs)) + 0.05;
+                ctx.beginPath(); ctx.moveTo(enemy.x, enemy.y); ctx.arc(enemy.x, enemy.y, 210, angle - spread, angle + spread); ctx.closePath(); ctx.fill(); ctx.stroke();
             } else {
-                for (let i = 0; i < 8; i++) {
-                    const ray = angle + i * Math.PI / 4;
+                for (let i = 0; i < identity.rays; i++) {
+                    const ray = angle + i * Math.PI * 2 / identity.rays;
                     ctx.beginPath(); ctx.moveTo(enemy.x + Math.cos(ray) * 40, enemy.y + Math.sin(ray) * 40);
                     ctx.lineTo(enemy.x + Math.cos(ray) * 150, enemy.y + Math.sin(ray) * 150); ctx.stroke();
                 }
             }
             ctx.fillStyle = color; ctx.textAlign = "center"; ctx.font = "bold 11px 'Segoe UI', sans-serif";
-            ctx.fillText(pattern === 1 ? "SLAM — MOVE OUT" : pattern === 2 ? "FAN — STEP ASIDE" : "RING — FIND A GAP", enemy.x, enemy.y - enemy.radius - 35);
+            ctx.fillText(pattern === 1 ? identity.warning : pattern === 2 ? "FAN — STEP ASIDE" : "RING — FIND A GAP", enemy.x, enemy.y - enemy.radius - 35);
             ctx.restore();
             continue;
         }
@@ -1040,11 +1045,80 @@ export function createGame(root, saveBridge = null) {
         delete root.dataset.stickY;
     }
     let practiceReturn = null;
+    const loreReader = root.querySelector("[data-lore-reader]");
+    const loreSeen = new WeakMap();
+    let loreResume = false;
+    function openLore() {
+        if (saving || setupAction || inMainMenu || state.training || state.mode !== "campaign" || !["playing", "paused", "camp", "won"].includes(state.status)) return;
+        loreResume = state.status === "playing";
+        if (loreResume) togglePause(state);
+        const chapterWave = state.status === "camp" && state.wave % 5 === 0 ? state.wave : Math.max(1, state.wave);
+        const chapter = mapForWave(chapterWave);
+        const identity = bossProfile(chapterWave);
+        root.querySelector("[data-lore-chapter]").textContent = chapter.chapter;
+        root.querySelector("[data-lore-title]").textContent = chapter.name;
+        root.querySelector("[data-lore-story]").textContent = chapter.story;
+        root.querySelector("[data-lore-boss]").textContent = `${chapter.boss} — ${identity.title}`;
+        root.querySelector("[data-lore-boss-story]").textContent = identity.lore;
+        root.querySelector("[data-lore-tactics]").textContent = `Watch for ${identity.warning.toLowerCase()}. At two-thirds and one-third health, new projectile patterns appear. Each special is warned before it strikes; attack during recovery, but avoid projectiles already in flight.`;
+        root.querySelector("[data-lore-ending]").textContent = ["camp", "won"].includes(state.status) ? chapter.ending : "";
+        clearInput();
+        updateHud();
+        loreReader.hidden = false;
+        root.querySelector("[data-close-lore]").focus({ preventScroll: true });
+    }
+    on(root.querySelector("[data-open-lore]"), "click", openLore);
+    on(root.querySelector("[data-close-lore]"), "click", () => {
+        loreReader.hidden = true;
+        if (loreResume && state.status === "paused" && !inMainMenu && !saving) togglePause(state);
+        loreResume = false;
+        clearInput();
+        last = performance.now();
+        updateHud();
+        canvas.focus({ preventScroll: true });
+    });
+    const mainMenu = root.querySelector("[data-main-menu]");
+    let inMainMenu = true;
+    root.dataset.mainMenu = "on";
+    function showMainMenu(show) {
+        if (saving || setupAction) return;
+        if (show && state.status === "playing") togglePause(state);
+        inMainMenu = show;
+        if (show) { loreReader.hidden = true; loreResume = false; }
+        mainMenu.hidden = !show;
+        root.dataset.mainMenu = show ? "on" : "off";
+        clearInput();
+        updateHud();
+    }
+    on(root.querySelector("[data-open-main-menu]"), "click", () => {
+        root.dispatchEvent(new CustomEvent("main-menu-open"));
+        showMainMenu(true);
+    });
+    on(root.querySelector("[data-main-resume]"), "click", () => { showMainMenu(false); if (state.status === "paused") begin(); });
+    on(root.querySelector("[data-main-new]"), "click", async () => {
+        if (state.status !== "ready" && !await gameConfirm("Start a new campaign? Unsaved progress in the current run will be replaced.")) return;
+        showMainMenu(false);
+        openSetup("campaign");
+    });
+    on(root.querySelector("[data-main-load]"), "click", () => { showMainMenu(false); loadButton.click(); });
+    on(root.querySelector("[data-main-options]"), "click", () => {
+        showMainMenu(false);
+        root.dispatchEvent(new CustomEvent("open-run-options"));
+        if (root.dataset.canvasHud !== "on") root.querySelector("[data-run-options]").scrollIntoView({ block: "start" });
+    });
+    on(root.querySelector("[data-main-quit]"), "click", async () => {
+        if (!await gameConfirm("Quit the app? Unsaved progress will be lost. Cancel and save your run first if needed.")) return;
+        const quit = saveBridge && await saveBridge.invokeMethodAsync("QuitApplication");
+        if (!quit) root.querySelector("[data-main-status]").textContent = "This browser cannot be closed by the game. Save your run, then close the tab.";
+    });
     for (const button of root.querySelectorAll("[data-training]")) on(button, "click", () => {
         if (saving || checkingUnlock || setupAction || state.training || state.status === "choosing") return;
         if (state.status === "playing") togglePause(state);
         void reportScore();
         practiceReturn = state;
+        inMainMenu = false;
+        mainMenu.hidden = true;
+        root.dataset.mainMenu = "off";
         state = startTraining(Math.random, state.difficulty === "legacy" ? "hard" : state.difficulty, state.heroClass);
         state.status = "paused";
         checkpointHandled = null;
@@ -1063,6 +1137,7 @@ export function createGame(root, saveBridge = null) {
         last = performance.now();
         updateHud();
         root.dispatchEvent(new CustomEvent("training-menu", { detail: { action: "exit" } }));
+        showMainMenu(true);
     });
     for (const select of root.querySelectorAll("[data-equipment-style]")) on(select, "change", () => {
         if (!saving && setEquipmentStyle(state, select.dataset.equipmentStyle, select.value)) updateHud();
@@ -1292,6 +1367,9 @@ export function createGame(root, saveBridge = null) {
     // loop() function below) as well as immediately after any state-changing action (setup, pause,
     // skill purchase, etc.) so the UI never lags a frame behind the actual game state.
     function updateHud() {
+        root.querySelector("[data-open-lore]").hidden = inMainMenu || state.training || state.mode !== "campaign" || state.status === "ready";
+        root.querySelector("[data-main-resume]").disabled = saving || state.status === "ready";
+        root.querySelector("[data-main-load]").disabled = saving || checkingUnlock || !saveBridge || !!state.training;
         root.dataset.gameStatus = setupAction ? "setup" : state.status;
         root.dataset.saveBusy = saving || checkingUnlock ? "on" : "off";
         const p = state.player;
@@ -1718,7 +1796,7 @@ export function createGame(root, saveBridge = null) {
     // Toggles pause via the engine, syncing input state and focus. Guarded against firing while a
     // save is in flight or the setup dialog is open, since pausing mid-save or mid-dialog would be confusing.
     function pause() {
-        if (saving || setupAction || root.dataset.menuOpen === "on") return;
+        if (saving || setupAction || !loreReader.hidden || root.dataset.menuOpen === "on") return;
         togglePause(state);
         clearInput();
         updateHud();
@@ -1727,6 +1805,7 @@ export function createGame(root, saveBridge = null) {
     on(root, "mobile-menu", event => {
         const opening = event.detail?.open === true;
         if (opening) {
+            if (!loreReader.hidden) return;
             const idleInformation = event.detail?.information && ["ready", "dead", "won"].includes(state.status);
             if (saving || setupAction || (!idleInformation && !["playing", "paused", "camp"].includes(state.status))) return;
             if (state.status === "playing") togglePause(state);
@@ -1752,7 +1831,7 @@ export function createGame(root, saveBridge = null) {
     // Handles the primary "Start/Resume" button: resumes if paused, continues the journey if at a
     // checkpoint camp, or opens the setup dialog for a brand-new campaign run otherwise.
     function begin() {
-        if (saving || checkingUnlock || setupAction || state.status === "choosing") return;
+        if (saving || checkingUnlock || setupAction || !loreReader.hidden || state.status === "choosing") return;
         if (state.status === "paused") togglePause(state);
         else if (state.status === "camp") continueJourney(state);
         else {
@@ -2093,15 +2172,21 @@ export function createGame(root, saveBridge = null) {
     function animate(now) {
         if (disposed) return;
         if (!root.isConnected) { dispose(); return; }
-        step(state, input(), last ? (now - last) / 1000 : 0);
+        if (!inMainMenu && loreReader.hidden) step(state, input(), last ? (now - last) / 1000 : 0);
+        if (!inMainMenu && !setupAction && !state.training && state.mode === "campaign" && state.status === "playing" && state.wave % 5 === 1) {
+            const chapter = mapIndexForWave(state.wave);
+            let seen = loreSeen.get(state);
+            if (!seen) { seen = new Set(); loreSeen.set(state, seen); }
+            if (!seen.has(chapter)) { seen.add(chapter); openLore(); }
+        }
         root.dataset.gameStatus = setupAction ? "setup" : state.status;
-        audio.update(state, mapIndexForWave(state.wave), Boolean(setupAction) || document.hidden);
+        audio.update(state, mapIndexForWave(state.wave), Boolean(setupAction) || document.hidden, inMainMenu);
         last = now;
         if (now - lastScoreAttempt >= 15000) {
             lastScoreAttempt = now;
             void reportScore();
         }
-        if (["camp", "won"].includes(state.status) && !saving && !checkingUnlock && !setupAction && checkpointHandled !== `${state.mode}:${state.wave}`) {
+        if (!inMainMenu && loreReader.hidden && ["camp", "won"].includes(state.status) && !saving && !checkingUnlock && !setupAction && checkpointHandled !== `${state.mode}:${state.wave}`) {
             checkpointHandled = `${state.mode}:${state.wave}`;
             void persist(false, true);
         }

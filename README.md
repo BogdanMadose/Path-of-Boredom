@@ -17,6 +17,8 @@ This README is the map of the place. Read this first, then head into the project
 - The six newer abilities per class each have a chosen-skill card (+6% damage per rank, ten ranks) and a Forge track (+10% damage, +8 reach, and +8% cooldown recovery per rank, eight ranks). Weapon forging now reaches 50 ranks and armor 12; only selected skill tracks count toward unlocking post-forge training.
 - Gear pickups improve equipment ratings, not Forge ranks; better gear equips automatically and weaker gear becomes gold. Free weapon and armor styles trade damage for recovery or armor for movement without losing ratings or Forge upgrades. Ranking build snapshots retain equipment names, ratings, and styles.
 - Optional stage challenges reward avoiding health damage, skipping flasks, or finishing within 180 combat seconds. A separate training arena keeps the real run intact and grants no loot, XP, saves, or ranking scores. Run summaries track combat time, stages, flask use, gold spent, challenges, and damage by skill.
+- Synthesized audio adds menu-button clicks, class-specific attacks, skill casts, impacts, dodge/flask cues, loot, level-ups, Forge purchases, skill choices, boss warnings, and victory/death feedback. Original ambient loops vary by area, with a faster boss theme. **Pause → Run options → Sound & music** provides device-saved music/effects volumes and mute. Audio starts after interaction and suspends in the background; visual warnings remain unchanged.
+- Run options is a separate sound/practice menu. Forge retains Upgrades, Mastery, and Equipment. Challenges has its own mobile menu-bar entry and Pause option, with visible choices, eligibility, stage progress, and bonus-gold rewards.
 
 ## The shape of the solution
 
@@ -46,7 +48,7 @@ The solution targets .NET 9. Android development needs the MAUI/Android workload
 
 For an ordinary compilation check, run `dotnet build "Path of Boredom.sln"` from the repository root. The gameplay and UI regressions are under `Path of Boredom.Maui/tests/`; they use Node and can be run individually, for example `node "Path of Boredom.Maui/tests/checkpoint-saves.test.mjs"`.
 
-There are currently 14 test suites covering skills, saves, combat facing, bosses, encounters, menus, rankings, SVG paths, and death-screen scrolling. Some layout checks launch Microsoft Edge when it's available; otherwise they explicitly skip the browser part. A clean C# build alone can't tell you whether a touch menu actually scrolls.
+The test suites cover skills, saves, combat facing, bosses, encounters, menus, rankings, SVG paths, death-screen scrolling, and procedural audio. Some layout checks launch Microsoft Edge when it's available; otherwise they explicitly skip the browser part. A clean C# build alone can't tell you whether a touch menu actually scrolls or how the mix sounds on a phone.
 
 ## Releases: three different numbers, not one
 

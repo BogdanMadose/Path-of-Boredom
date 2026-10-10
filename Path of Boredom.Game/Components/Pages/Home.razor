@@ -277,7 +277,7 @@
                     <button type="button" class="ember-button" data-resume-combat disabled>Return to battle</button>
                     <p class="forge-hint">Gold is your main upgrade source: select Forge to pause and buy ranks. Scrolls are rare elite/boss drops. Max every forge item to unlock unlimited stat training. Purchases at checkpoints autosave; elsewhere, use Save.</p>
                     <p class="forge-hint">Previews show effective current → next values with your present buffs and loadout. Damage is a normal hit before enemy defenses or conditional bonuses; arrow repeats and critical hits are separate. CAPPED means further ranks cannot improve that stat. A capped forge purchase may still be needed to unlock training.</p>
-                    <section class="run-options">
+                    <section class="equipment-options">
                         <h3>Equipment trade-offs</h3>
                         <p>Gear pickups improve equipment rating, not Forge ranks. Forge scrolls grant a free rank. Choose a style while resting; changing style is free and retains both ratings and ranks.</p>
                         <label>Weapon style
@@ -292,26 +292,6 @@
                                 <option value="balanced">Balanced — normal armor and speed</option>
                                 <option value="plated">Heavy plates — +8 armor, -12% movement speed</option>
                                 <option value="light">Light weave — -8 armor, +12% movement speed</option>
-                            </select>
-                        </label>
-                        <h3>Optional stage challenge</h3>
-                        <p>Opt in before the first wave or at a checkpoint. Success earns 100 + 50 per stage gold. Skipping or failing costs nothing.</p>
-                        <select data-stage-challenge aria-label="Optional stage challenge">
-                            <option value="none">No challenge</option>
-                            <option value="unscarred">Take no health damage</option>
-                            <option value="flaskless">Use no flasks</option>
-                            <option value="swift">Clear within 180 combat seconds</option>
-                        </select>
-                        <p data-challenge-status role="status"></p>
-                        <p data-forge-summary></p>
-                        <button type="button" class="quiet-button" data-training>Open training arena (keeps your run)</button>
-                        <button type="button" class="quiet-button" data-exit-training hidden>Exit training &amp; return to run</button>
-                        <label data-training-picker hidden>Practice ability (first slot)
-                            <select data-training-skill>
-                                @foreach (var skill in CombatSkills)
-                                {
-                                    <option value="@skill">@skill</option>
-                                }
                             </select>
                         </label>
                     </section>
@@ -345,6 +325,53 @@
                             <button type="button" data-mastery-stat="critDamage" disabled><strong>Endless ruin</strong><span>+2 percentage points critical damage</span><small data-mastery-label></small></button>
                         </div>
                     </section>
+                </section>
+                <section class="options-panel" data-run-options aria-labelledby="run-options-title">
+                    <h2 id="run-options-title">Run options</h2>
+                    <button type="button" class="ember-button" data-resume-combat disabled>Return to battle</button>
+                    <div class="run-options">
+                        <fieldset class="audio-settings">
+                            <legend>Sound &amp; music</legend>
+                            <label class="audio-mute"><input type="checkbox" data-audio-mute /> Mute all audio</label>
+                            <label>Music volume<input type="range" min="0" max="100" step="1" value="25" data-audio-music /></label>
+                            <label>Sound effects volume<input type="range" min="0" max="100" step="1" value="55" data-audio-effects /></label>
+                            <p data-audio-status role="status">Audio starts after interaction. Preferences are saved on this device.</p>
+                        </fieldset>
+                        <section class="training-card" aria-labelledby="training-title">
+                            <h3 id="training-title">Training arena</h3>
+                            <p>Try your class's abilities in a separate practice arena. Your real run stays paused and unchanged. No XP, loot, saves, or ranking scores are earned; fatal hits restore health.</p>
+                            <button type="button" class="quiet-button" data-training>Set up practice</button>
+                            <section data-training-picker hidden aria-label="Practice setup">
+                                <p>Choose an ability below, then select Start practice. It replaces the first automatic skill; the other two remain active. Pause to change it again.</p>
+                                <div class="training-skill-grid" role="group" aria-label="Choose practice ability">
+                                    @foreach (var skill in CombatSkills)
+                                    {
+                                        <button type="button" class="quiet-button" data-training-skill="@skill" aria-pressed="false"><span data-skill-name="@skill">@skill</span></button>
+                                    }
+                                </div>
+                                <p data-training-detail role="status"></p>
+                                <button type="button" class="ember-button" data-start-training>Start practice</button>
+                            </section>
+                            <button type="button" class="quiet-button" data-exit-training hidden>Exit training — return to my run</button>
+                            <small>During practice, open Pause → Run options to change abilities or exit. Your original run returns paused; resume when ready. Closing the app still loses unsaved real-run progress.</small>
+                        </section>
+                        <p data-forge-summary></p>
+                    </div>
+                </section>
+                <section class="challenges-panel" data-challenges aria-labelledby="challenges-title">
+                    <h2 id="challenges-title">Stage challenges</h2>
+                    <button type="button" class="ember-button" data-resume-combat disabled>Return to battle</button>
+                    <div class="challenge-options">
+                        <p>Optional bonus gold: choose before the first wave or at a five-wave checkpoint, before the next stage starts. Each challenge lasts one stage. Skipping or failing costs nothing.</p>
+                        <div class="training-skill-grid" role="group" aria-label="Choose a stage challenge">
+                            <button type="button" class="quiet-button" data-challenge-choice="none">No challenge</button>
+                            <button type="button" class="quiet-button" data-challenge-choice="unscarred">Unscarred — take no health damage</button>
+                            <button type="button" class="quiet-button" data-challenge-choice="flaskless">Flaskless — drink no flasks</button>
+                            <button type="button" class="quiet-button" data-challenge-choice="swift">Swift — clear within 180 combat seconds</button>
+                        </div>
+                        <p data-challenge-availability role="status"></p>
+                        <p data-challenge-status role="status"></p>
+                    </div>
                 </section>
             </section>
 

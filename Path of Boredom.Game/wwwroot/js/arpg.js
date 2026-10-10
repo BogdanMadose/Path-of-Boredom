@@ -34,6 +34,8 @@ import { automaticCheckpoint, forgeNotification, bossHudTop } from "./arpg-ui-st
 import { encounterForWave } from "./arpg-encounters.js";
 import { startTraining } from "./arpg-engine.js";
 import { setEquipmentStyle, acceptChallenge, CHALLENGES, runSummary } from "./arpg-run-systems.js";
+import { createGameAudio } from "./arpg-audio.js";
+import { bindButtonFeedback } from "./arpg-button-feedback.js";
 
 const mobFacing = new WeakMap();
 
@@ -766,6 +768,41 @@ export function createGame(root, saveBridge = null) {
     // `on` helper) so dispose() can remove every listener at once instead of tracking them individually.
     const controller = new AbortController();
     const on = (target, event, handler, options = {}) => target.addEventListener(event, handler, { ...options, signal: controller.signal });
+    const audio = createGameAudio();
+    const buttonFeedback = bindButtonFeedback(root);
+    const audioMute = root.querySelector("[data-audio-mute]");
+    const audioMusic = root.querySelector("[data-audio-music]");
+    const audioEffects = root.querySelector("[data-audio-effects]");
+    const audioStatus = root.querySelector("[data-audio-status]");
+    function updateAudioControls() {
+        const settings = audio.settings;
+        if (audioMute) audioMute.checked = settings.muted;
+        if (audioMusic) audioMusic.value = Math.round(settings.music * 100);
+        if (audioEffects) audioEffects.value = Math.round(settings.effects * 100);
+        if (audioStatus) audioStatus.textContent = !(window.AudioContext || window.webkitAudioContext)
+            ? "Audio is unavailable in this browser. Visual warnings remain active."
+            : settings.muted ? "Audio muted. Visual warnings remain active."
+            : `Music ${Math.round(settings.music * 100)}% · Effects ${Math.round(settings.effects * 100)}%. Audio starts after interaction and stops in the background.`;
+    }
+    updateAudioControls();
+    for (const [element, key] of [[audioMute, "muted"], [audioMusic, "music"], [audioEffects, "effects"]]) {
+        if (element) on(element, key === "muted" ? "change" : "input", () => {
+            audio.setSettings({ [key]: key === "muted" ? element.checked : Number(element.value) / 100 });
+            updateAudioControls();
+        });
+    }
+    const unlockAudio = event => {
+        if (!event.isTrusted || document.hidden) return;
+        audio.setBackground(false);
+        void audio.unlock();
+    };
+    on(window, "pointerdown", unlockAudio, { capture: true });
+    on(window, "keydown", unlockAudio, { capture: true });
+    on(root, "click", event => {
+        const button = event.target.closest("button");
+        if (event.isTrusted && button && !button.disabled && !button.matches("[data-skill], [data-move]")) audio.play("button");
+    }, { capture: true });
+    on(window, "pagehide", () => audio.setBackground(true));
     const stats = Object.fromEntries([...root.querySelectorAll("[data-stat]")].map(element => [element.dataset.stat, element]));
     const healthMeter = root.querySelector('[data-meter="health"]');
     const xpMeter = root.querySelector('[data-meter="xp"]');
@@ -1011,30 +1048,47 @@ export function createGame(root, saveBridge = null) {
         state = startTraining(Math.random, state.difficulty === "legacy" ? "hard" : state.difficulty, state.heroClass);
         state.status = "paused";
         checkpointHandled = null;
+        shownStatus = "";
         clearInput();
         updateHud();
+        root.dispatchEvent(new CustomEvent("training-menu", { detail: { action: "setup" } }));
     });
     for (const button of root.querySelectorAll("[data-exit-training]")) on(button, "click", () => {
         if (!practiceReturn || saving) return;
         state = practiceReturn;
         practiceReturn = null;
         checkpointHandled = null;
+        shownStatus = "";
         clearInput();
         last = performance.now();
         updateHud();
+        root.dispatchEvent(new CustomEvent("training-menu", { detail: { action: "exit" } }));
     });
     for (const select of root.querySelectorAll("[data-equipment-style]")) on(select, "change", () => {
         if (!saving && setEquipmentStyle(state, select.dataset.equipmentStyle, select.value)) updateHud();
     });
-    const challengeSelect = root.querySelector("[data-stage-challenge]");
-    on(challengeSelect, "change", () => { if (!saving) acceptChallenge(state, challengeSelect.value); updateHud(); });
-    const practiceSkill = root.querySelector("[data-training-skill]");
-    on(practiceSkill, "change", () => {
-        if (!state.training || state.status !== "paused" || !SLOTTABLE_SKILLS.includes(practiceSkill.value)) return;
-        const previous = state.loadout.auto[0];
-        state.loadout.auto = state.loadout.auto.map(key => key === practiceSkill.value ? previous : key);
-        state.loadout.auto[0] = practiceSkill.value;
+    const challengeButtons = [...root.querySelectorAll("[data-challenge-choice]")];
+    for (const button of challengeButtons) on(button, "click", () => {
+        if (!saving) acceptChallenge(state, button.dataset.challengeChoice);
         updateHud();
+    });
+    const practiceSkills = [...root.querySelectorAll("[data-training-skill]")];
+    for (const button of practiceSkills) on(button, "click", () => {
+        const skill = button.dataset.trainingSkill;
+        if (!state.training || saving || state.status !== "paused" || !SLOTTABLE_SKILLS.includes(skill)) return;
+        const previous = state.loadout.auto[0];
+        state.loadout.auto = state.loadout.auto.map(key => key === skill ? previous : key);
+        state.loadout.auto[0] = skill;
+        updateHud();
+    });
+    on(root.querySelector("[data-start-training]"), "click", () => {
+        if (!state.training || saving || state.status !== "paused") return;
+        root.dispatchEvent(new CustomEvent("training-menu", { detail: { action: "start" } }));
+        togglePause(state);
+        clearInput();
+        last = performance.now();
+        updateHud();
+        canvas.focus({ preventScroll: true });
     });
     let promptOpen = false;
     function gameConfirm(message) {
@@ -1404,20 +1458,36 @@ export function createGame(root, saveBridge = null) {
             select.value = state.runSystems.equipment[select.dataset.equipmentStyle];
             select.disabled = saving || !canForge;
         }
-        challengeSelect.disabled = saving || !canForge || state.training || state.wave % 5 !== 0 || state.enemies.length > 0;
-        challengeSelect.value = state.runSystems.challenge.resolved ? "none" : state.runSystems.challenge.key;
         const challenge = state.runSystems.challenge;
+        const challengeAvailable = !saving && canForge && !state.training && state.wave % 5 === 0 && state.enemies.length === 0
+            && !(challenge.stage === Math.floor(state.wave / 5) + 1 && challenge.elapsed > 0);
+        for (const button of challengeButtons) {
+            button.disabled = !challengeAvailable;
+            button.setAttribute("aria-pressed", String(!challenge.resolved && challenge.key === button.dataset.challengeChoice));
+        }
+        root.querySelector("[data-challenge-availability]").textContent = challengeAvailable
+            ? `Choose for stage ${Math.floor(state.wave / 5) + 1} · Reward: ${100 + (Math.floor(state.wave / 5) + 1) * 50} gold.`
+            : state.training ? "Challenges are unavailable in practice. Exit training to return to your run."
+            : "Choose before the first wave or at the next five-wave checkpoint. The current stage cannot be changed mid-fight.";
         root.querySelector("[data-challenge-status]").textContent = `${CHALLENGES[challenge.key]}${challenge.key === "none" ? "" : ` · stage ${challenge.stage} · ${Math.floor(challenge.elapsed)}s · ${challenge.flasks} flasks · ${Math.round(challenge.damage)} health lost${challenge.resolved ? " · resolved" : ""}`}`;
         const summary = runSummary(state, key => skillName(state, key));
         root.querySelector("[data-summary-text]").textContent = summary;
         root.querySelector("[data-run-summary]").hidden = state.status === "ready";
         root.querySelector("[data-forge-summary]").textContent = summary;
         for (const button of root.querySelectorAll("[data-training]")) { button.hidden = !!state.training; button.disabled = saving || checkingUnlock || !!setupAction || choosing; }
-        for (const button of root.querySelectorAll("[data-exit-training]")) button.hidden = !state.training;
+        for (const button of root.querySelectorAll("[data-exit-training]")) {
+            button.hidden = !state.training;
+            button.disabled = saving;
+        }
+        root.dataset.training = state.training ? "on" : "off";
         root.querySelector("[data-training-picker]").hidden = !state.training;
-        practiceSkill.disabled = state.status !== "paused";
-        practiceSkill.value = state.loadout.auto[0];
-        for (const option of practiceSkill.options) option.textContent = skillName(state, option.value);
+        for (const button of practiceSkills) {
+            button.disabled = saving || state.status !== "paused";
+            button.setAttribute("aria-pressed", String(state.loadout.auto[0] === button.dataset.trainingSkill));
+        }
+        root.querySelector("[data-start-training]").disabled = saving || state.status !== "paused";
+        root.querySelector("[data-training-detail]").textContent = state.training
+            ? `${skillName(state, state.loadout.auto[0])}: ${combatSkillDefinition(state, state.loadout.auto[0])?.detail ?? EXTRA_SKILLS[state.heroClass][state.loadout.auto[0]]?.detail ?? hero.description} Active skills: ${selectedSkills(state).map(key => skillName(state, key)).join(" · ")}.` : "";
         retrySave.hidden = !checkpointSaveFailed || !["camp", "won"].includes(state.status) || !!setupAction;
         retrySave.disabled = saving || checkingUnlock || !saveBridge;
         retrySave.textContent = saving ? "Retrying checkpoint save…" : "Retry checkpoint save";
@@ -1429,7 +1499,7 @@ export function createGame(root, saveBridge = null) {
         for (const button of root.querySelectorAll("[data-resume-combat]")) {
             button.hidden = state.mode === "endless" && state.status === "camp";
             button.disabled = saving || !!setupAction || !["paused", "camp"].includes(state.status);
-            button.textContent = state.status === "camp" ? "Travel to next stage" : "Return to battle";
+            button.textContent = state.training ? "Resume practice" : state.status === "camp" ? "Travel to next stage" : "Return to battle";
         }
         openSkills.disabled = saving || !!setupAction || !active || choosing;
         text("skill-points", `${skillPointsLeft(state)} points available · ${skillPointsEarned(state)}/${MAX_SKILL_POINTS} earned`);
@@ -1618,13 +1688,14 @@ export function createGame(root, saveBridge = null) {
                 const won = state.status === "won";
                 const camp = state.status === "camp";
                 const watch = state.mode === "endless";
-                kicker.textContent = paused ? "A MOMENT OF RESPITE" : won ? "ALL SIX DAWNS RESTORED" : camp ? (watch ? "WATCH CHECKPOINT" : `DAWN ${dawns} RECOVERED`) : "THE WATCH REMEMBERS";
-                title.textContent = paused ? "The hollow can wait." : won ? "A dawn of our own." : camp ? (watch ? "The watch endures." : `${map.boss} has fallen.`) : "Your ember fades.";
-                description.textContent = paused ? "Your run is paused. Spend gold at the forge below, save your progress, or return to battle."
+                kicker.textContent = state.training ? "PRACTICE — YOUR REAL RUN IS SAFE" : paused ? "A MOMENT OF RESPITE" : won ? "ALL SIX DAWNS RESTORED" : camp ? (watch ? "WATCH CHECKPOINT" : `DAWN ${dawns} RECOVERED`) : "THE WATCH REMEMBERS";
+                title.textContent = state.training ? "Training arena" : paused ? "The hollow can wait." : won ? "A dawn of our own." : camp ? (watch ? "The watch endures." : `${map.boss} has fallen.`) : "Your ember fades.";
+                description.textContent = state.training ? "Practice is separate from your run: no XP, loot, saves, or rankings. Fatal hits restore health. Open Run options to choose an ability, then Start practice. Exit training restores your original run paused."
+                    : paused ? "Your run is paused. Spend gold at the forge below, save your progress, or return to battle."
                     : camp || won ? (watch ? `Echo ${state.wave - LAST_WAVE} cleared. All loot collected, partial healing and two flask charges granted. Saving this stage, then continuing automatically. If saving fails, use Save to retry.` : map.ending)
                     : `${state.kills} enemies slain / ${state.gold} gold / Level ${p.level}. ${watch ? "Load your last checkpoint, or begin a fresh watch." : "Forge your equipment, dodge warning zones, and seek fallen upgrade scrolls."}`;
                 startButton.textContent = paused ? "Return to battle" : camp ? (watch ? "Continue the watch" : `Travel to ${mapForWave(state.wave + 1).name}`) : "Begin a new campaign";
-                if (!setupAction && !(camp && watch)) (won ? endlessButton : startButton).focus({ preventScroll: true });
+                if (!setupAction && root.dataset.menuOpen !== "on" && !state.training && !(camp && watch)) (won ? endlessButton : startButton).focus({ preventScroll: true });
             }
         }
     }
@@ -1938,8 +2009,15 @@ export function createGame(root, saveBridge = null) {
         }
     });
     on(window, "keyup", event => keys.delete(event.code));
-    on(window, "blur", () => { if (state.status === "playing") pause(); else clearInput(); });
-    on(document, "visibilitychange", () => { if (document.hidden && state.status === "playing") pause(); });
+    on(window, "blur", () => { audio.setBackground(true); if (state.status === "playing") pause(); else clearInput(); });
+    on(window, "game-background", () => {
+        audio.setBackground(true);
+        if (state.status === "playing") pause(); else clearInput();
+    });
+    on(document, "visibilitychange", () => {
+        if (document.hidden) audio.setBackground(true);
+        if (document.hidden && state.status === "playing") pause();
+    });
     on(root, "focusout", event => {
         if (event.relatedTarget && !root.contains(event.relatedTarget) && state.status === "playing") pause();
     });
@@ -2017,6 +2095,7 @@ export function createGame(root, saveBridge = null) {
         if (!root.isConnected) { dispose(); return; }
         step(state, input(), last ? (now - last) / 1000 : 0);
         root.dataset.gameStatus = setupAction ? "setup" : state.status;
+        audio.update(state, mapIndexForWave(state.wave), Boolean(setupAction) || document.hidden);
         last = now;
         if (now - lastScoreAttempt >= 15000) {
             lastScoreAttempt = now;
@@ -2048,6 +2127,8 @@ export function createGame(root, saveBridge = null) {
         cancelAnimationFrame(layoutFrame);
         resizeObserver.disconnect();
         controller.abort();
+        audio.dispose();
+        buttonFeedback.dispose();
         observer.disconnect();
         clearInput();
     }

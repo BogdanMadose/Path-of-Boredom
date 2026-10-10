@@ -23,11 +23,21 @@ The big rule is still **don't re-parent Blazor-rendered nodes**. The menu layer 
 ## Closed-test build systems
 
 - Level-up drafts only offer skill-specific cards for chosen abilities. Each of the six newer abilities per class has a ten-rank card granting +6% damage per rank and an eight-rank Forge track granting +10% damage, +8 reach, and +8% cooldown recovery per rank.
-- The Forge has **Upgrades**, **Mastery**, and **Run options** tabs. Weapon upgrades cap at 50 ranks and armor at 12. Unselected skill tracks stay hidden and don't block Mastery; selected tracks must be completed. Scrolls grant real Forge ranks, while capped or unselected rewards salvage into gold.
-- Run options provides free equipment styles: heavy weapons trade +20% damage for -15% cooldown recovery, quick weapons trade -15% damage for +20% recovery, heavy plates trade +8 armor for -12% movement, and light weave trades -8 armor for +12% movement. Balanced styles have no modifier. Change styles while paused or resting without losing gear ratings or Forge ranks.
+- The Forge has **Upgrades**, **Mastery**, and **Equipment** tabs. Weapon upgrades cap at 50 ranks and armor at 12. Unselected skill tracks stay hidden and don't block Mastery; selected tracks must be completed. Scrolls grant real Forge ranks, while capped or unselected rewards salvage into gold.
+- Forge's Equipment tab provides free equipment styles: heavy weapons trade +20% damage for -15% cooldown recovery, quick weapons trade -15% damage for +20% recovery, heavy plates trade +8 armor for -12% movement, and light weave trades -8 armor for +12% movement. Balanced styles have no modifier. Change styles while paused or resting without losing gear ratings or Forge ranks.
 - Better weapon/armor pickups equip automatically; weaker pickups salvage into gold. Gear improves equipment ratings, not Forge ranks. Rankings snapshot equipment names, ratings, and styles when a higher score is recorded.
 - Optional challenges can be selected before the first wave or at a checkpoint: no health damage, no flasks, or clear within 180 combat seconds. Success grants 100 + 50 per stage gold; skipping or failing costs nothing.
 - Training keeps the real run intact, restores health on fatal hits, and grants no loot, XP, saves, or rankings. Run summaries remain separate from save-status messages and track time, stages, flasks, spending, challenges, and damage by skill.
+- **Pause → Run options → Set up practice** uses its own scrollable panel, separate from Forge. Choose an ability with inline buttons (no native dropdown), read its details, then select **Start practice** to close the panel and begin the countdown. Pause to change abilities; **Exit training** restores the original run. Practice replaces the first automatic skill while retaining the other two, and closing the app still loses unsaved real-run progress. The Pause menu repeats these instructions during training.
+- **Challenges** is directly available on the mobile menu bar and in Pause. Its separate panel shows four inline choices, current stage progress, reward gold, and whether selection is available. Choices remain restricted to before the first wave or a five-wave checkpoint; challenges cannot be changed mid-stage or used in training.
+
+## Sound and music
+
+The shared `arpg-audio.js` synthesizes combat/UI sounds, ordinary menu-button clicks, and original ambient/boss loops through the WebView's Web Audio API. There are no external audio files to package. Open **Pause → Run options → Sound & music** for mute and separate music/effects volumes. Preferences stay on the device in WebView local storage and do not change save format 18 or cloud revisions.
+
+Audio begins after a trusted touch/key gesture and stops when the page loses focus or becomes hidden. `App.xaml.cs` forwards the Android window-stop event through `MainPage.SuspendGame()` as `game-background`, pausing gameplay and suspending audio even if the WebView doesn't emit a visibility event. Returning doesn't automatically resume combat or suspended audio; interact to resume. Disposal stops voices/timers and closes the context.
+
+`audio.test.mjs` validates synthesis/lifecycle contracts with a fake audio context. Also test the actual Android app with speakers and headphones: attack with each class, spam abilities, adjust both sliders, mute, restart the app, background during a boss warning, and return. Verify no background music remains and visual warnings still work when muted.
 
 ## Device first, cloud second
 
@@ -75,10 +85,12 @@ Building the bundle doesn't upload it, create a Play release, or deploy the API.
 
 ## Checking changes
 
-The 14 suites in `tests/` cover the shared engine as well as this shell. Run individual tests with Node, for example `node 'Path of Boredom.Maui/tests/base-icons-and-death-scroll.test.mjs'` from the repository root. The browser layout tests use Microsoft Edge when available and explicitly skip that part when it isn't. `closed-beta-regressions.test.mjs` checks loadout-specific offers and scroll rewards, Forge notification acknowledgement, mobile boss/countdown placement, automatic Endless save/retry flow, and encounter variety.
+The suites in `tests/` cover the shared engine as well as this shell, including procedural audio. Run individual tests with Node, for example `node 'Path of Boredom.Maui/tests/base-icons-and-death-scroll.test.mjs'` from the repository root. The browser layout tests use Microsoft Edge when available and explicitly skip that part when it isn't. `closed-beta-regressions.test.mjs` checks loadout-specific offers and scroll rewards, Forge notification acknowledgement, mobile boss/countdown placement, automatic Endless save/retry flow, and encounter variety.
 
 Also test the actual app: start a run, release the joystick, pick skills at levels 5 and 10, scroll the death screen, expand a ranking build, save/load offline, and sign in/out. Headless browser geometry is useful, but it isn't the same thing as an Android WebView under somebody's thumb.
 
 `run-options-and-forge.test.mjs` covers chosen-skill cards and Forge bonuses, previews, scrolls, Mastery gating, older-save migration, training isolation, and Run options scrolling. `equipment-rankings.test.mjs` checks equipment snapshots across all class/style combinations, save round-trips, and later gear changes. On-device checks should also exercise all three Forge tabs, equipment styles, challenge rewards, and entering/exiting training without replacing the real run.
+
+`training-flow.test.mjs` checks setup, ability swapping, countdown start, combat guards, and exact restoration of the original run. The Run options browser checks also expand the training controls and verify panel height, button widths, and reachable exit actions in portrait and short landscape.
 
 Keep keys, passwords, local SDKs, and signed artifacts out of commits and backend source archives. The backend packaging script has its own allowlist for exactly that reason.

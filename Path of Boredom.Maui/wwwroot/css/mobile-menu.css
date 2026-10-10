@@ -11,6 +11,17 @@
 
 @media (pointer: coarse) {
 
+    body.mobile-shell button:not(:disabled):not([aria-disabled="true"]):is(:active, .button-pressed) {
+        filter: brightness(1.3);
+        outline: 2px solid #f4c989;
+        outline-offset: -2px;
+        box-shadow: inset 0 0 0 2px #ffe3ac55, inset 0 3px 8px #0008;
+        scale: .97;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        body.mobile-shell button:is(:active, .button-pressed) { scale: 1; }
+    }
+
     /* ---- Menu layer ------------------------------------------------------ */
 
     /* Covers the whole app. Transparent and click-through by default so combat is unaffected;
@@ -30,7 +41,7 @@
     body.mobile-shell .mm-bar {
         display: flex;
         align-self: flex-end;
-        width: min(300px, 45vw);
+        width: min(360px, 58vw);
         align-items: stretch;
         gap: 4px;
         padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 6px 6px;
@@ -409,8 +420,10 @@
     body.mobile-shell .forge-panel[data-mobile-section="training"] > .forge-grid,
     body.mobile-shell .forge-panel[data-mobile-section="systems"] > .forge-grid,
     body.mobile-shell .forge-panel:not([data-mobile-section="training"]) > .mastery-panel,
-    body.mobile-shell .forge-panel:not([data-mobile-section="systems"]) > .run-options { display: none; }
-    body.mobile-shell .mm-panel .run-options {
+    body.mobile-shell .forge-panel:not([data-mobile-section="systems"]) > .equipment-options { display: none; }
+    body.mobile-shell .mm-panel .run-options,
+    body.mobile-shell .mm-panel .equipment-options,
+    body.mobile-shell .mm-panel .challenge-options {
         grid-row: 3;
         grid-column: 1 / -1;
         min-height: 0;
@@ -423,10 +436,25 @@
         font-size: 13px;
         line-height: 1.5;
     }
-    body.mobile-shell .mm-panel .run-options label { display: grid; gap: 6px; margin-block: 12px; }
-    body.mobile-shell .mm-panel .run-options select { min-width: 0; max-width: 100%; }
-    body.mobile-shell .mm-panel .run-options button { min-height: 44px; margin-block: 8px; }
+    body.mobile-shell .mm-panel .run-options label,
+    body.mobile-shell .mm-panel .equipment-options label { display: grid; gap: 6px; margin-block: 12px; }
+    body.mobile-shell .mm-panel .equipment-options select { min-width: 0; max-width: 100%; }
+    body.mobile-shell .mm-panel .run-options button,
+    body.mobile-shell .mm-panel .challenge-options button { min-height: 44px; margin-block: 8px; }
+    body.mobile-shell .options-panel.mm-open,
+    body.mobile-shell .challenges-panel.mm-open { grid-template-columns: minmax(0, 1fr); grid-template-rows: 58px minmax(0, 1fr); }
+    body.mobile-shell .options-panel > h2,
+    body.mobile-shell .challenges-panel > h2,
+    body.mobile-shell .options-panel > [data-resume-combat],
+    body.mobile-shell .challenges-panel > [data-resume-combat] { display: none; }
+    body.mobile-shell .options-panel .run-options,
+    body.mobile-shell .challenges-panel .challenge-options { grid-row: 2; }
+    body.mobile-shell .challenges-panel .training-skill-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     body.mobile-shell .mm-panel .run-options [data-forge-summary] { overflow-wrap: anywhere; }
+    body.mobile-shell .mm-panel .training-card { max-width: 100%; min-width: 0; }
+    body.mobile-shell .mm-panel .training-skill-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    body.mobile-shell .mm-panel .training-skill-grid button { width: 100%; margin: 0; font-size: 12px; }
+    body.mobile-shell .mm-panel .training-card small { display: block; font-size: 12px; color: #bed5cc; }
     body.mobile-shell .mm-panel .mastery-panel { grid-row: 3; grid-column: 1 / -1; overflow-y: auto; min-height: 0; }
     body.mobile-shell .mm-panel .mastery-panel .forge-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     body.mobile-shell .mm-panel .forge-grid span:not([data-upgrade-preview]) { display: none; }

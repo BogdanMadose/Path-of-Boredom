@@ -232,7 +232,7 @@
         markHelp(source, [".forge-hint", ".mastery-panel > p"]);
         addHelpToggle(panel.body, "How the forge works");
         var tabs = el("div", "mm-subtabs");
-        ["Upgrades", "Mastery", "Run options"].forEach(function (name, index) {
+        ["Upgrades", "Mastery", "Equipment"].forEach(function (name, index) {
             var button = el("button", "mm-subtab", name);
             button.type = "button";
             button.setAttribute("aria-selected", String(index === 0));
@@ -350,17 +350,22 @@
         makePanel("pause", "A moment of respite", section);
         var card = el("div", "mm-pause-card");
         card.appendChild(el("div", "mm-pause-emblem"));
-        card.appendChild(el("h2", null, "The hollow can wait."));
-        card.appendChild(el("p", null, "Combat and game timers are paused."));
+        var heading = el("h2", null, "The hollow can wait.");
+        heading.dataset.practiceHeading = "";
+        card.appendChild(heading);
+        var explanation = el("p", null, "Combat and game timers are paused.");
+        explanation.dataset.practiceExplanation = "";
+        card.appendChild(explanation);
         var resume = el("button", "mm-resume", "Return to battle");
+        resume.dataset.practiceResume = "";
         resume.type = "button";
         resume.addEventListener("click", function () {
             resumeAfterMenu = true;
             closePanel(true);
         });
         card.appendChild(resume);
-        var labels = { skills: "Skills & loadout", forge: "Forge & training", rankings: "Rankings", notes: "Patch notes - Coming soon" };
-        [{ title: "Character", names: ["skills", "forge"] }, { title: "Community", names: ["rankings", "notes"] }].forEach(function (group) {
+        var labels = { skills: "Skills & loadout", forge: "Forge & equipment", options: "Run options — sound & practice", challenges: "Stage challenges — bonus gold", rankings: "Rankings", notes: "Patch notes - Coming soon" };
+        [{ title: "Character", names: ["skills", "forge", "challenges", "options"] }, { title: "Community", names: ["rankings", "notes"] }].forEach(function (group) {
             var section = el("section", "mm-menu-group");
             section.appendChild(el("h3", null, group.title));
             group.names.forEach(function (name) {
@@ -374,13 +379,12 @@
         });
         addSaveActions(card, root);
         ["training", "exit-training"].forEach(function (action) {
-            var button = el("button", "mm-pause-option", action === "training" ? "Training arena (keeps your run)" : "Exit training & return to run");
+            var button = el("button", "mm-pause-option", action === "training" ? "Set up practice — keeps your run" : "Exit training — return to my run");
             button.type = "button";
             button.dataset.practiceProxy = action;
             button.addEventListener("click", function () {
                 var original = root.querySelector("[data-" + action + "]");
                 if (!original || original.disabled || original.hidden) return;
-                closePanel(false);
                 original.click();
             });
             card.appendChild(button);
@@ -461,6 +465,15 @@
         });
         var resume = root.querySelector(".mm-resume");
         if (resume) resume.disabled = root.dataset.saveBusy === "on";
+        var practicing = root.dataset.training === "on";
+        var practiceHeading = root.querySelector("[data-practice-heading]");
+        var practiceExplanation = root.querySelector("[data-practice-explanation]");
+        var practiceResume = root.querySelector("[data-practice-resume]");
+        if (practiceHeading) practiceHeading.textContent = practicing ? "Training paused" : "The hollow can wait.";
+        if (practiceExplanation) practiceExplanation.textContent = practicing
+            ? "Your real run is paused and unchanged. Practice earns no XP, loot, saves, or rankings; fatal hits restore health. Use Run options to change your practice ability, or Exit training below to return to your run."
+            : "Combat and game timers are paused.";
+        if (practiceResume) practiceResume.textContent = practicing ? "Resume practice" : "Return to battle";
         Array.prototype.forEach.call(layer.querySelectorAll(".mm-tab"), function (tab) {
             tab.disabled = root.dataset.saveBusy === "on" || !["playing", "paused", "camp"].includes(root.dataset.gameStatus);
         });
@@ -515,6 +528,8 @@
 
         buildSkills(skills);
         buildForge(forge);
+        makePanel("options", "Run options — sound & practice", root.querySelector("[data-run-options]"));
+        makePanel("challenges", "Stage challenges — bonus gold", root.querySelector("[data-challenges]"));
         buildInformation(root);
         buildAccount(root);
         buildPause(root);
@@ -530,6 +545,18 @@
 
         setInterval(syncBadges, 500);
         syncBadges();
+        root.addEventListener("training-menu", function (event) {
+            if (event.detail?.action === "setup") {
+                if (openName !== "options") openPanel("options");
+                var card = root.querySelector(".training-card");
+                var options = panels.options.root.querySelector(".run-options");
+                if (card && options) options.scrollTop += card.getBoundingClientRect().top - options.getBoundingClientRect().top;
+                root.querySelector("[data-start-training]")?.focus({ preventScroll: true });
+            } else if (event.detail?.action === "start" || event.detail?.action === "exit") {
+                closePanel(false);
+            }
+            syncBadges();
+        });
         root.addEventListener("mobile-save-result", function (event) {
             if (event.detail?.success && event.detail.loadingSave && openName) closePanel(false);
             syncBadges();

@@ -24,6 +24,7 @@ If the combat numbers feel wrong, start here. If the death screen won't scroll, 
 - **`arpg-facing.js`** — cosmetic body/weapon turning. The attack is immediate and accurately aimed; the art catches up without making the attack wait.
 - **`arpg-graphics.js`** — reusable hero art, cached orb/body sprites, floor decoration, atmosphere, and loot icons. Not the entire renderer; look in `arpg.js` for enemies and the frame draw order.
 - **`arpg-hud.js`** — the in-canvas mobile HUD.
+- **`arpg-audio.js`** — procedural Web Audio effects and original area/boss music, device-only volume preferences, bounded voice scheduling, background suspension, and cleanup. The controller observes transient state changes; audio never changes simulation or saves.
 - **`arpg-upgrade-preview.js`** — current-to-next forge stat previews.
 - **`arpg-ranking.js`** — snapshots the recorded build and keeps the initial mobile release board separate from development scores.
 - **`arpg-run-systems.js`** — equipment-style trade-offs, optional stage challenges and rewards, and run summaries. Training lifecycle and isolation live in the engine/controller.
@@ -49,6 +50,8 @@ Equipment styles are free to change while paused, at camp, or after victory. Hea
 
 Optional challenges are chosen before a stage starts and reward no health damage, no flasks, or a clear within 180 combat seconds. Success grants 100 + 50 × stage gold once; failure has no penalty. Training preserves the real run, restores health after fatal hits, and disables loot, XP, saving, and rankings. Run summaries track combat seconds, stages, flasks, gold spent, challenges, and per-skill damage.
 
+Training setup uses inline ability buttons in the independent Run options menu, not a native select popup. `training-menu` events keep mobile setup in that panel and close it explicitly on Start practice or Exit training. Changing an ability swaps the first automatic slot without duplicating the other two. Training-specific Pause copy explains isolation and exit; `training-flow.test.mjs` verifies the controller restores the exact original run without altering its progression. Forge retains equipment, upgrades, and Mastery; Challenges has its own panel and mobile menu-bar entry with inline choices and eligibility/reward text.
+
 ## The general shape of a frame
 
 The controller reads input, calls `step(state, input, dt)`, updates the page HUD, and renders the arena from that state. Damage and movement belong to the engine. Draw order, silhouettes, and animation belong to the rendering code. Keep those apart so a prettier weapon turn doesn't accidentally change attack cadence.
@@ -56,6 +59,16 @@ The controller reads input, calls `step(state, input, dt)`, updates the page HUD
 Hazard drawing and damage checks both use `arenaHazards()` and `hazardPhase()`. Don't go back to reading the fixed map templates for only one of them, or the player can be hurt by a circle drawn somewhere else.
 
 Hazard layouts are cached per state/wave in a `WeakMap`, not serialized. Loading a save generates a fresh layout with its own activation delay. Cosmetic facing is transient too. If either becomes persisted gameplay state later, that needs an explicit save-contract change rather than sneaking a new property into snapshots.
+
+## Sound and music lifecycle
+
+`createGameAudio()` lazily creates an `AudioContext` after trusted pointer/keyboard interaction. It synthesizes all effects and the original looping soundtrack with oscillators and generated noise; no downloaded audio assets or licenses are required. Class attacks and chosen skills have distinct tones, areas vary the ambient melody, and living bosses select a faster theme.
+
+Settings live under `path-of-boredom.audio.v1` in local storage, independently of the player/account save. Defaults are 25% music and 55% effects; both buses have separate sliders plus a global mute in the independent Run options menu. Trusted ordinary button clicks play a short throttled cue; combat controls retain their action sounds. Missing/blocked storage or unsupported audio must not prevent playing.
+
+Impact and loot cues are throttled, effects have a 16-voice ceiling, and all audio has a 40-voice ceiling with a compressor on the output. Pausing/countdowns stop music; document hiding, window blur, page exit, and Android's `game-background` event stop all voices and suspend the context. Returning requires interaction before resuming a suspended context. Disposal clears timers, stops sources, and closes the context. Audio is supplemental: boss warnings still have their visual indicators.
+
+`audio.test.mjs` checks generation and lifecycle with a fake audio context, including preferences, gesture gating, throttling, music transitions, save isolation, and disposal. It does not measure sound quality: test the mix, mute/volume persistence, rapid casts, background/resume, and speakers/headphones in an actual browser and Android WebView.
 
 ## Save version discipline (worth repeating)
 

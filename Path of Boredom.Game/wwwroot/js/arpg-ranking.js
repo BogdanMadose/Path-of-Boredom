@@ -7,7 +7,8 @@
 // together on the rankings page.
 import { UPGRADES } from "./arpg-campaign.js";
 import { LEVEL_CARDS } from "./arpg-cards.js";
-import { MASTERY } from "./arpg-engine.js";
+import { MASTERY, armorRating, resistanceRating } from "./arpg-engine.js";
+import { BOSS_RELICS } from "./arpg-adventures.js";
 import { SKILL_KEYS, skillName, treeNodeDefinition } from "./arpg-skills.js";
 
 // Mobile starts a separate release board without carrying development kills into its scores.
@@ -41,6 +42,8 @@ export function captureRankingBuild(state) {
     }
     return {
         level: state.player.level,
+        physicalArmor: armorRating(state), spellResistance: resistanceRating(state),
+        relics: BOSS_RELICS.filter((_, index) => state.adventures.relics[index]).map(relic => relic.name),
         upgrades,
         manualSkill: skillName(state, state.loadout.manual),
         autoSkills: state.loadout.auto.filter(skill => skill !== "none").map(skill => skillName(state, skill)),

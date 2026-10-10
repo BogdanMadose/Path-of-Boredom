@@ -1,7 +1,9 @@
 // Stable rank keys and caps preserve existing saves; branch effects belong to each ability.
+import { SORCERER_TREES } from './arpg-sorcerer.js';
 const branch = (name, detail, icon = '✦') => ({ name, detail, icon });
 const tree = (root, shape, keystone, mastery) => ({ potency: root, reach: shape, ember: branch(keystone, '', '◆'), recovery: mastery });
 export const CLASS_SKILL_TREES = {
+    sorcerer: SORCERER_TREES,
     knight: {
         chain: tree(branch('Living embers', '+10% Cinder relay hit damage per rank.'), branch('Fire bridges', '+60 initial targeting range and +30 jump range per rank.', '↝'), 'Ember procession', branch('Banked inferno', '+8% cooldown recovery and +5 percentage points jump damage retention per rank.', '♨')),
         frost: tree(branch('White-hot seams', '+10% Blazing cross damage per rank.'), branch('Burning avenues', '+25 lane reach and +6 lane half-width per rank.', '╋'), 'Fourfold furnace', branch('Crossfire heart', '+8% cooldown recovery per rank; enemies within the inner quarter of the cross take +10% damage per rank.', '⊕')),
@@ -28,6 +30,7 @@ export const CLASS_SKILL_TREES = {
     }
 };
 const RANGE_STEP = {
+    sorcerer: { chain: 30, frost: 30, reap: 30, meteor: 30, siphon: 30, nullwave: 30 },
     knight: { chain: 60, frost: 25, reap: 15, meteor: 80, siphon: 30, nullwave: 20 },
     ranger: { chain: 50, frost: 40, reap: 80, meteor: 40, siphon: 30, nullwave: 25 },
     warden: { chain: 30, frost: 20, reap: 25, meteor: 40, siphon: 20, nullwave: 30 }

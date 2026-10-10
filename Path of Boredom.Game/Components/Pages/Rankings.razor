@@ -50,6 +50,7 @@
                 <option value="knight">Ember Knight</option>
                 <option value="ranger">Dawn Ranger</option>
                 <option value="warden">Iron Warden</option>
+                <option value="sorcerer">Astral Sorcerer</option>
             </select>
         </label>
         <button type="button" data-rankings-refresh @onclick="RefreshAsync" disabled="@busy">Refresh</button>
@@ -100,6 +101,14 @@
                                     <details class="build-details">
                                         <summary>Level @build.Level · Build details</summary>
                                         <p><strong>Automatic skills:</strong> @(build.AutoSkills.Count == 0 ? "None" : string.Join(", ", build.AutoSkills))</p>
+                                        @if (build.PhysicalArmor is { } armor && build.SpellResistance is { } resistance)
+                                        {
+                                            <p>Physical armor @armor.ToString("0.#")% · Spell resistance @resistance.ToString("0.#")%</p>
+                                        }
+                                        @if (build.Relics is { Count: > 0 } relics)
+                                        {
+                                            <p><strong>Boss relics:</strong> @string.Join(", ", relics)</p>
+                                        }
                                         @if (build.Equipment is { } equipment)
                                         {
                                             <section class="build-equipment" aria-label="Equipment and trade-offs">

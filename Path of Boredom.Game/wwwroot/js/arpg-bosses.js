@@ -8,6 +8,8 @@ export const BOSS_PROFILES = [
     { id: "archive", title: "Author of the final page", radius: 110, fan: [-0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8], rays: 12, speed: 155, recovery: 1.3, interval: 3.3, warning: "ERASURE — LEAVE THE SEAL", lore: "The Nameless Archivist erased its own name to keep the prisoner's secret. Now it writes futures in lightning and burns every page that promises escape. Your sister left one sentence it could not destroy." },
     { id: "rift", title: "The hunger beyond the bell", radius: 180, fan: [-0.7, -0.35, 0, 0.35, 0.7], rays: 14, speed: 145, recovery: 1.6, interval: 3.6, warning: "UNMAKING — ESCAPE THE VOID", lore: "The Unmaking is not a king or a god. It is the space left when a promise is broken. The bell kept it outside the world; carrying the six dawns, you must teach that darkness to end." }
 ];
+const recoveryWindows = [0.75, 0.9, 0.7, 0.85, 0.8, 1];
+BOSS_PROFILES.forEach((profile, index) => { profile.recovery = recoveryWindows[index]; });
 export const bossProfile = wave => BOSS_PROFILES[mapIndexForWave(wave)];
 
 export function drawBoss(ctx, actor, map, time) {

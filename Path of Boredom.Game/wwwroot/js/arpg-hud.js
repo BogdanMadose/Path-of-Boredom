@@ -17,8 +17,8 @@
 import { WIDTH, HEIGHT } from "./arpg-engine.js";
 
 const PAD = 14;
-const BAR_W = 300;
-const BAR_H = 13;
+const BAR_W = 330;
+const BAR_H = 18;
 
 // Rounded rectangle path; Path2D's roundRect is not available on every Android WebView version
 // we support, so it is done manually.
@@ -56,7 +56,7 @@ function bar(ctx, x, y, w, h, fraction, from, to, label, value) {
         ctx.restore();
     }
 
-    ctx.font = "600 9px system-ui, sans-serif";
+    ctx.font = "600 12px system-ui, sans-serif";
     ctx.textBaseline = "alphabetic";
     ctx.fillStyle = "#9fb0ad";
     ctx.textAlign = "left";
@@ -105,13 +105,13 @@ export function drawHud(ctx, state, options = {}) {
     ctx.textBaseline = "alphabetic";
 
     // Top scrim keeps the bars legible over bright floors without hiding the playfield.
-    const scrim = ctx.createLinearGradient(0, 0, 0, 64);
+    const scrim = ctx.createLinearGradient(0, 0, 0, 76);
     scrim.addColorStop(0, "#0b1114e0");
     scrim.addColorStop(1, "#0b111400");
     ctx.fillStyle = scrim;
-    ctx.fillRect(0, 0, WIDTH, 64);
+    ctx.fillRect(0, 0, WIDTH, 76);
 
-    const top = PAD + 12;
+    const top = PAD + 16;
     const health = p.maxHealth > 0 ? p.health / p.maxHealth : 0;
     bar(ctx, PAD, top, BAR_W, BAR_H, health, "#722e31", "#cd6357",
         "VITALITY", `${Math.max(0, Math.ceil(p.health))} / ${Math.ceil(p.maxHealth)}`);
@@ -126,10 +126,10 @@ export function drawHud(ctx, state, options = {}) {
 
     // Flasks: pips rather than a number, readable at a glance mid-fight.
     const flasks = p.potions || 0;
-    const pipY = top + BAR_H + 14;
+    const pipY = top + BAR_H + 13;
     for (let i = 0; i < (options.maxFlasks || 5); i++) {
         ctx.beginPath();
-        ctx.arc(PAD + 5 + i * 13, pipY, 4, 0, Math.PI * 2);
+        ctx.arc(PAD + 6 + i * 16, pipY, 5, 0, Math.PI * 2);
         ctx.fillStyle = i < flasks ? "#c46d62" : "#2a3336";
         ctx.fill();
     }

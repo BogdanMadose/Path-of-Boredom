@@ -140,7 +140,7 @@
                         <section class="overlay-card">
                             <p class="eyebrow">BUILD YOUR PATH</p>
                             <h2 id="skill-choice-title">Choose your next automatic skill</h2>
-                            <p>Combat is paused. Pick a second skill at level 5 and a third at level 10. Each choice is locked for this run.</p>
+                            <p data-skill-choice-description>Combat is paused. Pick a second skill at level 10 and a third at level 20. Each choice is locked for this run.</p>
                             <div class="run-skill-pool">
                                 @foreach (var skill in CombatSkills)
                                 {
@@ -171,6 +171,7 @@
                                     <option value="knight">Ember Knight — balanced melee</option>
                                     <option value="ranger">Dawn Ranger — ranged skirmisher</option>
                                     <option value="warden">Iron Warden — armored bruiser</option>
+                                    <option value="sorcerer">Astral Sorcerer — fragile spellcaster</option>
                                 </select>
                             </label>
                             <section class="class-preview" data-class-preview aria-live="polite">
@@ -309,6 +310,8 @@
                     <section class="equipment-options">
                         <h3>Equipment trade-offs</h3>
                         <p>Gear pickups improve equipment rating, not Forge ranks. Forge scrolls grant a free rank. Choose a style while resting; changing style is free and retains both ratings and ranks.</p>
+                        <div data-equipment-preview role="status"></div>
+                        <small>Compare every alternative before choosing below. Physical armor blocks physical hits; spell resistance blocks magic. Ratings, Forge ranks, and relics are retained.</small>
                         <label>Weapon style
                             <select data-equipment-style="weapon">
                                 <option value="balanced">Balanced — normal damage and recovery</option>
@@ -384,6 +387,24 @@
                             <small>Training starts only from Main menu. During practice, use Run options to change abilities or Exit training to return. Closing the app still loses unsaved real-run progress.</small>
                         </section>
                         <p data-forge-summary></p>
+                        <h3>Build synergies</h3>
+                        <fieldset class="audio-settings">
+                            <legend>Controls &amp; readability</legend>
+                            <label>Joystick size<input type="range" min="28" max="64" step="1" data-preference="joystickSize" /></label>
+                            <label>Joystick dead zone<input type="range" min="2" max="18" step="1" data-preference="deadZone" /></label>
+                            <label>Joystick sensitivity<input type="range" min="0.5" max="1.5" step="0.05" data-preference="sensitivity" /></label>
+                            <label>Text size<input type="range" min="0.9" max="1.3" step="0.05" data-preference="textScale" /></label>
+                            <label>Damage numbers<select data-preference="damageNumbers"><option value="all">All hits</option><option value="reduced">Important hits only</option><option value="off">Off</option></select></label>
+                            <label>Combat button side<select data-preference="buttonSide"><option value="right">Right</option><option value="left">Left</option></select></label>
+                            <label><input type="checkbox" data-preference="shake" /> Screen shake</label>
+                            <label><input type="checkbox" data-preference="contrast" /> High-contrast warnings</label>
+                            <small>Preferences stay on this device. Dodge and healing remain manual; warnings never rely on sound alone.</small>
+                        </fieldset>
+                        <p data-build-synergy></p>
+                        <h3>Boss relics</h3>
+                        <p data-boss-relics></p>
+                        <h3>Campaign codex</h3>
+                        <div data-campaign-codex></div>
                     </div>
                 </section>
                 <section class="challenges-panel" data-challenges aria-labelledby="challenges-title">
@@ -399,6 +420,12 @@
                         </div>
                         <p data-challenge-availability role="status"></p>
                         <p data-challenge-status role="status"></p>
+                        <h3>Checkpoint report</h3>
+                        <p data-checkpoint-report></p>
+                        <h3>Stage encounter</h3>
+                        <p data-stage-event role="status"></p>
+                        <button type="button" class="quiet-button" data-stage-event-accept>Accept bargain</button>
+                        <button type="button" class="quiet-button" data-stage-event-skip>Pass by safely</button>
                     </div>
                 </section>
             </section>

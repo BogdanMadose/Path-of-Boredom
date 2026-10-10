@@ -37,7 +37,26 @@ export function drawClassSkillEffect(ctx, item, progress, reduced = false) {
     ctx.strokeStyle = item.color; ctx.fillStyle = item.color; ctx.lineWidth = 2.5;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     const { heroClass: hero, skill } = item;
-    if (hero === 'knight') {
+    if (hero === 'sorcerer') {
+        if (skill === 'attack') {
+            const head = r * Math.min(1, progress * 2.5);
+            ctx.lineWidth = 3;
+            line(ctx, [[Math.max(0, head - 35), 0], [head, 0]]);
+            ctx.strokeStyle = '#efe6ff'; ctx.lineWidth = 1;
+            line(ctx, [[Math.max(0, head - 24), 0], [head, 0]]);
+            ring(ctx, head, 0, 3);
+            ctx.restore();
+            return;
+        }
+        const index = ['nova', 'burst', 'guard', 'chain', 'frost', 'reap', 'meteor', 'siphon', 'nullwave'].indexOf(skill);
+        const count = 4 + Math.max(0, index);
+        ring(ctx, 0, 0, r * bloom);
+        for (let i = 0; i < count; i++) {
+            const angle = i * TAU / count + phase;
+            line(ctx, [[Math.cos(angle) * r * 0.3, Math.sin(angle) * r * 0.3], [Math.cos(angle) * r * bloom, Math.sin(angle) * r * bloom]]);
+            ring(ctx, Math.cos(angle) * r * 0.65, Math.sin(angle) * r * 0.65, 4 + index);
+        }
+    } else if (hero === 'knight') {
         if (skill === 'chain') {
             const points = [[0, 0]];
             for (let i = 1; i <= 8; i++) points.push([r * i / 8, i === 8 ? 0 : Math.sin(i * 2.4 + phase) * 12]);

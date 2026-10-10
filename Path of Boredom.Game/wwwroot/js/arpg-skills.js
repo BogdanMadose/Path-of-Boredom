@@ -15,9 +15,11 @@
 // per-node rank caps, so a new node also needs a save version bump and a matching server-side update.
 import { classFor } from "./arpg-classes.js";
 import { CLASS_SKILL_TREES } from "./arpg-skill-trees.js";
+import { SORCERER_SKILLS } from "./arpg-sorcerer.js";
 
 // Stable keys identify saved slots; each class supplies its own ability and keystone.
 export const CLASS_SKILLS = {
+    sorcerer: SORCERER_SKILLS,
     knight: {
         chain: { name: "Cinder relay", cooldown: 7, reach: 420, damage: 1.4, color: "#ffc477", detail: "Fire jumps through three nearby enemies, losing 25% damage per jump. Jumps travel up to 180 units.", keystone: "Cinder relay jumps to two additional enemies." },
         frost: { name: "Blazing cross", cooldown: 9, reach: 260, damage: 1.6, color: "#ff9850", detail: "Four narrow fire lanes extend from you in a cross. Enemies between the lanes are not hit.", keystone: "Blazing cross lanes become 50% wider." },
@@ -56,7 +58,7 @@ export const STARTER_SKILLS = ["nova", "chain", "reap"];
 // effectively starts players over at a higher baseline difficulty.
 export const wardUnlockWave = state => state.rankingMode === "endless" ? 41 : 11;
 export const skillUnlocked = (state, skill) => true;
-export const skillCapacity = state => 1 + [5, 10].filter(level => state.player.level >= level).length;
+export const skillCapacity = state => 1 + (state.skillSchedule === "legacy" ? [5, 10] : [10, 20]).filter(level => state.player.level >= level).length;
 export const selectedSkills = state => state.loadout.auto.filter(key => key !== "none");
 export const needsSkillChoice = state => selectedSkills(state).length < skillCapacity(state);
 export const skillSelected = (state, skill) => !SLOTTABLE_SKILLS.includes(skill) || selectedSkills(state).includes(skill);
@@ -125,6 +127,7 @@ for (const key of Object.keys(NEW_SKILLS)) {
 // (which every class has an equivalent of), burst and guard are distinct signature abilities per
 // class (e.g. Knight's Flame lance vs Ranger's Piercing rain), each with their own cooldown/reach/damage.
 export const EXTRA_SKILLS = {
+    sorcerer: { burst: { name: "Comet lance", cooldown: 12, reach: 480, damage: 2.4, shape: "beam" }, guard: { name: "Astral veil", cooldown: 15, reach: 145, damage: 0.7 } },
     knight: { burst: { name: "Flame lance", cooldown: 8, reach: 380, damage: 2.1, shape: "beam" }, guard: { name: "Ember aegis", cooldown: 12, reach: 125, damage: 0.8 } },
     ranger: { burst: { name: "Piercing rain", cooldown: 8, reach: 760, damage: 1.15, shape: "arrows" }, guard: { name: "Briar ward", cooldown: 11, reach: 180, damage: 0.65 } },
     warden: { burst: { name: "Fault line", cooldown: 11, reach: 250, damage: 2.6, shape: "cone" }, guard: { name: "Iron bastion", cooldown: 14, reach: 150, damage: 1 } }
@@ -133,6 +136,11 @@ export const EXTRA_SKILLS = {
 // matching TREE_SLOTS order) — this is what actually shows up in the skill tree UI instead of the
 // generic TREE_NODES keys/names.
 const CLASS_TREE_NAMES = {
+    sorcerer: {
+        attack: ["Astral focus", "Far constellation", "Finishing spark", "Casting cadence"], nova: ["Arcane pressure", "Expanding bloom", "Astral fire", "Rime wake"],
+        burst: ["Comet core", "Wide comet", "Giant slayer", "Starfall"], guard: ["Spell shell", "Enduring veil", "Repulsion", "Astral refuge"],
+        dodge: ["Phase step", "Long passage", "Afterimage", "Quick footing"], potion: ["Moon draught", "Last light", "Runic tonic", "Renewal"]
+    },
     knight: {
         attack: ["Tempered blade", "Flame arc", "Finisher", "Duelist tempo"], nova: ["Furnace", "Heat wave", "Sunfire", "Backdraft"],
         burst: ["Lance tip", "Broad lance", "Searing thrust", "Flashpoint"], guard: ["Ember shell", "Banked coals", "Cinder reprisal", "Hearth"],
@@ -155,6 +163,7 @@ const CLASS_TREE_NAMES = {
 // nodes without an override just get the generic TREE_NODES detail text with color words swapped
 // (see treeNodeDefinition's tint replacement below).
 const CLASS_TREE_EFFECTS = {
+    sorcerer: {},
     knight: {
         "nova.chill": { icon: "↗", detail: "Ember nova pushes surviving enemies back 16 units per rank; bosses move half as far. Replaces slowing with a fiery outward shockwave." },
         "burst.shatter": { icon: "♨", detail: "Flame lance deals 25% more damage to targets at or below 50% health. An ember mark identifies the finishing hit." },
@@ -279,7 +288,8 @@ export function treeNodeDefinition(state, skill, node) {
     const tint = state.heroClass === "knight" ? "ember-colored" : state.heroClass === "ranger" ? "jade" : "steel-blue";
     definition.detail = definition.detail.replace(/silver|golden|violet|crimson/gi, tint);
     if (skill !== "burst" || node !== "aperture") return definition;
-    const shape = state.heroClass === "knight" ? { name: "Broad lance", detail: "+20% Flame lance beam width per rank. Widens the visible beam as well as its hit area." }
+    const shape = state.heroClass === "sorcerer" ? { name: "Wide comet", detail: "+20% Comet lance beam width per rank." }
+        : state.heroClass === "knight" ? { name: "Broad lance", detail: "+20% Flame lance beam width per rank. Widens the visible beam as well as its hit area." }
         : state.heroClass === "ranger" ? { name: "Arrow storm", detail: "+2 Piercing rain arrows per rank, from seven to eleven. Adds visible arrows within the same fan." }
         : { name: "Rift fan", detail: "+10 degrees to each side of Fault line's cone per rank. Widens its visible strike arc." };
     return { ...definition, ...shape };

@@ -1,4 +1,4 @@
-// arpg-classes.js — base stats and identity for the three playable classes.
+// arpg-classes.js — base stats and identity for the four playable classes.
 //
 // This is pure data (no logic) describing each class's starting stats, attack/skill timings and
 // reach, and display info shown in the setup dialog's class preview. Class stays with the
@@ -11,6 +11,12 @@
 //   dodgeCooldown              — base cooldown of the dodge roll (Space).
 //   weaponType                 — used by arpg-graphics.js to pick which weapon sprite/shape to draw.
 export const HERO_CLASSES = {
+    sorcerer: {
+        name: "Astral Sorcerer", role: "Fragile spellcaster", health: 92, damage: 17, speed: 230, armor: 0, resistance: 12,
+        attackCooldown: 0.46, attackReach: 560, specialCooldown: 7, specialReach: 190, specialDamage: 1.8, dodgeCooldown: 1.9,
+        attackName: "Astral bolt", specialName: "Arcane bloom", weapon: "Cracked astral staff", weaponType: "staff", color: "#baa4ef",
+        description: "Magical ranged strikes and area control. Low health and slower attacks than Ranger; innate spell resistance helps against casters, not melee."
+    },
     knight: {
         name: "Ember Knight", role: "Balanced melee", health: 100, damage: 18, speed: 220, armor: 0,
         attackCooldown: 0.42, attackReach: 100, specialCooldown: 6, specialReach: 175, specialDamage: 1.85, dodgeCooldown: 1.8,
@@ -25,7 +31,7 @@ export const HERO_CLASSES = {
     },
     warden: {
         name: "Iron Warden", role: "Armored bruiser", health: 150, damage: 24, speed: 180, armor: 12,
-        attackCooldown: 0.72, attackReach: 85, specialCooldown: 8, specialReach: 160, specialDamage: 2.2, dodgeCooldown: 2.4,
+        attackCooldown: 0.66, attackReach: 100, specialCooldown: 8, specialReach: 160, specialDamage: 2.2, dodgeCooldown: 2.4,
         attackName: "Hammer sweep", specialName: "Iron quake", weapon: "Ironbound hammer", weaponType: "hammer", color: "#a7bfdc",
         description: "High health and innate armor. Gravity wells, ice wedges, shield-breaking strikes, stone pillars, and outer shockwaves control the battlefield."
     }

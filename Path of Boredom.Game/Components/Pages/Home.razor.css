@@ -27,7 +27,7 @@
 .main-menu-card { width: min(480px, 100%); display: grid; gap: 12px; padding: 24px; border: 1px solid #c7a56b66; border-radius: 16px; background: #122025; }
 .main-menu-card h1 { font: 32px Georgia, serif; color: #f3dfb9; }
 .main-menu-card p { font-size: 13px; line-height: 1.6; }
-.main-menu-return { position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); left: max(12px, env(safe-area-inset-left)); z-index: 45; }
+.main-menu-return { position: fixed; top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); z-index: 45; }
 .arpg[data-main-menu="on"] .main-menu-return { display: none; }
 .campaign-lore-return { position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); left: 130px; z-index: 45; }
 .campaign-lore { position: fixed; inset: 0; z-index: 65; display: grid; place-items: center; padding: 16px; background: #061018ed; }
@@ -35,6 +35,9 @@
 .campaign-lore-card h2 { font: 28px Georgia, serif; color: #f1d49b; }
 .campaign-lore-card p, .campaign-lore-card small { line-height: 1.8; }
 .campaign-lore-card button { margin-top: 16px; }
+.arpg ::deep .run-options, .arpg ::deep .campaign-lore-card, .arpg ::deep .main-menu-card { font-size: calc(14px * var(--game-text-scale, 1)); }
+.arpg[data-contrast="true"] canvas { filter: contrast(1.18); }
+.arpg[data-contrast="true"] ::deep button:focus-visible { outline-width: 3px; }
 .arpg ::deep .game-confirm,
 .arpg ::deep .account-confirm {
     padding: 24px;
@@ -146,7 +149,9 @@
 .run-options label { display: grid; gap: 6px; margin-block: 12px; }
 .run-options select { max-width: 100%; padding: 8px; background: #152126; color: #f3e5c7; }
 .run-options p { margin-block: 10px; font-size: 12px; line-height: 1.5; }
-.arena-viewport.low-health::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 25px #c94b3440; border: 2px solid #c9634a; pointer-events: none; }
+.arena-viewport.low-health::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 65px #d5222270; border: 3px solid #ef554a; pointer-events: none; animation: low-health-edge 1.6s ease-in-out infinite; }
+@keyframes low-health-edge { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .arena-viewport.low-health::after { animation: none; opacity: .8; } }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
 canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .arena-overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; background: #080f13b8; backdrop-filter: blur(3px); }

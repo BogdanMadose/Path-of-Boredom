@@ -12,8 +12,13 @@ If the combat numbers feel wrong, start here. If the death screen won't scroll, 
 
 - **`arpg.js`** — runtime entry point, input, setup flow, HUD updates, trees, forge, overlays, and save/ranking bridge calls. It also contains the main canvas renderer and mob artwork. `createGame()` returns the host-facing game instance.
 - **`arpg-engine.js`** — simulation and balance. `createState()` builds a run, `step()` advances combat, `useSkill()` dispatches attacks/abilities, and wave/checkpoint helpers advance the journey. `damageHistory` feeds the death report: up to 12 post-mitigation hits from the last eight seconds.
-- **`arpg-classes.js`** — the three classes' base stats, regular attack identities, weapon types, and descriptions.
-- **`arpg-skills.js`** — loadout rules, the 27 class combat abilities, tree rank/prerequisite rules, names, icons, and respec behaviour. `TREE_NODES` supplies stable saved rank keys; `treeNodeDefinition()` adds the class-specific presentation and effects.
+- **`arpg-classes.js`** — the four classes' base stats, regular attack identities, weapon types, and descriptions.
+- **`arpg-skills.js`** — loadout rules, the 36 class combat abilities, tree rank/prerequisite rules, names, icons, and respec behaviour. `TREE_NODES` supplies stable saved rank keys; `treeNodeDefinition()` adds the class-specific presentation and effects.
+- **`arpg-sorcerer.js`** — Sorcerer abilities and class-specific tree definitions.
+- **`arpg-damage.js`** — physical/magical damage types and separate armor/resistance mitigation for players and enemies.
+- **`arpg-boss-patterns.js`** — boss danger geometry shared by hit checks and telegraph rendering.
+- **`arpg-adventures.js`** — boss relics, checkpoint events, discovered chapters, build synergies, and codex entries.
+- **`arpg-preferences.js`** — device-local joystick, combat-button placement, and readability settings, independent of run saves.
 - **`arpg-skill-trees.js`** — the 72 named upgrades for the six newer abilities in each class, plus their range bonuses. The original attack/nova/burst/guard/dodge/flask trees are still defined in `arpg-skills.js`.
 - **`arpg-skill-effects.js`** — distinct canvas effects for class abilities. These are presentation, not extra damage checks.
 - **`arpg-cards.js`** — level-up boon definitions and three-card drafts. Skill-only cards are offered only for the selected loadout; old saved offers can be repaired deterministically rather than randomly rerolled.
@@ -34,7 +39,7 @@ If the combat numbers feel wrong, start here. If the death screen won't scroll, 
 
 ## The build rules, without the old manual slot
 
-Each class has nine combat choices. Pick one starter, a second at level 5, and a third at level 10; choices are locked for the run. Attack, dodge, and flask have their own trees but never consume one of those three slots. Mobile targets regular attacks and selected combat abilities automatically, while dodge and flask stay manual.
+Each class has nine combat choices. Pick one starter, a second at level 10, and a third at level 20; choices are locked for the run. Saves predating format 19 retain the legacy level 5/10 schedule. Attack, dodge, and flask have their own trees but never consume one of those three slots. Mobile targets regular attacks and selected combat abilities automatically, while dodge and flask stay manual.
 
 Tree points arrive every two levels, capped at 32. Respeccing a tree refunds its points for gold, but doesn't let you swap the run's chosen ability. The serialized loadout still has an unused fourth auto entry and a manual value of `none` for compatibility. Don't mistake that storage shape for a fourth playable skill slot.
 
@@ -76,7 +81,7 @@ Impact and loot cues are throttled, effects have a 16-voice ceiling, and all aud
 
 ## Save version discipline (worth repeating)
 
-The current save format is **18**. Format 17 added run systems and chosen-skill cards; format 18 adds the six newer Forge tracks. Formats 1–17 remain supported through explicit migration/defaults; missing newer Forge ranks in format 16/17 saves start at zero. Client capture/restore, `GameSaveEndpoints.cs`, and the device version gate in `OfflineGameSession.cs` need to agree. Training sessions cannot be captured as saves.
+The current save format is **20**. Format 17 added run systems and chosen-skill cards; format 18 added the six newer Forge tracks; format 19 introduced the explicit legacy/modern skill schedule; format 20 adds adventure progress. Formats 1–19 remain supported through explicit migration/defaults; missing newer Forge ranks in format 16/17 saves start at zero. Client capture/restore, `GameSaveEndpoints.cs`, and the device version gate in `OfflineGameSession.cs` need to agree. Training sessions cannot be captured as saves.
 
 When changing persisted state:
 

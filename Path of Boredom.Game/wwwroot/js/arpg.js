@@ -22,6 +22,11 @@ import { DIFFICULTIES } from "./arpg-difficulty.js";
 import { MASTERY, MAX_FLASKS, forgeSkillSelected, forgeComplete, masteryCost, buyMastery, chargeLaneEnd } from "./arpg-engine.js";
 import { movementSpeed, criticalChance, criticalDamage, skillReach } from "./arpg-engine.js";
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
+import { resistanceRating } from "./arpg-engine.js";
+import { enemyDefense, skillDamageType } from "./arpg-damage.js";
+import { BOSS_RELICS, codexEntries, stageEvent, eventAvailable, resolveStageEvent, buildSynergy, discoverChapter, checkpointReport } from "./arpg-adventures.js";
+import { bindPreferences } from "./arpg-preferences.js";
+import { drawBossDanger, bossWarning } from "./arpg-boss-patterns.js";
 import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
 import { treePointsSpent, treeRespecCost, canRespecTree, respecTree } from "./arpg-skills.js";
 import { SKILL_KEYS, SLOTTABLE_SKILLS, STARTER_SKILLS, EXTRA_SKILLS, NEW_SKILLS, combatSkillDefinition, MAX_SKILL_POINTS, skillIcon, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, skillSelected, skillCapacity, selectedSkills, needsSkillChoice, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
@@ -30,7 +35,7 @@ import { drawClassSkillEffect } from "./arpg-skill-effects.js";
 import { drawHud } from "./arpg-hud.js";
 import { arenaHazards, hazardPhase } from "./arpg-hazards.js";
 import { turnToward } from "./arpg-facing.js";
-import { automaticCheckpoint, forgeNotification, bossHudTop } from "./arpg-ui-state.js";
+import { automaticCheckpoint, forgeNotification, bossHudTop, combatControlStatus, bossWarningPosition } from "./arpg-ui-state.js";
 import { encounterForWave } from "./arpg-encounters.js";
 import { startTraining } from "./arpg-engine.js";
 import { setEquipmentStyle, acceptChallenge, CHALLENGES, runSummary } from "./arpg-run-systems.js";
@@ -400,6 +405,14 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
         }
         ctx.restore();
     }
+    if (!hero) {
+        const defense = enemyDefense(actor);
+        if (defense.physical || defense.magical) {
+            ctx.save(); ctx.globalAlpha = 0.45; ctx.lineWidth = 1;
+            ctx.strokeStyle = defense.magical ? "#baa4ef" : "#a7bfdc";
+            ctx.beginPath(); ctx.arc(actor.x, actor.y, r + 3, -0.9, -0.3); ctx.stroke(); ctx.restore();
+        }
+    }
     if (actor.elite) {
         const modifier = ELITE_MODIFIERS[actor.modifier ?? "none"];
         ctx.strokeStyle = modifier.color; ctx.lineWidth = actor.modifier === "armored" ? 4 : 2;
@@ -420,9 +433,11 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
 // corner brazier lights, then loops enemies to draw attack-telegraph shapes/labels before actors and
 // projectiles are drawn later in this function. Kept intentionally simple/flat (no z-sorting beyond
 // draw order) since the arena is a flat top-down view.
-function render(ctx, floor, state, bossTop = 49) {
+function render(ctx, floor, state, bossTop = 49, preferences = {}) {
     const map = mapForWave(state.wave);
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
+    ctx.save();
+    if (preferences.shake !== false && !reducedMotion.matches && state.damageHistory.some(hit => hit.age < 0.12)) ctx.translate(Math.sin(state.time * 70) * 1.5, Math.cos(state.time * 65) * 1.5);
     ctx.drawImage(floor, 0, 0, WIDTH, HEIGHT);
     drawAtmosphere(ctx, map, state.time, reducedMotion.matches, WIDTH, HEIGHT);
     const enemiesAlive = state.enemies.some(enemy => enemy.health > 0);
@@ -432,8 +447,8 @@ function render(ctx, floor, state, bossTop = 49) {
         const burning = map.hazard !== "slow" && phase >= 4 && enemiesAlive;
         const warning = map.hazard !== "slow" && phase >= 2 && !burning && enemiesAlive;
         circle(ctx, hazard.x, hazard.y, hazard.radius, map.hazard === "slow" ? map.accent + "20" : burning ? map.accent + "77" : warning ? map.accent + "44" : "#4e333366");
-        ctx.strokeStyle = map.accent;
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = preferences.contrast ? "#fff3cc" : map.accent;
+        ctx.lineWidth = preferences.contrast ? 4 : 2;
         ctx.beginPath(); ctx.arc(hazard.x, hazard.y, hazard.radius, 0, Math.PI * 2); ctx.stroke();
         ctx.textAlign = "center"; ctx.font = "10px 'Segoe UI', sans-serif"; ctx.fillStyle = map.accent;
         ctx.fillText(map.hazard === "slow" ? "SLOW" : burning ? map.hazard.toUpperCase() : warning ? "DANGER SOON" : `${map.hazard.toUpperCase()} SEAL`, hazard.x, hazard.y + 4);
@@ -484,13 +499,12 @@ function render(ctx, floor, state, bossTop = 49) {
             const identity = bossProfile(state.wave);
             const angle = Math.atan2(enemy.attackY - enemy.y, enemy.attackX - enemy.x);
             const color = pattern === 1 ? "#ff956f" : pattern === 2 ? "#ffdc86" : "#d6adff";
-            ctx.strokeStyle = color; ctx.fillStyle = color + "33"; ctx.lineWidth = 3;
-            if (pattern === 1) {
-                ctx.beginPath(); ctx.arc(enemy.x, enemy.y, identity.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-            } else if (pattern === 2) {
+            ctx.strokeStyle = preferences.contrast ? "#fff3cc" : color; ctx.fillStyle = color + "33"; ctx.lineWidth = preferences.contrast ? 5 : 3;
+            drawBossDanger(ctx, identity, enemy);
+            if (pattern === 2 && enemy.combat.phase >= 2) {
                 const spread = Math.max(...identity.fan.map(Math.abs)) + 0.05;
                 ctx.beginPath(); ctx.moveTo(enemy.x, enemy.y); ctx.arc(enemy.x, enemy.y, 210, angle - spread, angle + spread); ctx.closePath(); ctx.fill(); ctx.stroke();
-            } else {
+            } else if (pattern === 3 && enemy.combat.phase >= 3) {
                 for (let i = 0; i < identity.rays; i++) {
                     const ray = angle + i * Math.PI * 2 / identity.rays;
                     ctx.beginPath(); ctx.moveTo(enemy.x + Math.cos(ray) * 40, enemy.y + Math.sin(ray) * 40);
@@ -498,7 +512,10 @@ function render(ctx, floor, state, bossTop = 49) {
                 }
             }
             ctx.fillStyle = color; ctx.textAlign = "center"; ctx.font = "bold 11px 'Segoe UI', sans-serif";
-            ctx.fillText(pattern === 1 ? identity.warning : pattern === 2 ? "FAN — STEP ASIDE" : "RING — FIND A GAP", enemy.x, enemy.y - enemy.radius - 35);
+            const warningPosition = bossWarningPosition(enemy, bossTop);
+            ctx.strokeStyle = '#081218'; ctx.lineWidth = 4;
+            ctx.strokeText(bossWarning(identity, pattern), warningPosition.x, warningPosition.y, 400);
+            ctx.fillText(bossWarning(identity, pattern), warningPosition.x, warningPosition.y, 400);
             ctx.restore();
             continue;
         }
@@ -555,7 +572,15 @@ function render(ctx, floor, state, bossTop = 49) {
             }
         }
     }
-    for (const actor of actors) drawActor(ctx, actor, state.player, state.time, map, state.heroClass);
+    for (const actor of actors) {
+        const appearance = actor === state.player || actor.appearanceAt === undefined ? 1
+            : Math.max(0, Math.min(1, (state.time - actor.appearanceAt) / 0.25));
+        if (appearance === 0) continue;
+        ctx.save();
+        ctx.globalAlpha *= appearance;
+        drawActor(ctx, actor, state.player, state.time, map, state.heroClass);
+        ctx.restore();
+    }
     for (const shot of state.playerShots) {
         ctx.save();
         ctx.translate(shot.x, shot.y); ctx.rotate(Math.atan2(shot.vy, shot.vx));
@@ -617,7 +642,24 @@ function render(ctx, floor, state, bossTop = 49) {
         ctx.strokeStyle = item.color;
         ctx.fillStyle = item.color;
         ctx.lineWidth = 3 * (1 - progress) + 1;
-        if (item.kind === "text") {
+        if (item.kind === 'boss-intro') {
+            ctx.globalAlpha = Math.min(1, item.life, (item.maxLife - item.life) * 3);
+            ctx.font = '16px Georgia, serif'; ctx.textAlign = 'center';
+            const lines = item.text.split(' · ');
+            ctx.fillText(lines[0], WIDTH / 2, 105); ctx.font = "12px 'Segoe UI', sans-serif"; ctx.fillText(lines[1], WIDTH / 2, 124);
+        } else if (item.kind === 'impact') {
+            ctx.lineWidth = 2;
+            if (item.damageType === 'magical') {
+                ctx.beginPath(); ctx.arc(item.x, item.y, item.radius + progress * 12, 0, Math.PI * 2); ctx.stroke();
+            } else {
+                for (let i = 0; i < 3; i++) {
+                    const angle = i * Math.PI * 2 / 3;
+                    ctx.beginPath(); ctx.moveTo(item.x + Math.cos(angle) * item.radius * 0.5, item.y + Math.sin(angle) * item.radius * 0.5);
+                    ctx.lineTo(item.x + Math.cos(angle) * (item.radius + 8), item.y + Math.sin(angle) * (item.radius + 8)); ctx.stroke();
+                }
+            }
+        } else if (item.kind === "text") {
+            if (/^(CRIT )?-?\d+( (MAG|PHY))?$/.test(item.text) && (preferences.damageNumbers === "off" || preferences.damageNumbers === "reduced" && !item.text.startsWith("CRIT") && !item.text.startsWith("-"))) { ctx.restore(); continue; }
             ctx.font = "bold 16px 'Segoe UI', sans-serif";
             ctx.textAlign = "center";
             ctx.shadowBlur = 3;
@@ -728,6 +770,7 @@ function render(ctx, floor, state, bossTop = 49) {
             ctx.fillStyle = map.accent; ctx.fillRect(-3, -3, 6, 6); ctx.restore();
         }
     }
+    ctx.restore();
 }
 
 // Draws the pulsing full-screen "resumeDelay" countdown overlay shown briefly after unpausing or
@@ -774,6 +817,7 @@ export function createGame(root, saveBridge = null) {
     const controller = new AbortController();
     const on = (target, event, handler, options = {}) => target.addEventListener(event, handler, { ...options, signal: controller.signal });
     const audio = createGameAudio();
+    const preferences = bindPreferences(root);
     const buttonFeedback = bindButtonFeedback(root);
     const audioMute = root.querySelector("[data-audio-mute]");
     const audioMusic = root.querySelector("[data-audio-music]");
@@ -1101,9 +1145,10 @@ export function createGame(root, saveBridge = null) {
         openSetup("campaign");
     });
     on(root.querySelector("[data-main-load]"), "click", () => { showMainMenu(false); loadButton.click(); });
+    on(root, 'open-main-panel', () => { showMainMenu(false); });
     on(root.querySelector("[data-main-options]"), "click", () => {
         showMainMenu(false);
-        root.dispatchEvent(new CustomEvent("open-run-options"));
+        root.dispatchEvent(new CustomEvent("open-run-options", { detail: { fromMain: true } }));
         if (root.dataset.canvasHud !== "on") root.querySelector("[data-run-options]").scrollIntoView({ block: "start" });
     });
     on(root.querySelector("[data-main-quit]"), "click", async () => {
@@ -1143,6 +1188,13 @@ export function createGame(root, saveBridge = null) {
         if (!saving && setEquipmentStyle(state, select.dataset.equipmentStyle, select.value)) updateHud();
     });
     const challengeButtons = [...root.querySelectorAll("[data-challenge-choice]")];
+    for (const [attribute, accept] of [["data-stage-event-accept", true], ["data-stage-event-skip", false]]) {
+        on(root.querySelector(`[${attribute}]`), "click", async () => {
+            if (saving || !resolveStageEvent(state, accept, DIFFICULTIES[state.difficulty]?.healing ?? 1)) return;
+            updateHud();
+            if (["camp", "won"].includes(state.status)) await persist(false);
+        });
+    }
     for (const button of challengeButtons) on(button, "click", () => {
         if (!saving) acceptChallenge(state, button.dataset.challengeChoice);
         updateHud();
@@ -1276,7 +1328,7 @@ export function createGame(root, saveBridge = null) {
         root.querySelector("[data-setup-description]").textContent = choosingDifficulty
             ? setupAction === "continue" ? "Keep your character and choose your Endless difficulty. Endless kills start a new score on the campaign-equipped board. Your campaign record is kept."
                 : "Choose once for this new run. Stage transitions never change your difficulty. Starting replaces the current character; Cancel keeps it. Higher tiers strengthen enemies and reduce healing."
-            : choosingLoadout ? "Choose your first automatic combat skill. Add your second at level 5 and your third at level 10. Each choice is locked for this run; dodge and flask remain manual." : tutorial[setupStep - 1].text;
+                : choosingLoadout ? "Choose your first automatic combat skill. Add your second at level 10 and your third at level 20. Each choice is locked for this run; dodge and flask remain manual." : tutorial[setupStep - 1].text;
         if (setupStep === 1) {
             const hero = HERO_CLASSES[classSelect.value];
             root.querySelector("[data-setup-description]").textContent = `Move with WASD or arrows. ${hero.attackName} and your three chosen combat skills target automatically. Space dodges; E drinks a flask. Choose one of three class-specific starters, then add a skill at levels 5 and 10. Open Skills & loadout to upgrade your abilities. ${hero.description}`;
@@ -1367,6 +1419,39 @@ export function createGame(root, saveBridge = null) {
     // loop() function below) as well as immediately after any state-changing action (setup, pause,
     // skill purchase, etc.) so the UI never lags a frame behind the actual game state.
     function updateHud() {
+        const gearPreview = [];
+        for (const [slot, styles] of [["weapon", ["balanced", "heavy", "swift"]], ["armor", ["balanced", "plated", "light"]]]) {
+            for (const style of styles) {
+                const next = { ...state, runSystems: { ...state.runSystems, equipment: { ...state.runSystems.equipment, [slot]: style } } };
+                gearPreview.push(`${style}: damage ${weaponDamage(state)} → ${weaponDamage(next)}, armor ${armorRating(state).toFixed(1)} → ${armorRating(next).toFixed(1)}%, resistance ${resistanceRating(state).toFixed(1)} → ${resistanceRating(next).toFixed(1)}%, speed ${Math.round(movementSpeed(state))} → ${Math.round(movementSpeed(next))}`);
+            }
+        }
+        const equipmentPreview = root.querySelector('[data-equipment-preview]');
+        const gearSignature = gearPreview.join('|');
+        if (equipmentPreview.dataset.preview !== gearSignature) {
+            equipmentPreview.dataset.preview = gearSignature;
+            equipmentPreview.replaceChildren(...gearPreview.map(text => { const row = document.createElement('p'); row.textContent = text; return row; }));
+        }
+        root.querySelector("[data-checkpoint-report]").textContent = ["camp", "won"].includes(state.status)
+            ? `${checkpointReport(state)} ${checkpointSaveFailed ? "Checkpoint save failed — retry before leaving." : saving ? "Saving checkpoint…" : "Review your run and save before continuing."}`
+            : "At each five-wave checkpoint, review the boss relic, challenge result, and optional encounter here.";
+        root.querySelector("[data-build-synergy]").textContent = buildSynergy(state).detail;
+        root.querySelector("[data-boss-relics]").textContent = BOSS_RELICS.filter((_, index) => state.adventures.relics[index]).map(relic => `${relic.name}: ${relic.detail}`).join(" · ") || "Defeat each area boss to earn a unique, non-stacking relic. Practice grants none.";
+        const codex = root.querySelector("[data-campaign-codex]");
+        const signature = state.adventures.chapters.join("");
+        if (codex.dataset.entries !== signature) {
+            codex.dataset.entries = signature;
+            codex.replaceChildren();
+            for (const { map, index } of codexEntries(state)) {
+                const entry = document.createElement("details"), heading = document.createElement("summary"), copy = document.createElement("p");
+                heading.textContent = map.name;
+                copy.textContent = `${map.story} ${bossProfile(index * 5 + 1).lore}`;
+                entry.append(heading, copy); codex.append(entry);
+            }
+        }
+        const encounter = stageEvent(state);
+        root.querySelector("[data-stage-event]").textContent = `${encounter.name}: ${encounter.detail} ${eventAvailable(state) ? "One choice at this checkpoint." : "Available before a stage starts at a clear checkpoint; already resolved encounters cannot be repeated."}`;
+        for (const attribute of ["data-stage-event-accept", "data-stage-event-skip"]) root.querySelector(`[${attribute}]`).disabled = saving || !eventAvailable(state);
         root.querySelector("[data-open-lore]").hidden = inMainMenu || state.training || state.mode !== "campaign" || state.status === "ready";
         root.querySelector("[data-main-resume]").disabled = saving || state.status === "ready";
         root.querySelector("[data-main-load]").disabled = saving || checkingUnlock || !saveBridge || !!state.training;
@@ -1414,6 +1499,17 @@ export function createGame(root, saveBridge = null) {
                 return [key, `${skill.cooldown}s cooldown · ${Math.round(skill.damage * 100)}% weapon damage before conditional bonuses. ${skill.detail}`];
             }))
         };
+        if (state.heroClass === 'sorcerer') {
+            descriptions.attack = 'A focused bolt targets the nearest enemy in range; no skill slot required.';
+            descriptions.nova = 'A pulse damages nearby enemies. Rime wake slows survivors; range upgrades expand the pulse.';
+            descriptions.guard = 'An opening pulse and 40% protection against both damage types. Cannot refresh while active.';
+        }
+        for (const key of Object.keys(descriptions)) {
+            if (['dodge', 'potion'].includes(key)) continue;
+            const definition = combatSkillDefinition(state, key);
+            const cooldown = key === 'attack' ? hero.attackCooldown : key === 'nova' ? hero.specialCooldown : definition?.cooldown ?? extra[key]?.cooldown;
+            descriptions[key] += ` ${skillDamageType(state, key)} damage · ${Math.round(skillReach(state, key))} reach · ${cooldown}s base cooldown. Targeting: ${definition?.detail ?? (key === 'attack' ? 'nearest enemy in reach; aimed on desktop' : key === 'burst' ? extra.burst.shape : 'nearby area')}. ${NEW_SKILLS[key] ? 'Forge: +10% damage, +8 reach, +8% skill recovery per rank. Tree potency: +10% damage per rank; branch effects are described on each node.' : 'Forge and tree previews show the exact damage, reach, recovery and branch changes.'}`;
+        }
         for (const element of root.querySelectorAll("[data-skill-description]")) {
             const value = descriptions[element.dataset.skillDescription];
             if (element.textContent !== value) element.textContent = value;
@@ -1426,9 +1522,12 @@ export function createGame(root, saveBridge = null) {
         if (healthWarning.textContent !== warning) healthWarning.textContent = warning;
         if (critical && mobileHud) {
             const rect = canvas.getBoundingClientRect();
-            const menu = root.querySelector(".mm-bar")?.getBoundingClientRect();
-            healthWarning.style.top = `${bossHudTop(rect, menu, true) * rect.height / HEIGHT}px`;
-        } else healthWarning.style.removeProperty("top");
+            healthWarning.style.top = `${66 * rect.height / HEIGHT + 6}px`;
+            healthWarning.style.left = `${14 * rect.width / WIDTH + 54}px`;
+        } else {
+            healthWarning.style.removeProperty("top");
+            healthWarning.style.removeProperty("left");
+        }
         for (const button of skillButtons) {
             const skill = button.dataset.skill;
             const icon = button.querySelector(".skill-icon"), src = skillIcon(state, skill);
@@ -1449,11 +1548,16 @@ export function createGame(root, saveBridge = null) {
             button.classList.toggle("skill-cooling", p[skill] > 0);
             if (root.dataset.canvasHud === "on") {
                 const remaining = Math.max(0, p[skill]);
+                if (['dodge', 'potion'].includes(skill)) {
+                    const status = combatControlStatus(state, skill, !!setupAction || saving);
+                    button.dataset.controlState = status.mode;
+                    button.setAttribute('aria-label', `${skillName(state, skill)}: ${status.text}`);
+                }
                 const peak = remaining > 0 ? Math.max(remaining, cooldownPeaks.get(button) || 0) : 0;
                 cooldownPeaks.set(button, peak);
                 button.style.setProperty("--cooldown-turn", `${peak > 0 ? remaining / peak : 0}turn`);
                 button.dataset.skillMode = locked ? "locked" : automatic ? "auto" : manual ? "manual" : "unslotted";
-                button.setAttribute("aria-label", `${skillName(state, skill)}: ${locked ? "Locked" : remaining > 0 ? `${remaining.toFixed(1)} seconds` : "Ready"}${automatic ? ", automatic" : ""}`);
+                if (!['dodge', 'potion'].includes(skill)) button.setAttribute("aria-label", `${skillName(state, skill)}: ${locked ? "Locked" : remaining > 0 ? `${remaining.toFixed(1)} seconds` : "Ready"}${automatic ? ", automatic" : ""}`);
             }
             button.classList.toggle("flask-needed", skill === "potion" && critical && p.potions > 0 && p.potion === 0 && !setupAction && !saving);
             button.title = locked ? wardUnlockHint(state) : !manual ? automatic ? "Automatic casting: 60% longer cooldown" : "Assign a slot in Skills & loadout" : unavailable ? "Combat is paused or counting down" : cannotHeal ? p.potions === 0 ? "No flask charges left" : "Health is already full"
@@ -1502,7 +1606,7 @@ export function createGame(root, saveBridge = null) {
         text("kills", state.kills);
         text("damage", weaponDamage(state));
         text("armor-name", p.armor);
-        text("armor-detail", `${armorRating(state).toFixed(1)}% damage reduction (cap 60%)`);
+        text("armor-detail", `${armorRating(state).toFixed(1)}% physical armor · ${resistanceRating(state).toFixed(1)}% spell resistance (each capped at 60%)`);
         text("forge-gold", `${state.gold} gold`);
         text("checkpoint-save", ["camp", "won"].includes(state.status) ? saveStatus.textContent : "");
         text("weapon", p.weapon);
@@ -1512,7 +1616,9 @@ export function createGame(root, saveBridge = null) {
         const activePowers = POWER_UPS.filter(power => state.buffs[power.key] > 0);
         text("buffs", activePowers.length ? activePowers.map(power => `${power.name}: ${Math.ceil(state.buffs[power.key])}s`).join(" / ") : "No active power-ups");
         text("journal", state.journal);
-        for (const skill of SKILL_KEYS) text(skill, !skillUnlocked(state, skill) ? "Locked" : skill === "potion" ? `${p.potions}/${MAX_FLASKS} · ${p.potion > 0 ? `${p.potion.toFixed(1)}s` : "Ready"}` : p[skill] > 0 ? `${p[skill].toFixed(1)}s` : "Ready");
+        for (const skill of SKILL_KEYS) text(skill, !skillUnlocked(state, skill) ? "Locked"
+            : ['dodge', 'potion'].includes(skill) ? combatControlStatus(state, skill, !!setupAction || saving).text
+            : p[skill] > 0 ? `${p[skill].toFixed(1)}s` : "Ready");
         text("objective", state.status === "ready" ? `Survive ${LAST_WAVE} waves across ${MAPS.length} lands.`
             : state.status === "won" ? "Dawn restored. The Endless Watch is unlocked."
             : state.status === "camp" ? state.mode === "endless" ? "Stage cleared — save checkpoint, then auto-advance. Save retries a failed checkpoint." : "Checkpoint reached. Loot collected, partial healing and two flask charges granted."
@@ -1571,7 +1677,9 @@ export function createGame(root, saveBridge = null) {
         retrySave.textContent = saving ? "Retrying checkpoint save…" : "Retry checkpoint save";
         const wardUnlocked = skillUnlocked(state, "guard");
         const remindWard = false;
-        text("ward-unlock-status", `${selectedSkills(state).map(key => skillName(state, key)).join(" · ")}. ${p.level < 10 ? `Next skill at level ${p.level < 5 ? 5 : 10}.` : "All three skill slots unlocked."}`);
+        const unlockLevels = state.skillSchedule === "legacy" ? [5, 10] : [10, 20];
+        root.querySelector("[data-skill-choice-description]").textContent = `Combat is paused. Choose a second skill at level ${unlockLevels[0]} and a third at level ${unlockLevels[1]}. Choices stay locked for this run.`;
+        text("ward-unlock-status", `${selectedSkills(state).map(key => skillName(state, key)).join(" · ")}. ${p.level < unlockLevels[1] ? `Next skill at level ${p.level < unlockLevels[0] ? unlockLevels[0] : unlockLevels[1]}.` : "All three skill slots unlocked."}`);
         text("skill-unlock-hint", `${skillName(state, "guard")} unlocked! Slot your new skill.`);
         skillUnlockNotice.hidden = !remindWard || state.status !== "playing" || state.resumeDelay > 0 || draftClosing || !!setupAction;
         for (const button of root.querySelectorAll("[data-resume-combat]")) {
@@ -2018,6 +2126,7 @@ export function createGame(root, saveBridge = null) {
             saveStatus.textContent = automatic
                 ? result.success ? `Checkpoint ${state.wave} saved ${local ? "on this device" : "on the server"}.${endlessUnlocked ? " Endless Watch remains permanently unlocked." : ""}` : `Checkpoint autosave failed. ${result.message} Select Save to retry before leaving.`
                 : result.message;
+            if (result.success) saveStatus.textContent += ` Last successful ${loadingSave ? "load" : "save"}: ${new Date().toLocaleTimeString()}. ${local ? "Device storage" : "Cloud/server storage"}; unsaved combat progress remains in memory.`;
         } catch {
             operationSucceeded = false;
             if (!loadingSave && ["camp", "won"].includes(state.status)) checkpointSaveFailed = true;
@@ -2190,7 +2299,7 @@ export function createGame(root, saveBridge = null) {
             checkpointHandled = `${state.mode}:${state.wave}`;
             void persist(false, true);
         }
-        render(ctx, floors[mapIndexForWave(state.wave)], state, bossTop);
+        render(ctx, floors[mapIndexForWave(state.wave)], state, bossTop, preferences.settings);
         drawCountdown(ctx, state, root.dataset.canvasHud === "on");
         // Hosts without room for a DOM HUD (the mobile shell) draw it into the canvas instead, so
         // it scales with the playfield and cannot intercept touches. Opt-in: desktop keeps the
@@ -2214,6 +2323,7 @@ export function createGame(root, saveBridge = null) {
         controller.abort();
         audio.dispose();
         buttonFeedback.dispose();
+        preferences.dispose();
         observer.disconnect();
         clearInput();
     }

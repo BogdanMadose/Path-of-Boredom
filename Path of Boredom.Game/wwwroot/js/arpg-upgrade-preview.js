@@ -6,9 +6,10 @@
 // specific metrics that upgrade actually affects (fields lookup table) and formatting a readable
 // string. If you add a new forge/mastery upgrade, you need to: add it to `fields` (which derived
 // stats it touches) and make sure values() actually computes something meaningful for it.
-import { weaponDamage, armorRating, movementSpeed, criticalChance, criticalDamage, skillReach, flaskHealing, cooldownRecovery } from "./arpg-engine.js";
+import { weaponDamage, armorRating, resistanceRating, movementSpeed, criticalChance, criticalDamage, skillReach, flaskHealing, cooldownRecovery } from "./arpg-engine.js";
 import { classFor } from "./arpg-classes.js";
 import { EXTRA_SKILLS, NEW_SKILLS, combatSkillDefinition, AUTO_COOLDOWN, skillSelected } from "./arpg-skills.js";
+import { buildSynergy } from './arpg-adventures.js';
 
 // Computes the full set of derived, human-relevant combat stats for a given state snapshot — this
 // mirrors (and must stay consistent with) the actual formulas used in arpg-engine.js's combat code,
@@ -21,7 +22,7 @@ function values(state) {
     const interval = (value, skill) => value / recovery * (state.loadout.auto.includes(skill) ? AUTO_COOLDOWN : 1);
     const extra = EXTRA_SKILLS[state.heroClass];
     return {
-        damage, armor: armorRating(state), health: p.maxHealth, speed: movementSpeed(state),
+        damage, armor: armorRating(state), resistance: resistanceRating(state), health: p.maxHealth, speed: movementSpeed(state),
         crit: criticalChance(state) * 100, critDamage: criticalDamage(state) * 100, recovery: recovery * 100,
         attackHit: Math.round(damage * (1 + forge.cleave * 0.08) * (1 + tree.attack.edge * 0.08)),
         specialHit: Math.round(damage * (hero.specialDamage + forge.nova * (state.heroClass === "ranger" ? 0.1 : 0.12))
@@ -41,7 +42,7 @@ function values(state) {
         ...Object.fromEntries(Object.keys(NEW_SKILLS).flatMap(skill => {
             const definition = combatSkillDefinition(state, skill), nodes = tree[skill];
             return [
-                [`${skill}Hit`, Math.round(Math.round(damage * definition.damage * (1 + nodes.potency * 0.1)) * (1 + state.boons[`${skill}Oath`] * 0.06 + forge[skill] * 0.1))],
+                [`${skill}Hit`, Math.round(Math.round(Math.round(damage * definition.damage * (1 + nodes.potency * 0.1)) * (1 + state.boons[`${skill}Oath`] * 0.06 + forge[skill] * 0.1)) * (1 + (skill === 'chain' ? buildSynergy(state).areaDamage : 0)))],
                 [`${skill}Interval`, interval(definition.cooldown / (1 + nodes.recovery * 0.08) / (1 + forge[skill] * 0.08), skill)],
                 [`${skill}Reach`, skillReach(state, skill)]
             ];
@@ -51,7 +52,7 @@ function values(state) {
 // Maps each forge/mastery upgrade key to which of the derived stats (from values() above) it
 // actually affects — this is what upgradePreview() diffs to build its "X: before → after" text.
 const fields = {
-    weapon: ["damage"], armor: ["armor", "health"], cleave: ["attackHit", "attackInterval", "attackReach"],
+    weapon: ["damage"], armor: ["armor", "resistance", "health"], cleave: ["attackHit", "attackInterval", "attackReach"],
     nova: ["specialHit", "specialInterval", "specialReach"], burst: ["burstHit", "burstInterval", "burstReach"],
     guard: ["guardHit", "guardInterval", "guardReach", "protection"], dodge: ["dodgeInterval", "immunity"], flask: ["healing"],
     critChance: ["crit"], critDamage: ["critDamage"], might: ["damage"], vitality: ["health"],
@@ -60,7 +61,7 @@ const fields = {
 };
 // Human-readable labels for each derived stat, used to build the preview text.
 const labels = {
-    damage: "Weapon damage", armor: "Armor %", health: "Max health", speed: "Move speed", crit: "Crit chance %", critDamage: "Crit damage %", recovery: "Recovery %",
+    damage: "Weapon damage", armor: "Physical armor %", resistance: "Spell resistance %", health: "Max health", speed: "Move speed", crit: "Crit chance %", critDamage: "Crit damage %", recovery: "Recovery %",
     attackHit: "Attack hit", specialHit: "Special hit / arrow", burstHit: "Burst hit / arrow", guardHit: "Ward pulse",
     attackInterval: "Attack interval s", specialInterval: "Special recharge s", burstInterval: "Burst recharge s", guardInterval: "Ward recharge s",
     dodgeInterval: "Dodge recharge s", immunity: "Dodge immunity s", protection: "Ward duration s", healing: "Flask heal at current health",
@@ -89,7 +90,7 @@ export function upgradePreview(state, key, mastery = false) {
     next.player.maxHealth += health; next.player.health += health;
     const before = values(state), after = values(next);
     const ranged = state.heroClass === "ranger";
-    const caps = { armor: 60, crit: 75, recovery: 200, protection: 8, attackReach: ranged ? 1000 : 220,
+    const caps = { armor: 60, resistance: 60, crit: 75, recovery: 200, protection: 8, attackReach: ranged || state.heroClass === "sorcerer" ? 1000 : 220,
         specialReach: ranged ? 1000 : 340, burstReach: ranged ? 1000 : 500, guardReach: ranged ? 1000 : 340 };
     const metrics = (fields[key] ?? []).filter(metric => !metricSkills[metric] || skillSelected(state, metricSkills[metric]));
     const format = value => Number(value.toFixed(2)).toLocaleString();

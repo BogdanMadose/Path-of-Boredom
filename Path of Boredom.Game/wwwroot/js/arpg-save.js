@@ -78,9 +78,21 @@ function integer(value, min, max) {
 // the actual migration mechanism — it supplies a sensible default for saves older than the version
 // that introduced a given field, rather than requiring every historical save to be rewritten.
 export function restoreSnapshot(snapshot, random = Math.random) {
-    require([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].includes(snapshot?.version));
+    require([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].includes(snapshot?.version));
     const saved = snapshot.state;
     const state = createState(random);
+    state.skillSchedule = snapshot.version < 19 ? "legacy" : saved.skillSchedule;
+    require(["legacy", "modern"].includes(state.skillSchedule));
+    if (snapshot.version >= 20) {
+        const adventure = saved.adventures;
+        require(adventure && Array.isArray(adventure.relics) && Array.isArray(adventure.chapters) && adventure.relics.length === 6 && adventure.chapters.length === 6);
+        for (const key of ["relics", "chapters"]) {
+            adventure[key].forEach(value => integer(value, 0, 1));
+            state.adventures[key] = [...adventure[key]];
+        }
+        integer(adventure.eventStage, -1, Math.floor(saved.wave / 5));
+        state.adventures.eventStage = adventure.eventStage;
+    }
     state.rankingPatch = snapshot.version < 13 ? "pre004" : saved.rankingPatch;
     require(["release", "005", "004", "pre004"].includes(state.rankingPatch));
     state.volleySequence = snapshot.version < 14 ? 2 : saved.volleySequence;
@@ -246,7 +258,7 @@ export function restoreSnapshot(snapshot, random = Math.random) {
         const combat = snapshot.version < 14 ? { phase: 1, rest: 0, pattern: 1, volleys: [] } : item.combat;
         enemy.combat = numbers(combat, ["phase", "rest", "pattern"]);
         integer(enemy.combat.phase, 1, item.kind === "boss" ? 3 : 1);
-        integer(enemy.combat.pattern, 1, enemy.combat.phase);
+        integer(enemy.combat.pattern, 1, item.kind === "boss" ? 3 : 1);
         require(enemy.combat.rest >= 0 && enemy.combat.rest <= (item.kind === "boss" ? 2 : 0));
         require(!enemy.combat.rest || enemy.winding === 0 && enemy.attackWindup === 0);
         enemy.combat.volleys = array(combat.volleys, entry => {
@@ -330,7 +342,8 @@ export function restoreSnapshot(snapshot, random = Math.random) {
 export function captureSnapshot(state) {
     require(!state.training);
     require(["playing", "paused", "camp", "won", "choosing"].includes(state.status));
-    const restored = restoreSnapshot({ version: 18, state: {
+    const restored = restoreSnapshot({ version: 20, state: {
+        skillSchedule: state.skillSchedule,
         ...state,
         playerShots: state.playerShots.filter(shot => shot.life > 0),
         enemies: state.enemies.filter(enemy => enemy.health > 0),
@@ -338,7 +351,7 @@ export function captureSnapshot(state) {
         loot: state.loot.filter(drop => drop.life > 0)
     } });
     const { random, effects, damageHistory, ...saved } = restored;
-    const snapshot = { version: 18, state: saved };
+    const snapshot = { version: 20, state: saved };
     require(new TextEncoder().encode(JSON.stringify(snapshot)).length <= 64 * 1024);
     return snapshot;
 }

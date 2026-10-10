@@ -1,5 +1,20 @@
 const forgeSeen = new WeakMap();
 
+export function combatControlStatus(state, skill, blocked = false) {
+    const p = state.player;
+    const charges = skill === 'potion' ? `${p.potions}/5 · ` : '';
+    if (skill === 'potion' && p.potions === 0) return { mode: 'empty', text: '0/5 · Empty' };
+    if (blocked || state.status !== 'playing' || state.resumeDelay > 0) return { mode: 'paused', text: `${charges}Paused` };
+    if (p[skill] > 0) return { mode: 'cooling', text: `${charges}${p[skill].toFixed(1)}s` };
+    if (skill === 'potion' && p.health >= p.maxHealth) return { mode: 'full', text: `${charges}Full HP` };
+    return { mode: 'ready', text: `${charges}Ready` };
+}
+
+export const bossWarningPosition = (enemy, bossTop, width = 1100, height = 650) => ({
+    x: Math.max(200, Math.min(width - 200, enemy.x)),
+    y: Math.max(bossTop + 44, Math.min(height - 100, enemy.y - enemy.radius - 35))
+});
+
 export const automaticCheckpoint = (state, failed = false) => state.mode === "endless" && state.status === "camp" && !failed;
 
 export function forgeNotification(state, offers, acknowledge = false) {
@@ -11,6 +26,5 @@ export function forgeNotification(state, offers, acknowledge = false) {
 
 export function bossHudTop(canvas, menu, mobile = false, height = 650) {
     if (!mobile) return 49;
-    const menuBottom = menu?.height > 0 ? menu.bottom : canvas.top;
-    return Math.max(96, (menuBottom - canvas.top + 22) * height / Math.max(1, canvas.height));
+    return 76;
 }

@@ -111,6 +111,27 @@ function bodySprite(hero) {
 // swung via rotation tied to `strike` and the attack windup. `reduced` disables all of the purely
 // cosmetic motion (flutter, sway, flicker) for the prefers-reduced-motion accessibility setting.
 export function drawHero(ctx, actor, hero, stride, strike, time, reduced) {
+    if (hero.weaponType === "staff") {
+        ctx.save(); ctx.rotate(actor.facing + Math.PI / 2);
+        if (actor.invulnerable > 0) ctx.globalAlpha *= reduced ? 0.8 : 0.72 + Math.sin(time * 18) * 0.12;
+        const flutter = reduced ? 0 : Math.sin(time * 6) * 1.5 + stride * 1.5;
+        for (const side of [-1, 1]) {
+            polygon(ctx, [[side * 4, 14 + stride * side * 3], [side * 10, 14 + stride * side * 3], [side * 10, 29 + stride * side * 3], [side * 4, 29 + stride * side * 3]], '#25303e', '#8b80a255', 1);
+        }
+        polygon(ctx, [[-11, -8], [11, -8], [17 + flutter, 22], [6, 26], [0, 23], [-16 + flutter, 25]], "#51416f", '#a68ac055', 1.5);
+        polygon(ctx, [[0, -25], [11, -17], [10, -5], [-10, -5], [-11, -17]], '#30283f', hero.color, 1.5);
+        polygon(ctx, [[-5, -16], [5, -16], [4, -8], [-4, -8]], '#bba49c', '#181723', 1);
+        ctx.strokeStyle = '#cdb4ef'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, -3); ctx.lineTo(0, 20); ctx.moveTo(-8, 5); ctx.lineTo(8, 5); ctx.stroke();
+        const twist = angleDifference(actor.facing, actor.weaponFacing ?? actor.facing);
+        ctx.rotate(twist);
+        ctx.strokeStyle = "#bda77c"; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(17, 18); ctx.lineTo(17, -28); ctx.stroke();
+        drawOrb(ctx, 17, -31, 5, hero.color);
+        ctx.strokeStyle = hero.color; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(17, -31, 8, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore(); return;
+    }
     const ranger = hero.weaponType === "bow", warden = hero.weaponType === "hammer";
     ctx.save();
     ctx.strokeStyle = hero.color + "88"; ctx.lineWidth = 1;

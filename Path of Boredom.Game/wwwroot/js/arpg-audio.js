@@ -25,6 +25,7 @@ export function createGameAudio(environment = globalThis) {
     let timer = null, nextNote = 0, beat = 0, previous = null, previousState = null;
     const voices = new Set();
     const lastCue = new Map();
+    const introducedBosses = new WeakSet();
 
     function stopVoices(channel = null) {
         for (const voice of [...voices]) {
@@ -81,7 +82,8 @@ export function createGameAudio(environment = globalThis) {
         while (nextNote < now + 0.25) {
             const progression = menu ? [0, 5, 3, 7] : [0, 3, 5, -2];
             const root = (menu ? 48 : 45 + area) + progression[Math.floor(beat / 16) % 4];
-            const melody = boss ? [0, 7, 3, 10, 0, 5, 2, 7] : menu ? [0, 7, 12, 14, 10, 7, 5, 3] : melodies[area];
+            const bossMelodies = [[0, 7, 3, 10, 0, 5, 2, 7], [0, 2, 7, 5, 3, 2, 10, 7], [0, 0, 6, 7, 3, 0, 6, 10], [0, 12, 7, 14, 3, 10, 7, 2], [0, 3, 2, 7, 10, 5, 3, 2], [0, 1, 7, 6, 0, 10, 1, 3]];
+            const melody = boss ? bossMelodies[area] : menu ? [0, 7, 12, 14, 10, 7, 5, 3] : melodies[area];
             const note = frequency(root + 12 + melody[(beat + Math.floor(beat / 32) * 2) % melody.length]);
             voice("music", nextNote, boss ? 0.24 : 1.4, note, note, boss ? 0.075 : 0.055, boss ? "triangle" : "sine");
             if (beat % 4 === 0) {
@@ -184,6 +186,16 @@ export function createGameAudio(environment = globalThis) {
         const nextBoss = !mainMenu && state.enemies.some(enemy => enemy.kind === "boss" && enemy.health > 0);
         const nextArea = Math.max(0, Math.min(5, mapIndex));
         if (nextBoss !== boss || nextArea !== area || menu !== mainMenu) stopMusic();
+        const newBoss = state.enemies.find(enemy => enemy.kind === 'boss' && enemy.health > 0);
+        if (newBoss && !blocked && !background && state.status === 'playing' && !state.resumeDelay
+            && !introducedBosses.has(newBoss)) {
+            const motifs = [[0, 7, 3], [0, 2, 10], [0, 6, 7], [12, 7, 14], [3, 2, 7], [0, 1, 6]];
+            if (context && !settings.muted && context.state === 'running') for (const [i, note] of motifs[nextArea].entries()) {
+                const pitch = frequency(48 + note);
+                voice('music', context.currentTime + i * 0.16, 0.35, pitch, pitch, 0.055, 'triangle');
+            }
+            if (context && context.state === 'running') introducedBosses.add(newBoss);
+        }
         menu = mainMenu;
         boss = nextBoss;
         area = nextArea;

@@ -1,0 +1,73 @@
+import { mapIndexForWave, MAPS } from './arpg-campaign.js';
+
+export const BOSS_RELICS = [
+    { name: "Warden's oath", detail: '+2 physical armor.' },
+    { name: 'Ferryman token', detail: '+2 spell resistance.' },
+    { name: 'Furnace heart', detail: '+3% all damage.' },
+    { name: 'Glass memory', detail: '+2% movement speed.' },
+    { name: 'Unwritten page', detail: '+3% global cooldown recovery, within the normal cap.' },
+    { name: 'Sixth dawn', detail: '+3% all damage and +2 spell resistance.' }
+];
+export const STAGE_EVENTS = [
+    { name: 'Lantern keeper', detail: 'Give 80 gold to restore 30% maximum health, before difficulty penalties.', cost: 80, kind: 'heal' },
+    { name: 'Lost pilgrim', detail: 'Give one flask charge to receive 100 gold.', cost: 0, kind: 'flask' },
+    { name: 'Sealed coffer', detail: 'Sacrifice 20% maximum health to receive 150 gold. Cannot be used if the cost would defeat you.', cost: 0, kind: 'blood' }
+];
+export const newAdventures = () => ({ relics: [0, 0, 0, 0, 0, 0], chapters: [0, 0, 0, 0, 0, 0], eventStage: -1 });
+export function discoverChapter(state) {
+    if (state.training || state.mode !== 'campaign' || state.wave < 1) return;
+    state.adventures.chapters[mapIndexForWave(state.wave)] = 1;
+}
+export const stageEvent = state => STAGE_EVENTS[Math.floor(state.wave / 5) % STAGE_EVENTS.length];
+export const eventAvailable = state => !state.training && ['paused', 'camp', 'won'].includes(state.status)
+    && state.wave % 5 === 0 && state.enemies.length === 0 && state.adventures.eventStage !== Math.floor(state.wave / 5);
+export function resolveStageEvent(state, accept, healing = 1) {
+    if (!eventAvailable(state)) return false;
+    const event = stageEvent(state), p = state.player;
+    if (accept) {
+        if (state.gold < event.cost || event.kind === 'flask' && p.potions < 1 || event.kind === 'blood' && p.health <= p.maxHealth * 0.2) return false;
+        state.gold -= event.cost;
+        state.runSystems.summary.spent += event.cost;
+        if (event.kind === 'heal') p.health = Math.min(p.maxHealth, p.health + p.maxHealth * 0.3 * healing);
+        if (event.kind === 'flask') { p.potions--; state.gold += 100; }
+        if (event.kind === 'blood') { p.health -= p.maxHealth * 0.2; state.gold += 150; }
+    }
+    state.adventures.eventStage = Math.floor(state.wave / 5);
+    state.journal = accept ? `${event.name}: bargain completed.` : `${event.name}: passed by safely.`;
+    return true;
+}
+export function awardBossRelic(state) {
+    if (state.training) return;
+    const index = mapIndexForWave(state.wave);
+    if (!state.adventures.relics[index]) {
+        state.adventures.relics[index] = 1;
+        state.journal = `${BOSS_RELICS[index].name} recovered. ${BOSS_RELICS[index].detail}`;
+    }
+}
+export const BUILD_SYNERGIES = [
+    { name: 'Shatter', skills: ['frost', 'burst'], stat: 'damage', value: 0.04, detail: '+4% damage against slowed enemies.' },
+    { name: 'Sanctuary', skills: ['guard', 'siphon'], stat: 'resistance', value: 3, detail: '+3 spell resistance.' },
+    { name: 'Stormfront', skills: ['chain', 'nova'], stat: 'areaDamage', value: 0.03, detail: '+3% Chain and Nova damage.' },
+    { name: 'Execution window', skills: ['reap', 'burst'], stat: 'executeDamage', value: 0.04, detail: '+4% damage against enemies below 35% health.' },
+    { name: 'Mobile artillery', skills: ['meteor', 'frost'], stat: 'speed', value: 0.03, detail: '+3% movement speed.' },
+    { name: 'Counterguard', skills: ['guard', 'repulse'], stat: 'armor', value: 3, detail: '+3 physical armor.' },
+    { name: 'Battle rhythm', skills: ['chain', 'repulse'], stat: 'recovery', value: 0.03, detail: '+3% cooldown recovery, within the normal cap.' },
+    { name: 'Sustained assault', skills: ['siphon', 'reap'], stat: 'basicDamage', value: 0.04, detail: '+4% regular-attack damage.' }
+];
+export function buildSynergy(state) {
+    const active = BUILD_SYNERGIES.filter(synergy => synergy.skills.every(skill => state.loadout.auto.includes(skill)));
+    const result = { damage: 1, resistance: 0, armor: 0, speed: 0, recovery: 0, areaDamage: 0, executeDamage: 0, basicDamage: 0 };
+    for (const synergy of active) result[synergy.stat] += synergy.value;
+    result.detail = active.map(synergy => `${synergy.name}: ${synergy.detail}`).join(' · ')
+        || 'Optional synergies: Frost + Burst (slowed-target damage), Guard + Siphon (resistance), Chain + Nova (area damage), Reap + Burst (finishing), Meteor + Frost (movement), Guard + Repulse (armor), Chain + Repulse (recovery), Siphon + Reap (regular attacks).';
+    return result;
+}
+export function checkpointReport(state) {
+    const index = mapIndexForWave(state.wave), challenge = state.runSystems.challenge;
+    const success = challenge.key === 'unscarred' ? challenge.damage === 0 : challenge.key === 'flaskless' ? challenge.flasks === 0 : challenge.elapsed <= 180;
+    const result = challenge.key === 'none' || challenge.stage !== Math.ceil(state.wave / 5) ? 'No challenge selected.'
+        : challenge.resolved ? `${challenge.key}: ${success ? `completed (+${100 + challenge.stage * 50} gold)` : 'failed (no penalty)'}.` : `${challenge.key}: not yet resolved.`;
+    const event = stageEvent(state);
+    return `${MAPS[index].boss} defeated. Relic: ${state.adventures.relics[index] ? `${BOSS_RELICS[index].name} — ${BOSS_RELICS[index].detail}` : 'none earned in practice' } Challenge: ${result} Event: ${event.name} — ${event.detail} ${eventAvailable(state) ? 'Available now; accept or skip in Stage encounter.' : 'Already resolved or unavailable.'}`;
+}
+export const codexEntries = state => MAPS.map((map, index) => ({ map, index })).filter(({ index }) => state.adventures.chapters[index]);

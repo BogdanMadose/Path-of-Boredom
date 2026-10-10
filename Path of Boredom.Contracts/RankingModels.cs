@@ -76,7 +76,7 @@ public static class RankingRules
     public static bool IsMode(string? value) => value is "campaign" or "endless" or "ascended";
 
     /// <summary>True if <paramref name="value"/> is one of the three playable classes.</summary>
-    public static bool IsClass(string? value) => value is "knight" or "ranger" or "warden";
+    public static bool IsClass(string? value) => value is "knight" or "ranger" or "warden" or "sorcerer";
 
     /// <summary>Maps a class key to its display name shown on the rankings page and setup dialog.</summary>
     public static string ClassName(string? value) => value switch
@@ -84,6 +84,7 @@ public static class RankingRules
         "knight" => "Ember Knight",
         "ranger" => "Dawn Ranger",
         "warden" => "Iron Warden",
+        "sorcerer" => "Astral Sorcerer",
         _ => "—"
     };
 

@@ -71,7 +71,7 @@ public sealed class RankingStore(FirestorePersistence persistence)
         foreach (var entry in profiles) MigrateClassBests(entry.Profile);
         var current = FirestorePersistence.Key(owner);
         var rows = new List<RankingRow>();
-        string[] classes = heroClass is null or "all" ? ["knight", "ranger", "warden"] : [heroClass];
+        string[] classes = heroClass is null or "all" ? ["knight", "ranger", "warden", "sorcerer"] : [heroClass];
         foreach (var classKey in classes)
         {
             var entries = profiles.Select(entry => (entry.Key, entry.Profile.Player,

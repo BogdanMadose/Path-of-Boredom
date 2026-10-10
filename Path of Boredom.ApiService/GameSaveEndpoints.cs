@@ -17,7 +17,7 @@ public static class GameSaveEndpoints
     /// version-gated branch below) any time the client-side save shape changes in a way that needs
     /// server-side validation — see the Web project's JS runtime README for the full checklist.
     /// </summary>
-    public const int CurrentSaveVersion = 18;
+    public const int CurrentSaveVersion = 20;
 
     /// <summary>Registers the GET (load) and PUT (save) endpoints under /game/save.</summary>
     public static void MapGameSaves(this WebApplication app)
@@ -336,6 +336,17 @@ public static class GameSaveEndpoints
 
         if (version >= 9 && !ValidSkillProgress(state, player, version)) return false;
         if (version >= 17 && !ValidRunSystems(state)) return false;
+        if (version >= 20)
+        {
+            if (!state.TryGetProperty("adventures", out var adventure) || adventure.ValueKind != JsonValueKind.Object
+                || !adventure.TryGetProperty("eventStage", out var eventStage) || !eventStage.TryGetInt64(out var stage)
+                || stage < -1 || stage > state.GetProperty("wave").GetDouble() / 5) return false;
+            foreach (var name in new[] { "relics", "chapters" })
+            {
+                if (!adventure.TryGetProperty(name, out var flags) || flags.ValueKind != JsonValueKind.Array || flags.GetArrayLength() != 6
+                    || flags.EnumerateArray().Any(flag => !flag.TryGetInt32(out var value) || value is < 0 or > 1)) return false;
+            }
+        }
 
         // Every entity list (enemies/projectiles/loot) is validated per-item via ValidArray, which
         // also enforces the array's own size cap (128 entries) so a save can't smuggle in an
@@ -478,7 +489,14 @@ public static class GameSaveEndpoints
         }
         if (version >= 15)
         {
-            var capacity = 1 + (level >= 5 ? 1 : 0) + (level >= 10 ? 1 : 0) + (version < 16 && level >= 15 ? 1 : 0);
+            var legacySchedule = version < 19;
+            if (version >= 19)
+            {
+                if (!state.TryGetProperty("skillSchedule", out var schedule) || schedule.ValueKind != JsonValueKind.String
+                    || schedule.GetString() is not ("legacy" or "modern")) return false;
+                legacySchedule = schedule.GetString() == "legacy";
+            }
+            var capacity = 1 + (level >= (legacySchedule ? 5 : 10) ? 1 : 0) + (level >= (legacySchedule ? 10 : 20) ? 1 : 0) + (version < 16 && level >= 15 ? 1 : 0);
             if (auto[0].GetString() == "none" || auto.EnumerateArray().Skip(capacity).Any(item => item.GetString() != "none")) return false;
         }
         if (version >= 11)

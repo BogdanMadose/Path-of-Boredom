@@ -30,11 +30,15 @@ try {
     dotnet publish 'Path of Boredom.Maui/Path of Boredom.Maui.csproj' -f net9.0-android -c Release `
         -p:AndroidPackageFormats=aab "-p:ApplicationVersion=$VersionCode" `
         '-p:AndroidManifest=..\Play-Release\API36-AndroidManifest.xml' "-p:AndroidSdkDirectory=$sdk" `
+        -p:AndroidCreateProguardMappingFile=true -p:AndroidPreferNativeLibrariesWithDebugSymbols=true `
+        -p:_AndroidAotStripLibraries=false `
         --nologo -v:quiet -tl:off
     if ($LASTEXITCODE -ne 0) { throw 'Android Release publish failed.' }
 
     $unsigned = Join-Path $root 'Path of Boredom.Maui/bin/Release/net9.0-android/publish/com.madbone.pathofboredom.aab'
     if (-not (Test-Path -LiteralPath $unsigned)) { throw 'Publish did not produce the expected unsigned bundle.' }
+    & (Join-Path $PSScriptRoot 'Export-PlayDiagnostics.ps1') -BundlePath $unsigned `
+        -OutputPrefix ([IO.Path]::Combine($releaseDirectory, [IO.Path]::GetFileNameWithoutExtension($bundle)))
     jarsigner -keystore $key -storepass:file $password -keypass:file $password -signedjar $bundle $unsigned pob-upload
     if ($LASTEXITCODE -ne 0) { throw 'Upload signing failed.' }
     jarsigner -verify $bundle

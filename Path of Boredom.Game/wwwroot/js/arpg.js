@@ -1092,11 +1092,10 @@ export function createGame(root, saveBridge = null) {
     const loreReader = root.querySelector("[data-lore-reader]");
     const loreSeen = new WeakMap();
     let loreResume = false;
-    function openLore() {
+    function openLore(chapterWave = state.status === "camp" && state.wave % 5 === 0 ? state.wave : Math.max(1, state.wave)) {
         if (saving || setupAction || inMainMenu || state.training || state.mode !== "campaign" || !["playing", "paused", "camp", "won"].includes(state.status)) return;
         loreResume = state.status === "playing";
         if (loreResume) togglePause(state);
-        const chapterWave = state.status === "camp" && state.wave % 5 === 0 ? state.wave : Math.max(1, state.wave);
         const chapter = mapForWave(chapterWave);
         const identity = bossProfile(chapterWave);
         root.querySelector("[data-lore-chapter]").textContent = chapter.chapter;
@@ -1111,7 +1110,7 @@ export function createGame(root, saveBridge = null) {
         loreReader.hidden = false;
         root.querySelector("[data-close-lore]").focus({ preventScroll: true });
     }
-    on(root.querySelector("[data-open-lore]"), "click", openLore);
+    on(root.querySelector("[data-open-lore]"), "click", () => openLore());
     on(root.querySelector("[data-close-lore]"), "click", () => {
         loreReader.hidden = true;
         if (loreResume && state.status === "paused" && !inMainMenu && !saving) togglePause(state);
@@ -2287,13 +2286,14 @@ export function createGame(root, saveBridge = null) {
     function animate(now) {
         if (disposed) return;
         if (!root.isConnected) { dispose(); return; }
-        if (!inMainMenu && loreReader.hidden) step(state, input(), last ? (now - last) / 1000 : 0);
-        if (!inMainMenu && !setupAction && !state.training && state.mode === "campaign" && state.status === "playing" && state.wave % 5 === 1) {
-            const chapter = mapIndexForWave(state.wave);
+        const chapterWave = state.travelPending || state.wave === 0 ? state.wave + 1 : state.wave;
+        if (!inMainMenu && loreReader.hidden && !saving && !setupAction && !state.training && state.mode === "campaign" && state.status === "playing" && chapterWave % 5 === 1) {
+            const chapter = mapIndexForWave(chapterWave);
             let seen = loreSeen.get(state);
             if (!seen) { seen = new Set(); loreSeen.set(state, seen); }
-            if (!seen.has(chapter)) { seen.add(chapter); openLore(); }
+            if (!seen.has(chapter)) { seen.add(chapter); openLore(chapterWave); }
         }
+        if (!inMainMenu && loreReader.hidden) step(state, input(), last ? (now - last) / 1000 : 0);
         root.dataset.gameStatus = setupAction ? "setup" : state.status;
         audio.update(state, mapIndexForWave(state.wave), Boolean(setupAction) || document.hidden, inMainMenu);
         last = now;

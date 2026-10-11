@@ -30,6 +30,7 @@ import { bossProfile } from "./arpg-bosses.js";
 import { skillDamageType, incomingDamageType, mitigateDamage, enemyDamageType, hazardDamageType, enemyDefense } from "./arpg-damage.js";
 import { newAdventures, awardBossRelic, discoverChapter, buildSynergy } from "./arpg-adventures.js";
 import { bossDanger } from "./arpg-boss-patterns.js";
+import { observeBossRecovery, beginBossRecovery } from './arpg-boss-combat.js';
 // Logical canvas resolution (not the real on-screen pixel size — arpg-graphics.js scales this to
 // fit the actual canvas). All position math throughout this file is in these logical units.
 export const WIDTH = 1100;
@@ -1262,11 +1263,11 @@ export function step(state, input, elapsed) {
         if (enemy.kind === "boss") {
             const combat = enemy.combat;
             const identity = bossProfile(state.wave);
+            observeBossRecovery(enemy, state.time);
             const phase = enemy.health <= enemy.maxHealth / 3 ? 3 : enemy.health <= enemy.maxHealth * 2 / 3 ? 2 : 1;
             if (phase > combat.phase && enemy.winding <= 0) {
                 combat.phase = phase;
-                combat.rest = identity.recovery;
-                enemy.attackWindup = 0;
+                if (beginBossRecovery(enemy, state.time, identity.recovery, true)) enemy.attackWindup = 0;
                 effect(state, "text", enemy.x, enemy.y - 60, "#ffd18d", `PHASE ${phase}`);
             }
             if (combat.rest > 0) {
@@ -1286,7 +1287,8 @@ export function step(state, input, elapsed) {
                         enemy.x = clamp(enemy.x + Math.cos(angle) * 220, MARGIN, WIDTH - MARGIN);
                         enemy.y = clamp(enemy.y + Math.sin(angle) * 220, MARGIN, HEIGHT - MARGIN);
                     }
-                    combat.rest = identity.recovery;
+                    beginBossRecovery(enemy, state.time, identity.recovery);
+                    enemy.swing = 0.3;
                     enemy.slam = identity.interval;
                     enemy.cooldown = Math.max(enemy.cooldown, 1);
                 }

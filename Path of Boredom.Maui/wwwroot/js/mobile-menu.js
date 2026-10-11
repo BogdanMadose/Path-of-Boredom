@@ -417,7 +417,7 @@
     function addSaveActions(host, root) {
         var actions = el("div", "mm-save-actions");
         ["save", "load"].forEach(function (action) {
-            if (action === 'load' && host.matches?.('.main-menu-card')) return;
+            if (action === 'load' && (host.matches?.('.main-menu-card') || host.hasAttribute?.('data-main-menu-actions'))) return;
             var button = el("button", "mm-pause-option", action === "save" ? "Save on device" : "Load saved run");
             button.type = "button";
             button.dataset.mobileSaveAction = action;
@@ -467,15 +467,16 @@
         var pause = layer.querySelector('[data-mm-tab="pause"]');
         if (canvas && bar) {
             var bounds = canvas.getBoundingClientRect();
-            bar.style.setProperty('--menu-shortcuts-top', (bounds.top + bounds.height * 48 / 650 + 4) + 'px');
+            bar.style.setProperty('--menu-shortcuts-top', (bounds.top + 52) + 'px');
             if (pause) {
-                pause.style.setProperty('--pause-hud-top', (bounds.top + bounds.height * 66 / 650 + 6) + 'px');
-                pause.style.setProperty('--pause-hud-left', (bounds.left + bounds.width * 14 / 1100) + 'px');
+                pause.style.setProperty('--pause-hud-top', (bounds.top + 72) + 'px');
+                pause.style.setProperty('--pause-hud-left', (bounds.left + 14) + 'px');
             }
         }
         Array.prototype.forEach.call(root.querySelectorAll("[data-mobile-save-action]"), function (button) {
             var original = root.querySelector('[data-action="' + button.dataset.mobileSaveAction + '"]');
             button.disabled = !original || original.disabled;
+            if (button.dataset.mobileSaveAction === 'save') button.hidden = !['playing', 'paused', 'camp', 'won'].includes(root.dataset.gameStatus) || root.dataset.training === 'on';
             button.textContent = button.dataset.mobileSaveAction === "save"
                 ? root.dataset.cloudSignedIn === "on" ? "Save to cloud" : "Save on device"
                 : root.dataset.cloudSignedIn === "on" ? "Load cloud save" : "Load device save";
@@ -508,6 +509,7 @@
         Array.prototype.forEach.call(root.querySelectorAll('[data-main-panel]'), function (button) {
             var allowed = ['playing', 'paused', 'camp'].includes(root.dataset.gameStatus)
                 || button.dataset.mainPanel === 'rankings' && ['ready', 'dead', 'won'].includes(root.dataset.gameStatus);
+            button.hidden = button.dataset.mainPanel !== 'rankings' && (!['playing', 'paused', 'camp', 'won'].includes(root.dataset.gameStatus) || root.dataset.training === 'on');
             button.disabled = root.dataset.saveBusy === 'on' || !allowed;
         });
         var practicing = root.dataset.training === "on";
@@ -584,9 +586,9 @@
         buildAccount(root);
         buildPause(root);
         addSaveActions(root.querySelector("[data-run-menu]"), root);
-        var mainCard = root.querySelector('.main-menu-card');
+        var mainCard = root.querySelector('[data-main-menu-actions]');
         addSaveActions(mainCard, root);
-        ['skills', 'forge', 'challenges', 'rankings'].forEach(function (name) {
+        ['rankings', 'skills', 'forge', 'challenges'].forEach(function (name) {
             var button = el('button', 'mm-pause-option', { skills: 'Skills & loadout', forge: 'Forge & equipment', challenges: 'Stage challenges', rankings: 'Rankings' }[name]);
             button.type = 'button';
             button.dataset.mainPanel = name;

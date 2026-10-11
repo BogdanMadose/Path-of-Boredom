@@ -15,10 +15,10 @@ try {
  for(const [w,h] of [[320,480],[360,640],[430,932],[480,320],[640,360],[800,1280],[1024,768]]) {
   layer.style.width=w+'px'; layer.style.height=h+'px';
   root.style.width=w+'px'; root.style.height=h+'px';
-  const flaskBottom=h*66/650, healthLeft=w*14/1100;
+  const flaskBottom=66, healthLeft=14;
   pause.style.setProperty('--pause-hud-top',(flaskBottom+6)+'px');
   pause.style.setProperty('--pause-hud-left',healthLeft+'px');
-  bar.style.setProperty('--menu-shortcuts-top',(h*48/650+4)+'px');
+  bar.style.setProperty('--menu-shortcuts-top','52px');
   const a=pause.getBoundingClientRect();
   check(Math.abs(a.top-flaskBottom-6)<1,'pause clears flask row by six pixels');
   check(Math.abs(a.left-healthLeft)<1,'pause aligns with health bar');

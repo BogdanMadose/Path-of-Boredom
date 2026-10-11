@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import { startRun, weaponDamage, armorRating, resistanceRating, movementSpeed, cooldownRecovery } from '../../Path of Boredom.Game/wwwroot/js/arpg-engine.js';
+import { EQUIPMENT_STYLES } from '../../Path of Boredom.Game/wwwroot/js/arpg-run-systems.js';
+const source=fs.readFileSync(new URL('../../Path of Boredom.Game/wwwroot/js/arpg.js',import.meta.url),'utf8');
+const preview='{'+source.slice(source.indexOf('        const gearPreview ='),source.indexOf('        root.querySelector("[data-checkpoint-report]")'))+'}';
+const state=startRun(()=>0.99);
+const host={dataset:{},rows:[],replaceChildren(...rows){this.rows=rows;}};
+const context=vm.createContext({state,weaponDamage,armorRating,resistanceRating,movementSpeed,cooldownRecovery,EQUIPMENT_STYLES,
+ root:{querySelector(){return host;}},document:{createElement(){return {textContent:''};}}});
+vm.runInContext(preview,context);
+assert.equal(host.rows.length,5,'one current summary and four alternatives');
+const rows=host.rows.map(row=>row.textContent);
+assert.ok(rows[0].startsWith('Equipped now:'));
+assert.ok(!rows.slice(1).some(row=>row.includes('resistance')),'unchanged resistance is not repeated');
+assert.ok(!rows.slice(1).some(row=>row.includes('Balanced')),'current balanced styles are not repeated');
+for(const row of rows.filter(row=>row.startsWith('Weapon')))assert.ok(!row.includes('armor')&&!row.includes('movement'));
+for(const row of rows.filter(row=>row.startsWith('Armor')))assert.ok(!row.includes('damage')&&!row.includes('recovery'));
+state.runSystems.equipment.weapon='heavy';host.dataset={};vm.runInContext(preview,context);
+assert.ok(host.rows.some(row=>row.textContent.startsWith('Weapon — Balanced:')),'Balanced is shown only as an alternate style');
+console.log('PASS: one equipped summary, four named alternatives, no duplicate current styles or unchanged stats');

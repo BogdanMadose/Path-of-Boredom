@@ -20,7 +20,7 @@ import { MAPS, LAST_WAVE, UPGRADES, POWER_UPS, threatForWave, mapForWave, mapInd
 import { LEVEL_CARDS, normalizeCardChoices } from "./arpg-cards.js";
 import { DIFFICULTIES } from "./arpg-difficulty.js";
 import { MASTERY, MAX_FLASKS, forgeSkillSelected, forgeComplete, masteryCost, buyMastery, chargeLaneEnd } from "./arpg-engine.js";
-import { movementSpeed, criticalChance, criticalDamage, skillReach } from "./arpg-engine.js";
+import { movementSpeed, criticalChance, criticalDamage, skillReach, cooldownRecovery } from "./arpg-engine.js";
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
 import { resistanceRating } from "./arpg-engine.js";
 import { enemyDefense, skillDamageType } from "./arpg-damage.js";
@@ -38,7 +38,7 @@ import { turnToward } from "./arpg-facing.js";
 import { automaticCheckpoint, forgeNotification, bossHudTop, combatControlStatus, bossWarningPosition } from "./arpg-ui-state.js";
 import { encounterForWave } from "./arpg-encounters.js";
 import { startTraining } from "./arpg-engine.js";
-import { setEquipmentStyle, acceptChallenge, CHALLENGES, runSummary } from "./arpg-run-systems.js";
+import { setEquipmentStyle, acceptChallenge, CHALLENGES, EQUIPMENT_STYLES, runSummary } from "./arpg-run-systems.js";
 import { createGameAudio } from "./arpg-audio.js";
 import { bindButtonFeedback } from "./arpg-button-feedback.js";
 import { bossProfile, drawBoss } from "./arpg-bosses.js";
@@ -232,7 +232,7 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
     const strike = Math.sin(Math.PI * Math.min(1, (actor.swing ?? 0) / (hero ? 0.26 : 0.3)));
     if (!reducedMotion.matches) {
         ctx.translate(0, -stride * stride * (hero ? 2 : 2.5));
-        if (!hero) {
+        if (!hero && !boss) {
             const angle = Math.atan2(player.y - actor.y, player.x - actor.x);
             ctx.translate(Math.cos(angle) * strike * 7, Math.sin(angle) * strike * 7);
             const breath = Math.sin(time * 2.8 + actor.x * 0.01) * 0.012;
@@ -243,7 +243,7 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
     if (hero) {
         drawHero(ctx, actor, HERO_CLASSES[heroClass], stride, strike, time, reducedMotion.matches);
     } else if (boss) {
-        drawBoss(ctx, actor, map, time);
+        drawBoss(ctx, actor, map, time, reducedMotion.matches);
     } else if (actor.kind === "duelist") {
         ctx.rotate(facing);
         drawOrb(ctx, 0, 0, 15, actor.flash > 0 ? "#fff4d6" : "#357a89");
@@ -433,7 +433,7 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
 // corner brazier lights, then loops enemies to draw attack-telegraph shapes/labels before actors and
 // projectiles are drawn later in this function. Kept intentionally simple/flat (no z-sorting beyond
 // draw order) since the arena is a flat top-down view.
-function render(ctx, floor, state, bossTop = 49, preferences = {}) {
+function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = false) {
     const map = mapForWave(state.wave);
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     ctx.save();
@@ -754,7 +754,7 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}) {
         ctx.restore();
     }
     const boss = state.enemies.find(enemy => enemy.kind === "boss" && enemy.health > 0);
-    if (boss) {
+    if (boss && !canvasHud) {
         ctx.textAlign = "center";
         ctx.font = "14px Georgia, serif";
         ctx.fillStyle = "#e4c9a4";
@@ -944,7 +944,7 @@ export function createGame(root, saveBridge = null) {
     // rendering stays crisp regardless of the layout mode.
     function updateCanvasResolution() {
         const bounds = canvas.getBoundingClientRect();
-        bossTop = bossHudTop(bounds, root.querySelector(".mm-bar")?.getBoundingClientRect(), root.dataset.canvasHud === "on", HEIGHT);
+        bossTop = root.dataset.canvasHud === "on" ? 150 * HEIGHT / Math.max(1, bounds.height) : bossHudTop(bounds);
         const scale = Math.max(1, Math.min(2, bounds.width / WIDTH * (window.devicePixelRatio || 1)));
         const width = Math.round(WIDTH * scale), height = Math.round(HEIGHT * scale);
         if (canvas.width !== width || canvas.height !== height) {
@@ -1419,11 +1419,17 @@ export function createGame(root, saveBridge = null) {
     // loop() function below) as well as immediately after any state-changing action (setup, pause,
     // skill purchase, etc.) so the UI never lags a frame behind the actual game state.
     function updateHud() {
-        const gearPreview = [];
+        const gearPreview = [`Equipped now: damage ${weaponDamage(state)}, physical armor ${armorRating(state).toFixed(1)}%, spell resistance ${resistanceRating(state).toFixed(1)}%, movement ${Math.round(movementSpeed(state))}.`];
         for (const [slot, styles] of [["weapon", ["balanced", "heavy", "swift"]], ["armor", ["balanced", "plated", "light"]]]) {
             for (const style of styles) {
+                if (state.runSystems.equipment[slot] === style) continue;
                 const next = { ...state, runSystems: { ...state.runSystems, equipment: { ...state.runSystems.equipment, [slot]: style } } };
-                gearPreview.push(`${style}: damage ${weaponDamage(state)} → ${weaponDamage(next)}, armor ${armorRating(state).toFixed(1)} → ${armorRating(next).toFixed(1)}%, resistance ${resistanceRating(state).toFixed(1)} → ${resistanceRating(next).toFixed(1)}%, speed ${Math.round(movementSpeed(state))} → ${Math.round(movementSpeed(next))}`);
+                const metrics = slot === 'weapon'
+                    ? [['damage', weaponDamage], ['cooldown recovery %', value => cooldownRecovery(value) * 100]]
+                    : [['physical armor %', armorRating], ['movement', movementSpeed]];
+                const changes = metrics.filter(([, measure]) => Math.abs(measure(state) - measure(next)) > 0.001)
+                    .map(([label, measure]) => `${label} ${Number(measure(state).toFixed(1))} → ${Number(measure(next).toFixed(1))}`);
+                gearPreview.push(`${slot === 'weapon' ? 'Weapon' : 'Armor'} — ${EQUIPMENT_STYLES[slot][style].name}: ${changes.join(', ') || 'no effective change at current caps'}.`);
             }
         }
         const equipmentPreview = root.querySelector('[data-equipment-preview]');
@@ -1454,6 +1460,7 @@ export function createGame(root, saveBridge = null) {
         for (const attribute of ["data-stage-event-accept", "data-stage-event-skip"]) root.querySelector(`[${attribute}]`).disabled = saving || !eventAvailable(state);
         root.querySelector("[data-open-lore]").hidden = inMainMenu || state.training || state.mode !== "campaign" || state.status === "ready";
         root.querySelector("[data-main-resume]").disabled = saving || state.status === "ready";
+        root.querySelector('[data-main-resume]').hidden = !['playing', 'paused', 'camp', 'won'].includes(state.status) || !!state.training;
         root.querySelector("[data-main-load]").disabled = saving || checkingUnlock || !saveBridge || !!state.training;
         root.dataset.gameStatus = setupAction ? "setup" : state.status;
         root.dataset.saveBusy = saving || checkingUnlock ? "on" : "off";
@@ -1521,9 +1528,8 @@ export function createGame(root, saveBridge = null) {
         const warning = critical ? p.potions > 0 ? mobileHud ? "LOW HEALTH — tap flask" : "LOW HEALTH — E or Life flask to heal" : "LOW HEALTH — no flasks; evade" : "";
         if (healthWarning.textContent !== warning) healthWarning.textContent = warning;
         if (critical && mobileHud) {
-            const rect = canvas.getBoundingClientRect();
-            healthWarning.style.top = `${66 * rect.height / HEIGHT + 6}px`;
-            healthWarning.style.left = `${14 * rect.width / WIDTH + 54}px`;
+            healthWarning.style.top = "122px";
+            healthWarning.style.left = "14px";
         } else {
             healthWarning.style.removeProperty("top");
             healthWarning.style.removeProperty("left");
@@ -2299,13 +2305,17 @@ export function createGame(root, saveBridge = null) {
             checkpointHandled = `${state.mode}:${state.wave}`;
             void persist(false, true);
         }
-        render(ctx, floors[mapIndexForWave(state.wave)], state, bossTop, preferences.settings);
-        drawCountdown(ctx, state, root.dataset.canvasHud === "on");
-        // Hosts without room for a DOM HUD (the mobile shell) draw it into the canvas instead, so
-        // it scales with the playfield and cannot intercept touches. Opt-in: desktop keeps the
-        // DOM HUD and is unaffected.
-        if (root.dataset.canvasHud === "on") drawHud(ctx, state, { maxFlasks: MAX_FLASKS,
-            checkpoint: automaticCheckpoint(state, checkpointSaveFailed) ? "Stage cleared · saving checkpoint…" : "" });
+        const canvasHud = root.dataset.canvasHud === "on";
+        render(ctx, floors[mapIndexForWave(state.wave)], state, bossTop, preferences.settings, canvasHud);
+        drawCountdown(ctx, state, canvasHud);
+        if (canvasHud) {
+            const bounds = canvas.getBoundingClientRect();
+            const boss = state.enemies.find(enemy => enemy.kind === "boss" && enemy.health > 0);
+            const map = mapForWave(state.wave);
+            drawHud(ctx, state, { maxFlasks: MAX_FLASKS, cssWidth: bounds.width, cssHeight: bounds.height,
+                boss: boss ? { ...boss, name: map.boss, accent: map.accent } : null,
+                checkpoint: automaticCheckpoint(state, checkpointSaveFailed) ? "Stage cleared · saving checkpoint…" : "" });
+        }
         if (now - hudTime > 100 || state.status !== shownStatus) { updateHud(); hudTime = now; }
         frame = requestAnimationFrame(animate);
     }

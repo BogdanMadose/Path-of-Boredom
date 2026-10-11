@@ -18,8 +18,9 @@
             <button type="button" class="quiet-button" data-main-load>Load saved run</button>
             <button type="button" class="quiet-button" data-training>Training grounds — separate practice</button>
             <button type="button" class="quiet-button" data-main-options>Sound &amp; options</button>
-            <button type="button" class="quiet-button" data-main-quit>Quit</button>
+            <div data-main-menu-actions></div>
             <p data-main-status role="status"></p>
+            <button type="button" class="quiet-button" data-main-quit>Quit</button>
         </div>
     </section>
     <button type="button" class="quiet-button main-menu-return" data-open-main-menu>Main menu</button>
@@ -311,7 +312,7 @@
                         <h3>Equipment trade-offs</h3>
                         <p>Gear pickups improve equipment rating, not Forge ranks. Forge scrolls grant a free rank. Choose a style while resting; changing style is free and retains both ratings and ranks.</p>
                         <div data-equipment-preview role="status"></div>
-                        <small>Compare every alternative before choosing below. Physical armor blocks physical hits; spell resistance blocks magic. Ratings, Forge ranks, and relics are retained.</small>
+                        <small>These are styles for your equipped gear, not extra items. Previews show only stats that change. Pickups improve ratings automatically; switching styles retains ratings and Forge ranks.</small>
                         <label>Weapon style
                             <select data-equipment-style="weapon">
                                 <option value="balanced">Balanced — normal damage and recovery</option>

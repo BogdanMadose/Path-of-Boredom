@@ -1,0 +1,66 @@
+import assert from 'node:assert/strict';
+import { observeBossRecovery, beginBossRecovery, bossPose } from '../../Path of Boredom.Game/wwwroot/js/arpg-boss-combat.js';
+import { BOSS_PROFILES, drawBoss } from '../../Path of Boredom.Game/wwwroot/js/arpg-bosses.js';
+import { MAPS } from '../../Path of Boredom.Game/wwwroot/js/arpg-campaign.js';
+import { startEndlessRun, step } from '../../Path of Boredom.Game/wwwroot/js/arpg-engine.js';
+import { captureSnapshot, restoreSnapshot } from '../../Path of Boredom.Game/wwwroot/js/arpg-save.js';
+const enemy = { combat: { rest: 0 } };
+observeBossRecovery(enemy, 0);
+assert.equal(beginBossRecovery(enemy, 3, 0.75, true), true);
+enemy.combat.rest = 0.2;
+assert.equal(beginBossRecovery(enemy, 3.5, 0.75, true), false);
+assert.equal(enemy.combat.rest, 0.2, 'cannot extend current recovery');
+enemy.combat.rest = 0;
+assert.equal(beginBossRecovery(enemy, 4, 0.75, true), false, 'protected after recovery ends');
+assert.equal(beginBossRecovery(enemy, 6, 0.75, true), true, 'protection expires');
+assert.equal(beginBossRecovery(enemy, 6.2, 0.75), true, 'normal post-attack recovery remains');
+const state = startEndlessRun(() => 0.99);
+state.wave = 35; state.resumeDelay = 0; state.time = 10;
+state.player.level = 20; state.loadout.auto = ['nova', 'burst', 'guard', 'none'];
+state.player.nova = state.player.burst = state.player.guard = 30;
+state.player.invulnerable = 10;
+const boss = state.enemies[0];
+Object.assign(boss, { kind: 'boss', x: 100, y: 100, health: 1000, maxHealth: 1000, attackWindup: 0, winding: 0, slam: 10 });
+boss.combat = { phase: 1, pattern: 1, rest: 0, volleys: [] };
+state.enemies = [boss];
+step(state, {}, 0.05);
+for (let i = 0; i < 42; i++) step(state, {}, 0.05);
+boss.health = 600;
+step(state, {}, 0.05);
+assert.equal(boss.combat.phase, 2);
+assert.ok(boss.combat.rest > 0);
+for (let i = 0; i < 16; i++) step(state, {}, 0.05);
+assert.equal(boss.combat.rest, 0);
+boss.health = 300;
+step(state, {}, 0.05);
+assert.equal(boss.combat.phase, 3);
+assert.equal(boss.combat.rest, 0, 'second rapid phase transition cannot restagger the boss');
+beginBossRecovery(boss, state.time, 0.75);
+const restored = restoreSnapshot(captureSnapshot(state));
+const loaded = restored.enemies[0];
+observeBossRecovery(loaded, restored.time);
+loaded.combat.rest = 0;
+assert.equal(beginBossRecovery(loaded, restored.time + 0.8, 0.75, true), false, 'reload does not immediately bypass protection');
+function drawing(index, actor, time, reduced) {
+    const calls = []; let depth = 0;
+    const ctx = new Proxy({}, { get: (_, key) => (...args) => {
+        if (key === 'save') depth++;
+        if (key === 'restore') depth--;
+        assert.ok(depth >= 0);
+        for (const value of args) if (typeof value === 'number') assert.ok(Number.isFinite(value));
+        calls.push([key, ...args]);
+    }, set: () => true });
+    drawBoss(ctx, actor, MAPS[index], time, reduced);
+    assert.equal(depth, 0);
+    return JSON.stringify(calls);
+}
+for (let i = 0; i < BOSS_PROFILES.length; i++) {
+    const idle = { radius: 32, flash: 0, moving: false, winding: 0, swing: 0, stridePhase: 0 };
+    const windup = { ...idle, winding: 0.3 };
+    const strike = { ...idle, swing: 0.15 };
+    assert.notEqual(drawing(i, idle, 1, false), drawing(i, windup, 1, false));
+    assert.notEqual(drawing(i, windup, 1, false), drawing(i, strike, 1, false));
+    assert.equal(drawing(i, idle, 1, true), drawing(i, windup, 5, true), 'reduced motion disables cosmetic animation');
+}
+assert.deepEqual(bossPose({}, 1, true), { bob: 0, sway: 0, anticipation: 0, strike: 0, stride: 0 });
+console.log('PASS: phase recovery cannot chain/restart, protection expiry and reload handling, real engine phase transitions, six animated boss poses and reduced motion');

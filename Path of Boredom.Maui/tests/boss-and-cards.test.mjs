@@ -112,8 +112,8 @@ phaseChange.boss.combat.rest = 1.5;
 phaseChange.boss.health = phaseChange.boss.maxHealth * 0.25;
 tick(phaseChange.state);
 assert.equal(phaseChange.boss.combat.phase, 3, 'burst damage skips directly to the correct phase');
-assert.ok(phaseChange.boss.combat.rest <= 1.2, 'phase change uses the boss profile recovery without stacking');
-for (let frame = 0; frame < 26; frame++) tick(phaseChange.state);
+assert.ok(Math.abs(phaseChange.boss.combat.rest - 1.45) < 1e-9, 'phase change must not restart or replace an existing recovery');
+for (let frame = 0; frame < 30; frame++) tick(phaseChange.state);
 assert.equal(phaseChange.boss.combat.rest, 0);
 
 const loadedRecovery = isolatedBoss();

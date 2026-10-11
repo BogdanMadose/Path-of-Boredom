@@ -9,8 +9,8 @@
 //
 // COORDINATE SPACE
 // arpg.js sets a transform so the canvas works in logical WIDTH x HEIGHT units regardless of the
-// element's pixel size (see updateCanvasResolution). Everything here is therefore in those logical
-// units and needs no DPI handling of its own.
+// element's pixel size (see updateCanvasResolution). Mobile HUD drawing switches to CSS pixels
+// so its text and controls remain readable independently of the arena's aspect ratio.
 //
 // This module only DRAWS. It never mutates state and never reads the DOM, so it is safe to call
 // from the render loop every frame.
@@ -62,8 +62,11 @@ function bar(ctx, x, y, w, h, fraction, from, to, label, value) {
     ctx.textAlign = "left";
     ctx.fillText(label, x + 2, y - 4);
     ctx.fillStyle = "#d8cbb2";
-    ctx.textAlign = "right";
-    ctx.fillText(value, x + w - 2, y - 4);
+    ctx.textAlign = "center";
+    ctx.font = '600 12px system-ui, sans-serif';
+    ctx.strokeStyle = '#071018'; ctx.lineWidth = 2;
+    ctx.strokeText(value, x + w / 2, y + h - 5, w - 8);
+    ctx.fillText(value, x + w / 2, y + h - 5, w - 8);
 
     ctx.restore();
 }
@@ -81,7 +84,7 @@ function medallion(ctx, x, y, level) {
 
     ctx.textAlign = "center";
     ctx.fillStyle = "#d3ad68";
-    ctx.font = "600 7px system-ui, sans-serif";
+    ctx.font = "600 9px system-ui, sans-serif";
     ctx.fillText("LVL", x, y - 5);
     ctx.fillStyle = "#f1e5cc";
     ctx.font = "400 18px Georgia, serif";
@@ -102,6 +105,9 @@ export function drawHud(ctx, state, options = {}) {
     if (!p) return;
 
     ctx.save();
+    const width = options.cssWidth || WIDTH, height = options.cssHeight || HEIGHT;
+    if (options.cssWidth && options.cssHeight) ctx.setTransform(ctx.canvas.width / width, 0, 0, ctx.canvas.height / height, 0, 0);
+    const barWidth = Math.min(BAR_W, width * 0.3);
     ctx.textBaseline = "alphabetic";
 
     // Top scrim keeps the bars legible over bright floors without hiding the playfield.
@@ -109,20 +115,20 @@ export function drawHud(ctx, state, options = {}) {
     scrim.addColorStop(0, "#0b1114e0");
     scrim.addColorStop(1, "#0b111400");
     ctx.fillStyle = scrim;
-    ctx.fillRect(0, 0, WIDTH, 76);
+    ctx.fillRect(0, 0, width, 76);
 
     const top = PAD + 16;
     const health = p.maxHealth > 0 ? p.health / p.maxHealth : 0;
-    bar(ctx, PAD, top, BAR_W, BAR_H, health, "#722e31", "#cd6357",
+    bar(ctx, PAD, top, barWidth, BAR_H, health, "#722e31", "#cd6357",
         "VITALITY", `${Math.max(0, Math.ceil(p.health))} / ${Math.ceil(p.maxHealth)}`);
 
     // XP and level live on the PLAYER, not on state (see gainExperience in arpg-engine.js).
     const xpNeeded = p.nextLevel || 0;
     const xp = xpNeeded > 0 ? p.xp / xpNeeded : 0;
-    bar(ctx, WIDTH - PAD - BAR_W, top, BAR_W, BAR_H, xp, "#314c66", "#71afc6",
+    bar(ctx, width - PAD - barWidth, top, barWidth, BAR_H, xp, "#314c66", "#71afc6",
         "EXPERIENCE", `${Math.floor(p.xp || 0)} / ${xpNeeded}`);
 
-    medallion(ctx, WIDTH / 2, top + BAR_H / 2, p.level || 1);
+    medallion(ctx, width / 2, top + BAR_H / 2, p.level || 1);
 
     // Flasks: pips rather than a number, readable at a glance mid-fight.
     const flasks = p.potions || 0;
@@ -133,19 +139,43 @@ export function drawHud(ctx, state, options = {}) {
         ctx.fillStyle = i < flasks ? "#c46d62" : "#2a3336";
         ctx.fill();
     }
+    if (options.boss) {
+        const boss = options.boss, bossWidth = Math.min(360, width * 0.3);
+        ctx.textAlign = 'center'; ctx.font = '600 12px system-ui, sans-serif';
+        ctx.fillStyle = '#f1dfbf'; ctx.strokeStyle = '#071018'; ctx.lineWidth = 3;
+        const words = boss.name.toUpperCase().split(' '), lines = [''];
+        for (const word of words) {
+            const index = lines.length - 1, next = `${lines[index]} ${word}`.trim();
+            if (ctx.measureText(next).width > bossWidth && lines[index] && lines.length < 2) lines.push(word);
+            else lines[index] = next;
+        }
+        lines.forEach((line, index) => {
+            if (ctx.measureText(line).width > bossWidth) {
+                while (line.length && ctx.measureText(`${line}…`).width > bossWidth) line = line.slice(0, -1);
+                line = `${line.trimEnd()}…`;
+            }
+            ctx.strokeText(line, width / 2, 76 + index * 14, bossWidth);
+            ctx.fillText(line, width / 2, 76 + index * 14, bossWidth);
+        });
+        const y = 98;
+        ctx.fillStyle = '#090e11'; roundRect(ctx, (width - bossWidth) / 2, y, bossWidth, 10, 4); ctx.fill();
+        ctx.fillStyle = '#cf7965'; ctx.fillRect((width - bossWidth) / 2 + 1, y + 1, (bossWidth - 2) * Math.max(0, Math.min(1, boss.health / boss.maxHealth)), 8);
+        ctx.strokeStyle = boss.accent; ctx.lineWidth = 1;
+        roundRect(ctx, (width - bossWidth) / 2, y, bossWidth, 10, 4); ctx.stroke();
+    }
 
     // Active power-up names, centred under the medallion.
     if (options.buffs) {
         ctx.textAlign = "center";
-        ctx.font = "600 9px system-ui, sans-serif";
+        ctx.font = "600 12px system-ui, sans-serif";
         ctx.fillStyle = "#e0bd84";
-        ctx.fillText(options.buffs.toUpperCase(), WIDTH / 2, top + BAR_H + 22);
+        ctx.fillText(options.buffs.toUpperCase(), width / 2, options.boss ? 122 : top + BAR_H + 22, width * 0.3);
     }
     if (options.checkpoint) {
         ctx.textAlign = "center";
         ctx.font = "600 13px system-ui, sans-serif";
         ctx.fillStyle = "#ead5a8";
-        ctx.fillText(options.checkpoint, WIDTH / 2, HEIGHT - 24);
+        ctx.fillText(options.checkpoint, width / 2, height - 24, width - 28);
     }
 
     ctx.restore();

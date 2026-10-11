@@ -52,6 +52,13 @@
     body.mobile-shell .mm-tab[hidden] { display: none; }
     body.mobile-shell .mm-tab { min-width: 48px; }
     body.mobile-shell .campaign-lore-return { display: none; }
+    body.mobile-shell .main-menu-return { display: none !important; }
+    body.mobile-shell .arpg[data-main-menu="on"] .mm-bar,
+    body.mobile-shell .arpg[data-menu-open="on"] .mm-bar,
+    body.mobile-shell.mm-panel-open .mm-bar,
+    body.mobile-shell .arpg:not([data-game-status="playing"]) .mm-bar { display: none; }
+    body.mobile-shell [data-main-menu-actions],
+    body.mobile-shell [data-main-menu-actions] .mm-save-actions { display: grid; gap: 10px; }
 
     body.mobile-shell .mm-tab {
         flex: 1;

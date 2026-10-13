@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -8,6 +8,7 @@
          stores, the auth handler). -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <UserSecretsId>5807b31f-331e-47e7-a37e-a2021f430d81</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

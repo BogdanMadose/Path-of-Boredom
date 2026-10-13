@@ -41,20 +41,6 @@ builder.Services.AddOptions<GoogleIdentityOptions>()
 builder.Services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
 var authentication = builder.Services.AddAuthentication(GoogleTokenAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, GoogleTokenAuthenticationHandler>(GoogleTokenAuthenticationHandler.SchemeName, _ => { });
-// Legacy Windows identity forwarding is opt-in AND development-only. Never enabled on Cloud Run.
-if (builder.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Authentication:EnableLegacyWindows"))
-{
-    builder.Services.AddOptions<SaveServiceOptions>().BindConfiguration(SaveServiceOptions.SectionName)
-        .Validate(options => SaveServiceOptions.IsValidApiKey(options.ApiKey), "Configure the development SaveService API key.")
-        .ValidateOnStart();
-    authentication.AddScheme<AuthenticationSchemeOptions, SaveServiceAuthenticationHandler>(SaveServiceOptions.AuthenticationScheme, _ => { })
-        .AddPolicyScheme("DevelopmentIdentity", null, options => options.ForwardDefaultSelector = context =>
-            context.Request.Headers.Authorization.ToString() is { Length: 71 } credential
-                && credential.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-                && SaveServiceOptions.IsValidApiKey(credential[7..])
-                    ? SaveServiceOptions.AuthenticationScheme : GoogleTokenAuthenticationHandler.SchemeName);
-    builder.Services.Configure<AuthenticationOptions>(options => options.DefaultScheme = "DevelopmentIdentity");
-}
 builder.Services.AddAuthorization(options => options.AddPolicy(GoogleTokenAuthenticationHandler.MobilePolicy,
     policy => policy.AddAuthenticationSchemes(GoogleTokenAuthenticationHandler.SchemeName)
         .RequireAuthenticatedUser().RequireClaim("sub").RequireClaim(ClaimTypes.NameIdentifier)));

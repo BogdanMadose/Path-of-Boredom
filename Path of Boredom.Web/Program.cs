@@ -1,7 +1,11 @@
 using Path_of_Boredom.Web;
 using Path_of_Boredom.Web.Components;
-using Microsoft.AspNetCore.Authentication.Negotiate;
-using Path_of_Boredom.ServiceDefaults;
+using System.Security.Claims;
+using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.WebUtilities;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,24 +13,73 @@ var builder = WebApplication.CreateBuilder(args);
 // health checks, OpenTelemetry) — see Path of Boredom.ServiceDefaults/Extensions.cs.
 builder.AddServiceDefaults();
 
-// Windows/Kerberos authentication. There's no login page or password anywhere in this app — the
-// browser and IIS/Kestrel negotiate the Windows identity automatically, and everything past this
-// point trusts whatever identity comes out of that handshake. This is why the app assumes a
-// domain-joined / intranet environment rather than public internet access.
-builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
-    .AddNegotiate();
+// Google is the only sign-in. The same Google account (and the same Web OAuth client the API
+// validates ID tokens against) is used on mobile, so progress continues across devices. The
+// browser only holds a cookie; the Google ID/refresh tokens stay on the server in GoogleTokenStore.
+builder.Services.AddOptions<GoogleAuthOptions>()
+    .BindConfiguration(GoogleAuthOptions.SectionName)
+    .Validate(options => options.ClientId.EndsWith(".apps.googleusercontent.com", StringComparison.Ordinal)
+        && !string.IsNullOrWhiteSpace(options.ClientSecret),
+        "Configure Authentication:Google:ClientId and Authentication:Google:ClientSecret (user-secrets locally, Authentication__Google__ClientSecret when deployed).")
+    .ValidateOnStart();
+builder.Services.AddSingleton<GoogleTokenStore>();
+builder.Services.AddHttpClient();
+var googleAuth = builder.Configuration.GetSection(GoogleAuthOptions.SectionName).Get<GoogleAuthOptions>() ?? new();
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/account/login";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.ExpireTimeSpan = TimeSpan.FromDays(14);
+        options.SlidingExpiration = true;
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            // Tokens live only in memory; after a restart the player signs in with Google again.
+            var store = context.HttpContext.RequestServices.GetRequiredService<GoogleTokenStore>();
+            if (context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier) is not { } sub || !store.Has(sub))
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+        };
+    })
+    .AddGoogle(GoogleDefaults.AuthenticationScheme, options =>
+    {
+        options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        options.ClientId = googleAuth.ClientId;
+        options.ClientSecret = googleAuth.ClientSecret;
+        options.CallbackPath = "/signin-google";
+        options.Scope.Add("openid");
+        options.Events.OnRedirectToAuthorizationEndpoint = context =>
+        {
+            // offline + consent so Google issues a refresh token and the ID token can be renewed.
+            var uri = QueryHelpers.AddQueryString(context.RedirectUri, new Dictionary<string, string?>
+            {
+                ["access_type"] = "offline", ["prompt"] = "select_account consent"
+            });
+            context.Response.Redirect(uri);
+            return Task.CompletedTask;
+        };
+        options.Events.OnCreatingTicket = context =>
+        {
+            var sub = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (sub is null || context.TokenResponse.Response is not { } json
+                || !json.RootElement.TryGetProperty("id_token", out var idToken) || idToken.GetString() is not { Length: > 0 } token)
+                throw new InvalidOperationException("Google did not return an ID token.");
+            var expires = DateTimeOffset.UtcNow.AddSeconds(int.TryParse(context.TokenResponse.ExpiresIn, out var seconds) ? seconds : 3600);
+            context.HttpContext.RequestServices.GetRequiredService<GoogleTokenStore>()
+                .Save(sub, token, context.RefreshToken, expires);
+            // Public profiles use the game's own player name, never the Google profile name.
+            foreach (var claim in context.Identity?.FindAll(ClaimTypes.Name).ToList() ?? [])
+                context.Identity!.RemoveClaim(claim);
+            return Task.CompletedTask;
+        };
+    });
 builder.Services.AddAuthorization();
 // Lets child components (like Home.razor) get at the current user via CascadingAuthenticationState
 // without each one needing its own AuthenticationStateProvider plumbing.
 builder.Services.AddCascadingAuthenticationState();
-// Binds and validates the shared save-service secret. ValidateOnStart() means a missing or
-// malformed key crashes the app immediately at boot with a clear message, rather than surfacing
-// as a confusing 401 the first time a player tries to save.
-builder.Services.AddOptions<SaveServiceOptions>()
-    .BindConfiguration(SaveServiceOptions.SectionName)
-    .Validate(options => SaveServiceOptions.IsValidApiKey(options.ApiKey), "Configure SaveService:ApiKey with the same 64-character hexadecimal secret in Web and ApiService, or start AppHost.")
-    .ValidateOnStart();
-
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     // Raises the default 32KB SignalR message size limit to 96KB so a full save snapshot can be
@@ -39,16 +92,17 @@ builder.Services.AddRazorComponents()
 // in production/IIS it should be overridden by an explicit ApiService:BaseUrl app setting pointing
 // at wherever ApiService is actually hosted.
 var apiServiceBaseUrl = builder.Configuration["ApiService:BaseUrl"] ?? "https+http://apiservice";
-builder.Services.AddHttpClient<GameSaveClient>(client =>
+builder.Services.AddHttpClient(WebCloudGameSession.ApiClientName, client =>
     {
         client.BaseAddress = new(apiServiceBaseUrl);
         client.Timeout = TimeSpan.FromSeconds(15);
     });
 
 // Supplies the shared game components (Path of Boredom.Game) with their host-specific identity and
-// save transport. On this host that means Negotiate-authenticated Windows identity plus the
-// shared-secret GameSaveClient; the MAUI head will register its own implementation instead.
-builder.Services.AddScoped<Path_of_Boredom.Game.IGameSession, WindowsGameSession>();
+// save transport: Google sign-in plus the player's Google ID token sent to the API as a Bearer.
+builder.Services.AddScoped<WebCloudGameSession>();
+builder.Services.AddScoped<Path_of_Boredom.Game.IGameSession>(services => services.GetRequiredService<WebCloudGameSession>());
+builder.Services.AddScoped<Path_of_Boredom.Game.ICloudGameSession>(services => services.GetRequiredService<WebCloudGameSession>());
 
 var app = builder.Build();
 
@@ -82,11 +136,18 @@ app.MapRazorComponents<App>()
     .AddAdditionalAssemblies(typeof(Path_of_Boredom.Game.IGameSession).Assembly)
     .RequireAuthorization();
 
-// Exists purely so Negotiate has an authenticated route to challenge against and redirect back
-// from; there's no real "login page" UI here, the 401 challenge/response happens at the HTTP
-// level and the browser resolves it silently via Windows credentials.
-app.MapGet("/account/login", () => Results.LocalRedirect("/"))
-    .RequireAuthorization();
+// Starts the Google sign-in, then returns to the game.
+app.MapGet("/account/login", () => Results.Challenge(
+    new AuthenticationProperties { RedirectUri = "/" }, [GoogleDefaults.AuthenticationScheme]))
+    .AllowAnonymous();
+
+// Signs out of this browser only; the device-independent cloud save is untouched.
+app.MapGet("/account/logout", async (HttpContext context, GoogleTokenStore store) =>
+{
+    if (context.User.FindFirstValue(ClaimTypes.NameIdentifier) is { } sub) store.Remove(sub);
+    await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    return Results.LocalRedirect("/");
+}).AllowAnonymous();
 
 // Maps the /health and /alive endpoints from ServiceDefaults (development-only).
 app.MapDefaultEndpoints();

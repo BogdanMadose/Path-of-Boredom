@@ -5,7 +5,7 @@
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Path_of_Boredom.Game.Components.Layout.GameLayout)">
             <NotAuthorized>
-                <main class="error-page"><h1>Windows sign-in required</h1><p>Sign in with your Windows account to access your personal save.</p><a href="/account/login">Sign in with Windows</a></main>
+                <main class="error-page"><h1>Sign in required</h1><p>Continue with the same Google account you use on mobile to reach your save.</p><a href="/account/login">Continue with Google</a></main>
             </NotAuthorized>
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />

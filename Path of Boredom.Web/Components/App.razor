@@ -3,18 +3,23 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Path of Boredom</title>
     <base href="/" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["Path of Boredom.Web.styles.css"]" />
+    <link rel="stylesheet" href="@Assets["css/mobile-shell.css"]" />
+    <link rel="stylesheet" href="@Assets["css/mobile-menu.css"]" />
     <ImportMap />
     <HeadOutlet />
 </head>
 
-<body>
-    <Routes @rendermode="InteractiveServer" />
+<body class="mobile-shell">
+    <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)" />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["js/mobile-shell.js"]" defer></script>
+    <script src="@Assets["js/mobile-menu.js"]" defer></script>
 </body>
 
 </html>

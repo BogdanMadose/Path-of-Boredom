@@ -1,7 +1,7 @@
-/* Mobile game shell — MAUI head only.
+ /* Mobile game shell, shared by the MAUI and Web heads (desktop is the same game with mouse + WASD).
  *
- * Loaded only by Path of Boredom.Maui/wwwroot/index.html, after the scoped-CSS bundle. The
- * browser build never sees this file, so the desktop page is untouched.
+ * Loaded by Path of Boredom.Maui/wwwroot/index.html and Path of Boredom.Web/Components/App.razor,
+ * after the scoped-CSS bundle.
  *
  * WHY THIS FILE EXISTS
  * The game markup was written for a desktop page: header, patch banner, two status paragraphs,
@@ -21,7 +21,7 @@
  * also inspectable/toggleable while debugging in the WebView.
  */
 
-@media (pointer: coarse) {
+@media all {
 
     /* ---- Fullscreen shell ------------------------------------------------ */
 
@@ -247,6 +247,13 @@
 
     body.mobile-shell .touch-movement > div {
         position: absolute;
+    }
+
+    /* Desktop: WASD moves and a click attacks, so the touch zone must not swallow mouse clicks. */
+    @media (hover: hover) and (pointer: fine) {
+        body.mobile-shell .touch-movement {
+            pointer-events: none;
+        }
     }
 
     /* Thumbstick, injected by js/mobile-shell.js. Positioned by the script at the touch point;
@@ -730,7 +737,7 @@
 /* Landscape / short screens: HEIGHT becomes the binding constraint, so bind height and release
    width (the mirror of the portrait rule above). Keeping width:100% here would overflow the
    screen horizontally once aspect-ratio derived the height. */
-@media (pointer: coarse) and (min-aspect-ratio: 1100 / 650) {
+@media (min-aspect-ratio: 1100 / 650) {
     body.mobile-shell .arena-viewport {
         width: 100%;
         height: 100%;
@@ -739,7 +746,7 @@
 }
 
 /* Landscape phones are short. Trim the HUD so the arena keeps as much height as possible. */
-@media (pointer: coarse) and (max-height: 480px) {
+@media (max-height: 480px) {
 
     body.mobile-shell .vitals {
         padding: 4px 8px !important;

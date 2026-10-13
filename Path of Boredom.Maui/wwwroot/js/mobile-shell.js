@@ -108,6 +108,7 @@
         // Listen on the pad
         // not exist until the thumb lands.
         pad.addEventListener("pointerdown", function (event) {
+            if (event.pointerType === "mouse") return;
             if (root.dataset.gameStatus !== "playing" || root.dataset.menuOpen === "on") return;
             if (active !== null) { waiting.set(event.pointerId, { x: event.clientX, y: event.clientY }); return; }
             event.preventDefault();

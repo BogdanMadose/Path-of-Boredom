@@ -27,7 +27,7 @@
 (function () {
     "use strict";
 
-    if (!window.matchMedia || !window.matchMedia("(pointer: coarse)").matches) return;
+    // Same menu layer for touch and mouse: desktop is the mobile game, driven by WASD and clicks.
 
     var layer = null;
     var panels = {};

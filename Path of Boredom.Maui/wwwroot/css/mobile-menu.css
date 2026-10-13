@@ -1,4 +1,8 @@
-/* Mobile menu shell — MAUI head only.
+ /* Mobile game shell, shared by the MAUI and Web heads (desktop is the same game with mouse + WASD).
+ *
+ * Loaded by Path of Boredom.Maui/wwwroot/index.html and Path of Boredom.Web/Components/App.razor,
+ * after the scoped-CSS bundle.
+ *
 /*
  * Replaces the desktop page-section menus (Skills, Forge, and the vitals/toolbar HUD) with a
  * game-style UI layer that sits over the canvas: a bottom tab bar, full-bleed panels sized to the
@@ -9,7 +13,7 @@
  * `body.mobile-shell` for the specificity reasons documented in mobile-shell.css.
  */
 
-@media (pointer: coarse) {
+@media all {
 
     body.mobile-shell button:not(:disabled):not([aria-disabled="true"]):is(:active, .button-pressed) {
         filter: brightness(1.3);

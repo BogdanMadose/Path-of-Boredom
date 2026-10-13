@@ -43,10 +43,10 @@ export function drawOrb(ctx, x, y, radius, color) {
     let sprite = sprites.get(key);
     if (!sprite) {
         sprite = document.createElement("canvas");
-        sprite.width = sprite.height = Math.ceil(r * 4 + 8);
+        sprite.width = sprite.height = Math.ceil(r * 8 + 16);
         const brush = sprite.getContext("2d");
-        brush.scale(2, 2);
-        const center = sprite.width / 4;
+        brush.scale(4, 4);
+        const center = sprite.width / 8;
         const gradient = brush.createRadialGradient(center - r * 0.35, center - r * 0.45, 0, center, center, r);
         gradient.addColorStop(0, "#f8eacb"); gradient.addColorStop(0.25, color); gradient.addColorStop(1, "#18222a");
         brush.fillStyle = gradient;
@@ -55,7 +55,7 @@ export function drawOrb(ctx, x, y, radius, color) {
         if (sprites.size >= 128) sprites.delete(sprites.keys().next().value);
         sprites.set(key, sprite);
     }
-    ctx.drawImage(sprite, x - sprite.width / 4, y - sprite.height / 4, sprite.width / 2, sprite.height / 2);
+    ctx.drawImage(sprite, x - sprite.width / 8, y - sprite.height / 8, sprite.width / 4, sprite.height / 4);
 }
 
 // Pre-renders and caches the hero's torso/armor sprite for a given weapon type (bow/hammer/sword),
@@ -66,8 +66,9 @@ function bodySprite(hero) {
     const key = `body:${hero.weaponType}`;
     let sprite = sprites.get(key);
     if (sprite) return sprite;
-    sprite = document.createElement("canvas"); sprite.width = 128; sprite.height = 144;
-    const ctx = sprite.getContext("2d"); ctx.scale(2, 2); ctx.translate(32, 36);
+    sprite = document.createElement("canvas");
+    sprite.width = 256; sprite.height = 288;
+    const ctx = sprite.getContext("2d"); ctx.imageSmoothingQuality = "high"; ctx.scale(4, 4); ctx.translate(32, 36);
     const ranger = hero.weaponType === "bow", warden = hero.weaponType === "hammer";
     const plate = metal(ctx, ranger ? "#ced6a1" : "#f0f2d9", ranger ? "#668c65" : warden ? "#8da7c7" : "#8daead", "#263847");
     ctx.fillStyle = plate; ctx.strokeStyle = "#10191f"; ctx.lineWidth = 1.5;

@@ -34,7 +34,6 @@
             <p data-lore-boss-story></p>
             <p data-lore-tactics></p>
             <p data-lore-ending></p>
-            <small>Combat is paused while reading. Read at your own pace, or continue now. Chapter lore can be reopened during the campaign.</small>
             <button type="button" class="ember-button" data-close-lore>Continue campaign</button>
         </article>
     </section>
@@ -207,6 +206,14 @@
                                         </button>
                                     }
                                 </div>
+                                <label class="difficulty-picker">Stage challenge (optional bonus gold)
+                                    <select data-setup-challenge>
+                                        <option value="none">No challenge</option>
+                                        <option value="unscarred">Unscarred — take no health damage</option>
+                                        <option value="flaskless">Flaskless — drink no flasks</option>
+                                        <option value="swift">Swift — clear within 180 combat seconds</option>
+                                    </select>
+                                </label>
                                 <p class="forge-feedback" data-setup-loadout-feedback role="status"></p>
                             </section>
                             <button type="button" class="ember-button" data-setup-next>Continue</button>
@@ -241,7 +248,7 @@
                 </div>
                 <section class="skills-panel" data-skills aria-labelledby="skills-title">
                     <div class="forge-heading"><h2 id="skills-title">Paths of power</h2><strong data-stat="skill-points">0 points available</strong></div>
-                    <p>Attacks and selected combat skills target automatically. Dodge and flask remain manual. Choose one starting skill, then add another at levels 5 and 10 for three total. Each choice is locked for this run. Earn one upgrade point every two levels, up to 32.</p>
+                    <p>Attacks and selected combat skills target automatically. Dodge and flask remain manual. Choose one starting skill, then add another at levels 10 and 20 for three total. Each choice is locked for this run. Earn one upgrade point every two levels, up to 32.</p>
                     <div class="loadout-grid">
                         @for (var slot = 1; slot <= 3; slot++)
                         {
@@ -310,9 +317,8 @@
                     <p class="forge-hint">Previews show effective current → next values with your present buffs and loadout. Damage is a normal hit before enemy defenses or conditional bonuses; arrow repeats and critical hits are separate. CAPPED means further ranks cannot improve that stat. A capped forge purchase may still be needed to unlock training.</p>
                     <section class="equipment-options">
                         <h3>Equipment trade-offs</h3>
-                        <p>Gear pickups improve equipment rating, not Forge ranks. Forge scrolls grant a free rank. Choose a style while resting; changing style is free and retains both ratings and ranks.</p>
+                        <p>Pick a style for your current weapon and armor. Switching is free and keeps your ratings and ranks.</p>
                         <div data-equipment-preview role="status"></div>
-                        <small>These are styles for your equipped gear, not extra items. Previews show only stats that change. Pickups improve ratings automatically; switching styles retains ratings and Forge ranks.</small>
                         <label>Weapon style
                             <select data-equipment-style="weapon">
                                 <option value="balanced">Balanced — normal damage and recovery</option>
@@ -327,6 +333,10 @@
                                 <option value="light">Light weave — -8 armor, +12% movement speed</option>
                             </select>
                         </label>
+                    </section>
+                    <section class="equipment-options">
+                        <h3>Boss relics</h3>
+                        <p data-boss-relics></p>
                     </section>
                     <div class="forge-grid">
                         <button type="button" data-upgrade="weapon" disabled><strong>Sunsteel edge</strong><span>Weapon damage</span><small data-upgrade-label="weapon">Rank 0 / 50</small></button>
@@ -402,8 +412,6 @@
                             <small>Preferences stay on this device. Dodge and healing remain manual; warnings never rely on sound alone.</small>
                         </fieldset>
                         <p data-build-synergy></p>
-                        <h3>Boss relics</h3>
-                        <p data-boss-relics></p>
                         <h3>Campaign codex</h3>
                         <div data-campaign-codex></div>
                     </div>

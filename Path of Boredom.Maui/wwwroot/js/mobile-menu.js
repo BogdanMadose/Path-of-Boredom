@@ -34,6 +34,7 @@
     var openName = null;
     var resumeAfterMenu = false;
     var returnToMain = false;
+    var accountFromMain = false;
 
     function el(tag, className, text) {
         var node = document.createElement(tag);
@@ -68,7 +69,9 @@
         close.textContent = information ? "\u2190" : "\u2715";
         close.setAttribute("aria-label", information ? "Back to pause menu" : "Close");
         close.addEventListener("click", function () {
+            if (name === "account" && accountFromMain) returnToMain = true;
             if (returnToMain) {
+                accountFromMain = false;
                 closePanel(false);
                 document.querySelector('.arpg [data-open-main-menu]').click();
                 returnToMain = false;
@@ -431,7 +434,10 @@
         var signIn = el("button", "mm-pause-option", "Account & cloud");
         signIn.type = "button";
         signIn.addEventListener("click", function () {
-            if (root.dataset.mainMenu === 'on') root.dispatchEvent(new CustomEvent('open-main-panel', { detail: { panel: 'account' } }));
+            if (root.dataset.mainMenu === 'on') {
+                accountFromMain = true;
+                root.dispatchEvent(new CustomEvent('open-main-panel', { detail: { panel: 'account' } }));
+            } else accountFromMain = false;
             openPanel("account");
         });
         actions.appendChild(signIn);
@@ -588,8 +594,7 @@
         addSaveActions(root.querySelector("[data-run-menu]"), root);
         var mainCard = root.querySelector('[data-main-menu-actions]');
         addSaveActions(mainCard, root);
-        ['rankings', 'skills', 'forge', 'challenges'].forEach(function (name) {
-            var button = el('button', 'mm-pause-option', { skills: 'Skills & loadout', forge: 'Forge & equipment', challenges: 'Stage challenges', rankings: 'Rankings' }[name]);
+        ['rankings', 'skills', 'forge'].forEach(function (name) {            var button = el('button', 'mm-pause-option', { skills: 'Skills & loadout', forge: 'Forge & equipment', challenges: 'Stage challenges', rankings: 'Rankings' }[name]);
             button.type = 'button';
             button.dataset.mainPanel = name;
             button.addEventListener('click', function () {
@@ -613,7 +618,7 @@
         main.type = "button";
         main.addEventListener("click", function () { closePanel(false); root.querySelector("[data-open-main-menu]").click(); });
         panels.pause.root.querySelector(".mm-pause-card").appendChild(main);
-        root.addEventListener("main-menu-open", function () { closePanel(false); returnToMain = false; });
+        root.addEventListener("main-menu-open", function () { closePanel(false); returnToMain = false; accountFromMain = false; });
         root.addEventListener('open-main-panel', function () { returnToMain = true; });
         root.addEventListener("open-run-options", function (event) { returnToMain = event.detail?.fromMain === true; openPanel("options"); });
         root.addEventListener("training-menu", function (event) {

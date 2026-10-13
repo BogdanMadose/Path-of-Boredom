@@ -33,6 +33,9 @@
         // into existence wherever the thumb lands rather than living at a fixed spot, so the
         // player never has to look down to find it.
         var originX = 0, originY = 0;
+        // Other fingers resting on the pad while one drives the stick. When the driving finger
+        // lifts, the most recent of these becomes the new stick at its current position.
+        var waiting = new Map();
 
         function place(x, y) {
             originX = x;
@@ -70,7 +73,8 @@
         }
 
         function end(event) {
-            if (active === null || (event && event.pointerId !== active)) return;
+            if (event && event.pointerId !== active) { waiting.delete(event.pointerId); return; }
+            if (active === null) return;
             var pointer = active;
             active = null;
             knob.style.transform = "";
@@ -82,22 +86,39 @@
                 delete root.dataset.stickY;
             }
             if (pad.hasPointerCapture(pointer)) pad.releasePointerCapture(pointer);
+            if (!event || event.type !== "lostpointercapture") adoptWaiting();
         }
 
-        // Listen on the pad (the left-hand touch zone), not on the stick itself: the stick does
+        function start(id, x, y) {
+            active = id;
+            waiting.delete(id);
+            place(x, y);
+            pad.classList.add("joystick-visible");
+            try { pad.setPointerCapture(id); } catch (error) { /* non-fatal */ }
+            move({ pointerId: id, clientX: x, clientY: y });
+        }
+
+        function adoptWaiting() {
+            if (root.dataset.gameStatus !== "playing" || root.dataset.menuOpen === "on") { waiting.clear(); return; }
+            var next = null;
+            waiting.forEach(function (position, id) { next = { id: id, x: position.x, y: position.y }; });
+            if (next) start(next.id, next.x, next.y);
+        }
+
+        // Listen on the pad
         // not exist until the thumb lands.
         pad.addEventListener("pointerdown", function (event) {
-            if (active !== null || root.dataset.gameStatus !== "playing" || root.dataset.menuOpen === "on") return;
+            if (root.dataset.gameStatus !== "playing" || root.dataset.menuOpen === "on") return;
+            if (active !== null) { waiting.set(event.pointerId, { x: event.clientX, y: event.clientY }); return; }
             event.preventDefault();
-            active = event.pointerId;
-            place(event.clientX, event.clientY);
-            pad.classList.add("joystick-visible");
             // Capture on the pad so the gesture keeps tracking even if the thumb slides outside
             // it — without this, dragging past the zone edge would silently drop movement.
-            try { pad.setPointerCapture(event.pointerId); } catch (error) { /* non-fatal */ }
+            start(event.pointerId, event.clientX, event.clientY);
+        });
+        pad.addEventListener("pointermove", function (event) {
+            if (waiting.has(event.pointerId)) waiting.set(event.pointerId, { x: event.clientX, y: event.clientY });
             move(event);
         });
-        pad.addEventListener("pointermove", move);
         pad.addEventListener("pointerup", end);
         pad.addEventListener("pointercancel", end);
         pad.addEventListener("lostpointercapture", end);

@@ -383,11 +383,11 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .level-draft { width: 100%; max-width: 960px; text-align: center; padding: 12px 0; }
 .level-draft.level-draft-enter { opacity: 0; transform: scale(.9) translateY(22px); }
 .level-draft.level-draft-enter .level-card { opacity: 0; transform: translateY(16px) scale(.94); }
-.level-draft:not(.level-draft-enter):not(.level-draft-exit) { opacity: 1; transform: none; transition: opacity .42s cubic-bezier(.16, .8, .3, 1), transform .42s cubic-bezier(.16, .8, .3, 1); }
-.level-draft:not(.level-draft-enter):not(.level-draft-exit) .level-card { opacity: 1; transform: none; transition: opacity .38s ease-out, transform .38s cubic-bezier(.2, .85, .3, 1.15); }
-.level-draft:not(.level-draft-enter):not(.level-draft-exit) .level-card:nth-child(1) { transition-delay: .03s; }
-.level-draft:not(.level-draft-enter):not(.level-draft-exit) .level-card:nth-child(2) { transition-delay: .09s; }
-.level-draft:not(.level-draft-enter):not(.level-draft-exit) .level-card:nth-child(3) { transition-delay: .15s; }
+.level-draft:not(.level-draft-enter):not(.level-draft-exit) { opacity: 1; transform: none; transition: opacity .8s cubic-bezier(.22, .7, .25, 1), transform .8s cubic-bezier(.22, .7, .25, 1); }
+.level-draft:not(.level-draft-enter):not(.level-draft-exit) .level-card { opacity: 1; transform: none; transition: opacity .7s ease-out, transform .7s cubic-bezier(.22, .8, .3, 1); }
+.level-draft:not(.level-draft-enter):not(.level-draft-exit) .level-card:nth-child(1) { transition-delay: .15s; }
+.level-draft:not(.level-draft-enter):not(.level-draft-exit) .level-card:nth-child(2) { transition-delay: .35s; }
+.level-draft:not(.level-draft-enter):not(.level-draft-exit) .level-card:nth-child(3) { transition-delay: .55s; }
 .level-draft.level-draft-exit { opacity: 0; transform: scale(.95) translateY(-14px); transition: opacity .3s ease-in, transform .3s ease-in; }
 .level-draft.level-draft-exit .level-card { transition: opacity .22s ease-in, transform .22s ease-in; }
 .level-draft h2 { font: 32px Georgia, serif; color: #f3dfb9; margin-bottom: 12px; }

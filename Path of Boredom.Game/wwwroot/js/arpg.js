@@ -1122,6 +1122,7 @@ export function createGame(root, saveBridge = null) {
     });
     const mainMenu = root.querySelector("[data-main-menu]");
     let inMainMenu = true;
+    let setupFromMain = false;
     root.dataset.mainMenu = "on";
     function showMainMenu(show) {
         if (saving || setupAction) return;
@@ -1141,6 +1142,7 @@ export function createGame(root, saveBridge = null) {
     on(root.querySelector("[data-main-new]"), "click", async () => {
         if (state.status !== "ready" && !await gameConfirm("Start a new campaign? Unsaved progress in the current run will be replaced.")) return;
         showMainMenu(false);
+        setupFromMain = true;
         openSetup("campaign");
     });
     on(root.querySelector("[data-main-load]"), "click", () => { showMainMenu(false); loadButton.click(); });
@@ -1375,9 +1377,12 @@ export function createGame(root, saveBridge = null) {
         } else {
             state = setupAction === "endless" ? startEndlessRun(Math.random, difficultySelect.value, classSelect.value) : startRun(Math.random, difficultySelect.value, classSelect.value);
             state.loadout = loadout;
+            const chosenChallenge = root.querySelector("[data-setup-challenge]")?.value;
+            if (chosenChallenge && chosenChallenge !== "none") state.runSystems.challenge = { key: chosenChallenge, stage: 1, elapsed: 0, damage: 0, flasks: 0, resolved: 0 };
             if (releaseRankings) resetToReleaseRankings(state);
         }
         setupAction = null;
+        setupFromMain = false;
         setup.hidden = true;
         checkpointHandled = null;
         clearInput();
@@ -1390,6 +1395,12 @@ export function createGame(root, saveBridge = null) {
     function cancelSetup() {
         setupAction = null;
         setup.hidden = true;
+        if (setupFromMain) {
+            setupFromMain = false;
+            root.dispatchEvent(new CustomEvent("main-menu-open"));
+            showMainMenu(true);
+            return;
+        }
         updateHud();
         (state.status === "won" ? endlessButton : startButton).focus({ preventScroll: true });
     }
@@ -1498,8 +1509,8 @@ export function createGame(root, saveBridge = null) {
             nova: `${hero.specialCooldown}s base cooldown. ${ranged ? "Five-arrow fan. Bodkin volley adds a second target per arrow at 70% damage." : state.heroClass === "knight" ? "A fire pulse; Backdraft pushes survivors away." : "A seismic pulse dealing 25% extra damage inside half its radius and slowing walking by 15% for 1.5s. Train its core and slow to set up Fault line."}`,
             burst: `${extra.burst.cooldown}s base cooldown. ${extra.burst.shape === "beam" ? "A narrow lance strikes every enemy along its line." : extra.burst.shape === "arrows" ? "Seven arrows, each penetrating a second target at 70% damage. Deep penetration adds a third." : "A heavy cone; Crushing force rewards hitting slowed enemies."}`,
             guard: `${extra.guard.cooldown}s base cooldown. ${state.heroClass === "knight" ? "An opening fire pulse burns nearby enemies." : ranged ? "Opening vines slow nearby enemies' walking by 25% for 1.5s." : "An opening shockwave pushes ordinary enemies back 60 units."} Grants 40% damage reduction for at least 3s. Cannot refresh while active; at least 2s without protection after expiry.`,
-            dodge: "Directional evasion on Space. Always available without a slot; manual-only.",
-            potion: "Press E to consume one flask and heal. Always available without a slot; manual-only.",
+            dodge: "Directional evasion. Always available without a slot; manual-only.",
+            potion: "Consume one flask and heal. Always available without a slot; manual-only.",
             ...Object.fromEntries(Object.keys(NEW_SKILLS).map(key => {
                 const skill = combatSkillDefinition(state, key);
                 return [key, `${skill.cooldown}s cooldown · ${Math.round(skill.damage * 100)}% weapon damage before conditional bonuses. ${skill.detail}`];

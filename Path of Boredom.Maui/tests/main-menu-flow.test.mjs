@@ -15,24 +15,26 @@ const html = `<html><head><style>html,body{margin:0}*{box-sizing:border-box}[hid
 const root=document.querySelector('.arpg');
 function el(tag,className,text){const node=document.createElement(tag);node.className=className||'';if(text!=null)node.textContent=text;return node;}
 function openPanel(){}
+let sync;
+try {
 ${actions}
 ${construction}
-function sync(){${saveSync}${panelSync}}
-try {
+sync=function(){${saveSync}${panelSync}};
  const check=(ok,message)=>{if(!ok)throw Error(message)};
  const card=root.querySelector('.main-menu-card');
  sync();
  const buttons=[...card.querySelectorAll('button')].filter(b=>!b.hidden);
  check(buttons.at(-1).hasAttribute('data-main-quit'),'Quit must be last');
  check(!buttons.some(b=>b.dataset.mobileSaveAction==='save'),'no Save before a run');
- check(!buttons.some(b=>['skills','forge','challenges'].includes(b.dataset.mainPanel)),'no character management before a run');
+ check(!buttons.some(b=>['skills','forge'].includes(b.dataset.mainPanel)),'no character management before a run');
  check(buttons.some(b=>b.dataset.mainPanel==='rankings'&&!b.disabled),'Rankings available initially');
  check(buttons.filter(b=>b.hasAttribute('data-main-load')||b.dataset.mobileSaveAction==='load').length===1,'exactly one Load');
  const quit=card.querySelector('[data-main-quit]').getBoundingClientRect();
  for(const b of buttons.filter(b=>!b.hasAttribute('data-main-quit')))check(b.getBoundingClientRect().bottom<=quit.top,'every action before Quit');
  root.dataset.gameStatus='paused';sync();
  check(!card.querySelector('[data-mobile-save-action="save"]').hidden,'Save available with a run');
- for(const name of ['skills','forge','challenges'])check(!card.querySelector('[data-main-panel="'+name+'"]').hidden,'run tools available');
+ for(const name of ['skills','forge'])check(!card.querySelector('[data-main-panel="'+name+'"]').hidden,'run tools available');
+ check(!card.querySelector('[data-main-panel="challenges"]'),'challenges are chosen in setup, not the main menu');
  for(const status of ['ready','setup','choosing','dead','won','paused']){
   root.dataset.gameStatus=status;root.dataset.mainMenu='off';
   check(getComputedStyle(root.querySelector('.main-menu-return')).display==='none','no floating Main menu in '+status);
@@ -47,10 +49,12 @@ try {
  document.body.dataset.result='PASS';
 }catch(error){document.body.dataset.result=error.message;}
 </script></body></html>`;
+const pageScript = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
+try { new Function(pageScript); } catch (error) { assert.fail('Generated page script is invalid: ' + error.message); }
 const server=http.createServer((req,res)=>{res.setHeader('Content-Type','text/html');res.end(html)});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 try{
  const output=await dumpBrowserDom('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',['--window-size=430,932','--virtual-time-budget=1000',`http://127.0.0.1:${server.address().port}/`]);
- assert.equal(output.match(/data-result="([^"]*)"/)?.[1],'PASS');
+ assert.equal(output.match(/data-result="([^"]*)"/)?.[1],'PASS',String(output.match(/<body[^>]*>/)?.[0]));
  console.log('PASS: initial menu contents, single Load, Quit last visually, run-only actions and no floating controls in submenus/setup/card selection');
 }finally{await new Promise(resolve=>server.close(resolve));}

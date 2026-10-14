@@ -1430,18 +1430,6 @@ export function createGame(root, saveBridge = null) {
     // skill purchase, etc.) so the UI never lags a frame behind the actual game state.
     function updateHud() {
         const gearPreview = [`Equipped now: damage ${weaponDamage(state)}, physical armor ${armorRating(state).toFixed(1)}%, spell resistance ${resistanceRating(state).toFixed(1)}%, movement ${Math.round(movementSpeed(state))}.`];
-        for (const [slot, styles] of [["weapon", ["balanced", "heavy", "swift"]], ["armor", ["balanced", "plated", "light"]]]) {
-            for (const style of styles) {
-                if (state.runSystems.equipment[slot] === style) continue;
-                const next = { ...state, runSystems: { ...state.runSystems, equipment: { ...state.runSystems.equipment, [slot]: style } } };
-                const metrics = slot === 'weapon'
-                    ? [['damage', weaponDamage], ['cooldown recovery %', value => cooldownRecovery(value) * 100]]
-                    : [['physical armor %', armorRating], ['movement', movementSpeed]];
-                const changes = metrics.filter(([, measure]) => Math.abs(measure(state) - measure(next)) > 0.001)
-                    .map(([label, measure]) => `${label} ${Number(measure(state).toFixed(1))} → ${Number(measure(next).toFixed(1))}`);
-                gearPreview.push(`${slot === 'weapon' ? 'Weapon' : 'Armor'} — ${EQUIPMENT_STYLES[slot][style].name}: ${changes.join(', ') || 'no effective change at current caps'}.`);
-            }
-        }
         const equipmentPreview = root.querySelector('[data-equipment-preview]');
         const gearSignature = gearPreview.join('|');
         if (equipmentPreview.dataset.preview !== gearSignature) {

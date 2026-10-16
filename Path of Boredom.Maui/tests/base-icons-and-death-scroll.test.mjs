@@ -46,19 +46,17 @@ if (edge && fs.existsSync(edge)) {
         for (const height of [180, 280, 600]) {
             viewport.style.cssText = 'width:650px;height:' + height + 'px;';
             card.scrollTop = 0;
-            check(getComputedStyle(card).overflowY === 'auto', 'whole card must scroll');
+            check(getComputedStyle(card).overflowY === 'auto', 'whole card must scroll as a fallback');
             check(getComputedStyle(card).touchAction === 'pan-y', 'touch scrolling must be allowed');
-            check(getComputedStyle(report).overflowY === 'visible', 'report must not trap scrolling');
-            check(getComputedStyle(report.querySelector('ol')).overflowY === 'visible', 'hit list must not trap scrolling');
+            check(getComputedStyle(report.querySelector('ol')).overflowY === 'visible', 'hit list scrolls with its report, not on its own');
             check(card.clientHeight <= viewport.clientHeight, 'card must fit the arena');
-            if (height < 300) {
-                check(card.scrollHeight > card.clientHeight, 'short screens need overflow');
+            if (card.scrollHeight > card.clientHeight) {
                 card.scrollTop = card.scrollHeight;
                 check(card.scrollTop > 0, 'card must actually scroll');
-                const action = card.querySelector('[data-action="start"]').getBoundingClientRect();
-                const bounds = card.getBoundingClientRect();
-                check(action.top >= bounds.top - 1 && action.bottom <= bounds.bottom + 1, 'primary action must be reachable');
             }
+            const action = card.querySelector('[data-action="start"]').getBoundingClientRect();
+            const bounds = card.getBoundingClientRect();
+            check(action.top >= bounds.top - 1 && action.bottom <= bounds.bottom + 1, 'primary action must be reachable');
         }
         const parser = new DOMParser();
         for (const url of ${JSON.stringify([...assets.keys()])}) {

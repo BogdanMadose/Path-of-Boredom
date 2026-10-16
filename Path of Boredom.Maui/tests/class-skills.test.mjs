@@ -6,6 +6,7 @@ import { captureSnapshot, restoreSnapshot } from '../../Path of Boredom.Game/www
 
 function arena(hero, skill, offsets = [[60, 0], [160, 0], [300, 0], [150, 120], [-80, 0], [0, 100]]) {
     const state = startEndlessRun(() => 0.99, 'hard', hero);
+    for (const key of Object.keys(state.upgrades)) state.upgrades[key] = 0;
     const template = state.enemies.find(enemy => enemy.kind !== 'boss');
     state.resumeDelay = 0;
     state.intermission = 0;

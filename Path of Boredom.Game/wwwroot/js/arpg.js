@@ -32,7 +32,7 @@ import { treePointsSpent, treeRespecCost, canRespecTree, respecTree } from "./ar
 import { SKILL_KEYS, SLOTTABLE_SKILLS, STARTER_SKILLS, EXTRA_SKILLS, NEW_SKILLS, combatSkillDefinition, MAX_SKILL_POINTS, skillIcon, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, skillSelected, skillCapacity, selectedSkills, needsSkillChoice, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
 import { drawHero, drawOrb, decorateFloor, drawAtmosphere, drawLootIcon } from "./arpg-graphics.js";
 import { drawClassSkillEffect } from "./arpg-skill-effects.js";
-import { drawHud } from "./arpg-hud.js";
+import { drawHud, drawHudCached } from "./arpg-hud.js";
 import { arenaHazards, hazardPhase } from "./arpg-hazards.js";
 import { turnToward } from "./arpg-facing.js";
 import { automaticCheckpoint, forgeNotification, bossHudTop, combatControlStatus, bossWarningPosition } from "./arpg-ui-state.js";
@@ -42,6 +42,8 @@ import { setEquipmentStyle, acceptChallenge, CHALLENGES, EQUIPMENT_STYLES, runSu
 import { createGameAudio } from "./arpg-audio.js";
 import { bindButtonFeedback } from "./arpg-button-feedback.js";
 import { bossProfile, drawBoss } from "./arpg-bosses.js";
+import { skillTagline } from "./arpg-skill-taglines.js";
+import { drawGlow, drawGroundShadow, drawOutline } from "./arpg-sprite-cache.js";
 
 const mobFacing = new WeakMap();
 
@@ -177,8 +179,8 @@ function makeFloor(map) {
     ctx.strokeRect(27, 27, WIDTH - 54, HEIGHT - 54);
     for (const [x, y] of [[74, 75], [WIDTH - 74, 75], [74, HEIGHT - 75], [WIDTH - 74, HEIGHT - 75]]) {
         const glow = ctx.createRadialGradient(x, y, 3, x, y, 140);
-        glow.addColorStop(0, "#cb803f33");
-        glow.addColorStop(1, "#cb803f00");
+        glow.addColorStop(0, map.accent + "38");
+        glow.addColorStop(1, map.accent + "00");
         ctx.fillStyle = glow;
         ctx.fillRect(x - 140, y - 140, 280, 280);
         ctx.fillStyle = "#0c1215";
@@ -187,7 +189,39 @@ function makeFloor(map) {
         ctx.fillRect(x - 17, y - 12, 34, 11);
     }
     decorateFloor(ctx, map, random, WIDTH, HEIGHT);
+    bakeFloorLighting(ctx, map, random);
     return floor;
+}
+
+// Lighting painted once into the cached floor so it costs nothing per frame: soft fog patches,
+// darkened edges where the floor meets the walls (ambient occlusion), a gentle colour grade in the
+// act's accent colour so every act has its own palette, and the arena vignette.
+function bakeFloorLighting(ctx, map, random) {
+    ctx.save();
+    for (let i = 0; i < 7; i++) {
+        const x = 120 + random() * (WIDTH - 240), y = 100 + random() * (HEIGHT - 200), r = 90 + random() * 120;
+        const fog = ctx.createRadialGradient(x, y, 0, x, y, r);
+        fog.addColorStop(0, map.accent + "12"); fog.addColorStop(1, map.accent + "00");
+        ctx.fillStyle = fog; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    const edge = 70;
+    for (const [x0, y0, x1, y1, rx, ry, rw, rh] of [
+        [0, 27, 0, 27 + edge, 0, 27, WIDTH, edge], [0, HEIGHT - 27, 0, HEIGHT - 27 - edge, 0, HEIGHT - 27 - edge, WIDTH, edge],
+        [27, 0, 27 + edge, 0, 27, 0, edge, HEIGHT], [WIDTH - 27, 0, WIDTH - 27 - edge, 0, WIDTH - 27 - edge, 0, edge, HEIGHT]]) {
+        const shade = ctx.createLinearGradient(x0, y0, x1, y1);
+        shade.addColorStop(0, "#02070a66"); shade.addColorStop(1, "#02070a00");
+        ctx.fillStyle = shade; ctx.fillRect(rx, ry, rw, rh);
+    }
+    ctx.globalCompositeOperation = "soft-light";
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = map.accent;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    const vignette = ctx.createRadialGradient(WIDTH / 2, HEIGHT / 2, 160, WIDTH / 2, HEIGHT / 2, 630);
+    vignette.addColorStop(0, "#03090d00"); vignette.addColorStop(1, "#03090d70");
+    ctx.fillStyle = vignette; ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    ctx.restore();
 }
 
 // Tiny shorthand for filling a solid circle — used constantly throughout the per-kind enemy art below.
@@ -196,6 +230,17 @@ function circle(ctx, x, y, radius, color) {
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
+}
+
+// Enemy body gradients are in local (translated) coordinates, so one gradient object per kind/size
+// can be reused forever instead of being rebuilt for every enemy on every frame.
+const gradientCache = new WeakMap();
+function cachedGradient(ctx, key, make) {
+    let byKey = gradientCache.get(ctx);
+    if (!byKey) { byKey = new Map(); gradientCache.set(ctx, byKey); }
+    let gradient = byKey.get(key);
+    if (!gradient) { gradient = make(); byKey.set(key, gradient); }
+    return gradient;
 }
 
 // Draws one actor (the player or any enemy) at its current position: a soft ground shadow, a
@@ -213,12 +258,10 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
     ctx.translate(actor.x, actor.y);
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
-    const shadow = ctx.createRadialGradient(2, r * 0.55, 0, 2, r * 0.55, r * 1.4);
-    shadow.addColorStop(0, "#02080c88"); shadow.addColorStop(1, "#02080c00");
-    ctx.fillStyle = shadow;
-    ctx.beginPath();
-    ctx.ellipse(3, r * 0.55, r * 1.35, r * 0.65, 0, 0, Math.PI * 2);
-    ctx.fill();
+    drawGroundShadow(ctx, r);
+    if (actor.elite && !hero) drawGlow(ctx, 0, 0, r * 2.2, "#c79bff", 0.22);
+    if (actor.flash > 0 && !hero) drawGlow(ctx, 0, 0, r * 1.9, "#fff1cc", 0.5);
+    if (!hero && !boss) drawOutline(ctx, r);
     const targetFacing = actor.winding > 0 || actor.charging > 0
         ? Math.atan2(actor.chargeY || 0, actor.chargeX || 0)
         : actor.attackWindup > 0 ? Math.atan2(actor.attackY - actor.y, actor.attackX - actor.x)
@@ -261,8 +304,11 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
         drawOrb(ctx, 29, 0, actor.attackWindup > 0 ? 9 : 5, "#e1b7ff");
     } else if (["summoner", "cantor", "hexer"].includes(actor.kind)) {
         const color = actor.kind === "cantor" ? "#a4e9bb" : actor.kind === "hexer" ? "#ef96cf" : "#b994e1";
-        const cloth = ctx.createLinearGradient(-20, -25, 20, 20);
-        cloth.addColorStop(0, color); cloth.addColorStop(1, "#252437");
+        const cloth = cachedGradient(ctx, "cloth:" + color, () => {
+            const g = ctx.createLinearGradient(-20, -25, 20, 20);
+            g.addColorStop(0, color); g.addColorStop(1, "#252437");
+            return g;
+        });
         ctx.fillStyle = actor.flash > 0 ? "#fff4d6" : cloth;
         ctx.beginPath(); ctx.moveTo(0, -25); ctx.bezierCurveTo(13, -23, 12, 4, 20, 20);
         ctx.quadraticCurveTo(10, 24, 0, 16); ctx.quadraticCurveTo(-10, 24, -20, 20);
@@ -285,10 +331,13 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
         circle(ctx, 0, -22, 4 + Math.sin(time * 15), "#ffb65d");
     } else if (["reaver", "lancer"].includes(actor.kind)) {
         ctx.rotate(facing);
-        const plate = ctx.createLinearGradient(-18, -18, 22, 18);
-        plate.addColorStop(0, actor.kind === "lancer" ? "#ffe2ad" : "#c7f1ed");
-        plate.addColorStop(0.45, actor.kind === "lancer" ? "#e9ac63" : "#83b9cb");
-        plate.addColorStop(1, "#304958");
+        const plate = cachedGradient(ctx, "plate:" + actor.kind, () => {
+            const g = ctx.createLinearGradient(-18, -18, 22, 18);
+            g.addColorStop(0, actor.kind === "lancer" ? "#ffe2ad" : "#c7f1ed");
+            g.addColorStop(0.45, actor.kind === "lancer" ? "#e9ac63" : "#83b9cb");
+            g.addColorStop(1, "#304958");
+            return g;
+        });
         ctx.fillStyle = actor.flash > 0 ? "#fff4d6" : plate;
         if (actor.charging > 0 && !reducedMotion.matches) ctx.scale(1.3, 0.8);
         ctx.beginPath(); ctx.moveTo(25, 0); ctx.quadraticCurveTo(3, -18, -18, -18);
@@ -321,10 +370,12 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
         circle(ctx, 0, 6, 8, "#253e36");
         circle(ctx, 0, 7, 4 + Math.sin(time * 3), "#bde498");
     } else if (actor.kind === "wisp") {
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = "#85c0c6";
-        const mist = ctx.createRadialGradient(-5, -10, 1, 0, 0, 28);
-        mist.addColorStop(0, "#c8f2e9"); mist.addColorStop(0.45, "#568188"); mist.addColorStop(1, "#24344866");
+        circle(ctx, 0, 0, 30, "#85c0c626");
+        const mist = cachedGradient(ctx, "mist", () => {
+            const g = ctx.createRadialGradient(-5, -10, 1, 0, 0, 28);
+            g.addColorStop(0, "#c8f2e9"); g.addColorStop(0.45, "#568188"); g.addColorStop(1, "#24344866");
+            return g;
+        });
         ctx.fillStyle = actor.flash > 0 ? "#fff3d5" : mist;
         ctx.beginPath();
         ctx.moveTo(0, -23 + Math.sin(time * 4) * 3);
@@ -334,14 +385,16 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
         ctx.bezierCurveTo(-24, 9, -20, -18, 0, -23 + Math.sin(time * 4) * 3);
         ctx.closePath();
         ctx.fill();
-        ctx.shadowBlur = 0;
         circle(ctx, -4, -3, 2, "#e9ffe8");
         circle(ctx, 4, -3, 2, "#e9ffe8");
     } else {
         const base = actor.flash > 0 ? "#fce5bf" : boss ? map.accent : actor.kind === "sentinel" ? "#8b6576" : actor.kind === "brute" ? "#787469" : "#747d6c";
         if (boss) {
-            const mantle = ctx.createLinearGradient(-r, -r, r, r);
-            mantle.addColorStop(0, "#896552"); mantle.addColorStop(1, "#292331");
+            const mantle = cachedGradient(ctx, "mantle:" + r, () => {
+                const g = ctx.createLinearGradient(-r, -r, r, r);
+                g.addColorStop(0, "#896552"); g.addColorStop(1, "#292331");
+                return g;
+            });
             ctx.fillStyle = mantle; ctx.strokeStyle = "#d0ac7266"; ctx.lineWidth = 2;
             ctx.beginPath(); ctx.moveTo(-r * 0.65, -r);
             ctx.bezierCurveTo(-r * 1.4, -r * 0.4, -r * 1.2, r, -r * 0.8, r * 1.3);
@@ -354,8 +407,11 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
             ctx.beginPath(); ctx.moveTo(side * r * 0.4, 2);
             ctx.quadraticCurveTo(side * r * 0.5, r * 0.6, side * r * 0.5, r + stride * side * 5); ctx.stroke();
         }
-        const armor = ctx.createLinearGradient(-r, -r, r, r);
-        armor.addColorStop(0, base); armor.addColorStop(0.35, base); armor.addColorStop(1, "#27333a");
+        const armor = cachedGradient(ctx, "armor:" + r + ":" + base, () => {
+            const g = ctx.createLinearGradient(-r, -r, r, r);
+            g.addColorStop(0, base); g.addColorStop(0.35, base); g.addColorStop(1, "#27333a");
+            return g;
+        });
         ctx.fillStyle = armor; ctx.strokeStyle = "#15222b"; ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.moveTo(-r * 0.65, -r * 0.65);
         ctx.bezierCurveTo(-r * 1.1, -r * 0.15, -r * 0.75, r * 0.65, 0, r * 0.7);
@@ -437,15 +493,30 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
     const map = mapForWave(state.wave);
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     ctx.save();
-    if (preferences.shake !== false && !reducedMotion.matches && state.damageHistory.some(hit => hit.age < 0.12)) ctx.translate(Math.sin(state.time * 70) * 1.5, Math.cos(state.time * 65) * 1.5);
+    const lite = preferences.batterySaver === true;
+    if (preferences.shake !== false && !reducedMotion.matches && !lite) {
+        const amount = state.shake > 0 ? state.shake * 16 : 0;
+        if (amount) ctx.translate(Math.sin(state.time * 70) * amount, Math.cos(state.time * 65) * amount);
+    }
     ctx.drawImage(floor, 0, 0, WIDTH, HEIGHT);
     drawAtmosphere(ctx, map, state.time, reducedMotion.matches, WIDTH, HEIGHT);
+    // Twenty drifting motes in the act's colour. Positions are derived from time, so no objects are
+    // allocated; all twenty are filled in one path (a single draw call). Skipped in Battery Saver.
+    if (!lite) {
+        const t = reducedMotion.matches ? 0 : state.time;
+        for (let i = 0; i < 20; i++) {
+            const x = ((i * 197.3 + t * (8 + (i % 5) * 3)) % (WIDTH + 40)) - 20;
+            const y = ((i * 131.7 - t * (5 + (i % 3) * 4)) % HEIGHT + HEIGHT) % HEIGHT + Math.sin(t + i) * 6;
+            drawGlow(ctx, x, y, 7 + (i % 3) * 2, map.accent, 0.18 + 0.14 * Math.sin(t * 1.7 + i));
+        }
+    }
     const enemiesAlive = state.enemies.some(enemy => enemy.health > 0);
     for (const hazard of arenaHazards(state)) {
         const phase = hazardPhase(hazard, state.time);
         if (phase < 0) continue;
         const burning = map.hazard !== "slow" && phase >= 4 && enemiesAlive;
         const warning = map.hazard !== "slow" && phase >= 2 && !burning && enemiesAlive;
+        if (burning || warning) drawGlow(ctx, hazard.x, hazard.y, hazard.radius * 1.35, map.accent, burning ? 0.38 : 0.2 + 0.1 * Math.sin(state.time * 8));
         circle(ctx, hazard.x, hazard.y, hazard.radius, map.hazard === "slow" ? map.accent + "20" : burning ? map.accent + "77" : warning ? map.accent + "44" : "#4e333366");
         ctx.strokeStyle = preferences.contrast ? "#fff3cc" : map.accent;
         ctx.lineWidth = preferences.contrast ? 4 : 2;
@@ -460,12 +531,10 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
         }
     }
     for (const [x, y] of [[74, 75], [WIDTH - 74, 75], [74, HEIGHT - 75], [WIDTH - 74, HEIGHT - 75]]) {
-        ctx.save();
-        ctx.shadowBlur = 25;
-        ctx.shadowColor = "#ffae50";
-        circle(ctx, x, y - 17, 7 + Math.sin(state.time * 8 + x) * 2, "#e5a14f");
+        const flicker = Math.sin(state.time * 8 + x) * 2;
+        drawGlow(ctx, x, y - 17, 46 + flicker * 2, "#ffae50", 0.32);
+        circle(ctx, x, y - 17, 7 + flicker, "#e5a14f");
         circle(ctx, x, y - 19, 3, "#ffe1a0");
-        ctx.restore();
     }
     for (const enemy of state.enemies) {
         if (enemy.attackWindup > 0) {
@@ -578,6 +647,20 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
         if (appearance === 0) continue;
         ctx.save();
         ctx.globalAlpha *= appearance;
+        if (!reducedMotion.matches) {
+            const hero = actor === state.player;
+            // Squash on spawn (lands wide then settles) and stretch along the roll while dodging.
+            const squash = appearance < 1 ? 1 + (1 - appearance) * 0.35 : 1;
+            const rolling = hero && actor.rolling > 0;
+            if (squash !== 1 || rolling) {
+                ctx.translate(actor.x, actor.y);
+                if (rolling) {
+                    const angle = Math.atan2(actor.rollY, actor.rollX);
+                    ctx.rotate(angle); ctx.scale(1.18, 0.86); ctx.rotate(-angle);
+                } else ctx.scale(squash, 1 / squash);
+                ctx.translate(-actor.x, -actor.y);
+            }
+        }
         drawActor(ctx, actor, state.player, state.time, map, state.heroClass);
         ctx.restore();
     }
@@ -635,6 +718,7 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
         ctx.strokeStyle = power.color; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(state.player.x, state.player.y, 25 + index * 4, state.time + index, state.time + index + Math.PI * 1.5); ctx.stroke();
     }
+    let burstGlows = 0;
     for (const item of state.effects) {
         const progress = reducedMotion.matches && item.kind !== "text" ? 0.65 : 1 - item.life / item.maxLife;
         ctx.save();
@@ -660,13 +744,17 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
             }
         } else if (item.kind === "text") {
             if (/^(CRIT )?-?\d+( (MAG|PHY))?$/.test(item.text) && (preferences.damageNumbers === "off" || preferences.damageNumbers === "reduced" && !item.text.startsWith("CRIT") && !item.text.startsWith("-"))) { ctx.restore(); continue; }
-            ctx.font = "bold 16px 'Segoe UI', sans-serif";
+            const crit = item.text.startsWith("CRIT");
+            const pop = reducedMotion.matches ? 1 : 1 + Math.max(0, 0.18 - progress) * (crit ? 3.5 : 2);
+            const size = Math.round((crit ? 21 : 15) * pop);
+            ctx.font = `bold ${size}px 'Segoe UI', sans-serif`;
             ctx.textAlign = "center";
-            ctx.shadowBlur = 3;
-            ctx.shadowColor = "#000";
-            ctx.strokeStyle = "#111921"; ctx.lineWidth = 3;
-            ctx.strokeText(item.text, item.x, item.y - progress * 35);
-            ctx.fillText(item.text, item.x, item.y - progress * 35);
+            ctx.strokeStyle = crit ? "#3a1f04" : "#111921"; ctx.lineWidth = crit ? 4.5 : 3;
+            if (crit) ctx.fillStyle = "#ffc93a";
+            const drift = reducedMotion.matches ? 0 : progress * (crit ? 42 : 32);
+            const sway = reducedMotion.matches ? 0 : Math.sin(item.x + progress * 3) * 6 * progress;
+            ctx.strokeText(item.text, item.x + sway, item.y - drift);
+            ctx.fillText(item.text, item.x + sway, item.y - drift);
         } else if (item.kind === "class-skill") {
             drawClassSkillEffect(ctx, item, progress, reducedMotion.matches);
         } else if (item.kind === "beam") {
@@ -717,6 +805,22 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
             ctx.arc(item.x, item.y, item.radius * (0.6 + progress * 0.4), item.angle - arc, item.angle + arc);
             ctx.stroke();
             ctx.strokeStyle = "#fff1c9"; ctx.lineWidth = Math.max(1, 3 * (1 - progress)); ctx.stroke();
+        } else if (item.kind === "burst") {
+            // Death burst: one soft cached glow (max 6 at once) plus a ring and 6 chunks in one path.
+            const fade = 1 - progress;
+            if (!lite && burstGlows++ < 6) drawGlow(ctx, item.x, item.y, item.radius * (0.9 + progress * 0.6), item.color, 0.55 * fade);
+            ctx.globalAlpha = fade;
+            ctx.lineWidth = 3 * fade + 1;
+            ctx.beginPath(); ctx.arc(item.x, item.y, Math.max(1, item.radius * (0.4 + progress * 1.2)), 0, Math.PI * 2); ctx.stroke();
+            const ease = 1 - fade * fade, size = 3 * fade + 0.5;
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = i * Math.PI / 3 + item.x * 0.01;
+                const reach = item.radius * (0.3 + ease * 1.5);
+                const x = item.x + Math.cos(angle) * reach, y = item.y + Math.sin(angle) * reach;
+                ctx.moveTo(x + size, y); ctx.arc(x, y, size, 0, Math.PI * 2);
+            }
+            ctx.fill();
         } else {
             ctx.save();
             ctx.globalAlpha *= 0.2;
@@ -733,19 +837,19 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
         }
         ctx.restore();
     }
-    const vignette = ctx.createRadialGradient(WIDTH / 2, HEIGHT / 2, 160, WIDTH / 2, HEIGHT / 2, 630);
-    vignette.addColorStop(0, "#03090d00");
-    vignette.addColorStop(1, "#03090d70");
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, WIDTH, HEIGHT);
     for (const bolt of state.projectiles) {
         ctx.save();
         const speed = Math.hypot(bolt.vx, bolt.vy) || 1;
+        drawGlow(ctx, bolt.x, bolt.y, 26, "#ff3d70", 0.45);
+        if (!lite) {
+            for (let i = 1; i <= 3; i++) {
+                circle(ctx, bolt.x - bolt.vx / speed * i * 11, bolt.y - bolt.vy / speed * i * 11, 6 - i * 1.4, `rgba(255, 82, 122, ${0.42 - i * 0.12})`);
+            }
+        }
         ctx.lineCap = "round";
         ctx.beginPath(); ctx.moveTo(bolt.x - bolt.vx / speed * 30, bolt.y - bolt.vy / speed * 30); ctx.lineTo(bolt.x, bolt.y);
         ctx.strokeStyle = "#100c1b"; ctx.lineWidth = 10; ctx.stroke();
         ctx.strokeStyle = "#ff527a"; ctx.lineWidth = 5; ctx.stroke();
-        circle(ctx, bolt.x, bolt.y, 13, "#ff3d7044");
         circle(ctx, bolt.x, bolt.y, 9, "#140c1e");
         circle(ctx, bolt.x, bolt.y, 7, "#ff466d");
         circle(ctx, bolt.x, bolt.y, 3.5, "#fff5fc");
@@ -881,6 +985,7 @@ export function createGame(root, saveBridge = null) {
     let frame = 0;
     let last = 0;
     let hudTime = 0;
+    let canvasCssWidth = 0, canvasCssHeight = 0, idleDrawTime = 0, idleDrawKey = "";
     let shownStatus = "ready";
     let disposed = false;
     let saving = false;
@@ -942,10 +1047,15 @@ export function createGame(root, saveBridge = null) {
     // players still see their HUD/buttons without scrolling. updateCanvasResolution() keeps the
     // actual canvas backing-store resolution in sync with its CSS size and devicePixelRatio so
     // rendering stays crisp regardless of the layout mode.
+    let lastSaverMode;
     function updateCanvasResolution() {
+        lastSaverMode = root.dataset.batterySaver;
         const bounds = canvas.getBoundingClientRect();
+        canvasCssWidth = bounds.width;
+        canvasCssHeight = bounds.height;
         bossTop = root.dataset.canvasHud === "on" ? 150 * HEIGHT / Math.max(1, bounds.height) : bossHudTop(bounds);
-        const scale = Math.max(1, Math.min(2, bounds.width / WIDTH * (window.devicePixelRatio || 1)));
+        const maxScale = root.dataset.batterySaver === "true" ? 1.25 : root.dataset.canvasHud === "on" ? 1.5 : 2;
+        const scale = Math.max(1, Math.min(maxScale, bounds.width / WIDTH * (window.devicePixelRatio || 1)));
         const width = Math.round(WIDTH * scale), height = Math.round(HEIGHT * scale);
         if (canvas.width !== width || canvas.height !== height) {
             canvas.width = width;
@@ -1017,10 +1127,13 @@ export function createGame(root, saveBridge = null) {
     on(window, "resize", () => scheduleArenaLayout());
     if (window.visualViewport) on(window.visualViewport, "resize", () => scheduleArenaLayout());
     const tutorial = [
-        { title: "Move, aim, strike", text: "Move with WASD or arrows. Aim with the mouse; J or left click is your regular attack, always available without a slot. Q casts your selected manual skill. Configure one manual and two auto combat-skill slots through Skills & loadout. Auto skills have 60% longer cooldowns." },
-        { title: "Read danger before it strikes", text: "Space dodges and E drinks a flask. Both are manual-only and always available without a slot. Leave marked melee arcs and violet mortar circles, step out of amber Lancer lanes, and avoid bright pink-white enemy projectiles. Carry up to 5 flasks; level-ups do not refill them." },
-        { title: "Spend gold to survive", text: "Select Forge to pause and buy weapon, armor, or skill ranks. Scrolls are rare: do not wait for drops. Max every forge item to unlock uncapped stat training from 1,000 gold. Level-ups offer a card; checkpoints autosave. Your difficulty stays locked through all campaign stages." }
+        { title: "Move, aim, strike", text: "Move with WASD or arrows. Attacks and chosen skills cast automatically.", touch: "Drag the left side of the screen to move. Attacks and skills fire on their own." },
+        { title: "Read danger before it strikes", text: "Space dodges, E drinks a flask (max 5). Leave marked circles, lanes and arcs.", touch: "Tap Dodge to roll and the flask to heal (max 5). Step out of marked circles and lanes." },
+        { title: "Spend gold to survive", text: "Open Forge to buy weapon, armor and skill ranks. Checkpoints autosave.", touch: "Pause, then open Forge to spend gold and Skills to spend points. Checkpoints autosave." }
     ];
+    const tutorialKey = "pob-touch-tutorial-seen";
+    const tutorialSeen = () => { try { return localStorage.getItem(tutorialKey) === "1"; } catch { return true; } };
+    const markTutorialSeen = () => { try { localStorage.setItem(tutorialKey, "1"); } catch { /* storage unavailable */ } };
     const rankingStatus = root.querySelector("[data-ranking-status]");
     const pendingScores = new Map();
     const reportedScores = new Map();
@@ -1292,13 +1405,15 @@ export function createGame(root, saveBridge = null) {
             button.setAttribute("aria-pressed", String(setupSlots[0].value === key));
             button.disabled = saving;
         }
-        root.querySelector("[data-setup-unlock]").textContent = `Choose from ${STARTER_SKILLS.map(key => skillName(preview, key)).join(", ")}. Add skills from your class's nine-skill pool at levels 5 and 10, for three total. Choices are locked for this run.`;
+        root.querySelector("[data-setup-unlock]").textContent = "Step 1: tap a starting skill. More skills at levels 10 and 20.";
         const loadout = readSetupLoadout();
         const valid = validLoadout(preview, loadout.manual, loadout.auto) && (setupAction === "continue" || STARTER_SKILLS.includes(loadout.auto[0]));
-        setupNext.disabled = saving || !valid;
+        setupNext.disabled = saving;
+        setup.dataset.needsSkill = valid ? "off" : "on";
+        if (valid) setup.dataset.skillPrompt = "off";
         root.querySelector("[data-setup-loadout-feedback]").textContent = valid
-            ? `${skillName(preview, setupSlots[0].value)}: ${combatSkillDefinition(preview, setupSlots[0].value)?.detail ?? "Your class combat skill casts automatically at nearby enemies."}`
-            : "Choose one starting skill.";
+            ? `${skillName(preview, setupSlots[0].value)}: ${skillTagline(preview.heroClass, setupSlots[0].value) || combatSkillDefinition(preview, setupSlots[0].value)?.detail || "Casts automatically at nearby enemies."}`
+            : "Tap a skill above to start.";
     }
     for (const select of setupSlots) on(select, "change", () => {
         if (select === setupSlots[0]) {
@@ -1327,19 +1442,22 @@ export function createGame(root, saveBridge = null) {
         root.querySelector("[data-setup-step]").textContent = choosingDifficulty ? "PREPARE YOUR JOURNEY" : choosingLoadout ? "SLOT YOUR SKILLS" : `QUICK GUIDE ${setupStep} / ${tutorial.length}`;
         root.querySelector("[data-setup-title]").textContent = choosingDifficulty ? "Choose your challenge" : choosingLoadout ? "Choose your starting loadout" : tutorial[setupStep - 1].title;
         root.querySelector("[data-setup-description]").textContent = choosingDifficulty
-            ? setupAction === "continue" ? "Keep your character and choose your Endless difficulty. Endless kills start a new score on the campaign-equipped board. Your campaign record is kept."
-                : "Choose once for this new run. Stage transitions never change your difficulty. Starting replaces the current character; Cancel keeps it. Higher tiers strengthen enemies and reduce healing."
-                : choosingLoadout ? "Choose your first automatic combat skill. Add your second at level 10 and your third at level 20. Each choice is locked for this run; dodge and flask remain manual." : tutorial[setupStep - 1].text;
-        if (setupStep === 1) {
+            ? setupAction === "continue" ? "Keep your character. Pick an Endless difficulty."
+                : "Locked for this run. Starting replaces your current character."
+                : choosingLoadout ? "Pick your first skill. More at levels 10 and 20." : tutorial[setupStep - 1][mobile ? "touch" : "text"];
+        setup.dataset.tutorial = !choosingDifficulty && !choosingLoadout ? "on" : "off";
+        if (setupStep === 1 && !mobile) {
             const hero = HERO_CLASSES[classSelect.value];
-            root.querySelector("[data-setup-description]").textContent = `Move with WASD or arrows. ${hero.attackName} and your three chosen combat skills target automatically. Space dodges; E drinks a flask. Choose one of three class-specific starters, then add a skill at levels 5 and 10. Open Skills & loadout to upgrade your abilities. ${hero.description}`;
+            root.querySelector("[data-setup-description]").textContent = `Move with WASD or arrows. ${hero.attackName} and your skills fire automatically. Space dodges; E drinks a flask.`;
         }
         root.querySelector("[data-setup-difficulty]").hidden = !choosingDifficulty;
         difficultySelect.disabled = !choosingDifficulty;
         setupSkip.hidden = choosingDifficulty || choosingLoadout;
+        setupSkip.textContent = mobile ? "Skip tutorial" : "Skip tips & choose skills";
         setupLoadoutPanel.hidden = setupAction === "continue" || (mobile ? !choosingDifficulty : !choosingLoadout);
-        setupNext.textContent = mobile ? "Start adventure" : choosingLoadout ? setupAction === "campaign" ? "Confirm slots & begin" : "Confirm slots & enter Endless" : "Next";
+        setupNext.textContent = mobile ? (choosingDifficulty ? "Start adventure" : setupStep === tutorial.length ? "Got it — begin" : "Next") : choosingLoadout ? setupAction === "campaign" ? "Confirm slots & begin" : "Confirm slots & enter Endless" : "Next";
         setupNext.disabled = saving;
+        setup.dataset.skillPrompt = "off";
         if (choosingLoadout || mobile) updateSetupLoadout();
         (choosingDifficulty ? difficultySelect : choosingLoadout ? setupSkillButtons[0] : setupNext).focus({ preventScroll: true });
     }
@@ -1404,8 +1522,28 @@ export function createGame(root, saveBridge = null) {
         updateHud();
         (state.status === "won" ? endlessButton : startButton).focus({ preventScroll: true });
     }
+    // Start stays clickable: without a starter skill it points the player at the skill buttons
+    // instead of silently doing nothing (beta feedback: "I can't click start and don't know why").
+    function promptForSkill() {
+        const loadout = readSetupLoadout();
+        const needsSkill = setupAction !== "continue" && !STARTER_SKILLS.includes(loadout.auto[0]);
+        const atSkillStep = root.dataset.canvasHud === "on" ? setupStep === 0 : setupStep === tutorial.length + 1;
+        if (!needsSkill || !atSkillStep) return false;
+        setup.dataset.skillPrompt = "on";
+        setupSkillButtons[0]?.focus({ preventScroll: true });
+        return true;
+    }
     on(setupNext, "click", () => {
+        if (promptForSkill()) return;
         if (root.dataset.canvasHud === "on") {
+            const touringFirstTime = setupAction === "campaign" && !tutorialSeen();
+            if (touringFirstTime && setupStep === 0) {
+                const loadout = readSetupLoadout();
+                if (!STARTER_SKILLS.includes(loadout.auto[0])) return;
+                setupStep = 1; showSetupStep(); return;
+            }
+            if (setupStep >= 1 && setupStep < tutorial.length) { setupStep += 1; showSetupStep(); return; }
+            if (setupStep === tutorial.length) markTutorialSeen();
             setupStep = tutorial.length + 1;
             finishSetup();
             return;
@@ -1413,7 +1551,10 @@ export function createGame(root, saveBridge = null) {
         if (setupStep === tutorial.length + 1) finishSetup();
         else { setupStep = setupAction === "continue" ? tutorial.length + 1 : setupStep + 1; showSetupStep(); }
     });
-    on(setupSkip, "click", () => { setupStep = tutorial.length + 1; showSetupStep(); });
+    on(setupSkip, "click", () => {
+        if (root.dataset.canvasHud === "on") { markTutorialSeen(); setupStep = tutorial.length + 1; finishSetup(); return; }
+        setupStep = tutorial.length + 1; showSetupStep();
+    });
     on(setupCancel, "click", cancelSetup);
     on(setup, "keydown", event => {
         if (event.key === "Escape") { event.preventDefault(); cancelSetup(); }
@@ -1428,20 +1569,39 @@ export function createGame(root, saveBridge = null) {
     // enabled/cooldown/slot-label state, and the score readout. Called every render frame (see the
     // loop() function below) as well as immediately after any state-changing action (setup, pause,
     // skill purchase, etc.) so the UI never lags a frame behind the actual game state.
+    // Cached lookups for updateHud(), which runs ~10x per second: static elements are looked up once
+    // (re-queried only if Blazor replaced them), and text is written only when it actually changes,
+    // avoiding needless DOM mutations that trigger style/layout work on phones.
+    const hudCache = new Map();
+    const hudOne = selector => {
+        let element = hudCache.get(selector);
+        if (!element || !element.isConnected) { element = root.querySelector(selector); hudCache.set(selector, element); }
+        return element;
+    };
+    const hudAll = selector => {
+        const key = `all:${selector}`;
+        let elements = hudCache.get(key);
+        if (!elements || !elements.length || !elements[0].isConnected) { elements = Array.from(root.querySelectorAll(selector)); hudCache.set(key, elements); }
+        return elements;
+    };
+    const setText = (element, value) => {
+        const next = String(value);
+        if (element && element.textContent !== next) element.textContent = next;
+    };
     function updateHud() {
         const gearPreview = [`Equipped now: damage ${weaponDamage(state)}, physical armor ${armorRating(state).toFixed(1)}%, spell resistance ${resistanceRating(state).toFixed(1)}%, movement ${Math.round(movementSpeed(state))}.`];
-        const equipmentPreview = root.querySelector('[data-equipment-preview]');
+        const equipmentPreview = hudOne('[data-equipment-preview]');
         const gearSignature = gearPreview.join('|');
         if (equipmentPreview.dataset.preview !== gearSignature) {
             equipmentPreview.dataset.preview = gearSignature;
             equipmentPreview.replaceChildren(...gearPreview.map(text => { const row = document.createElement('p'); row.textContent = text; return row; }));
         }
-        root.querySelector("[data-checkpoint-report]").textContent = ["camp", "won"].includes(state.status)
+        hudOne("[data-checkpoint-report]").textContent = ["camp", "won"].includes(state.status)
             ? `${checkpointReport(state)} ${checkpointSaveFailed ? "Checkpoint save failed — retry before leaving." : saving ? "Saving checkpoint…" : "Review your run and save before continuing."}`
             : "At each five-wave checkpoint, review the boss relic, challenge result, and optional encounter here.";
-        root.querySelector("[data-build-synergy]").textContent = buildSynergy(state).detail;
-        root.querySelector("[data-boss-relics]").textContent = BOSS_RELICS.filter((_, index) => state.adventures.relics[index]).map(relic => `${relic.name}: ${relic.detail}`).join(" · ") || "Defeat each area boss to earn a unique, non-stacking relic. Practice grants none.";
-        const codex = root.querySelector("[data-campaign-codex]");
+        setText(hudOne("[data-build-synergy]"), buildSynergy(state).detail);
+        setText(hudOne("[data-boss-relics]"), BOSS_RELICS.filter((_, index) => state.adventures.relics[index]).map(relic => `${relic.name}: ${relic.detail}`).join(" · ") || "Defeat each area boss to earn a unique, non-stacking relic. Practice grants none.");
+        const codex = hudOne("[data-campaign-codex]");
         const signature = state.adventures.chapters.join("");
         if (codex.dataset.entries !== signature) {
             codex.dataset.entries = signature;
@@ -1454,12 +1614,12 @@ export function createGame(root, saveBridge = null) {
             }
         }
         const encounter = stageEvent(state);
-        root.querySelector("[data-stage-event]").textContent = `${encounter.name}: ${encounter.detail} ${eventAvailable(state) ? "One choice at this checkpoint." : "Available before a stage starts at a clear checkpoint; already resolved encounters cannot be repeated."}`;
+        setText(hudOne("[data-stage-event]"), `${encounter.name}: ${encounter.detail} ${eventAvailable(state) ? "One choice at this checkpoint." : "Available before a stage starts at a clear checkpoint; already resolved encounters cannot be repeated."}`);
         for (const attribute of ["data-stage-event-accept", "data-stage-event-skip"]) root.querySelector(`[${attribute}]`).disabled = saving || !eventAvailable(state);
-        root.querySelector("[data-open-lore]").hidden = inMainMenu || state.training || state.mode !== "campaign" || state.status === "ready";
-        root.querySelector("[data-main-resume]").disabled = saving || state.status === "ready";
-        root.querySelector('[data-main-resume]').hidden = !['playing', 'paused', 'camp', 'won'].includes(state.status) || !!state.training;
-        root.querySelector("[data-main-load]").disabled = saving || checkingUnlock || !saveBridge || !!state.training;
+        hudOne("[data-open-lore]").hidden = inMainMenu || state.training || state.mode !== "campaign" || state.status === "ready";
+        hudOne("[data-main-resume]").disabled = saving || state.status === "ready";
+        hudOne('[data-main-resume]').hidden = !['playing', 'paused', 'camp', 'won'].includes(state.status) || !!state.training;
+        hudOne("[data-main-load]").disabled = saving || checkingUnlock || !saveBridge || !!state.training;
         root.dataset.gameStatus = setupAction ? "setup" : state.status;
         root.dataset.saveBusy = saving || checkingUnlock ? "on" : "off";
         const p = state.player;
@@ -1483,11 +1643,11 @@ export function createGame(root, saveBridge = null) {
         text("forge-special", `${hero.specialName}: damage, ${ranged ? "range" : "radius"}, recovery`);
         text("forge-burst", `${skillName(state, "burst")}: damage, range, recovery`);
         text("forge-guard", `${skillName(state, "guard")}: damage, radius, protection, recovery`);
-        for (const element of root.querySelectorAll("[data-skill-name]")) {
+        for (const element of hudAll("[data-skill-name]")) {
             const name = skillName(state, element.dataset.skillName) + (element.tagName === "OPTION" && !skillUnlocked(state, element.dataset.skillName) ? " — Locked" : "");
             if (element.textContent !== name) element.textContent = name;
         }
-        for (const image of root.querySelectorAll("img[data-skill-icon]")) {
+        for (const image of hudAll("img[data-skill-icon]")) {
             const src = skillIcon(state, image.dataset.skillIcon);
             if (image.getAttribute("src") !== src) image.setAttribute("src", src);
         }
@@ -1515,8 +1675,9 @@ export function createGame(root, saveBridge = null) {
             const cooldown = key === 'attack' ? hero.attackCooldown : key === 'nova' ? hero.specialCooldown : definition?.cooldown ?? extra[key]?.cooldown;
             descriptions[key] += ` ${skillDamageType(state, key)} damage · ${Math.round(skillReach(state, key))} reach · ${cooldown}s base cooldown. Targeting: ${definition?.detail ?? (key === 'attack' ? 'nearest enemy in reach; aimed on desktop' : key === 'burst' ? extra.burst.shape : 'nearby area')}. ${NEW_SKILLS[key] ? 'Forge: +10% damage, +8 reach, +8% skill recovery per rank. Tree potency: +10% damage per rank; branch effects are described on each node.' : 'Forge and tree previews show the exact damage, reach, recovery and branch changes.'}`;
         }
-        for (const element of root.querySelectorAll("[data-skill-description]")) {
-            const value = descriptions[element.dataset.skillDescription];
+        for (const element of hudAll("[data-skill-description]")) {
+            const key = element.dataset.skillDescription;
+            const value = element.closest("[data-skill-choice]") ? skillTagline(state.heroClass, key) || descriptions[key] : descriptions[key];
             if (element.textContent !== value) element.textContent = value;
         }
         classSelect.disabled = saving || !setupAction || setupStep !== 0 || setupAction === "continue";
@@ -1642,7 +1803,7 @@ export function createGame(root, saveBridge = null) {
         overlay.hidden = !!setupAction || (state.status === "playing" || checkpointInBackground) && !draftClosing;
         const active = ["playing", "paused", "camp", "won", "choosing"].includes(state.status);
         const canForge = !setupAction && ["paused", "camp", "won"].includes(state.status);
-        for (const select of root.querySelectorAll("[data-equipment-style]")) {
+        for (const select of hudAll("[data-equipment-style]")) {
             select.value = state.runSystems.equipment[select.dataset.equipmentStyle];
             select.disabled = saving || !canForge;
         }
@@ -1653,50 +1814,50 @@ export function createGame(root, saveBridge = null) {
             button.disabled = !challengeAvailable;
             button.setAttribute("aria-pressed", String(!challenge.resolved && challenge.key === button.dataset.challengeChoice));
         }
-        root.querySelector("[data-challenge-availability]").textContent = challengeAvailable
+        hudOne("[data-challenge-availability]").textContent = challengeAvailable
             ? `Choose for stage ${Math.floor(state.wave / 5) + 1} · Reward: ${100 + (Math.floor(state.wave / 5) + 1) * 50} gold.`
             : state.training ? "Challenges are unavailable in practice. Exit training to return to your run."
             : "Choose before the first wave or at the next five-wave checkpoint. The current stage cannot be changed mid-fight.";
-        root.querySelector("[data-challenge-status]").textContent = `${CHALLENGES[challenge.key]}${challenge.key === "none" ? "" : ` · stage ${challenge.stage} · ${Math.floor(challenge.elapsed)}s · ${challenge.flasks} flasks · ${Math.round(challenge.damage)} health lost${challenge.resolved ? " · resolved" : ""}`}`;
+        setText(hudOne("[data-challenge-status]"), `${CHALLENGES[challenge.key]}${challenge.key === "none" ? "" : ` · stage ${challenge.stage} · ${Math.floor(challenge.elapsed)}s · ${challenge.flasks} flasks · ${Math.round(challenge.damage)} health lost${challenge.resolved ? " · resolved" : ""}`}`);
         const summary = runSummary(state, key => skillName(state, key));
-        root.querySelector("[data-summary-text]").textContent = summary;
-        root.querySelector("[data-run-summary]").hidden = state.status === "ready";
-        root.querySelector("[data-forge-summary]").textContent = summary;
-        for (const button of root.querySelectorAll("[data-training]")) { button.hidden = !!state.training; button.disabled = saving || checkingUnlock || !!setupAction || choosing; }
-        for (const button of root.querySelectorAll("[data-exit-training]")) {
+        setText(hudOne("[data-summary-text]"), summary);
+        hudOne("[data-run-summary]").hidden = state.status === "ready";
+        setText(hudOne("[data-forge-summary]"), summary);
+        for (const button of hudAll("[data-training]")) { button.hidden = !!state.training; button.disabled = saving || checkingUnlock || !!setupAction || choosing; }
+        for (const button of hudAll("[data-exit-training]")) {
             button.hidden = !state.training;
             button.disabled = saving;
         }
         root.dataset.training = state.training ? "on" : "off";
-        root.querySelector("[data-training-picker]").hidden = !state.training;
+        hudOne("[data-training-picker]").hidden = !state.training;
         for (const button of practiceSkills) {
             button.disabled = saving || state.status !== "paused";
             button.setAttribute("aria-pressed", String(state.loadout.auto[0] === button.dataset.trainingSkill));
         }
-        root.querySelector("[data-start-training]").disabled = saving || state.status !== "paused";
-        root.querySelector("[data-training-detail]").textContent = state.training
+        hudOne("[data-start-training]").disabled = saving || state.status !== "paused";
+        hudOne("[data-training-detail]").textContent = state.training
             ? `${skillName(state, state.loadout.auto[0])}: ${combatSkillDefinition(state, state.loadout.auto[0])?.detail ?? EXTRA_SKILLS[state.heroClass][state.loadout.auto[0]]?.detail ?? hero.description} Active skills: ${selectedSkills(state).map(key => skillName(state, key)).join(" · ")}.` : "";
         retrySave.hidden = !checkpointSaveFailed || !["camp", "won"].includes(state.status) || !!setupAction;
         retrySave.disabled = saving || checkingUnlock || !saveBridge;
-        retrySave.textContent = saving ? "Retrying checkpoint save…" : "Retry checkpoint save";
+        setText(retrySave, saving ? "Retrying checkpoint save…" : "Retry checkpoint save");
         const wardUnlocked = skillUnlocked(state, "guard");
         const remindWard = false;
         const unlockLevels = state.skillSchedule === "legacy" ? [5, 10] : [10, 20];
-        root.querySelector("[data-skill-choice-description]").textContent = `Combat is paused. Choose a second skill at level ${unlockLevels[0]} and a third at level ${unlockLevels[1]}. Choices stay locked for this run.`;
+        setText(hudOne("[data-skill-choice-description]"), `New skill at levels ${unlockLevels[0]} and ${unlockLevels[1]}. Locked for this run.`);
         text("ward-unlock-status", `${selectedSkills(state).map(key => skillName(state, key)).join(" · ")}. ${p.level < unlockLevels[1] ? `Next skill at level ${p.level < unlockLevels[0] ? unlockLevels[0] : unlockLevels[1]}.` : "All three skill slots unlocked."}`);
         text("skill-unlock-hint", `${skillName(state, "guard")} unlocked! Slot your new skill.`);
         skillUnlockNotice.hidden = !remindWard || state.status !== "playing" || state.resumeDelay > 0 || draftClosing || !!setupAction;
-        for (const button of root.querySelectorAll("[data-resume-combat]")) {
+        for (const button of hudAll("[data-resume-combat]")) {
             button.hidden = state.mode === "endless" && state.status === "camp";
             button.disabled = saving || !!setupAction || !["paused", "camp"].includes(state.status);
-            button.textContent = state.training ? "Resume practice" : state.status === "camp" ? "Travel to next stage" : "Return to battle";
+            setText(button, state.training ? "Resume practice" : state.status === "camp" ? "Travel to next stage" : "Return to battle");
         }
         openSkills.disabled = saving || !!setupAction || !active || choosing;
         text("skill-points", `${skillPointsLeft(state)} points available · ${skillPointsEarned(state)}/${MAX_SKILL_POINTS} earned`);
-        for (const button of root.querySelectorAll("[data-respec-tree]")) {
+        for (const button of hudAll("[data-respec-tree]")) {
             const skill = button.dataset.respecTree;
             const points = treePointsSpent(state, skill), cost = treeRespecCost(state, skill);
-            button.textContent = points ? `Reset tree · ${cost} gold · refund ${points} points` : "No points to refund";
+            setText(button, points ? `Reset · ${cost}g · +${points} pts` : "Reset");
             button.disabled = saving || !!setupAction || !canRespecTree(state, skill);
             button.title = points ? `Reset ${skillName(state, skill)} only. Requires ${cost} gold; ${state.gold} available. Cooldowns remain; refunded effects end.` : "Learn an upgrade before resetting this tree.";
         }
@@ -1715,17 +1876,17 @@ export function createGame(root, saveBridge = null) {
             button.dataset.nodeVisual = definition.visual;
             const rank = state.skillTree[skill][node];
             const available = !saving && !setupAction && canLearnSkill(state, skill, node);
-            button.querySelector("[data-tree-name]").textContent = definition.name;
-            button.querySelector("[data-tree-icon]").textContent = definition.icon;
-            button.parentElement.querySelector("[data-tree-detail]").textContent = definition.detail;
-            button.parentElement.querySelector("[data-tree-status]").textContent = saving ? "Saving…" : treeNodeStatus(state, skill, node);
-            button.querySelector("[data-tree-rank]").textContent = `${rank}/${definition.max}`;
+            setText(button.querySelector("[data-tree-name]"), definition.name);
+            setText(button.querySelector("[data-tree-icon]"), definition.icon);
+            setText(button.parentElement.querySelector("[data-tree-detail]"), definition.detail);
+            setText(button.parentElement.querySelector("[data-tree-status]"), saving ? "Saving…" : treeNodeStatus(state, skill, node));
+            setText(button.querySelector("[data-tree-rank]"), `${rank}/${definition.max}`);
             button.setAttribute("aria-disabled", String(!available));
             button.setAttribute("aria-label", `${skillName(state, skill)}: ${definition.name}, rank ${rank} of ${definition.max}`);
             button.classList.toggle("learned", rank > 0);
             button.classList.toggle("available", available);
         }
-        for (const tree of root.querySelectorAll("[data-tree-skill]")) {
+        for (const tree of hudAll("[data-tree-skill]")) {
             tree.dataset.heroClass = state.heroClass;
             const skill = tree.dataset.treeSkill, nodes = state.skillTree[skill];
             tree.dataset.skillIcon = skillIcon(state, skill);
@@ -1740,7 +1901,7 @@ export function createGame(root, saveBridge = null) {
         }
         pauseButton.disabled = saving || !!setupAction || !["playing", "paused"].includes(state.status);
         combatPause.disabled = pauseButton.disabled;
-        combatPause.textContent = state.status === "paused" ? "Resume" : "Pause";
+        setText(combatPause, state.status === "paused" ? "Resume" : "Pause");
         focusViewButton.disabled = !!setupAction;
         recenterButton.disabled = !!setupAction;
         startButton.hidden = state.mode === "endless" && state.status === "camp";
@@ -1748,9 +1909,9 @@ export function createGame(root, saveBridge = null) {
         restartButton.disabled = saving || choosing || !!setupAction || !!state.training;
         endlessButton.disabled = saving || checkingUnlock || choosing || !!setupAction || !!state.training;
         endlessButton.hidden = choosing || !(endlessUnlocked || state.status === "won") || (state.mode === "endless" && state.status !== "dead") || state.status === "playing";
-        endlessButton.textContent = state.status === "won" ? "Continue into the Endless Watch" : "New Endless Watch run";
+        setText(endlessButton, state.status === "won" ? "Continue into the Endless Watch" : "New Endless Watch run");
         launchEndless.disabled = endlessButton.disabled || !(endlessUnlocked || state.campaignComplete === 1);
-        launchEndless.textContent = checkingUnlock ? "Checking Endless…" : state.status === "won" ? "Continue Endless" : endlessUnlocked || state.campaignComplete === 1 ? "New Endless run" : "Endless (locked)";
+        setText(launchEndless, checkingUnlock ? "Checking Endless…" : state.status === "won" ? "Continue Endless" : endlessUnlocked || state.campaignComplete === 1 ? "New Endless run" : "Endless (locked)");
         launchEndless.title = state.status === "won" ? "Continue this campaign character into Endless" : "Unlocked profiles can start a new veteran Endless character here. To keep a completed campaign character, load its victory save first.";
         forgeButton.disabled = saving || !active || choosing || !!setupAction;
         const completedForge = forgeComplete(state);
@@ -1764,13 +1925,13 @@ export function createGame(root, saveBridge = null) {
         forgeNudge.hidden = state.status !== "playing" || state.resumeDelay > 0 || draftClosing || !!setupAction || !notifyForge || !skillUnlockNotice.hidden;
         forgeButton.classList.toggle("forge-available", active && !choosing && !setupAction && notifyForge);
         root.dataset.forgeAvailable = active && !choosing && !setupAction && notifyForge ? "on" : "off";
-        root.querySelector("[data-open-forge]").disabled = forgeButton.disabled;
+        hudOne("[data-open-forge]").disabled = forgeButton.disabled;
         text("forge-hint", completedForge ? `Stat training from ${cheapestTraining.toLocaleString()} gold.` : "Forge upgrade available!");
         masteryPanel.hidden = !completedForge;
         for (const button of masteryButtons) {
             const key = button.dataset.masteryStat;
             const cost = masteryCost(state, key);
-            button.querySelector("[data-mastery-label]").textContent = `Rank ${state.mastery[key]} / ${cost.toLocaleString()} gold`;
+            setText(button.querySelector("[data-mastery-label]"), `Rank ${state.mastery[key]} / ${cost.toLocaleString()} gold`);
             button.disabled = saving || !canForge || !completedForge || state.gold < cost || !Number.isFinite(cost);
             button.title = MASTERY[key].detail;
             if (canForge && completedForge) showUpgradePreview(button, key, true);
@@ -1778,6 +1939,10 @@ export function createGame(root, saveBridge = null) {
         if (choosing !== draftVisible) {
             draftVisible = choosing;
             if (choosing) {
+                // Players are mid-fight when a level lands; ignore taps until the cards have settled in
+                // so a stray attack tap never picks a boon by accident.
+                cardPickReadyAt = performance.now() + 900;
+                clearInput();
                 draft.hidden = false;
                 draft.classList.remove("level-draft-exit");
                 draft.classList.add("level-draft-enter");
@@ -1797,10 +1962,10 @@ export function createGame(root, saveBridge = null) {
             }
         }
         runMenu.hidden = choosing || draftClosing || !!setupAction || checkpointInBackground;
-        for (const button of cardButtons) button.disabled = saving || !choosing;
+        for (const button of cardButtons) button.disabled = saving || !choosing || performance.now() < cardPickReadyAt;
         if (choosing) {
             normalizeCardChoices(state);
-            text("draft-level", `LEVEL ${state.player.level - state.pendingChoices + 1} / AN OATH FOR THE JOURNEY`);
+            text("draft-level", `LEVEL UP! · LEVEL ${state.player.level - state.pendingChoices + 1} · COMBAT PAUSED`);
             text("draft-pending", state.pendingChoices > 1 ? `${state.pendingChoices} level-up choices queued. Select one card for each level.` : "Choose one card. Its bonus stays with this character and save.");
             const signature = `${state.pendingChoices}:${state.cardChoices.join(",")}`;
             if (signature !== shownDraft) {
@@ -1826,7 +1991,7 @@ export function createGame(root, saveBridge = null) {
             const selected = forgeSkillSelected(state, key);
             button.hidden = !selected;
             if (["cleave", "nova", "burst", "guard"].includes(key) || NEW_SKILLS[key])
-                button.querySelector("strong").textContent = `${skillName(state, key === "cleave" ? "attack" : key)} upgrades`;
+                setText(button.querySelector("strong"), `${skillName(state, key === "cleave" ? "attack" : key)} upgrades`);
             const rank = state.upgrades[key];
             const max = UPGRADES[key].max;
             const cost = upgradeCost(state, key);
@@ -1838,7 +2003,7 @@ export function createGame(root, saveBridge = null) {
             button.disabled = saving || !canForge || !selected || rank >= max || state.gold < cost;
             if (!skillUnlocked(state, key)) button.title = wardUnlockHint(state);
             if (canForge && selected && rank < max) showUpgradePreview(button, key);
-            else if (button.querySelector("[data-upgrade-preview]")) button.querySelector("[data-upgrade-preview]").textContent = rank >= max ? "Fully forged" : "";
+            else setText(button.querySelector("[data-upgrade-preview]"), rank >= max ? "Fully forged" : "");
         }
         if (saveButton) saveButton.disabled = saving || checkingUnlock || !saveBridge || !active || !!setupAction || !!state.training;
         const choosingSkill = active && !choosing && !setupAction && needsSkillChoice(state);
@@ -1848,15 +2013,15 @@ export function createGame(root, saveBridge = null) {
             button.disabled = saving || !choosingSkill;
         }
         if (loadButton) loadButton.disabled = saving || checkingUnlock || !saveBridge || !!setupAction || !!state.training;
-        pauseButton.firstChild.textContent = state.status === "paused" ? "Resume " : "Pause ";
+        setText(pauseButton.firstChild, state.status === "paused" ? "Resume " : "Pause ");
         if (state.status !== shownStatus) {
-            const report = root.querySelector("[data-death-report]");
+            const report = hudOne("[data-death-report]");
             report.hidden = state.status !== "dead";
             if (state.status === "dead") {
                 const fatal = state.damageHistory.findLast(hit => hit.lethal);
-                root.querySelector("[data-killing-blow]").textContent = fatal
+                hudOne("[data-killing-blow]").textContent = fatal
                     ? `Killing blow: ${fatal.source} — ${fatal.damage.toFixed(1)} health lost.` : "Damage source unavailable.";
-                const list = root.querySelector("[data-damage-history]");
+                const list = hudOne("[data-damage-history]");
                 list.replaceChildren();
                 for (const hit of [...state.damageHistory].reverse()) {
                     const item = document.createElement("li");
@@ -2080,6 +2245,30 @@ export function createGame(root, saveBridge = null) {
     async function persist(loadingSave, automatic = false) {
         if (state.training) return;
         if (saving || checkingUnlock || setupAction) return;
+        if (automatic && !loadingSave && saveBridge && state.mode === "endless" && state.status === "camp") {
+            // Endless checkpoints save in the background so the watch never appears frozen.
+            const snapshot = captureSnapshot(state);
+            const wave = state.wave;
+            const local = root.dataset.localSaves === "on" && root.dataset.cloudSignedIn !== "on";
+            continueJourney(state);
+            clearInput();
+            last = performance.now();
+            checkpointSaveFailed = false;
+            saveStatus.textContent = local ? "Saving checkpoint on this device in the background..." : "Autosaving checkpoint to the server in the background...";
+            try {
+                const result = await saveBridge.invokeMethodAsync("SaveRun", snapshot);
+                if (disposed) return;
+                if (result.success) root.dataset.hasSave = "on";
+                saveStatus.textContent = result.success
+                    ? `Checkpoint ${wave} saved ${local ? "on this device" : "on the server"}. Last successful save: ${new Date().toLocaleTimeString()}.`
+                    : `Checkpoint autosave failed. ${result.message} Pause and select Save to retry.`;
+                root.dispatchEvent(new CustomEvent("mobile-save-result", { detail: { success: result.success, loadingSave: false } }));
+            } catch {
+                if (!disposed) saveStatus.textContent = "Checkpoint autosave failed. Pause and select Save to retry.";
+            }
+            if (!disposed) updateHud();
+            return;
+        }
         if (!saveBridge) {
             checkpointSaveFailed = ["camp", "won"].includes(state.status);
             saveStatus.textContent = "Checkpoint autosave unavailable. Reconnect to Blazor and select Save before leaving.";
@@ -2208,8 +2397,10 @@ export function createGame(root, saveBridge = null) {
     });
     on(document, "visibilitychange", () => {
         if (document.hidden) audio.setBackground(true);
+        else { audio.setBackground(false); void audio.unlock(); }
         if (document.hidden && state.status === "playing") pause();
     });
+    on(window, "focus", () => { if (!document.hidden) { audio.setBackground(false); void audio.unlock(); } });
     on(root, "focusout", event => {
         if (event.relatedTarget && !root.contains(event.relatedTarget) && state.status === "playing") pause();
     });
@@ -2285,6 +2476,13 @@ export function createGame(root, saveBridge = null) {
     function animate(now) {
         if (disposed) return;
         if (!root.isConnected) { dispose(); return; }
+        // 90/120 Hz phones would otherwise render up to twice as often as needed; cap at ~60 fps,
+        // or ~30 fps with the battery saver preference. step() uses real elapsed time, so gameplay
+        // speed is unaffected.
+        const idleLoop = inMainMenu || !loreReader.hidden || state.status !== "playing";
+        const minFrameMs = idleLoop ? 95 : root.dataset?.batterySaver === "true" ? 31 : 15;
+        if (typeof updateCanvasResolution === "function" && root.dataset?.batterySaver !== lastSaverMode) updateCanvasResolution();
+        if (last && now - last < minFrameMs) { frame = requestAnimationFrame(animate); return; }
         const chapterWave = state.travelPending || state.wave === 0 ? state.wave + 1 : state.wave;
         if (!inMainMenu && loreReader.hidden && !saving && !setupAction && !state.training && state.mode === "campaign" && state.status === "playing" && chapterWave % 5 === 1) {
             const chapter = mapIndexForWave(chapterWave);
@@ -2305,15 +2503,22 @@ export function createGame(root, saveBridge = null) {
             void persist(false, true);
         }
         const canvasHud = root.dataset.canvasHud === "on";
-        render(ctx, floors[mapIndexForWave(state.wave)], state, bossTop, preferences.settings, canvasHud);
-        drawCountdown(ctx, state, canvasHud);
-        if (canvasHud) {
-            const bounds = canvas.getBoundingClientRect();
-            const boss = state.enemies.find(enemy => enemy.kind === "boss" && enemy.health > 0);
-            const map = mapForWave(state.wave);
-            drawHud(ctx, state, { maxFlasks: MAX_FLASKS, cssWidth: bounds.width, cssHeight: bounds.height,
-                boss: boss ? { ...boss, name: map.boss, accent: map.accent } : null,
-                checkpoint: automaticCheckpoint(state, checkpointSaveFailed) ? "Stage cleared · saving checkpoint…" : "" });
+        // Paused, menus, lore and checkpoints show a static arena: draw it once, then only redraw when
+        // something visible changes (or once a second as a safety net) to save battery and heat.
+        const idle = inMainMenu || !loreReader.hidden || state.status !== "playing";
+        const idleKey = idle ? [state.status, state.wave, inMainMenu, loreReader.hidden, canvas.width, canvas.height, state.player.health, state.enemies.length, state.gold].join("|") : "";
+        if (!idle || idleKey !== idleDrawKey || now - idleDrawTime >= 1000 || state.status !== shownStatus) {
+            idleDrawTime = now;
+            idleDrawKey = idleKey;
+            render(ctx, floors[mapIndexForWave(state.wave)], state, bossTop, preferences.settings, canvasHud);
+            drawCountdown(ctx, state, canvasHud);
+            if (canvasHud) {
+                const boss = state.enemies.find(enemy => enemy.kind === "boss" && enemy.health > 0);
+                const map = mapForWave(state.wave);
+                drawHudCached(ctx, state, { maxFlasks: MAX_FLASKS, cssWidth: canvasCssWidth, cssHeight: canvasCssHeight,
+                    boss: boss ? { ...boss, name: map.boss, accent: map.accent } : null,
+                    checkpoint: automaticCheckpoint(state, checkpointSaveFailed) ? "Stage cleared \u00b7 saving checkpoint\u2026" : "" });
+            }
         }
         if (now - hudTime > 100 || state.status !== shownStatus) { updateHud(); hudTime = now; }
         frame = requestAnimationFrame(animate);

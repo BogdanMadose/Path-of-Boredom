@@ -305,6 +305,12 @@ export function startEndlessRun(random = Math.random, difficulty = "hard", heroC
     state.gold = 350;
     Object.assign(state.upgrades, { weapon: 4, armor: 3, cleave: 2, nova: 2, dodge: 2, flask: 1 });
     Object.assign(state.player, { level: 20, maxHealth: hero.health + 201, health: hero.health + 201, damage: hero.damage + 44, nextLevel: 1600, weaponBonus: 72, weapon: `Watchkeeper's ${hero.weaponType}`, armorBonus: 20, armor: "Watchkeeper's mail" });
+    // Endless veterans start with the whole forge mastered, so gold goes straight into mastery.
+    for (const [key, upgrade] of Object.entries(UPGRADES)) {
+        if (key === "armor") state.player.maxHealth += 12 * Math.max(0, upgrade.max - state.upgrades.armor);
+        state.upgrades[key] = upgrade.max;
+    }
+    state.player.health = state.player.maxHealth;
     spawnWave(state);
     state.intermission = 3.5;
     state.journal = "The Endless Watch remembers you. A veteran's kit awaits. Build a new legend beyond the gate.";
@@ -323,11 +329,20 @@ export function togglePause(state) {
 
 // Queues a short-lived purely-visual effect (slash arcs, rings, floating damage text, etc.) for
 // arpg-graphics.js to render and fade out. Capped at 256 concurrent effects (oldest dropped first).
+// Expired effect objects are recycled from a small pool so busy fights don't churn the garbage
+// collector (GC pauses cause visible hitches and extra CPU work on phones).
+// Death-burst colour per enemy kind, matched to each kind's body art so kills read at a glance.
+const DEATH_COLORS = { husk: "#9aa38a", brute: "#a39d8c", sentinel: "#b58aa0", runner: "#d9a273", spitter: "#8fc27f", wisp: "#9fe0d6",
+    summoner: "#c3a2ec", cantor: "#a4e9bb", hexer: "#ef96cf", reaver: "#9fd7e6", lancer: "#f0b56e", bomber: "#ff9a5c", duelist: "#85e6eb", artillerist: "#b99ce0" };
+const effectPool = [];
+export function recycleEffect(item) { if (effectPool.length < 256) effectPool.push(item); }
 function effect(state, kind, x, y, color, text = "", radius = 0, angle = 0) {
-    const life = kind === "text" ? 0.9 : 0.35;
-    const item = { kind, x, y, color, text, radius, angle, life, maxLife: life };
+    const life = kind === "text" ? 0.9 : kind === "burst" ? 0.6 : 0.35;
+    const item = effectPool.pop() ?? {};
+    for (const key of Object.keys(item)) delete item[key];
+    Object.assign(item, { kind, x, y, color, text, radius, angle, life, maxLife: life });
     state.effects.push(item);
-    if (state.effects.length > 256) state.effects.shift();
+    if (state.effects.length > 256) recycleEffect(state.effects.shift());
     return item;
 }
 
@@ -411,7 +426,7 @@ function killEnemy(state, enemy) {
         const key = available[Math.floor(state.random() * available.length)];
         state.loot.push({ kind: key ? "upgrade" : "gold", x: enemy.x - 20, y: enemy.y - 10, value: key ? keys.indexOf(key) : 50, life: 30 });
     }
-    effect(state, "burst", enemy.x, enemy.y, enemy.kind === "boss" ? "#edac60" : "#ac796d", "", enemy.radius * 2);
+    effect(state, "burst", enemy.x, enemy.y, enemy.kind === "boss" ? "#edac60" : DEATH_COLORS[enemy.kind] ?? "#ac796d", "", enemy.radius * 2);
     if (state.loot.length > 64) {
         collectLoot(state, 0, true);
     }
@@ -447,6 +462,11 @@ function hitEnemy(state, enemy, damage, piercing = false, skill = "attack") {
     state.runSystems.summary.damage[skill] += Math.min(enemy.health, damage);
     enemy.health -= damage;
     enemy.flash = enemy.kind === "boss" ? 0.06 : 0.15;
+    if (critical && (enemy.kind === "boss" || enemy.health <= 0) && state.time - (state.lastHitStop ?? -Infinity) > 0.8) {
+        state.lastHitStop = state.time;
+        state.hitStop = Math.max(state.hitStop ?? 0, 0.03);
+        state.shake = Math.max(state.shake ?? 0, 0.06);
+    }
     if (!state.effects.some(item => item.kind === 'impact' && item.target === enemy && item.life > 0.12)) {
         const impact = effect(state, 'impact', enemy.x, enemy.y, damageType === 'magical' ? '#b6a0ff' : '#ffd5a0', '', enemy.radius + 5);
         Object.assign(impact, { damageType, target: enemy });
@@ -474,6 +494,38 @@ function pushEnemy(state, enemy, amount) {
     const push = amount;
     enemy.x = clamp(enemy.x + (d ? (enemy.x - p.x) / d : Math.cos(p.facing)) * push, MARGIN, WIDTH - MARGIN);
     enemy.y = clamp(enemy.y + (d ? (enemy.y - p.y) / d : Math.sin(p.facing)) * push, MARGIN, HEIGHT - MARGIN);
+}
+
+// Keeps enemies from stacking: each has a tiny square "core" (~35% of its radius) and overlapping
+// cores are pushed apart along the dominant axis. Bodies may still overlap at the edges; only the
+// centres are kept distinct. Bosses and charging enemies don't get moved.
+function separateEnemies(state) {
+    const list = state.enemies, count = list.length;
+    for (let i = 0; i < count; i++) {
+        const a = list[i];
+        if (a.health <= 0) continue;
+        const ca = Math.max(5, a.radius * 0.35);
+        for (let j = i + 1; j < count; j++) {
+            const b = list[j];
+            if (b.health <= 0) continue;
+            const reach = ca + Math.max(5, b.radius * 0.35);
+            let dx = b.x - a.x, dy = b.y - a.y;
+            const ox = reach - Math.abs(dx), oy = reach - Math.abs(dy);
+            if (ox <= 0 || oy <= 0) continue;
+            const fixedA = a.kind === "boss" || a.charging > 0, fixedB = b.kind === "boss" || b.charging > 0;
+            if (fixedA && fixedB) continue;
+            const shareA = fixedA ? 0 : fixedB ? 1 : 0.5, shareB = 1 - shareA;
+            if (ox < oy) {
+                const s = dx === 0 ? (i & 1 ? 1 : -1) : Math.sign(dx);
+                a.x = clamp(a.x - s * ox * shareA, MARGIN, WIDTH - MARGIN);
+                b.x = clamp(b.x + s * ox * shareB, MARGIN, WIDTH - MARGIN);
+            } else {
+                const s = dy === 0 ? (i & 1 ? 1 : -1) : Math.sign(dy);
+                a.y = clamp(a.y - s * oy * shareA, MARGIN, HEIGHT - MARGIN);
+                b.y = clamp(b.y + s * oy * shareB, MARGIN, HEIGHT - MARGIN);
+            }
+        }
+    }
 }
 
 function castClassSkill(state, skill) {
@@ -881,6 +933,7 @@ function autoCast(state) {
 function stepPlayerShots(state, dt) {
     const activeVolleys = new Set(state.playerShots.map(shot => shot.volley));
     for (const enemy of state.enemies) enemy.combat.volleys = enemy.combat.volleys.filter(entry => activeVolleys.has(entry.volley));
+    const bounces = [];
     for (const shot of state.playerShots) {
         if (state.status !== "playing") break;
         const start = { x: shot.x, y: shot.y };
@@ -911,18 +964,24 @@ function stepPlayerShots(state, dt) {
                 hitArrowTarget(state, shot, target, damage, true);
                 previous = target;
             }
-            if (shot.skill === "attack" && state.skillTree.attack.execution) {
+            if (shot.skill === "attack" && state.skillTree.attack.execution && !shot.bounced) {
                 const target = state.enemies.filter(target => target !== enemy && target.health > 0 && distance(enemy, target) <= 180)
                     .sort((a, b) => distance(enemy, a) - distance(enemy, b))[0];
                 if (target) {
-                    arrowLink(state, enemy, target);
-                    hitEnemy(state, target, Math.max(1, Math.round(shot.damage * 0.6)), false, "attack");
+                    // The arrow itself ricochets: a real shot leaves the first enemy's edge, flies to
+                    // the next target and hits it on contact (once only, it cannot bounce again).
+                    const angle = Math.atan2(target.y - enemy.y, target.x - enemy.x);
+                    const ox = enemy.x + Math.cos(angle) * (enemy.radius + 8), oy = enemy.y + Math.sin(angle) * (enemy.radius + 8);
+                    const flight = Math.max(20, distance({ x: ox, y: oy }, target)) + target.radius + 20;
+                    bounces.push({ x: ox, y: oy, vx: Math.cos(angle) * 780, vy: Math.sin(angle) * 780, damage: Math.max(1, Math.round(shot.damage * 0.6)),
+                        life: Math.min(2, flight / 780), piercing: 0, skill: "attack", volley: 0, bounced: 1 });
                 }
             }
         }
         if (shot.x < 0 || shot.x > WIDTH || shot.y < 0 || shot.y > HEIGHT) shot.life = 0;
     }
     state.playerShots = state.playerShots.filter(shot => shot.life > 0);
+    if (bounces.length) state.playerShots.push(...bounces.slice(0, Math.max(0, 48 - state.playerShots.length)));
 }
 
 // Draws the thin connecting beam effect between two enemies hit by the same piercing arrow, purely
@@ -983,13 +1042,13 @@ function spawnWave(state) {
         const x = grouped ? (i < 3 ? MARGIN + (i % 3) * 45 : WIDTH - MARGIN - (i % 3) * 45) : side === 0 ? MARGIN : side === 1 ? WIDTH - MARGIN : WIDTH * t;
         const y = grouped ? HEIGHT / 2 + (i % 3 - 1) * 65 : side === 2 ? MARGIN : side === 3 ? HEIGHT - MARGIN : HEIGHT * t;
         const elite = boss ? 0 : encounterElite(state.wave, i, depth);
-        const health = Math.round((boss ? (680 + act * 380) * 1.5 : (kind === "brute" || kind === "sentinel" ? 75 : kind === "runner" ? 20 : 32) + Math.min(state.wave, LAST_WAVE) * 10) * scaling * (elite ? 1.7 : 1));
+        const health = Math.round((boss ? (680 + act * 380) * 1.7 : (kind === "brute" || kind === "sentinel" ? 75 : kind === "runner" ? 20 : 32) + Math.min(state.wave, LAST_WAVE) * 10) * scaling * (elite ? 1.7 : 1));
         state.enemies.push({
             kind, x, y, health, maxHealth: health, elite, charging: 0, chargeX: 0, chargeY: 0,
             combat: { volleys: [], phase: 1, rest: 0, pattern: 1 },
             radius: boss ? 32 : kind === "brute" || kind === "sentinel" ? 22 : kind === "runner" ? 12 : 15,
             speed: boss ? 90 + act * 10 : kind === "runner" ? 160 + act * 10 : kind === "sentinel" ? 55 : kind === "brute" ? 62 : ["wisp", "spitter", "summoner", "cantor", "hexer"].includes(kind) ? 80 : 92 + Math.min(state.wave, LAST_WAVE) * 2.2,
-            damage: Math.round((boss ? 30 + act * 10 : kind === "sentinel" ? 26 + act * 4 : kind === "brute" ? 22 + act * 5 : 13 + Math.min(state.wave, LAST_WAVE) * 1.5)
+            damage: Math.round((boss ? 34 + act * 11 : kind === "sentinel" ? 26 + act * 4 : kind === "brute" ? 22 + act * 5 : 13 + Math.min(state.wave, LAST_WAVE) * 1.5)
                 * (1 + act * 0.045 + depth * 0.009 + levelPressure * 0.008) * (elite ? 1.3 : 1)),
             cooldown: grouped ? 1.2 + (i % 3) * 0.55 : 1.2, flash: 0, slam: 4, winding: 0, attackWindup: 0, attackX: x, attackY: y, chilled: 0, chillStrength: 0
         });
@@ -998,7 +1057,8 @@ function spawnWave(state) {
         const traits = Object.keys(ELITE_MODIFIERS).filter(key => key !== "none");
         spawned.modifier = elite && state.wave >= 11 && state.random() < 0.35
             ? traits[Math.floor(state.random() * traits.length)] : "none";
-        spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * difficulty.health);
+        spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * difficulty.health
+            * (boss && state.mode === "endless" ? 2.6 + depth * 0.06 : 1));
         spawned.damage = Math.round(spawned.damage * difficulty.damage);
         spawned.speed = Math.min(210, spawned.speed) * difficulty.speed * (1 + Math.min(0.15, depth * 0.0015));
     }
@@ -1100,6 +1160,9 @@ export function step(state, input, elapsed) {
     if (state.status !== "playing" || !Number.isFinite(elapsed) || elapsed <= 0) return;
     if (needsSkillChoice(state)) { state.status = "paused"; return; }
     const dt = Math.min(elapsed, 0.05);
+    if (state.shake > 0) state.shake = Math.max(0, state.shake - dt);
+    // Hit-stop: freeze the simulation for a few milliseconds after big hits so they land with weight.
+    if (state.hitStop > 0) { state.hitStop = Math.max(0, state.hitStop - dt); return; }
     if (state.resumeDelay > 0) {
         state.resumeDelay = Math.max(0, state.resumeDelay - dt);
         if (state.travelPending && state.resumeDelay <= 1.5) {
@@ -1183,6 +1246,7 @@ export function step(state, input, elapsed) {
 
     stepPlayerShots(state, dt);
     if (state.status !== "playing") return;
+    separateEnemies(state);
     // Per-enemy AI: each kind has its own movement/attack pattern below (lancer charges down a
     // lane, reaver winds up then dashes, bomber self-detonates on approach, boss cycles through
     // health-gated phases/patterns, and the remaining "generic" kinds share a common
@@ -1214,7 +1278,7 @@ export function step(state, input, elapsed) {
                 if (!enemy.charging) enemy.slam = 3.8;
             } else if (enemy.winding > 0) {
                 enemy.winding = Math.max(0, enemy.winding - dt);
-                if (!enemy.winding) enemy.charging = distance(enemy, chargeLaneEnd(enemy)) / 1200;
+                if (!enemy.winding) { enemy.charging = distance(enemy, chargeLaneEnd(enemy)) / 1200; state.shake = Math.max(state.shake ?? 0, 0.22); }
             } else {
                 enemy.slam -= dt;
                 if (enemy.slam <= 0) {
@@ -1289,7 +1353,7 @@ export function step(state, input, elapsed) {
                     }
                     beginBossRecovery(enemy, state.time, identity.recovery);
                     enemy.swing = 0.3;
-                    enemy.slam = identity.interval;
+                    enemy.slam = identity.interval * (combat.phase >= 3 ? 0.72 : combat.phase === 2 ? 0.86 : 1);
                     enemy.cooldown = Math.max(enemy.cooldown, 1);
                 }
                 continue;
@@ -1381,7 +1445,12 @@ export function step(state, input, elapsed) {
     if (state.status !== "playing") return;
     collectLoot(state, dt);
     for (const item of state.effects) item.life -= dt;
-    state.effects = state.effects.filter(item => item.life > 0);
+    let keptEffects = 0;
+    for (const item of state.effects) {
+        if (item.life > 0) state.effects[keptEffects++] = item;
+        else recycleEffect(item);
+    }
+    state.effects.length = keptEffects;
     if (state.enemies.length === 0) {
         state.projectiles = [];
         state.playerShots = [];

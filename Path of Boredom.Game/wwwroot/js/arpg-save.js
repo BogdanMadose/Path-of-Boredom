@@ -108,6 +108,7 @@ export function restoreSnapshot(snapshot, random = Math.random) {
             require(["attack", "nova", "burst"].includes(shot.skill));
             shot.volley = snapshot.version < 14 ? shot.skill === "attack" ? 0 : shot.skill === "nova" ? 1 : 2 : item.volley;
             integer(shot.volley, shot.skill === "attack" ? 0 : 1, shot.skill === "attack" ? 0 : state.volleySequence);
+            if (item.bounced === 1 && shot.skill === "attack") shot.bounced = 1;
             return shot;
         });
         require(state.playerShots.length <= 48 && (state.heroClass === "ranger" || state.playerShots.length === 0));

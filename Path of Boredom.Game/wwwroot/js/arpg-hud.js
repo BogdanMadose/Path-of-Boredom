@@ -180,3 +180,35 @@ export function drawHud(ctx, state, options = {}) {
 
     ctx.restore();
 }
+
+// Draws the HUD into an offscreen layer that is only repainted when a displayed value changes,
+// then stamps that layer each frame. Health, XP, flasks and boss bars change a few times a second
+// at most, so most frames become a single drawImage instead of gradients, text and paths.
+let hudLayer = null, hudKey = "";
+export function drawHudCached(ctx, state, options = {}) {
+    const p = state.player;
+    if (!p) return;
+    const canvas = ctx.canvas;
+    if (typeof document === "undefined" || !canvas?.width) { drawHud(ctx, state, options); return; }
+    const boss = options.boss;
+    const key = [canvas.width, canvas.height, options.cssWidth, options.cssHeight, Math.ceil(p.health), Math.ceil(p.maxHealth),
+        Math.floor(p.xp || 0), p.nextLevel, p.level, p.potions, options.maxFlasks, boss ? boss.name + ":" + Math.ceil(boss.health) + ":" + boss.maxHealth : "",
+        options.buffs || "", options.checkpoint || ""].join("|");
+    if (!hudLayer || hudLayer.width !== canvas.width || hudLayer.height !== canvas.height) {
+        hudLayer = document.createElement("canvas");
+        hudLayer.width = canvas.width; hudLayer.height = canvas.height;
+        hudKey = "";
+    }
+    if (key !== hudKey) {
+        const layer = hudLayer.getContext("2d");
+        layer.setTransform(1, 0, 0, 1, 0, 0);
+        layer.clearRect(0, 0, hudLayer.width, hudLayer.height);
+        layer.setTransform(canvas.width / WIDTH, 0, 0, canvas.height / HEIGHT, 0, 0);
+        drawHud(layer, state, options);
+        hudKey = key;
+    }
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(hudLayer, 0, 0);
+    ctx.restore();
+}

@@ -258,6 +258,31 @@
         return panel;
     }
 
+    // Run options split into tabs so each section fits a landscape phone screen without scrolling.
+    function buildOptions(source) {
+        var panel = makePanel("options", "Run options — sound & practice", source);
+        var tabs = el("div", "mm-subtabs");
+        var sections = ["sound", "controls", "training", "codex"];
+        ["Sound", "Controls", "Training", "Codex"].forEach(function (name, index) {
+            var button = el("button", "mm-subtab", name);
+            button.type = "button";
+            button.setAttribute("aria-selected", String(index === 0));
+            button.addEventListener("click", function () { selectOptionsSection(source, sections[index]); });
+            tabs.appendChild(button);
+        });
+        source.dataset.mobileSection = "sound";
+        source.appendChild(tabs);
+        return panel;
+    }
+
+    function selectOptionsSection(source, section) {
+        var sections = ["sound", "controls", "training", "codex"];
+        source.dataset.mobileSection = section;
+        Array.prototype.forEach.call(source.querySelector(".mm-subtabs").children, function (tab, index) {
+            tab.setAttribute("aria-selected", String(sections[index] === section));
+        });
+    }
+
     // ---- Open / close ------------------------------------------------------------------
 
     function closePanel(resume = true) {
@@ -361,13 +386,17 @@
         root.appendChild(section);
         makePanel("pause", "A moment of respite", section);
         var card = el("div", "mm-pause-card");
-        card.appendChild(el("div", "mm-pause-emblem"));
+        var side = el("div", "mm-pause-side");
+        var groups = el("div", "mm-pause-groups");
+        card.appendChild(side);
+        card.appendChild(groups);
+        side.appendChild(el("div", "mm-pause-emblem"));
         var heading = el("h2", null, "The hollow can wait.");
         heading.dataset.practiceHeading = "";
-        card.appendChild(heading);
+        side.appendChild(heading);
         var explanation = el("p", null, "Combat and game timers are paused.");
         explanation.dataset.practiceExplanation = "";
-        card.appendChild(explanation);
+        side.appendChild(explanation);
         var resume = el("button", "mm-resume", "Return to battle");
         resume.dataset.practiceResume = "";
         resume.type = "button";
@@ -375,9 +404,9 @@
             resumeAfterMenu = true;
             closePanel(true);
         });
-        card.appendChild(resume);
+        side.appendChild(resume);
         var labels = { skills: "Skills & loadout", forge: "Forge & equipment", options: "Run options — sound & practice", challenges: "Stage challenges — bonus gold", rankings: "Rankings", notes: "Patch notes - Coming soon" };
-        [{ title: "Character", names: ["skills", "forge", "challenges", "options"] }, { title: "Community", names: ["rankings", "notes"] }].forEach(function (group) {
+        [{ title: "Character", names: ["skills", "forge", "challenges", "options"] }, { title: "Community", names: ["rankings"] }].forEach(function (group) {
             var section = el("section", "mm-menu-group");
             section.appendChild(el("h3", null, group.title));
             group.names.forEach(function (name) {
@@ -387,9 +416,13 @@
                 else button.addEventListener("click", function () { openPanel(name); });
                 section.appendChild(button);
             });
-            card.appendChild(section);
+            groups.appendChild(section);
         });
-        addSaveActions(card, root);
+        var community = groups.lastChild;
+        var progress = el("section", "mm-menu-group mm-progress-group");
+        progress.appendChild(el("h3", null, "Progress"));
+        groups.appendChild(progress);
+        addSaveActions(progress, root);
         var lore = el('button', 'mm-pause-option', 'Chapter lore');
         lore.type = 'button';
         lore.dataset.mobileLore = '';
@@ -399,7 +432,7 @@
             closePanel(false);
             original.click();
         });
-        card.appendChild(lore);
+        community.appendChild(lore);
         ["exit-training"].forEach(function (action) {
             var button = el("button", "mm-pause-option", action === "training" ? "Set up practice — keeps your run" : "Exit training — return to my run");
             button.type = "button";
@@ -409,11 +442,11 @@
                 if (!original || original.disabled || original.hidden) return;
                 original.click();
             });
-            card.appendChild(button);
+            side.appendChild(button);
         });
-        var summary = el("p", "mm-save-status");
+        var summary = el("p", "mm-save-status mm-run-recap");
         summary.dataset.mobileRunSummary = "";
-        card.appendChild(summary);
+        side.appendChild(summary);
         section.appendChild(card);
     }
 
@@ -586,7 +619,7 @@
 
         buildSkills(skills);
         buildForge(forge);
-        makePanel("options", "Run options — sound & practice", root.querySelector("[data-run-options]"));
+        buildOptions(root.querySelector("[data-run-options]"));
         makePanel("challenges", "Stage challenges — bonus gold", root.querySelector("[data-challenges]"));
         buildInformation(root);
         buildAccount(root);
@@ -614,19 +647,17 @@
 
         setInterval(syncBadges, 500);
         syncBadges();
-        var main = el("button", "mm-pause-option", "Main menu");
+        var main = el("button", "mm-pause-option mm-pause-footer", "Main menu");
         main.type = "button";
         main.addEventListener("click", function () { closePanel(false); root.querySelector("[data-open-main-menu]").click(); });
-        panels.pause.root.querySelector(".mm-pause-card").appendChild(main);
+        panels.pause.root.querySelector(".mm-pause-side").appendChild(main);
         root.addEventListener("main-menu-open", function () { closePanel(false); returnToMain = false; accountFromMain = false; });
         root.addEventListener('open-main-panel', function () { returnToMain = true; });
         root.addEventListener("open-run-options", function (event) { returnToMain = event.detail?.fromMain === true; openPanel("options"); });
         root.addEventListener("training-menu", function (event) {
             if (event.detail?.action === "setup") {
                 if (openName !== "options") openPanel("options");
-                var card = root.querySelector(".training-card");
-                var options = panels.options.root.querySelector(".run-options");
-                if (card && options) options.scrollTop += card.getBoundingClientRect().top - options.getBoundingClientRect().top;
+                selectOptionsSection(panels.options.root, "training");
                 root.querySelector("[data-start-training]")?.focus({ preventScroll: true });
             } else if (event.detail?.action === "start" || event.detail?.action === "exit") {
                 closePanel(false);

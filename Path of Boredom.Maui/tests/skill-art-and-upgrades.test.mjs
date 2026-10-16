@@ -6,6 +6,7 @@ import { CLASS_SKILL_TREES } from '../../Path of Boredom.Game/wwwroot/js/arpg-sk
 import { CLASS_SKILLS, SLOTTABLE_SKILLS, STARTER_SKILLS, skillIcon, skillName, treeNodeDefinition, learnSkill, skillPointsLeft, validLoadout, combatSkillDefinition } from '../../Path of Boredom.Game/wwwroot/js/arpg-skills.js';
 import { drawClassSkillEffect } from '../../Path of Boredom.Game/wwwroot/js/arpg-skill-effects.js';
 import { captureSnapshot, restoreSnapshot } from '../../Path of Boredom.Game/wwwroot/js/arpg-save.js';
+import { skillTagline } from '../../Path of Boredom.Game/wwwroot/js/arpg-skill-taglines.js';
 
 const names = [], iconGeometry = [], effects = [];
 for (const hero of Object.keys(CLASS_SKILLS)) {
@@ -41,6 +42,7 @@ assert.equal(new Set(names).size, 96, 'new abilities have uniquely named upgrade
 
 function arena(hero, skill, offsets = [[60, 0], [160, 0]]) {
     const state = startEndlessRun(() => 0.99, 'hard', hero);
+    for (const key of Object.keys(state.upgrades)) state.upgrades[key] = 0;
     const template = state.enemies.find(enemy => enemy.kind !== 'boss');
     state.player.level = 32;
     state.player.x = 400;
@@ -115,14 +117,16 @@ for (const hero of Object.keys(CLASS_SKILLS)) {
     }, querySelector(selector) { return selector === 'img' ? this.image : this.name; }, setAttribute(name, value) { this.attrs[name] = value; } }));
     const messages = {};
     const context = vm.createContext({ setupSlots, setupSkillButtons, STARTER_SKILLS, skillName, skillIcon, validLoadout,
-        combatSkillDefinition, saving: false, setupAction: 'campaign', setupNext: {},
+        combatSkillDefinition, skillTagline, saving: false, setupAction: 'campaign', setupNext: {}, setup: { dataset: {} },
         setupPreview: () => state, readSetupLoadout: () => ({ manual: 'none', auto: [setupSlots[0].value, 'none', 'none', 'none'] }),
         root: { querySelectorAll: () => STARTER_SKILLS.map(key => ({ dataset: { setupSkill: key } })),
             querySelector: selector => messages[selector] ??= {} }, on: (button, type, action) => { button[type] = action; }
     });
     vm.runInContext(refresh + bind, context);
     context.updateSetupLoadout();
-    assert.equal(context.setupNext.disabled, true, 'an explicit starter choice is required');
+    assert.equal(context.setupNext.disabled, false, 'Start stays tappable and explains what is missing');
+    assert.equal(context.setup.dataset.needsSkill, 'on', 'an explicit starter choice is required');
+    assert.match(messages['[data-setup-loadout-feedback]'].textContent, /Tap a skill/);
     setupSkillButtons.forEach(button => {
         assert.equal(button.image.src, skillIcon(state, button.dataset.chooseStarterSkill));
         assert.equal(button.name.textContent, skillName(state, button.dataset.chooseStarterSkill));
@@ -130,6 +134,8 @@ for (const hero of Object.keys(CLASS_SKILLS)) {
     setupSkillButtons[1].click();
     assert.equal(setupSlots[0].value, 'chain');
     assert.equal(context.setupNext.disabled, false);
+    assert.equal(context.setup.dataset.needsSkill, 'off');
+    assert.ok(messages['[data-setup-loadout-feedback]'].textContent.length <= 50, 'starter description fits on one line');
     assert.equal(setupSkillButtons[1].attrs['aria-pressed'], 'true');
     context.saving = true;
     setupSkillButtons[2].click();

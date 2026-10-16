@@ -64,6 +64,9 @@
 .starter-skill-pool button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-width: 0; padding: 10px 6px; white-space: normal; color: #f3dfb9; }
 .starter-skill-pool button[aria-pressed="true"] { border-color: #efcb86; background: #303c35; outline: 2px solid #efcb86; outline-offset: -2px; }
 .starter-skill-pool span { font-size: 12px; line-height: 1.3; }
+.setup-overlay[data-needs-skill="on"] .starter-skill-pool { outline: 1px dashed #efcb86; outline-offset: 4px; border-radius: 8px; }
+.setup-overlay[data-skill-prompt="on"] .starter-skill-pool { outline: 2px solid #efcb86; background: #efcb8622; }
+.setup-overlay[data-needs-skill="on"] .forge-feedback { color: #f1d49b; font-weight: 700; }
 .skill-choice-overlay { z-index: 3; overflow-y: auto; align-items: safe center; touch-action: pan-y; overscroll-behavior: contain; }
 .skill-choice-overlay .overlay-card { width: 100%; max-width: 760px; max-height: 100%; overflow-y: auto; padding: 16px; text-align: left; touch-action: pan-y; scrollbar-width: thin; scrollbar-color: #c7a56b #14212a; }
 @media (max-width: 540px) {
@@ -154,7 +157,7 @@
 @media (prefers-reduced-motion: reduce) { .arena-viewport.low-health::after { animation: none; opacity: .8; } }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
 canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
-.arena-overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; background: #080f13b8; backdrop-filter: blur(3px); }
+.arena-overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; background: #080f13d9; }
 .overlay-card { max-width: 410px; text-align: center; }
 .sigil { color: #e6b370; font-size: 64px; line-height: 1; margin-bottom: 16px; text-shadow: 0 0 35px #ed992b80; }
 .overlay-card h2 { color: #f1e5cc; font-family: Georgia, serif; font-size: clamp(24px, 3.4vw, 46px); font-weight: 400; margin-bottom: 16px; }
@@ -237,12 +240,13 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .class-stat-grid dd { margin: 0; color: #edcf9b; font-variant-numeric: tabular-nums; }
 .forge-nudge { position: absolute; inset: auto 0 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 12px; background: #211c14f2; border-top: 1px solid #c7a56b99; color: #edcc90; font-size: 12px; pointer-events: none; user-select: none; }
 .forge-nudge button { flex-shrink: 0; pointer-events: auto; }
-.forge-available { border-color: #e9ac63; animation: forge-glow 2s ease-in-out infinite; }
+.forge-available { position: relative; border-color: #e9ac63; }
+.forge-available::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 14px #e9ac6344; opacity: 0; pointer-events: none; animation: forge-glow 2s ease-in-out infinite; }
 .mastery-panel { margin-top: 24px; border-top: 1px solid #c7a56b55; padding-top: 20px; }
 .mastery-panel h3 { font: 24px Georgia, serif; color: #f3dfb9; }
 .mastery-panel > p { color: #b8c1b4; font-size: 12px; line-height: 1.8; }
-@keyframes forge-glow { 50% { box-shadow: 0 0 14px #e9ac6344; } }
-@media (prefers-reduced-motion: reduce) { .forge-available { animation: none; } }
+@keyframes forge-glow { 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .forge-available::after { animation: none; } }
 .endless-button { display: block; margin: 12px auto 0; background: linear-gradient(135deg, #56365c, #382a4a); border-color: #b99cd7; }
 .endless-button:hover:not(:disabled) { background: #624372; }
 .story-card { background: linear-gradient(135deg, #59422c18, #101b2310); }
@@ -297,8 +301,9 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .skill-tree > p { margin: 10px 0; font-size: 11px; line-height: 1.7; color: #b2c4c1; }
 .skill-tree .tree-path { color: #e7bd79; font-size: 10px; }
 .skill-tree-map { position: relative; height: 300px; margin-top: 14px; }
-.tree-connections { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.tree-connections path { fill: none; stroke: #60777777; stroke-width: 3; stroke-dasharray: 5 5; vector-effect: non-scaling-stroke; }
+.tree-connections { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.tree-connections path { fill: none; stroke: #7f9998; stroke-width: 3; stroke-dasharray: 6 5; }
+.tree-node { z-index: 1; }
 .tree-connections path.available { stroke: #caa361; stroke-dasharray: none; }
 .tree-connections path.learned { stroke: #ffe2a4; stroke-width: 4; }
 .tree-node { position: absolute; width: 72px; transform: translate(-50%, -50%); }
@@ -358,17 +363,18 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .forge-grid span { font-size: 10px; color: #a4b4b3; }
 .forge-grid small { color: #ddbc75; font-size: 10px; }
 .forge-feedback { margin: 16px 0 0; font-size: 11px; color: #c6cfb6; min-height: 2em; }
-.audio-settings { min-width: 0; margin: 0 0 16px; padding: 12px; border: 1px solid #b79b6255; border-radius: 4px; }
+.audio-settings { min-width: 0; margin: 0 0 10px; padding: 8px 12px; border: 1px solid #b79b6255; border-radius: 4px; }
 .audio-settings legend { padding: 0 6px; color: #e3c277; }
-.audio-settings label { display: grid; gap: 8px; margin: 12px 0; }
+.audio-settings label { display: grid; gap: 4px; margin: 8px 0; }
 .audio-settings input[type="range"] { width: 100%; min-width: 0; accent-color: #e3c277; }
 .audio-settings .audio-mute { display: flex; align-items: center; gap: 10px; }
 .audio-settings input[type="checkbox"] { width: auto; accent-color: #e3c277; }
+.audio-settings label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
 .audio-settings p { font-size: 11px; line-height: 1.6; color: #a8a99d; }
-.training-card { min-width: 0; padding: 12px; margin-block: 12px; border: 1px solid #b79b6255; border-radius: 6px; }
+.training-card { min-width: 0; padding: 8px 12px; margin-block: 8px; border: 1px solid #b79b6255; border-radius: 6px; }
 .options-panel, .challenges-panel { min-width: 0; margin-top: 16px; padding: 18px; background: #141d20; border: 1px solid #b79b6255; border-radius: 6px; }
 .options-panel h2, .challenges-panel h2 { font: 24px Georgia, serif; color: #f3dfb9; }
-.equipment-options label { display: grid; gap: 6px; margin-block: 12px; }
+.equipment-options label { display: grid; gap: 4px; margin-block: 8px; }
 .equipment-options select { min-width: 0; max-width: 100%; }
 .challenge-options p { line-height: 1.6; }
 .training-card p, .training-card small { line-height: 1.6; overflow-wrap: anywhere; }

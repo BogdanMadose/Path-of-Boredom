@@ -67,15 +67,15 @@ function context() {
     });
 }
 globalThis.document = { createElement: () => ({ getContext: () => context() }) };
-await import('../../Path of Boredom.Game/wwwroot/js/arpg-sprite-cache.js');
-const glowA
+const { drawGlow, drawGroundShadow, drawOutline, vignetteSprite } = await import('../../Path of Boredom.Game/wwwroot/js/arpg-sprite-cache.js');
+const glowA = vignetteSprite(1280, 720), glowB = vignetteSprite(1280, 720);
 assert.equal(glowA, glowB, 'sprites are rendered once and reused');
 const source = fs.readFileSync(new URL('../../Path of Boredom.Game/wwwroot/js/arpg.js', import.meta.url), 'utf8');
 const actorCode = source.slice(source.indexOf('function drawActor('), source.indexOf('// The main per-frame draw call:'));
 const sandbox = { reducedMotion: { matches: false }, mobFacing: new WeakMap(), turnToward, drawHero, drawOrb, drawBoss, enemyDefense,
-    drawGlow, drawGroundShadow, drawOutline, document: globalThis.document };
-vm.createContext
-vm.runInContext(`${actorCode}\nthis.drawActor = drawActor;`, sandbox);
+    HERO_CLASSES, ELITE_MODIFIERS, drawGlow, drawGroundShadow, drawOutline, document: globalThis.document };
+vm.createContext(sandbox);
+vm.runInContext(source.slice(source.indexOf('function circle('), source.indexOf('function drawActor(')) + actorCode + '\nthis.drawActor = drawActor;', sandbox);
 const player = createState().player;
 for (const kind of ENEMY_KINDS) {
     const actor = { kind, x: 300, y: 300, radius: kind === 'boss' ? 40 : 18, moving: 1, stridePhase: 0.4,

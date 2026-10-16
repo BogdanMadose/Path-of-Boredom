@@ -100,12 +100,41 @@ function bodySprite(hero) {
         ctx.strokeStyle = "#f1dfb4"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -27); ctx.lineTo(0, -9); ctx.stroke();
         if (!warden) polygon(ctx, [[-3, -28], [-4, -35], [2, -33], [5, -26]], "#bd6045", "#eea275", 1);
     }
-    if (sprites.size >= 128) sprites.delete(sprites.keys().next().value);
+    // Baked polish (free at draw time): top-left rim light, chest gloss, and a class-coloured trim.
+    ctx.globalCompositeOperation = "source-atop";
+    const sheen = ctx.createRadialGradient(-6, -14, 1, -6, -14, 22);
+    sheen.addColorStop(0, "#ffffff40"); sheen.addColorStop(1, "#ffffff00");
+    ctx.fillStyle = sheen; ctx.fillRect(-32, -36, 64, 72);
+    const shade = ctx.createLinearGradient(-10, -10, 16, 18);
+    shade.addColorStop(0.55, "#00000000"); shade.addColorStop(1, "#0000004d");
+    ctx.fillStyle = shade; ctx.fillRect(-32, -36, 64, 72);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = "#fff6d266"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-11, -9); ctx.quadraticCurveTo(0, -13.5, 11, -9); ctx.stroke();
+    ctx.strokeStyle = hero.color + "cc"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(-10, 14); ctx.quadraticCurveTo(0, 18, 10, 14); ctx.stroke();
+    if (sprites.size >= 128)
     sprites.set(key, sprite);
     return sprite;
 }
 
-// Draws the player character every frame: a ground shadow ellipse, a casting-ring pulse while a
+// Gradients are reusable per context, so build the hero's cloak/steel paints once instead of every frame.
+const paintCache = new WeakMap();
+function heroPaints(ctx, type, ranger, warden) {
+    let byType = paintCache.get(ctx);
+    if (!byType) { byType = new Map(); paintCache.set(ctx, byType); }
+    let paints = byType.get(type);
+    if (!paints) {
+        paints = {
+            cloak: metal(ctx, ranger ? "#5a9565" : warden ? "#607c9d" : "#c5784e", ranger ? "#315b42" : warden ? "#344d6e" : "#78382d", "#18232c"),
+            steel: metal(ctx, "#fff9de", "#a9d1d2", "#456276")
+        };
+        byType.set(type, paints);
+    }
+    return paints;
+}
+
+// Draws the player character every frame:
 // skill is winding up, an invulnerability flicker, then a flowing cloak and walking legs facing
 // the body's heading, a partially twisted torso, and finally a weapon following its attack aim — a
 // weapon drawn per class — a bow with a stretch/loose animation tied to `strike`, or a sword/hammer
@@ -144,14 +173,17 @@ export function drawHero(ctx, actor, hero, stride, strike, time, reduced) {
     if (actor.invulnerable > 0) ctx.globalAlpha *= reduced ? 0.8 : 0.72 + Math.sin(time * 18) * 0.12;
     ctx.rotate(actor.facing + Math.PI / 2);
     const flutter = reduced ? 0 : Math.sin(time * 6) * 2 + stride * 2;
-    const cloak = metal(ctx, ranger ? "#5a9565" : warden ? "#607c9d" : "#c5784e", ranger ? "#315b42" : warden ? "#344d6e" : "#78382d", "#18232c");
+    const paints = heroPaints(ctx, hero.weaponType, ranger, warden);
+    const cloak = paints.cloak;
     ctx.fillStyle = cloak; ctx.strokeStyle = "#10191f"; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(-12, -4); ctx.quadraticCurveTo(0, -9, 12, -4);
     ctx.bezierCurveTo(13, 9, 22 + flutter, 18, 18 + flutter, 28);
     ctx.quadraticCurveTo(8, 24, -2, 33); ctx.quadraticCurveTo(-10, 28, -18 + flutter, 29);
     ctx.bezierCurveTo(-22 + flutter, 18, -13, 9, -12, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = hero.color + "aa"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-2, 33); ctx.quadraticCurveTo(8, 24, 18 + flutter, 28); ctx.moveTo(-2, 33); ctx.quadraticCurveTo(-10, 28, -18 + flutter, 29); ctx.stroke();
     ctx.strokeStyle = hero.color + "55"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(-8, 3); ctx.lineTo(-11 + flutter, 23); ctx.moveTo(8, 3); ctx.lineTo(12 + flutter, 23); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-8, 3); ctx.lineTo(-11 + flutter, 23);
     for (const side of [-1, 1]) {
         const y = 13 + stride * side * 4;
         polygon(ctx, [[side * 4, y - 5], [side * 11, y - 5], [side * 12, y + 7], [side * 4, y + 8]], "#344753", "#a2b9ac55", 1);
@@ -163,7 +195,7 @@ export function drawHero(ctx, actor, hero, stride, strike, time, reduced) {
     ctx.drawImage(body, -32, -36, 64, 72);
     ctx.restore();
     ctx.rotate(twist);
-    const steel = metal(ctx, "#fff9de", "#a9d1d2", "#456276");
+    const steel = paints.steel;
     if (ranger) {
         ctx.strokeStyle = "#15282b"; ctx.lineWidth = 6;
         ctx.beginPath(); ctx.moveTo(-22, -22); ctx.quadraticCurveTo(-15, -38, 0, -38); ctx.quadraticCurveTo(15, -38, 22, -22); ctx.stroke();

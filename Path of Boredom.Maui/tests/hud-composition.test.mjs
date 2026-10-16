@@ -10,7 +10,7 @@ const engine = read('../../Path of Boredom.Game/wwwroot/js/arpg.js');
 const menu = read('../wwwroot/js/mobile-menu.js');
 const align = menu.slice(menu.indexOf("        var bar = layer.querySelector('.mm-bar');"), menu.indexOf('        Array.prototype.forEach.call(root.querySelectorAll("[data-mobile-save-action]"'));
 const warning = engine.slice(engine.indexOf('        if (critical && mobileHud) {'), engine.indexOf('        for (const button of skillButtons)', engine.indexOf('        if (critical && mobileHud) {')));
-assert.ok(engine.includes('cssWidth: bounds.width, cssHeight: bounds.height'), 'render loop passes CSS dimensions');
+assert.ok(engine.includes('cssWidth: canvasCssWidth, cssHeight: canvasCssHeight'), 'render loop passes CSS dimensions');
 assert.ok(engine.includes('boss: boss ? { ...boss, name: map.boss, accent: map.accent } : null'), 'render loop supplies the boss');
 assert.ok(engine.includes('if (boss && !canvasHud)'), 'legacy boss bar is not drawn twice');
 const css = [read('../wwwroot/css/mobile-shell.css'), read('../wwwroot/css/mobile-menu.css'), read('../../Path of Boredom.Game/Components/Pages/Home.razor.css')].join('\n').replaceAll('@media (pointer: coarse)', '@media all');

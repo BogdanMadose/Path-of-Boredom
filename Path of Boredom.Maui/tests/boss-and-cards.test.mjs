@@ -92,11 +92,12 @@ for (const pattern of [1, 2, 3]) {
     boss.winding = 0.05;
     tick(state);
     assert.equal(boss.combat.rest, 0.75);
-    assert.equal(boss.slam, 3.2);
+    const interval = 3.2 * (pattern >= 3 ? 0.72 : pattern === 2 ? 0.86 : 1);
+    assert.ok(Math.abs(boss.slam - interval) < 1e-9, 'later phases attack faster');
     const duringRecovery = captureSnapshot(state);
     assert.equal(restoreSnapshot(duringRecovery).enemies[0].combat.rest, boss.combat.rest);
     tick(state);
-    assert.ok(boss.slam < 3.2, 'next attack timer runs during recovery');
+    assert.ok(boss.slam < interval, 'next attack timer runs during recovery');
     for (let frame = 0; frame < 32; frame++) tick(state);
     assert.equal(boss.combat.rest, 0);
     assert.ok(boss.moving || Math.hypot(boss.x - state.player.x, boss.y - state.player.y) <= boss.radius + state.player.radius + 28,

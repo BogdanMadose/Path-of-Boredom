@@ -170,7 +170,7 @@ const CLASS_TREE_EFFECTS = {
         "guard.repulse": { icon: "✹", detail: "Double Ember aegis opening-pulse damage. Releases a fiery blast instead of knocking enemies back." }
     },
     ranger: {
-        "attack.execution": { icon: "↝", detail: "Dawn shot ricochets once to a different living enemy within 180 units for 60% damage. A green tracer connects the targets. Cannot bounce back." },
+        "attack.execution": { icon: "\u219d", detail: "Dawn shot ricochets once: the arrow bounces off its target and flies to a different living enemy within 180 units for 60% damage. Cannot bounce back." },
         "nova.ignition": { icon: "➶", detail: "Each Sunburst volley arrow penetrates one additional target in its remaining flight path for 70% damage. Green tracers show the piercing path; no added fire damage." },
         "burst.shatter": { icon: "⋙", detail: "Piercing rain penetrates two additional targets instead of one. Each penetration retains 70% of the previous hit's damage; no target is hit twice by the same arrow." },
         "guard.repulse": { icon: "♧", detail: "Briar ward also pushes ordinary enemies back 60 units and strengthens its walking slow from 25% to 40% for 1.5 seconds. Bosses are not displaced; charges are unaffected." }

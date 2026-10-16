@@ -182,7 +182,11 @@ if (fs.existsSync(edge)) {
                 panel.classList.add('mm-open'); forgePanel.classList.remove('mm-open');
                 check(!panel.querySelector('[data-equipment-style]') && !panel.querySelector('[data-challenge-choice]'), 'options must be separate from equipment and challenges');
                 check(options.clientHeight > 0 && getComputedStyle(options).overflowY === 'auto', 'Run options must have a usable scrolling container');
-                if (height === 360) check(options.scrollHeight > options.clientHeight, 'short landscape options must scroll');
+                for (const section of ['sound', 'controls', 'training', 'codex']) {
+                    panel.dataset.mobileSection = section;
+                    if (width > height && height >= 360) check(options.scrollHeight <= options.clientHeight + 1, 'landscape options tab must fit without scrolling: ' + section + ' ' + width + 'x' + height + ' @' + scale + ' (' + options.scrollHeight + '>' + options.clientHeight + ')');
+                }
+                panel.dataset.mobileSection = 'training';
                 const bounds = options.getBoundingClientRect();
                 check(bounds.bottom <= panel.getBoundingClientRect().bottom && bounds.top >= 58, 'Run options must fit below the header');
                 for (const select of options.querySelectorAll('select')) check(select.getBoundingClientRect().right <= bounds.right + 1, 'select must not overflow');
@@ -203,6 +207,7 @@ if (fs.existsSync(edge)) {
                 check(panel.getBoundingClientRect().height === height, 'training setup must not expand the panel');
                 picker.hidden = true;
                 options.querySelector('[data-exit-training]').hidden = true;
+                options.scrollTop = 0;
                 panel.classList.remove('mm-open'); forgePanel.classList.add('mm-open');
                 forgePanel.style.width = width + 'px'; forgePanel.style.height = height + 'px';
                 forgePanel.dataset.mobileSection = 'systems';

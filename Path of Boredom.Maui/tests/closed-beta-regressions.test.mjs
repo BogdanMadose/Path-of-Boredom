@@ -102,19 +102,14 @@ for (const outcome of ['success', 'failure', 'exception']) {
     vm.createContext(sandbox);
     vm.runInContext(`${persistCode}\nthis.persist = persist;`, sandbox);
     const saving = sandbox.persist(false, true);
-    assert.equal(sandbox.saving, true);
-    assert.equal(screens.at(-1), false, 'no full menu while the automatic checkpoint is saving');
+    assert.equal(sandbox.saving, false, 'endless checkpoints save in the background');
+    assert.equal(sandbox.state.status, 'playing', 'the watch continues immediately instead of stopping to save');
+    assert.equal(sandbox.state.travelPending, 1);
     complete(); await saving;
-    if (outcome === 'success') {
-        assert.equal(sandbox.state.status, 'playing');
-        assert.equal(sandbox.state.travelPending, 1);
-        assert.equal(sandbox.checkpointSaveFailed, false);
-        assert.ok(screens.every(shown => !shown), 'successful checkpoints never flash a menu');
-    } else {
-        assert.equal(sandbox.state.status, 'camp');
-        assert.equal(sandbox.checkpointSaveFailed, true);
-        assert.equal(screens.at(-1), true, 'failed saves show a stable retry screen');
-    }
+    assert.equal(sandbox.state.status, 'playing');
+    assert.ok(screens.every(shown => !shown), 'background checkpoints never flash a menu');
+    if (outcome === 'success') assert.match(sandbox.saveStatus.textContent, /saved/);
+    else assert.match(sandbox.saveStatus.textContent, /failed/);
 }
 
 assert.deepEqual([1, 2, 3, 4, 5].map(wave => encounterForWave(wave).key), ['swarm', 'elites', 'ranged', 'mixed', 'boss']);

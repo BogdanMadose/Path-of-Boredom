@@ -9,6 +9,7 @@ import { drawHero, drawOrb } from '../../Path of Boredom.Game/wwwroot/js/arpg-gr
 import { turnToward } from '../../Path of Boredom.Game/wwwroot/js/arpg-facing.js';
 import { drawBoss } from '../../Path of Boredom.Game/wwwroot/js/arpg-bosses.js';
 import { enemyDefense } from '../../Path of Boredom.Game/wwwroot/js/arpg-damage.js';
+import { ELITE_MODIFIERS } from '../../Path of Boredom.Game/wwwroot/js/arpg-modifiers.js';
 
 for (let run = 0; run < 40; run++) {
     const state = createState(() => run / 40);
@@ -66,16 +67,19 @@ function context() {
     });
 }
 globalThis.document = { createElement: () => ({ getContext: () => context() }) };
+await import('../../Path of Boredom.Game/wwwroot/js/arpg-sprite-cache.js');
+const glowA
+assert.equal(glowA, glowB, 'sprites are rendered once and reused');
 const source = fs.readFileSync(new URL('../../Path of Boredom.Game/wwwroot/js/arpg.js', import.meta.url), 'utf8');
 const actorCode = source.slice(source.indexOf('function drawActor('), source.indexOf('// The main per-frame draw call:'));
 const sandbox = { reducedMotion: { matches: false }, mobFacing: new WeakMap(), turnToward, drawHero, drawOrb, drawBoss, enemyDefense,
-    HERO_CLASSES, circle: (ctx, x, y, radius) => ctx.arc(x, y, radius, 0, Math.PI * 2) };
-vm.createContext(sandbox);
+    drawGlow, drawGroundShadow, drawOutline, document: globalThis.document };
+vm.createContext
 vm.runInContext(`${actorCode}\nthis.drawActor = drawActor;`, sandbox);
 const player = createState().player;
 for (const kind of ENEMY_KINDS) {
     const actor = { kind, x: 300, y: 300, radius: kind === 'boss' ? 40 : 18, moving: 1, stridePhase: 0.4,
-        swing: 0.1, health: 100, maxHealth: 100, elite: 0, chilled: 0, winding: 0, attackWindup: 0, flash: 0 };
+        swing: 0.1, health: 100, maxHealth: 100, elite: kind === 'husk' ? 1 : 0, chilled: 0, winding: 0, attackWindup: 0, flash: 0.1 };
     sandbox.drawActor(context(), actor, player, 1, mapForWave(11), 'knight');
     player.x = 100;
     sandbox.drawActor(context(), actor, player, 1.016, mapForWave(11), 'knight');

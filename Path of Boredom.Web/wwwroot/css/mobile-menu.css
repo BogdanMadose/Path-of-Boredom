@@ -964,4 +964,96 @@
     body.mobile-shell .mm-subtab[hidden],
     body.mobile-shell .mm-panel [data-tree-skill][hidden],
     body.mobile-shell .mm-panel [data-upgrade][hidden] { display: none !important; }
+
+    /* Account & cloud: a centred, evenly sized card row instead of a ragged auto-fit grid. */
+    body.mobile-shell .mm-account-body {
+        align-self: center;
+        justify-self: center;
+        width: min(100%, 860px);
+        max-height: 100%;
+        grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+        justify-content: center;
+        align-content: center;
+        gap: 6px 10px;
+        padding: 6px 10px;
+    }
+    body.mobile-shell .mm-account-body > p { text-align: center; }
+    body.mobile-shell .mm-account-body fieldset {
+        align-content: start;
+        align-self: stretch;
+        grid-auto-rows: min-content;
+        text-align: center;
+    }
+    body.mobile-shell .mm-account-body legend { margin-inline: auto; }
+    body.mobile-shell .mm-account-body .mm-display-name { text-align: left; }
+    body.mobile-shell .mm-account-body .account-confirm {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        padding: 8px;
+        border: 1px solid #e9ac6388;
+        border-radius: 12px;
+        background: #211c14;
+    }
+    body.mobile-shell .mm-account-body .account-confirm h3,
+    body.mobile-shell .mm-account-body .account-confirm p { grid-column: 1 / -1; margin: 0; }
+
+    /* Forge "Equipment" and "Mastery" tabs: fit one screen with no scrolling. */
+    body.mobile-shell .mm-panel .equipment-options {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-content: start;
+        gap: 2px 14px;
+        overflow: hidden;
+        padding: 6px 12px;
+        font-size: 12px;
+        line-height: 1.3;
+    }
+    body.mobile-shell .forge-panel:not([data-mobile-section="systems"]) > .equipment-options { display: none; }
+    body.mobile-shell .mm-panel .equipment-options > * { margin: 0; min-width: 0; }
+    body.mobile-shell .mm-panel .equipment-options h3 { font-size: 13px; color: #f1d49b; margin: 4px 0 0; }
+    body.mobile-shell .mm-panel .equipment-options > h3:first-child,
+    body.mobile-shell .mm-panel .equipment-options > p:nth-child(2),
+    body.mobile-shell .mm-panel .equipment-options [data-equipment-preview] { grid-column: 1 / -1; }
+    body.mobile-shell .mm-panel .equipment-options label { gap: 2px; margin: 0; font-size: 12px; }
+    body.mobile-shell .mm-panel .equipment-options select { min-height: 32px; padding: 2px 6px; font-size: 12px; }
+    body.mobile-shell .mm-panel .equipment-options [data-equipment-preview],
+    body.mobile-shell .mm-panel .equipment-options [data-build-synergy],
+    body.mobile-shell .mm-panel .equipment-options [data-boss-relics] {
+        font-size: 11px;
+        line-height: 1.3;
+        color: #bed5cc;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    body.mobile-shell .mm-panel .mastery-panel {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        overflow: hidden;
+        margin: 0;
+        padding: 4px 0 0;
+        border: 0;
+    }
+    body.mobile-shell .forge-panel:not([data-mobile-section="training"]) > .mastery-panel { display: none; }
+    body.mobile-shell .mm-panel .mastery-panel h3 { display: none; }
+    body.mobile-shell .mm-panel .mastery-panel > p { margin: 0 0 4px; font-size: 11px; text-align: center; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid {
+        grid-row: 2;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-auto-rows: minmax(0, 1fr);
+        overflow: hidden;
+        gap: 6px;
+    }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button { min-height: 0; padding: 6px 8px; gap: 2px; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid span:not([data-upgrade-preview]) {
+        display: block;
+        font-size: 10px;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 }

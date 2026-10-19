@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFrameworks>net9.0;net9.0-android</TargetFrameworks>
-    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx'))">net9.0;net9.0-android;net9.0-ios</TargetFrameworks>
+    <!-- No net9.0-ios: the iOS SDK rejects Razor library Content items; the iOS head consumes net9.0. -->
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
     <!-- Deliberately space-free, unlike the other projects. The static web asset pipeline builds
@@ -33,5 +33,6 @@
     <!-- The Razor SDK compiles components and bundles static web assets for the BlazorWebView. -->
     <Content Update="Components\**;wwwroot\**" ExcludeFromContentCheck="true" />
   </ItemGroup>
+
 
 </Project>

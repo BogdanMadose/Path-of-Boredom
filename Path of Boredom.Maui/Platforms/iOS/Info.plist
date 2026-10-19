@@ -8,6 +8,8 @@
         <integer>2</integer>
     </array>
     <!-- Landscape-only, matching MainActivity on Android: the arena canvas assumes a wide layout. -->
+    <key>UIRequiresFullScreen</key>
+    <true/>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationLandscapeLeft</string>

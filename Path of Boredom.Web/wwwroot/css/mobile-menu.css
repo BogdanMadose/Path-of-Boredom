@@ -991,6 +991,7 @@
         text-align: center;
     }
     body.mobile-shell .mm-account-body legend { margin-inline: auto; }
+    body.mobile-shell .mm-account-body .mm-apple { background: #000; border-color: #666; color: #fff; }
     body.mobile-shell .mm-account-body .mm-display-name { text-align: left; }
     body.mobile-shell .mm-account-body .account-confirm {
         flex: 1 1 100%;

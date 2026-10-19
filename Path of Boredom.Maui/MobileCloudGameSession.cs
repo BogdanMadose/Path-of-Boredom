@@ -40,6 +40,7 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
     private void ClearCloudSession()
     {
         token = null;
+        appleSession = false;
         expectedRevision = null;
         observedRevision = null;
         observedSave = null;
@@ -73,14 +74,80 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         {
             ClearCloudSession();
             Preferences.Set(AutoSignInPreference, false);
+            SecureStorage.Remove(AppleSessionKey);
             message = await IsDeletedSessionAsync(response)
-                ? "This session belongs to a deleted game account. Continue with Google to sign in afresh."
-                : "Sign-in expired. Your device save is unchanged; continue with Google again.";
+                ? "This session belongs to a deleted game account. Sign in again to start afresh."
+                : "Sign-in expired. Your device save is unchanged; sign in again.";
         }
         return response;
     }
 
     public Task<CloudAccountStatus> SignInAsync() => SignInAsync(false);
+
+    private const string AppleSessionKey = "cloud.apple-session";
+    private bool appleSession;
+
+    /// <summary>
+    /// Sign in with Apple: native on iOS, Apple's web flow elsewhere. Either way the API verifies
+    /// Apple's token and returns a 30-day game session, kept in SecureStorage for silent restore.
+    /// </summary>
+    public async Task<CloudAccountStatus> SignInWithAppleAsync()
+    {
+        await gate.WaitAsync();
+        try
+        {
+            if (!GoogleSignInConfiguration.IsConfigured) return AccountStatus;
+            ClearCloudSession();
+            restoreAttempted = true;
+            var session = await NativeAppleSignIn.SignInAsync(GoogleSignInConfiguration.ApiBaseUrl, http);
+            if (session is null) { message = "Sign-in cancelled. Your device save is unchanged."; return AccountStatus; }
+            var status = await ActivateAsync(session, false);
+            if (token is not null) await SecureStorage.SetAsync(AppleSessionKey, session);
+            return status;
+        }
+        catch (Exception exception) when (IsRecoverable(exception) || exception is TaskCanceledException)
+        {
+            ClearCloudSession();
+            message = "Apple sign-in unavailable. Device progress is safe. Check the connection and retry.";
+            return AccountStatus;
+        }
+        finally { gate.Release(); }
+    }
+
+    // Verifies a bearer with the API, then registers the player exactly like Google sign-in.
+    private async Task<CloudAccountStatus> ActivateAsync(string candidate, bool silent)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, GoogleSignInConfiguration.ApiBaseUrl.TrimEnd('/') + "/game/account/");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", candidate);
+        using var response = await http.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            SecureStorage.Remove(AppleSessionKey);
+            if (!silent) message = await IsDeletedSessionAsync(response)
+                ? "Your previous game account was deleted. Sign in with Apple again to create a new account."
+                : "Apple sign-in could not be verified. Please sign in again.";
+            return AccountStatus;
+        }
+        var identity = await response.Content.ReadFromJsonAsync<VerifiedIdentity>();
+        if (identity is null || string.IsNullOrWhiteSpace(identity.Subject)) throw new JsonException();
+        token = candidate;
+        appleSession = true;
+        player = identity.Name;
+        await ReadCloudMetadataAsync();
+        expectedRevision = observedRevision;
+        using var profile = Request(HttpMethod.Post, "game/rankings/profile");
+        using var registered = await SendAsync(profile);
+        if (!registered.IsSuccessStatusCode)
+        {
+            if (registered.StatusCode != HttpStatusCode.Unauthorized)
+                message = "Sign-in was verified, but account registration failed. Please retry.";
+            ClearCloudSession();
+            return AccountStatus;
+        }
+        deleted = false;
+        Preferences.Set(AutoSignInPreference, true);
+        return AccountStatus;
+    }
 
     private async Task<CloudAccountStatus> SignInAsync(bool silent)
     {
@@ -90,6 +157,8 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
             if (!GoogleSignInConfiguration.IsConfigured) return AccountStatus;
             ClearCloudSession();
             restoreAttempted = true;
+            if (silent && await SecureStorage.GetAsync(AppleSessionKey) is { Length: > 0 } saved)
+                return await ActivateAsync(saved, true);
             var candidate = silent ? await NativeGoogleSignIn.TrySilentSignInAsync(GoogleSignInConfiguration.WebClientId)
                 : await NativeGoogleSignIn.SignInAsync(GoogleSignInConfiguration.WebClientId);
             for (var attempt = 0; attempt < 2; attempt++)
@@ -156,6 +225,7 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
             ClearCloudSession();
             restoreAttempted = true;
             Preferences.Set(AutoSignInPreference, false);
+            SecureStorage.Remove(AppleSessionKey);
             message = "Signed out. Device progress remains; no further cloud requests are authorized.";
             await NativeGoogleSignIn.SignOutAsync();
             return AccountStatus;
@@ -390,15 +460,17 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
             using var request = Request(HttpMethod.Delete, "game/account/");
             using var response = await SendAsync(request);
             if (response.StatusCode != HttpStatusCode.NoContent) { message = "Account deletion was not confirmed. Retry; local files were not deleted."; return AccountStatus; }
+            var wasApple = appleSession;
             deleted = true;
             ClearCloudSession();
             restoreAttempted = true;
             Preferences.Set(AutoSignInPreference, false);
+            SecureStorage.Remove(AppleSessionKey);
             // Server deletion is already committed; report a local-cleanup error separately.
             try { await local.ClearAsync(); message = "Game account deleted. Continue with Google to create a new account, or start a new offline run."; }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             { message = "Cloud data deleted. Device cleanup failed; clear app storage before playing again."; }
-            try { await NativeGoogleSignIn.RevokeAccessAsync(); }
+            try { if (!wasApple) await NativeGoogleSignIn.RevokeAccessAsync(); }
             catch (Exception)
             { message += " Google cleanup could not finish; continue with Google again to refresh the session."; }
             return AccountStatus;

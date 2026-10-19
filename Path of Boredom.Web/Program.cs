@@ -136,10 +136,45 @@ app.MapRazorComponents<App>()
     .AddAdditionalAssemblies(typeof(Path_of_Boredom.Game.IGameSession).Assembly)
     .RequireAuthorization();
 
+// Sign-in chooser: Google or Apple. Every game page redirects here when signed out.
+app.MapGet("/account/login", () => Results.Content("""
+    <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Sign in · Path of Boredom</title><style>
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0e1619;color:#f1d49b;font-family:Georgia,serif}
+    main{display:grid;gap:12px;padding:28px;border:1px solid #c7a56b55;border-radius:14px;background:#132127;text-align:center;width:min(90vw,320px)}
+    a{display:block;padding:12px;border-radius:8px;text-decoration:none;font:600 15px system-ui,sans-serif}
+    .g{background:#fff;color:#1f1f1f}.a{background:#000;color:#fff;border:1px solid #555}</style></head>
+    <body><main><h1 style="margin:0 0 8px;font-size:24px">Path of Boredom</h1>
+    <a class="g" href="/account/login-google">Continue with Google</a>
+    <a class="a" href="/account/login-apple">&#63743; Sign in with Apple</a></main></body></html>
+    """, "text/html; charset=utf-8")).AllowAnonymous();
+
 // Starts the Google sign-in, then returns to the game.
-app.MapGet("/account/login", () => Results.Challenge(
+app.MapGet("/account/login-google", () => Results.Challenge(
     new AuthenticationProperties { RedirectUri = "/" }, [GoogleDefaults.AuthenticationScheme]))
     .AllowAnonymous();
+
+// Sign in with Apple runs on the API (Apple requires a public return URL); the API verifies Apple's
+// token and posts back a game session token, which stays server-side like the Google tokens.
+var apiPublicUrl = builder.Configuration["ApiService:PublicUrl"] ?? "https://pob-api-438780560503.europe-west1.run.app";
+app.MapGet("/account/login-apple", (HttpContext context) =>
+{
+    var returnUrl = $"{context.Request.Scheme}://{context.Request.Host}/signin-apple-complete";
+    return Results.Redirect($"{apiPublicUrl.TrimEnd('/')}/signin-apple/start?returnUrl={Uri.EscapeDataString(returnUrl)}");
+}).AllowAnonymous();
+app.MapPost("/signin-apple-complete", async (HttpContext context, GoogleTokenStore store) =>
+{
+    var form = await context.Request.ReadFormAsync();
+    var token = form["token"].ToString();
+    if (token.Length == 0 || !long.TryParse(form["expires"], out var expires)) return Results.LocalRedirect("/");
+    // Read the subject for the cookie; the API re-verifies the signature on every request.
+    var subject = ReadSubject(token);
+    if (subject is null || !GoogleTokenStore.IsApple(subject)) return Results.LocalRedirect("/");
+    store.Save(subject, token, null, DateTimeOffset.FromUnixTimeSeconds(expires));
+    await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(new ClaimsIdentity(
+        [new Claim(ClaimTypes.NameIdentifier, subject), new Claim("sub", subject)], CookieAuthenticationDefaults.AuthenticationScheme)));
+    return Results.LocalRedirect("/");
+}).AllowAnonymous().DisableAntiforgery();
 
 // Signs out of this browser only; the device-independent cloud save is untouched.
 app.MapGet("/account/logout", async (HttpContext context, GoogleTokenStore store) =>
@@ -153,3 +188,17 @@ app.MapGet("/account/logout", async (HttpContext context, GoogleTokenStore store
 app.MapDefaultEndpoints();
 
 app.Run();
+
+static string? ReadSubject(string jwt)
+{
+    var parts = jwt.Split('.');
+    if (parts.Length != 3) return null;
+    try
+    {
+        var payload = parts[1].Replace('-', '+').Replace('_', '/');
+        payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+        using var json = JsonDocument.Parse(Convert.FromBase64String(payload));
+        return json.RootElement.TryGetProperty("sub", out var sub) ? sub.GetString() : null;
+    }
+    catch (Exception exception) when (exception is FormatException or JsonException) { return null; }
+}

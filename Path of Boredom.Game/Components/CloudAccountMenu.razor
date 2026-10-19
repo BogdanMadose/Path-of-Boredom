@@ -11,7 +11,7 @@
             <p role="status" aria-live="polite">@lastResult</p>
         }
         <fieldset disabled="@busy">
-            <legend>Google account</legend>
+            <legend>Game account</legend>
             @if (cloud.AccountStatus.SignedIn)
             {
                 <p>Signed in as <strong>@cloud.AccountStatus.Player</strong></p>
@@ -26,6 +26,7 @@
             else
             {
                 <button type="button" class="mm-pause-option" disabled="@(!cloud.AccountStatus.Configured)" @onclick="SignIn">@(cloud.AccountStatus.Deleted ? "Create a new game account with Google" : "Continue with Google")</button>
+                <button type="button" class="mm-pause-option mm-apple" disabled="@(!cloud.AccountStatus.Configured)" @onclick="SignInApple">&#63743; Sign in with Apple</button>
                 @if (cloud.AccountStatus.Deleted)
                 {
                     <p>Old data deleted. Signing in starts fresh.</p>
@@ -107,6 +108,12 @@
     {
         renameResult = null;
         status = await Cloud.SignInAsync();
+        displayName = status.Player;
+    });
+    private Task SignInApple() => Run(async () =>
+    {
+        renameResult = null;
+        status = await Cloud.SignInWithAppleAsync();
         displayName = status.Player;
     });
     private Task SignOut() => Run(async () =>

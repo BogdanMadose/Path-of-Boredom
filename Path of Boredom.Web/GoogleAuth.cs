@@ -34,6 +34,9 @@ public sealed class GoogleTokenStore(IHttpClientFactory httpFactory, IOptions<Go
 
     public bool Has(string subject) => entries.ContainsKey(subject);
 
+    /// <summary>Apple sessions are issued by the API, last 30 days and have no refresh token.</summary>
+    public static bool IsApple(string subject) => subject.StartsWith("apple:", StringComparison.Ordinal);
+
     public void Remove(string subject) => entries.TryRemove(subject, out _);
 
     public void Save(string subject, string idToken, string? refreshToken, DateTimeOffset expires) =>

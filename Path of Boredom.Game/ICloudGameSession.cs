@@ -7,6 +7,8 @@ public interface ICloudGameSession
 {
     CloudAccountStatus AccountStatus { get; }
     Task<CloudAccountStatus> SignInAsync();
+    /// <summary>Sign in with Apple; hosts without it report an explanatory status.</summary>
+    Task<CloudAccountStatus> SignInWithAppleAsync();
     Task<CloudAccountStatus> SignOutAsync();
     Task<CloudAccountStatus> RefreshCloudAsync();
     Task<CloudAccountStatus> ChangeDisplayNameAsync(string name);

@@ -248,7 +248,13 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
 
     public Task<CloudAccountStatus> SignInAsync()
     {
-        navigation.NavigateTo("/account/login", forceLoad: true);
+        navigation.NavigateTo("/account/login-google", forceLoad: true);
+        return Task.FromResult(AccountStatus);
+    }
+
+    public Task<CloudAccountStatus> SignInWithAppleAsync()
+    {
+        navigation.NavigateTo("/account/login-apple", forceLoad: true);
         return Task.FromResult(AccountStatus);
     }
 

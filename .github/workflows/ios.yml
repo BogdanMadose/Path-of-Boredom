@@ -52,6 +52,7 @@ jobs:
           -p:CodesignKey="Apple Distribution"
           -p:CodesignProvision="$PROFILE_NAME"
           -p:ApplicationVersion=${{ inputs.build_number }}
+          -p:ValidateXcodeVersion=false
           -o artifacts
 
       - name: Upload to TestFlight

@@ -362,3 +362,12 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /.copilot-validation
+
+# Signing material - never commit
+.local-signing/
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+*.csr
+

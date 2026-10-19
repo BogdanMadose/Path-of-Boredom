@@ -31,7 +31,7 @@ public sealed class GoogleTokenValidator(IOptions<GoogleIdentityOptions> options
 
 public sealed class GoogleTokenAuthenticationHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger,
-    UrlEncoder encoder, IGoogleTokenValidator validator)
+    UrlEncoder encoder, IGoogleTokenValidator validator, AppleIdentityService apple)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
     public const string SchemeName = "GoogleIdToken";
@@ -45,6 +45,13 @@ public sealed class GoogleTokenAuthenticationHandler(
             || !header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
             || header.Length is <= 7 or > 8192)
             return AuthenticateResult.Fail("A Google ID token is required.");
+        // Sign in with Apple players present the game's own session token (see AppleIdentity.cs).
+        if (AppleIdentityService.LooksLikeSession(header[7..]))
+        {
+            if (await apple.ValidateSessionAsync(header[7..]) is not { } session)
+                return AuthenticateResult.Fail("Invalid or expired Apple session.");
+            return Success(session.Subject, session.IssuedAt);
+        }
         try
         {
             var payload = await validator.ValidateAsync(header[7..]);
@@ -54,17 +61,7 @@ public sealed class GoogleTokenAuthenticationHandler(
                 || expires <= DateTimeOffset.UtcNow.ToUnixTimeSeconds()
                 || payload.Issuer is not ("accounts.google.com" or "https://accounts.google.com"))
                 return AuthenticateResult.Fail("Invalid Google identity.");
-            // Public profiles use a neutral alias, never the Google account's personal name.
-            var name = RankingStore.DefaultDisplayName(payload.Subject);
-            var claims = new[]
-            {
-                new Claim("sub", payload.Subject),
-                new Claim(ClaimTypes.NameIdentifier, payload.Subject),
-                new Claim(ClaimTypes.Name, name),
-                new Claim("iat", issuedAt.ToString(System.Globalization.CultureInfo.InvariantCulture))
-            };
-            return AuthenticateResult.Success(new AuthenticationTicket(
-                new ClaimsPrincipal(new ClaimsIdentity(claims, SchemeName)), SchemeName));
+            return Success(payload.Subject, issuedAt);
         }
         catch (InvalidJwtException) { return AuthenticateResult.Fail("Invalid or expired Google ID token."); }
         catch (HttpRequestException)
@@ -72,6 +69,20 @@ public sealed class GoogleTokenAuthenticationHandler(
             // Fail closed when Google's signing keys cannot be retrieved; never log bearer tokens.
             return AuthenticateResult.Fail("Identity verification unavailable.");
         }
+    }
+
+    private AuthenticateResult Success(string subject, long issuedAt)
+    {
+        // Public profiles use a neutral alias, never the account's personal name.
+        var claims = new[]
+        {
+            new Claim("sub", subject),
+            new Claim(ClaimTypes.NameIdentifier, subject),
+            new Claim(ClaimTypes.Name, RankingStore.DefaultDisplayName(subject)),
+            new Claim("iat", issuedAt.ToString(System.Globalization.CultureInfo.InvariantCulture))
+        };
+        return AuthenticateResult.Success(new AuthenticationTicket(
+            new ClaimsPrincipal(new ClaimsIdentity(claims, SchemeName)), SchemeName));
     }
 
     public static long IssuedAt(ClaimsPrincipal principal) =>

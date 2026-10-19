@@ -39,6 +39,8 @@ builder.Services.AddOptions<GoogleIdentityOptions>()
         && !string.IsNullOrWhiteSpace(options.Audience), "Configure GoogleIdentity:Audience with the verified Web OAuth client ID.")
     .ValidateOnStart();
 builder.Services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
+builder.Services.AddOptions<AppleIdentityOptions>().BindConfiguration("AppleIdentity");
+builder.Services.AddSingleton<AppleIdentityService>();
 var authentication = builder.Services.AddAuthentication(GoogleTokenAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, GoogleTokenAuthenticationHandler>(GoogleTokenAuthenticationHandler.SchemeName, _ => { });
 builder.Services.AddAuthorization(options => options.AddPolicy(GoogleTokenAuthenticationHandler.MobilePolicy,
@@ -84,6 +86,7 @@ app.UseRateLimiter();
 app.MapGameSaves();
 app.MapRankings();
 app.MapPlayerAccount();
+app.MapAppleSignIn();
 // /health and /alive (development-only, see ServiceDefaults.Extensions).
 app.MapDefaultEndpoints();
 

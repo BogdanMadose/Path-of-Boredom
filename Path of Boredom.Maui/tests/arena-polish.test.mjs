@@ -72,7 +72,8 @@ const glowA = vignetteSprite(1280, 720), glowB = vignetteSprite(1280, 720);
 assert.equal(glowA, glowB, 'sprites are rendered once and reused');
 const source = fs.readFileSync(new URL('../../Path of Boredom.Game/wwwroot/js/arpg.js', import.meta.url), 'utf8');
 const actorCode = source.slice(source.indexOf('function drawActor('), source.indexOf('// The main per-frame draw call:'));
-const sandbox = { reducedMotion: { matches: false }, mobFacing: new WeakMap(), turnToward, drawHero, drawOrb, drawBoss, enemyDefense,
+const { drawMob } = await import('../../Path of Boredom.Game/wwwroot/js/arpg-mob-art.js');
+const sandbox = { reducedMotion: { matches: false }, mobFacing: new WeakMap(), turnToward, drawHero, drawOrb, drawBoss, enemyDefense, drawMob,
     HERO_CLASSES, ELITE_MODIFIERS, drawGlow, drawGroundShadow, drawOutline, document: globalThis.document };
 vm.createContext(sandbox);
 vm.runInContext(source.slice(source.indexOf('function circle('), source.indexOf('function drawActor(')) + actorCode + '\nthis.drawActor = drawActor;', sandbox);

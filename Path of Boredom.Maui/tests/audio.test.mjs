@@ -64,7 +64,7 @@ await audio.unlock();
 const context = fixture.contexts[0];
 assert.equal(context.resumes, 1);
 assert.equal(fixture.timers.size, 1, 'music scheduler starts after unlock');
-assert.ok(context.sources.length >= 3 && context.sources.length <= 8, 'first beat layers melody, bass, pad and groove');
+assert.ok(context.sources.length >= 3 && context.sources.length <= 24, 'first beat layers melody, bass, unison pad and groove');
 assert.deepEqual(captureSnapshot(state), saved, 'audio must not change serialized state');
 context.finish();
 const beforeButton = context.sources.length;

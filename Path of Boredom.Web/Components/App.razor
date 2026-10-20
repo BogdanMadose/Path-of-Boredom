@@ -13,9 +13,49 @@
     <link rel="stylesheet" href="@Assets["css/mobile-menu.css"]" />
     <ImportMap />
     <HeadOutlet />
+    <style>
+        .boot { position: fixed; inset: 0; z-index: 100000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+            background: radial-gradient(circle at 50% 42%, #1c2a2b 0%, #0b1114 62%); color: #f0d9ad; font-family: Georgia, serif; text-align: center; padding: 24px; transition: opacity .6s ease; }
+        .boot h1 { margin: 0; font-size: 26px; font-weight: 400; letter-spacing: 1px; color: #f1e5cc; }
+        .boot p { margin: 0; font-family: system-ui, sans-serif; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #9fb0ad; }
+        .boot-ember { position: relative; width: 76px; height: 76px; border-radius: 50%;
+            background: radial-gradient(circle, #ffcf87 0%, #e08a2e 38%, #7a3d12 62%, transparent 70%); animation: boot-pulse 1.9s ease-in-out infinite; }
+        .boot-ember::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; border: 1px solid #c7a56b44; border-top-color: #f0c98d; animation: boot-spin 1.5s linear infinite; }
+        .boot-dots::after { content: ""; animation: boot-dots 1.4s steps(4, end) infinite; }
+        @@keyframes boot-pulse { 0%, 100% { transform: scale(.88); opacity: .78; } 50% { transform: scale(1.06); opacity: 1; } }
+        @@keyframes boot-spin { to { transform: rotate(360deg); } }
+        @@keyframes boot-dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+        @@media (prefers-reduced-motion: reduce) { .boot-ember, .boot-ember::after, .boot-dots::after { animation: none; } }
+    </style>
 </head>
 
-<body class="mobile-shell">
+<body class="mobile-shell" style="background: #0b1114;">
+    <div class="boot" id="boot-splash">
+        <div class="boot-ember" aria-hidden="true"></div>
+        <h1>Path of Boredom</h1>
+        <p>Kindling the last ember<span class="boot-dots"></span></p>
+    </div>
+    <script>
+        (function () {
+            var minimumMs = 2600, started = Date.now(), ready = false;
+            var splash = document.getElementById("boot-splash");
+            var ignored = { SCRIPT: 1, STYLE: 1, LINK: 1, TEMPLATE: 1 };
+            var observer = new MutationObserver(function (changes) {
+                for (var i = 0; i < changes.length; i++) for (var j = 0; j < changes[i].addedNodes.length; j++) {
+                    var node = changes[i].addedNodes[j];
+                    if (node.nodeType === 1 && !ignored[node.tagName] && node !== splash && node.id !== "blazor-error-ui") { ready = true; observer.disconnect(); return; }
+                }
+            });
+            observer.observe(document.body, { childList: true });
+            function check() {
+                if (ready && Date.now() - started >= minimumMs) {
+                    splash.style.opacity = "0";
+                    setTimeout(function () { splash.remove(); }, 650);
+                } else setTimeout(check, 150);
+            }
+            setTimeout(check, 150);
+        })();
+    </script>
     <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)" />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="@Assets["js/mobile-shell.js"]" defer></script>

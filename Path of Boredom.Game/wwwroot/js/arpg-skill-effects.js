@@ -48,13 +48,89 @@ export function drawClassSkillEffect(ctx, item, progress, reduced = false) {
             ctx.restore();
             return;
         }
-        const index = ['nova', 'burst', 'guard', 'chain', 'frost', 'reap', 'meteor', 'siphon', 'nullwave'].indexOf(skill);
-        const count = 4 + Math.max(0, index);
-        ring(ctx, 0, 0, r * bloom);
-        for (let i = 0; i < count; i++) {
-            const angle = i * TAU / count + phase;
-            line(ctx, [[Math.cos(angle) * r * 0.3, Math.sin(angle) * r * 0.3], [Math.cos(angle) * r * bloom, Math.sin(angle) * r * bloom]]);
-            ring(ctx, Math.cos(angle) * r * 0.65, Math.sin(angle) * r * 0.65, 4 + index);
+        const pale = '#f3ecff';
+        const baseAlpha = ctx.globalAlpha;
+        const glow = alpha => { ctx.globalAlpha = baseAlpha * Math.max(0, Math.min(1, alpha)); };
+        const fade = 1 - progress;
+        if (skill === 'burst') {
+            // Comet lance: a tapered beam with a bright comet head racing to the end.
+            const w = (item.width ?? 40) / 2, head = r * Math.min(1, progress * 2);
+            glow(0.35 * fade + 0.15); polygon(ctx, [[0, -w * 0.4], [r, -w], [r, w], [0, w * 0.4]]);
+            glow(1); ctx.strokeStyle = pale; ctx.lineWidth = 3; line(ctx, [[0, 0], [head, 0]]);
+            ctx.fillStyle = pale; ctx.beginPath(); ctx.arc(head, 0, 7 + 5 * fade, 0, TAU); ctx.fill();
+            for (let i = 1; i <= 5; i++) ring(ctx, head - i * 14, Math.sin(i * 2 + phase * 6) * 6, 2);
+        } else if (skill === 'guard') {
+            // Astral veil: rotating hexagram shell around the sorcerer.
+            const shell = r * (0.75 + 0.25 * bloom);
+            for (const offset of [0, Math.PI / 6]) {
+                polygon(ctx, Array.from({ length: 3 }, (_, i) => {
+                    const a = i * TAU / 3 + offset + phase; return [Math.cos(a) * shell, Math.sin(a) * shell];
+                }), false);
+            }
+            glow(0.25 * fade + 0.1); ctx.beginPath(); ctx.arc(0, 0, shell, 0, TAU); ctx.fill();
+            glow(1); ring(ctx, 0, 0, shell);
+        } else if (skill === 'nova') {
+            // Arcane nova: expanding rune circle with orbiting glyph dots.
+            ring(ctx, 0, 0, r * bloom); ring(ctx, 0, 0, r * bloom * 0.7);
+            for (let i = 0; i < 8; i++) {
+                const a = i * TAU / 8 - phase * 2, x = Math.cos(a) * r * bloom * 0.85, y = Math.sin(a) * r * bloom * 0.85;
+                polygon(ctx, [[x, y - 6], [x + 5, y], [x, y + 6], [x - 5, y]]);
+            }
+        } else if (skill === 'chain') {
+            // Arc relay: jagged lightning bolt from the caster/previous target.
+            ctx.lineWidth = 3;
+            const points = [[0, 0]];
+            for (let i = 1; i < 6; i++) points.push([r * i / 6, (Math.sin(i * 12.9 + progress * 40) * 0.5) * 22]);
+            points.push([r, 0]);
+            line(ctx, points); ctx.strokeStyle = pale; ctx.lineWidth = 1; line(ctx, points);
+            ring(ctx, 0, 0, 10 * fade + 4);
+        } else if (skill === 'frost') {
+            // Rime sphere: snowflake burst with icy spokes.
+            ctx.strokeStyle = '#d8f4ff';
+            for (let i = 0; i < 6; i++) {
+                const a = i * TAU / 6 + phase * 0.3, cx = Math.cos(a), cy = Math.sin(a), rr = r * bloom;
+                line(ctx, [[0, 0], [cx * rr, cy * rr]]);
+                for (const t of [0.45, 0.7]) {
+                    const bx = cx * rr * t, by = cy * rr * t, s = rr * 0.15;
+                    line(ctx, [[bx + Math.cos(a + 0.8) * s, by + Math.sin(a + 0.8) * s], [bx, by], [bx + Math.cos(a - 0.8) * s, by + Math.sin(a - 0.8) * s]]);
+                }
+            }
+            glow(0.2 * fade); ctx.fillStyle = item.color; ctx.beginPath(); ctx.arc(0, 0, r * bloom, 0, TAU); ctx.fill();
+        } else if (skill === 'reap') {
+            // Soul needle: a thin piercing spike dropping onto the target.
+            const drop = r * 2 * (1 - Math.min(1, progress * 3));
+            ctx.lineWidth = 2; polygon(ctx, [[-3, -drop - 30], [0, -drop], [3, -drop - 30]]);
+            ctx.strokeStyle = pale; line(ctx, [[0, -drop - 40], [0, -drop]]);
+            if (progress > 0.3) { ring(ctx, 0, 0, r * (progress - 0.3) * 1.6); ring(ctx, 0, 0, 4); }
+        } else if (skill === 'meteor') {
+            // Falling star: star streaks down, then a starburst crater.
+            const impact = Math.min(1, progress * 2.5);
+            if (impact < 1) {
+                const sy = -r * 2.5 * (1 - impact), sx = -r * 1.2 * (1 - impact);
+                ctx.lineWidth = 4; line(ctx, [[sx - 40, sy - 70], [sx, sy]]);
+                ctx.fillStyle = pale; ctx.beginPath(); ctx.arc(sx, sy, 9, 0, TAU); ctx.fill();
+            } else {
+                const rr = r * bloom;
+                polygon(ctx, Array.from({ length: 10 }, (_, i) => {
+                    const a = i * TAU / 10 - Math.PI / 2, k = i % 2 ? 0.45 : 1; return [Math.cos(a) * rr * k, Math.sin(a) * rr * k];
+                }), false);
+                glow(0.3 * fade); ctx.beginPath(); ctx.arc(0, 0, rr * 0.6, 0, TAU); ctx.fill();
+            }
+        } else if (skill === 'siphon') {
+            // Astral draught: motes spiral inward from the target.
+            ctx.fillStyle = '#c9fff2';
+            for (let i = 0; i < 7; i++) {
+                const a = i * TAU / 7 + phase * 4, d = r * (1 - progress) * (0.6 + (i % 3) * 0.2);
+                ctx.beginPath(); ctx.arc(Math.cos(a) * d, Math.sin(a) * d, 3.5, 0, TAU); ctx.fill();
+            }
+            ring(ctx, 0, 0, r * 0.4 * fade + 3);
+        } else {
+            // Spellbreak: shattering shock ring with broken shards flying outward.
+            ctx.lineWidth = 4 * fade + 1; ring(ctx, 0, 0, r * bloom);
+            for (let i = 0; i < 10; i++) {
+                const a = i * TAU / 10, d = r * bloom * (0.85 + progress * 0.3);
+                polygon(ctx, [[Math.cos(a) * d, Math.sin(a) * d], [Math.cos(a + 0.12) * (d + 10), Math.sin(a + 0.12) * (d + 10)], [Math.cos(a - 0.05) * (d + 14), Math.sin(a - 0.05) * (d + 14)]]);
+            }
         }
     } else if (hero === 'knight') {
         if (skill === 'chain') {

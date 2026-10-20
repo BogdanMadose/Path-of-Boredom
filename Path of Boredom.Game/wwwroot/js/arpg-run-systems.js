@@ -33,7 +33,8 @@ export function setEquipmentStyle(state, slot, key) {
     return true;
 }
 export function acceptChallenge(state, key) {
-    if (state.training || !Object.hasOwn(CHALLENGES, key) || !["paused", "camp"].includes(state.status)) return false;
+    const traveling = state.status === "playing" && state.travelPending === 1;
+    if (state.training || !Object.hasOwn(CHALLENGES, key) || !(["paused", "camp"].includes(state.status) || traveling)) return false;
     if (state.wave % 5 !== 0 || state.enemies.length) return false;
     const stage = Math.floor(state.wave / 5) + 1;
     const previous = state.runSystems.challenge;

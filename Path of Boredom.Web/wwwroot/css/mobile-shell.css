@@ -300,9 +300,15 @@
     }
     body.mobile-shell .arpg:not([data-game-status="playing"]) .touch-aim,
     body.mobile-shell .arpg[data-menu-open="on"] .touch-aim,
-    body.mobile-shell .forge-nudge {
+    body.mobile-shell .forge-nudge:not(.challenge-nudge) {
         display: none !important;
     }
+    body.mobile-shell .challenge-nudge {
+        position: absolute; top: max(8px, env(safe-area-inset-top)); left: 50%; right: auto; bottom: auto; transform: translateX(-50%);
+        width: min(560px, calc(100% - 24px)); border: 1px solid #ff9b7a; border-radius: 10px; z-index: 40; pointer-events: auto;
+        box-shadow: 0 6px 24px #000a; font-size: 13px; animation: mobile-challenge-in .35s ease-out;
+    }
+    body.mobile-shell .challenge-nudge button { min-height: 40px; padding: 0 12px; }
 
     body.mobile-shell .joystick-knob {
         position: absolute;
@@ -984,3 +990,5 @@
         max-width: 124px;
     }
 }
+
+@keyframes mobile-challenge-in { from { opacity: 0; margin-top: -24px; } }

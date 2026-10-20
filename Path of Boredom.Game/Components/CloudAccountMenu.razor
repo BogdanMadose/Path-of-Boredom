@@ -4,6 +4,14 @@
 @if (Session is ICloudGameSession cloud)
 {
     <div class="mm-account-body">
+        @if (busyLabel is not null)
+        {
+            <div class="account-busy" role="status" aria-live="assertive">
+                <div class="account-busy-ember" aria-hidden="true"></div>
+                <strong>@busyLabel</strong>
+                <small>@busyHint</small>
+            </div>
+        }
 
         <p role="status" aria-live="polite">@cloud.AccountStatus.Message</p>
         @if (lastResult is not null)
@@ -104,19 +112,32 @@
         await Changed.InvokeAsync();
     }
 
-    private Task SignIn() => Run(async () =>
+    private string? busyLabel;
+    private string? busyHint;
+
+    private async Task RunWithLabel(string label, string hint, Func<Task> action)
+    {
+        busyLabel = label; busyHint = hint;
+        StateHasChanged();
+        try { await Run(action); }
+        finally { busyLabel = null; busyHint = null; StateHasChanged(); }
+    }
+
+    private Task SignIn() => RunWithLabel("Signing in with Google…", "Finish in the Google window, then come back here.", async () =>
     {
         renameResult = null;
         status = await Cloud.SignInAsync();
+        busyLabel = "Loading your account…"; busyHint = "Checking cloud saves and rankings."; StateHasChanged();
         displayName = status.Player;
     });
-    private Task SignInApple() => Run(async () =>
+    private Task SignInApple() => RunWithLabel("Signing in with Apple…", "Finish in the Apple window, then come back here.", async () =>
     {
         renameResult = null;
         status = await Cloud.SignInWithAppleAsync();
+        busyLabel = "Loading your account…"; busyHint = "Checking cloud saves and rankings."; StateHasChanged();
         displayName = status.Player;
     });
-    private Task SignOut() => Run(async () =>
+    private Task SignOut() => RunWithLabel("Signing out…", "Your device save stays here.", async () =>
     {
         renameResult = null;
         status = await Cloud.SignOutAsync();

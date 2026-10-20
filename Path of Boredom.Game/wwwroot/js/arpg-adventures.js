@@ -10,9 +10,11 @@ export const BOSS_RELICS = [
 ];
 export const STAGE_EVENTS = [
     { name: 'Lantern keeper', detail: 'Give 80 gold to restore 30% maximum health, before difficulty penalties.', cost: 80, kind: 'heal' },
-    { name: 'Lost pilgrim', detail: 'Give one flask charge to receive 100 gold.', cost: 0, kind: 'flask' },
-    { name: 'Sealed coffer', detail: 'Sacrifice 20% maximum health to receive 150 gold. Cannot be used if the cost would defeat you.', cost: 0, kind: 'blood' }
+    { name: 'Lost pilgrim', detail: 'Give one flask charge to receive {gold} gold.', cost: 0, kind: 'flask', reward: 200, perStage: 60 },
+    { name: 'Sealed coffer', detail: 'Sacrifice 20% maximum health to receive {gold} gold. Cannot be used if the cost would defeat you.', cost: 0, kind: 'blood', reward: 300, perStage: 80 }
 ];
+export const eventReward = (state, event = stageEvent(state)) => (event.reward ?? 0) + (event.perStage ?? 0) * Math.floor(state.wave / 5);
+export const eventDetail = (state, event = stageEvent(state)) => event.detail.replace('{gold}', eventReward(state, event));
 export const newAdventures = () => ({ relics: [0, 0, 0, 0, 0, 0], chapters: [0, 0, 0, 0, 0, 0], eventStage: -1 });
 export function discoverChapter(state) {
     if (state.training || state.mode !== 'campaign' || state.wave < 1) return;
@@ -29,8 +31,8 @@ export function resolveStageEvent(state, accept, healing = 1) {
         state.gold -= event.cost;
         state.runSystems.summary.spent += event.cost;
         if (event.kind === 'heal') p.health = Math.min(p.maxHealth, p.health + p.maxHealth * 0.3 * healing);
-        if (event.kind === 'flask') { p.potions--; state.gold += 100; }
-        if (event.kind === 'blood') { p.health -= p.maxHealth * 0.2; state.gold += 150; }
+        if (event.kind === 'flask') { p.potions--; state.gold += eventReward(state, event); }
+        if (event.kind === 'blood') { p.health -= p.maxHealth * 0.2; state.gold += eventReward(state, event); }
     }
     state.adventures.eventStage = Math.floor(state.wave / 5);
     state.journal = accept ? `${event.name}: bargain completed.` : `${event.name}: passed by safely.`;

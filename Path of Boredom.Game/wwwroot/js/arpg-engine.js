@@ -30,6 +30,7 @@ import { bossProfile } from "./arpg-bosses.js";
 import { skillDamageType, incomingDamageType, mitigateDamage, enemyDamageType, hazardDamageType, enemyDefense } from "./arpg-damage.js";
 import { newAdventures, awardBossRelic, discoverChapter, buildSynergy } from "./arpg-adventures.js";
 import { bossDanger } from "./arpg-boss-patterns.js";
+import { RELICS, hasRelic, rollRelic } from "./arpg-relics.js";
 import { observeBossRecovery, beginBossRecovery } from './arpg-boss-combat.js';
 // Logical canvas resolution (not the real on-screen pixel size — arpg-graphics.js scales this to
 // fit the actual canvas). All position math throughout this file is in these logical units.
@@ -37,6 +38,9 @@ export const WIDTH = 1100;
 export const HEIGHT = 650;
 // Maximum number of health flasks a player can carry at once, regardless of class or upgrades.
 export const MAX_FLASKS = 5;
+// Class-mastery relay forks (extra chain jumps), set from the meta profile when a run starts/loads.
+let relayForks = 0;
+export function setRelayForks(count) { relayForks = Math.max(0, Math.min(2, count | 0)); }
 // Mastery training — the gold-cost stat sink unlocked once every forge upgrade is maxed (see
 // forgeComplete() below). Unlike boons/forge upgrades, mastery ranks have no cap; masteryCost()
 // grows linearly with rank so it's always a meaningful, if diminishing, gold sink.
@@ -92,7 +96,7 @@ export function createState(random = Math.random) {
         loadout: { manual: "none", auto: ["nova", "none", "none", "none"] }, skillTree: newSkillTree(), wardUnlockSeen: 1,
         resumeDelay: 0, travelPending: 0,
         heroClass: "knight", playerShots: [],
-        kills: 0, gold: 0, enemies: [], projectiles: [], loot: [], effects: [],
+        kills: 0, gold: 0, enemies: [], projectiles: [], loot: [], effects: [], runRelics: [], burns: [],
         journal: "A faint warmth lingers beneath the ashes.",
         player: {
             x: WIDTH / 2, y: HEIGHT / 2, radius: 16, facing: -Math.PI / 2,
@@ -239,7 +243,7 @@ export function chooseLevelCard(state, key) {
     } else {
         state.cardChoices = [];
         state.enemies = state.enemies.filter(enemy => enemy.health > 0);
-        if (!state.enemies.length && state.wave > 0 && state.wave % WAVES_PER_MAP === 0) finishCheckpoint(state);
+        if (!state.enemies.length && !pendingSpawns(state) && state.wave > 0 && state.wave % WAVES_PER_MAP === 0) finishCheckpoint(state);
         else state.status = needsSkillChoice(state) ? "paused" : "playing";
     }
     return true;
@@ -252,7 +256,7 @@ export function continueJourney(state) {
     if (state.status === "camp") {
         state.status = "playing";
         state.travelPending = 1;
-        state.resumeDelay = 3;
+        state.resumeDelay = state.mode === "endless" ? 6 : 3;
         return true;
     }
     return false;
@@ -363,6 +367,10 @@ function hurtPlayer(state, damage, source = "Unknown attack") {
     if (state.damageHistory.length > 12) state.damageHistory.shift();
     player.invulnerable = 0.3;
     effect(state, "text", player.x, player.y - 35, type === "magical" ? "#c6a4ff" : "#ff9384", `-${Math.ceil(taken)} ${type === "magical" ? "MAG" : "PHY"}`);
+    if (taken > 0 && player.health > 0 && hasRelic(state, "thorn")) {
+        effect(state, "ring", player.x, player.y, RELICS.thorn.color, "", 110);
+        for (const enemy of state.enemies) if (enemy.health > 0 && distance(player, enemy) < 110 + enemy.radius) hitEnemy(state, enemy, Math.round(weaponDamage(state) * 0.5), true, "relic");
+    }
     if (player.health === 0) {
         state.status = "dead";
         state.journal = `Defeated by ${source}. The death report shows recent health lost after mitigation.`;
@@ -400,6 +408,13 @@ function killEnemy(state, enemy) {
     state.kills++;
     if (state.training) return;
     if (enemy.kind === "boss") awardBossRelic(state);
+    if (hasRelic(state, "leech")) state.player.health = Math.min(state.player.maxHealth, state.player.health + state.player.maxHealth * 0.015);
+    const relic = rollRelic(state, enemy);
+    if (relic) {
+        effect(state, "burst", enemy.x, enemy.y, RELICS[relic].color, "", 90);
+        effect(state, "text", state.player.x, state.player.y - 60, RELICS[relic].color, `RARE RELIC: ${RELICS[relic].name.toUpperCase()}`);
+        state.journal = `Rare relic found! ${RELICS[relic].name}: ${RELICS[relic].detail} Active for the rest of this run and added to your Relic Codex.`;
+    }
     if (enemy.elite || enemy.kind === "boss") {
         state.player.health = Math.min(state.player.maxHealth, state.player.health + state.boons.siphon * 0.8 * difficultyFor(state).healing);
     }
@@ -459,7 +474,7 @@ function hitEnemy(state, enemy, damage, piercing = false, skill = "attack") {
     const critical = state.random() < Math.min(0.75, criticalChance(state) + (skill === "burst" && state.heroClass !== "warden" ? state.skillTree.burst.overdrive * 0.1 : 0));
     if (critical) damage = Math.round(damage * criticalDamage(state));
     if (damageType === "physical" && enemy.kind === "sentinel" && !piercing && !(state.heroClass === "warden" && skill === "attack" && state.skillTree.attack.execution)) damage = Math.round(damage * 0.55);
-    state.runSystems.summary.damage[skill] += Math.min(enemy.health, damage);
+    if (skill in state.runSystems.summary.damage) state.runSystems.summary.damage[skill] += Math.min(enemy.health, damage);
     enemy.health -= damage;
     enemy.flash = enemy.kind === "boss" ? 0.06 : 0.15;
     if (critical && (enemy.kind === "boss" || enemy.health <= 0) && state.time - (state.lastHitStop ?? -Infinity) > 0.8) {
@@ -564,11 +579,11 @@ function castClassSkill(state, skill) {
         if (skill === "chain") {
             let previous = p;
             const visited = new Set();
-            for (let jump = 0; jump < 3 + nodes.ember * 2; jump++) {
+            for (let jump = 0; jump < 3 + nodes.ember * 2 + relayForks; jump++) {
                 const target = state.enemies.filter(enemy => enemy.health > 0 && !visited.has(enemy) && distance(previous, enemy) <= (jump ? 180 : reach))
                     .sort((a, b) => distance(previous, a) - distance(previous, b))[0];
                 if (!target) break;
-                art(target, 30);
+                art(previous, distance(previous, target), Math.atan2(target.y - previous.y, target.x - previous.x));
                 visited.add(target);
                 strike(target, 0.75 ** jump);
                 previous = target;
@@ -594,7 +609,7 @@ function castClassSkill(state, skill) {
         if (skill === "chain") {
             let previous = p;
             const visited = new Set();
-            for (let index = 0; index < 3 + nodes.ember * 2; index++) {
+            for (let index = 0; index < 3 + nodes.ember * 2 + relayForks; index++) {
                 const target = state.enemies.filter(enemy => enemy.health > 0 && !visited.has(enemy) && distance(previous, enemy) <= (index ? 180 + nodes.reach * 30 : reach))
                     .sort((a, b) => distance(previous, a) - distance(previous, b))[0];
                 if (!target) break;
@@ -642,7 +657,7 @@ function castClassSkill(state, skill) {
         if (skill === "chain") {
             let previous = p;
             const visited = new Set();
-            for (let index = 0; index < 2 + nodes.ember; index++) {
+            for (let index = 0; index < 2 + nodes.ember + relayForks; index++) {
                 const candidates = state.enemies.filter(enemy => enemy.health > 0 && !visited.has(enemy) && distance(previous, enemy) <= (index ? 220 + nodes.reach * 35 : reach))
                     .sort((a, b) => distance(previous, a) - distance(previous, b));
                 const target = index ? candidates.at(-1) : candidates[0];
@@ -693,7 +708,7 @@ function castClassSkill(state, skill) {
         }
     } else {
         if (skill === "chain") {
-            const centre = { x: targets[0].x, y: targets[0].y }, radius = (nodes.ember ? 180 : 130) + nodes.reach * 20;
+            const centre = { x: targets[0].x, y: targets[0].y }, radius = (nodes.ember ? 180 : 130) + nodes.reach * 20 + relayForks * 25;
             art(centre, radius);
             for (const enemy of state.enemies) if (enemy.health > 0 && distance(centre, enemy) <= radius + enemy.radius) {
                 strike(enemy);
@@ -795,6 +810,11 @@ export function useSkill(state, skill, automatic = false) {
         p.casting = 0.4;
         p.nova = hero.specialCooldown / (1 + state.upgrades.nova * 0.07);
         const reach = skillReach(state, "nova");
+        if (hasRelic(state, "cinder")) {
+            state.burns ??= [];
+            state.burns.push({ x: p.x, y: p.y, radius: Math.min(160, reach * 0.6), life: 3, tick: 0, damage: Math.round(weaponDamage(state) * 0.35) });
+            if (state.burns.length > 6) state.burns.shift();
+        }
         if (state.heroClass === "ranger") {
             art(reach);
             firePlayerArrows(state, [-0.36, -0.18, 0, 0.18, 0.36], damage(hero.specialDamage + state.upgrades.nova * 0.1), reach, 1, skill);
@@ -863,6 +883,13 @@ export function useSkill(state, skill, automatic = false) {
         p.rollX = Math.cos(p.facing);
         p.rollY = Math.sin(p.facing);
         effect(state, "wind", p.x, p.y, "#b5ecf4", "", 45 + nodes.distance * 15, p.facing);
+        if (hasRelic(state, "quiver")) {
+            const targets = state.enemies.filter(enemy => enemy.health > 0 && distance(p, enemy) < 420).sort((a, b) => distance(p, a) - distance(p, b)).slice(0, 3);
+            for (const enemy of targets) {
+                effect(state, "relic-arrow", p.x, p.y, RELICS.quiver.color, "", distance(p, enemy), Math.atan2(enemy.y - p.y, enemy.x - p.x));
+                hitEnemy(state, enemy, Math.round(weaponDamage(state) * 0.8), true, "relic");
+            }
+        }
     } else {
         if (p.potions <= 0 || p.health >= p.maxHealth) return false;
         p.potion = 0.7;
@@ -874,6 +901,10 @@ export function useSkill(state, skill, automatic = false) {
         if (nodes.tonic) p.flaskWard = 2;
         if (nodes.renewal) p.renewal = 2;
         effect(state, "heal", p.x, p.y, emergency && nodes.triage ? "#ffcd79" : "#9de8ad", "", 24 + nodes.concentration * 5);
+        if (hasRelic(state, "echo")) {
+            effect(state, "expand", p.x, p.y, RELICS.echo.color, "", 160);
+            for (const enemy of state.enemies) if (enemy.health > 0 && distance(p, enemy) < 160 + enemy.radius) hitEnemy(state, enemy, Math.round(weaponDamage(state) * 1.5), true, "relic");
+        }
         state.journal = "A moment of warmth. Refill flasks at checkpoints or the forge, not on level-up.";
     }
     p[skill] *= automatic ? AUTO_COOLDOWN : 1;
@@ -1010,6 +1041,25 @@ function hitArrowTarget(state, shot, enemy, damage, piercing) {
 // the `depth` term), player level (levelPressure), and difficulty preset. Every 5th wave
 // (WAVES_PER_MAP) is a boss wave with one guaranteed boss. On returning to wave 1 of a new map,
 // clears leftover projectiles/loot/effects and resets the player to the arena center.
+// Releases queued wave members a few at a time: one every ~0.75s, or immediately when the arena
+// is nearly empty so the player never stands around waiting for the next enemy.
+export function pendingSpawns(state) {
+    return state.spawnQueueWave === state.wave ? state.spawnQueue?.length ?? 0 : 0;
+}
+
+function releaseSpawns(state, dt) {
+    if (!pendingSpawns(state)) return;
+    const queue = state.spawnQueue;
+    state.spawnTimer -= dt;
+    const alive = state.enemies.filter(enemy => enemy.health > 0).length;
+    if (state.spawnTimer > 0 && alive >= 3) return;
+    const enemy = queue.shift();
+    enemy.appearanceAt = state.time;
+    enemy.flash = 0.2;
+    state.enemies.push(enemy);
+    state.spawnTimer = 0.6 + state.random() * 0.3;
+}
+
 function spawnWave(state) {
     state.wave++;
     discoverChapter(state);
@@ -1031,7 +1081,8 @@ function spawnWave(state) {
         * (1 + levelPressure * 0.055) ** 1.15;
     const encounter = encounterForWave(state.wave);
     const formation = encounterFormation(state.wave);
-    const baseCount = (bossWave ? 10 + act * 3 : 5 + localWave * 3 + act * 3) + Math.floor(depth / 4) + difficulty.extra;
+    const baseCount = (bossWave ? 10 + act * 3 : 7 + localWave * 3 + act * 3) + Math.floor(depth / 4) + difficulty.extra;
+    const earlyToughness = state.wave <= 4 ? 1.3 : state.wave <= 8 ? 1.15 : 1;
     const count = Math.min(40, Math.max(5, Math.round(baseCount * (state.wave >= 6 ? encounter.count : 1))));
     for (let i = 0; i < count; i++) {
         const boss = bossWave && i === 0;
@@ -1059,12 +1110,18 @@ function spawnWave(state) {
             ? traits[Math.floor(state.random() * traits.length)] : "none";
         spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * difficulty.health
             * (boss && state.mode === "endless" ? 2.6 + depth * 0.06 : 1));
-        spawned.damage = Math.round(spawned.damage * difficulty.damage);
+        spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * earlyToughness);
+        spawned.damage = Math.round(spawned.damage * difficulty.damage * (earlyToughness > 1 ? 1.1 : 1));
         spawned.speed = Math.min(210, spawned.speed) * difficulty.speed * (1 + Math.min(0.15, depth * 0.0015));
     }
+    const opening = Math.max(3, Math.ceil(count * 0.35));
+    const waveStart = state.enemies.length - count;
+    state.spawnQueue = state.enemies.splice(waveStart + opening);
+    state.spawnTimer = 1.2;
+    state.spawnQueueWave = state.wave;
     if (bossWave) {
         const reveal = effect(state, 'boss-intro', WIDTH / 2, 100, map.accent, `${map.boss} · ${bossProfile(state.wave).title}`);
-        reveal.life = reveal.maxLife = 3;
+        reveal.life
     }
     state.journal = bossWave ? `${map.boss} awakens. Escape the slam${act ? " and its projectile volley" : ""}!`
         : localWave === 1 && act > 0 ? `${map.name}. The next stage begins. ${map.description}`
@@ -1100,7 +1157,7 @@ function collectLoot(state, dt, collectAll = false) {
         }
         if (!collectAll && distance(p, drop) > 28) continue;
         drop.life = 0;
-        if (drop.kind === "gold") state.gold += goldReward(drop.value, state.boons.fortune);
+        if (drop.kind === "gold") state.gold += Math.round(goldReward(drop.value, state.boons.fortune) * (hasRelic(state, "midas") ? 1.3 : 1));
         else if (drop.kind === "flask") {
             const full = p.potions >= MAX_FLASKS;
             if (full) p.health = Math.min(p.maxHealth, p.health + p.maxHealth * 0.08 * difficultyFor(state).healing);
@@ -1443,6 +1500,16 @@ export function step(state, input, elapsed) {
     }
     state.projectiles = state.projectiles.filter(bolt => bolt.life > 0);
     if (state.status !== "playing") return;
+    if (state.burns?.length) {
+        for (const burn of state.burns) {
+            burn.life -= dt;
+            burn.tick -= dt;
+            if (burn.tick > 0) continue;
+            burn.tick = 0.5;
+            for (const enemy of state.enemies) if (enemy.health > 0 && distance(burn, enemy) < burn.radius + enemy.radius) hitEnemy(state, enemy, burn.damage, true, "relic");
+        }
+        state.burns = state.burns.filter(burn => burn.life > 0);
+    }
     collectLoot(state, dt);
     for (const item of state.effects) item.life -= dt;
     let keptEffects = 0;
@@ -1451,7 +1518,8 @@ export function step(state, input, elapsed) {
         else recycleEffect(item);
     }
     state.effects.length = keptEffects;
-    if (state.enemies.length === 0) {
+    releaseSpawns(state, dt);
+    if (state.enemies.length === 0 && !pendingSpawns(state)) {
         state.projectiles = [];
         state.playerShots = [];
         if (state.wave > 0 && state.wave % WAVES_PER_MAP === 0) {

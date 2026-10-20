@@ -58,6 +58,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="tests\ember-camp-landscape.test.mjs" />
+    <None Include="tests\relics.test.mjs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Path of Boredom.Game\Path of Boredom.Game.csproj" />
   </ItemGroup>
 

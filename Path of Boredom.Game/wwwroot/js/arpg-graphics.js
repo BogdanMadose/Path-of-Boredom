@@ -113,7 +113,64 @@ function bodySprite(hero) {
     ctx.beginPath(); ctx.moveTo(-11, -9); ctx.quadraticCurveTo(0, -13.5, 11, -9); ctx.stroke();
     ctx.strokeStyle = hero.color + "cc"; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(-10, 14); ctx.quadraticCurveTo(0, 18, 10, 14); ctx.stroke();
-    if (sprites.size >= 128)
+    // Fine detail: mail scallops under the breastplate, gilded pauldron trim, rivets and a lit gem.
+    ctx.strokeStyle = "#0e161c88"; ctx.lineWidth = 0.6;
+    for (let row = 0; row < 2; row++) for (let x = -9 + row * 1.5; x <= 9; x += 3) {
+        ctx.beginPath(); ctx.arc(x, 4 + row * 2, 1.4, 0, Math.PI); ctx.stroke();
+    }
+    ctx.strokeStyle = "#e3c98a"; ctx.lineWidth = 0.9;
+    for (const side of [-1, 1]) {
+        ctx.beginPath(); ctx.moveTo(side * 10, -10); ctx.lineTo(side * 19, -10); ctx.lineTo(side * 21, -2); ctx.stroke();
+        ctx.fillStyle = "#f2e2b4";
+        for (const [x, y] of [[side * 12, -8], [side * 17, -8], [side * 19, -4]]) { ctx.beginPath(); ctx.arc(x, y, 0.7, 0, Math.PI * 2); ctx.fill(); }
+    }
+    for (const side of [-1, 1]) {
+        ctx.fillStyle = "#5a4130"; ctx.strokeStyle = "#1a120c"; ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.rect(side * 8 - 2, 8.5, 4, 3.5); ctx.fill(); ctx.stroke();
+    }
+    const gem = ctx.createRadialGradient(-1, -3, 0.2, 0, -2, 3.5);
+    gem.addColorStop(0, "#ffffff"); gem.addColorStop(0.4, hero.color); gem.addColorStop(1, hero.color + "00");
+    ctx.fillStyle = gem; ctx.beginPath(); ctx.arc(0, -2, 3.5, 0, Math.PI * 2); ctx.fill();
+    if (sprites.size >= 128) sprites.delete(sprites.keys().next().value);
+    sprites.set(key, sprite);
+    return sprite;
+}
+
+// Sorcerer hood, face, shoulders and robe trim, baked once (only the robe hem and staff animate).
+function sorcererSprite(hero) {
+    const key = `body:staff:${hero.color}`;
+    let sprite = sprites.get(key);
+    if (sprite) return sprite;
+    sprite = document.createElement("canvas");
+    sprite.width = 256; sprite.height = 288;
+    const ctx = sprite.getContext("2d"); ctx.scale(4, 4); ctx.translate(32, 36);
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.strokeStyle = hero.color; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(0, -3); ctx.lineTo(0, 20); ctx.stroke();
+    for (const y of [2, 8, 14]) { polygon(ctx, [[0, y - 2], [2, y], [0, y + 2], [-2, y]], "#e9dcff", null); }
+    for (const side of [-1, 1]) {
+        polygon(ctx, [[side * 6, -8], [side * 14, -7], [side * 15, 0], [side * 8, 2]], metal(ctx, "#8f78b8", "#4b3a6b", "#1d1729"), "#10101a", 1.2);
+        ctx.strokeStyle = "#e3c98a"; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(side * 7, -7.5); ctx.lineTo(side * 14, -6.5); ctx.stroke();
+    }
+    polygon(ctx, [[0, -26], [11, -17], [10, -5], [-10, -5], [-11, -17]], metal(ctx, "#5a4a7c", "#30283f", "#15111e"), "#0d0b14", 1.5);
+    ctx.strokeStyle = hero.color; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-10, -6); ctx.lineTo(-11, -17); ctx.lineTo(0, -26); ctx.lineTo(11, -17); ctx.lineTo(10, -6); ctx.stroke();
+    polygon(ctx, [[-5.5, -17], [5.5, -17], [4.5, -8], [-4.5, -8]], "#0c0a12", null);
+    const face = ctx.createLinearGradient(0, -17, 0, -8);
+    face.addColorStop(0, "#6a5850"); face.addColorStop(1, "#c9b2a3");
+    polygon(ctx, [[-3.5, -14], [3.5, -14], [3, -8.5], [-3, -8.5]], face, null);
+    for (const x of [-1.6, 1.6]) {
+        const eye = ctx.createRadialGradient(x, -12.5, 0, x, -12.5, 2.2);
+        eye.addColorStop(0, "#ffffff"); eye.addColorStop(0.35, hero.color); eye.addColorStop(1, hero.color + "00");
+        ctx.fillStyle = eye; ctx.beginPath(); ctx.arc(x, -12.5, 2.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = "source-atop";
+    const sheen = ctx.createRadialGradient(-6, -16, 1, -6, -16, 20);
+    sheen.addColorStop(0, "#ffffff30"); sheen.addColorStop(1, "#ffffff00");
+    ctx.fillStyle = sheen; ctx.fillRect(-32, -36, 64, 72);
+    ctx.globalCompositeOperation = "source-over";
+    if (sprites.size >= 128) sprites.delete(sprites.keys().next().value);
     sprites.set(key, sprite);
     return sprite;
 }
@@ -140,7 +197,17 @@ function heroPaints(ctx, type, ranger, warden) {
 // weapon drawn per class — a bow with a stretch/loose animation tied to `strike`, or a sword/hammer
 // swung via rotation tied to `strike` and the attack windup. `reduced` disables all of the purely
 // cosmetic motion (flutter, sway, flicker) for the prefers-reduced-motion accessibility setting.
-export function drawHero(ctx, actor, hero, stride, strike, time, reduced) {
+// Mastery cosmetic: a trim-coloured shoulder line and chest gem drawn over the cached body sprite.
+function drawTrimAccent(ctx, trim) {
+    ctx.save();
+    ctx.strokeStyle = trim; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-12, -10); ctx.quadraticCurveTo(0, -15, 12, -10); ctx.stroke();
+    ctx.fillStyle = trim; ctx.strokeStyle = "#10191f"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(3.5, -1); ctx.lineTo(0, 4); ctx.lineTo(-3.5, -1); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+}
+
+export function drawHero(ctx, actor, hero, stride, strike, time, reduced, trim = "") {
     if (hero.weaponType === "staff") {
         ctx.save(); ctx.rotate(actor.facing + Math.PI / 2);
         if (actor.invulnerable > 0) ctx.globalAlpha *= reduced ? 0.8 : 0.72 + Math.sin(time * 18) * 0.12;
@@ -148,11 +215,9 @@ export function drawHero(ctx, actor, hero, stride, strike, time, reduced) {
         for (const side of [-1, 1]) {
             polygon(ctx, [[side * 4, 14 + stride * side * 3], [side * 10, 14 + stride * side * 3], [side * 10, 29 + stride * side * 3], [side * 4, 29 + stride * side * 3]], '#25303e', '#8b80a255', 1);
         }
-        polygon(ctx, [[-11, -8], [11, -8], [17 + flutter, 22], [6, 26], [0, 23], [-16 + flutter, 25]], "#51416f", '#a68ac055', 1.5);
-        polygon(ctx, [[0, -25], [11, -17], [10, -5], [-10, -5], [-11, -17]], '#30283f', hero.color, 1.5);
-        polygon(ctx, [[-5, -16], [5, -16], [4, -8], [-4, -8]], '#bba49c', '#181723', 1);
-        ctx.strokeStyle = '#cdb4ef'; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(0, -3); ctx.lineTo(0, 20); ctx.moveTo(-8, 5); ctx.lineTo(8, 5); ctx.stroke();
+        polygon(ctx, [[-11, -8], [11, -8], [17 + flutter, 22], [6, 26], [0, 23], [-16 + flutter, 25]], "#51416f", trim || '#a68ac055', trim ? 2.5 : 1.5);
+        ctx.drawImage(sorcererSprite(hero), -32, -36, 64, 72);
+        if (trim) drawTrimAccent(ctx, trim);
         const twist = angleDifference(actor.facing, actor.weaponFacing ?? actor.facing);
         ctx.rotate(twist);
         ctx.strokeStyle = "#bda77c"; ctx.lineWidth = 4;
@@ -180,7 +245,7 @@ export function drawHero(ctx, actor, hero, stride, strike, time, reduced) {
     ctx.bezierCurveTo(13, 9, 22 + flutter, 18, 18 + flutter, 28);
     ctx.quadraticCurveTo(8, 24, -2, 33); ctx.quadraticCurveTo(-10, 28, -18 + flutter, 29);
     ctx.bezierCurveTo(-22 + flutter, 18, -13, 9, -12, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = hero.color + "aa"; ctx.lineWidth = 1.5;
+    ctx.strokeStyle = trim || hero.color + "aa"; ctx.lineWidth = trim ? 2.5 : 1.5;
     ctx.beginPath(); ctx.moveTo(-2, 33); ctx.quadraticCurveTo(8, 24, 18 + flutter, 28); ctx.moveTo(-2, 33); ctx.quadraticCurveTo(-10, 28, -18 + flutter, 29); ctx.stroke();
     ctx.strokeStyle = hero.color + "55"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(-8, 3); ctx.lineTo(-11 + flutter, 23);
@@ -193,6 +258,7 @@ export function drawHero(ctx, actor, hero, stride, strike, time, reduced) {
     ctx.save();
     ctx.rotate(twist * 0.45);
     ctx.drawImage(body, -32, -36, 64, 72);
+    if (trim) drawTrimAccent(ctx, trim);
     ctx.restore();
     ctx.rotate(twist);
     const steel = paints.steel;

@@ -24,9 +24,15 @@ import { movementSpeed, criticalChance, criticalDamage, skillReach, cooldownReco
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
 import { resistanceRating } from "./arpg-engine.js";
 import { enemyDefense, skillDamageType } from "./arpg-damage.js";
-import { BOSS_RELICS, codexEntries, stageEvent, eventAvailable, resolveStageEvent, buildSynergy, discoverChapter, checkpointReport } from "./arpg-adventures.js";
+import { BOSS_RELICS, codexEntries, stageEvent, eventAvailable, eventDetail, resolveStageEvent, buildSynergy, discoverChapter, checkpointReport } from "./arpg-adventures.js";
 import { bindPreferences } from "./arpg-preferences.js";
 import { drawBossDanger, bossWarning } from "./arpg-boss-patterns.js";
+import { drawMob } from "./arpg-mob-art.js";
+import { CAMP_NODES, CLASS_ORDER, CLASS_UNLOCK_HINT, MASTERY_MAX, MASTERY_REWARDS, masteryStep, loadProfile, onProfileChange, grandfatherClasses, classUnlocked, campCost, buyCampNode, extraStarters, relayForks, unlockedTrims, setTrim, applyCampBonuses, rerollsPerRun, creditProgress, mergeProfile } from "./arpg-meta.js";
+import { setRelayForks } from "./arpg-engine.js";
+import { RELICS, RELIC_KEYS } from "./arpg-relics.js";
+import { recordRelics } from "./arpg-meta.js";
+import { drawLevelCards } from "./arpg-cards.js";
 import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
 import { treePointsSpent, treeRespecCost, canRespecTree, respecTree } from "./arpg-skills.js";
 import { SKILL_KEYS, SLOTTABLE_SKILLS, STARTER_SKILLS, EXTRA_SKILLS, NEW_SKILLS, combatSkillDefinition, MAX_SKILL_POINTS, skillIcon, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, skillSelected, skillCapacity, selectedSkills, needsSkillChoice, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
@@ -38,6 +44,7 @@ import { turnToward } from "./arpg-facing.js";
 import { automaticCheckpoint, forgeNotification, bossHudTop, combatControlStatus, bossWarningPosition } from "./arpg-ui-state.js";
 import { encounterForWave } from "./arpg-encounters.js";
 import { startTraining } from "./arpg-engine.js";
+import { paintGround } from "./arpg-ground.js";
 import { setEquipmentStyle, acceptChallenge, CHALLENGES, EQUIPMENT_STYLES, runSummary } from "./arpg-run-systems.js";
 import { createGameAudio } from "./arpg-audio.js";
 import { bindButtonFeedback } from "./arpg-button-feedback.js";
@@ -74,29 +81,7 @@ function makeFloor(map) {
 
     let seed = 72;
     const random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-    for (let row = -1; row < 12; row++) {
-        for (let col = -1; col < 17; col++) {
-            const x = col * 78 + (row % 2) * 39;
-            const y = row * 62;
-            const shade = Math.floor(random() * 12);
-            ctx.fillStyle = `rgb(${map.tint.map(channel => channel + shade).join(",")})`;
-            ctx.fillRect(x + 2, y + 2, 74, 58);
-            ctx.strokeStyle = "#dbd9b71b"; ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(x + 3, y + 59); ctx.lineTo(x + 3, y + 3); ctx.lineTo(x + 75, y + 3); ctx.stroke();
-            ctx.strokeStyle = "#050c1266";
-            ctx.beginPath(); ctx.moveTo(x + 76, y + 3); ctx.lineTo(x + 76, y + 60); ctx.lineTo(x + 3, y + 60); ctx.stroke();
-            ctx.strokeStyle = "#aeb3a408";
-            ctx.strokeRect(x + 4, y + 4, 69, 53);
-            if (random() < 0.3) {
-                ctx.strokeStyle = "#0b13176b";
-                ctx.beginPath();
-                ctx.moveTo(x + 20, y + 3);
-                ctx.lineTo(x + 35, y + 25);
-                ctx.lineTo(x + 30, y + 40);
-                ctx.stroke();
-            }
-        }
-    }
+    paintGround(ctx, map, random, WIDTH, HEIGHT);
     if (map.id === "marsh") {
         ctx.strokeStyle = "#73957755";
         ctx.lineWidth = 2;
@@ -284,7 +269,9 @@ function drawActor(ctx, actor, player, time, map, heroClass) {
         }
     }
     if (hero) {
-        drawHero(ctx, actor, HERO_CLASSES[heroClass], stride, strike, time, reducedMotion.matches);
+        drawHero(ctx, actor, HERO_CLASSES[heroClass], stride, strike, time, reducedMotion.matches, loadProfile().trim[heroClass] || "");
+    } else if (!boss && drawMob(ctx, actor, facing, stride, strike, time)) {
+        // Detailed cached artwork (arpg-mob-art.js).
     } else if (boss) {
         drawBoss(ctx, actor, map, time, reducedMotion.matches);
     } else if (actor.kind === "duelist") {
@@ -718,6 +705,41 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
         ctx.strokeStyle = power.color; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(state.player.x, state.player.y, 25 + index * 4, state.time + index, state.time + index + Math.PI * 1.5); ctx.stroke();
     }
+    if (state.runRelics?.length && !state.training) {
+        ctx.save();
+        ctx.font = "bold 11px 'Segoe UI', sans-serif"; ctx.textBaseline = "middle";
+        let x = 14;
+        const y = 90;
+        for (const key of state.runRelics) {
+            const relic = RELICS[key], label = relic.name;
+            const w = ctx.measureText(label).width + 30;
+            ctx.fillStyle = "#0c171bcc"; ctx.strokeStyle = relic.color; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.roundRect(x, y - 11, w, 22, 11); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = relic.color;
+            ctx.beginPath(); ctx.moveTo(x + 12, y - 6); ctx.lineTo(x + 17, y); ctx.lineTo(x + 12, y + 6); ctx.lineTo(x + 7, y); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = "#f3dfb9"; ctx.fillText(label, x + 22, y + 1);
+            x += w + 6;
+        }
+        ctx.restore();
+    }
+    for (const burn of state.burns ?? []) {
+        const fade = Math.min(1, burn.life / 0.6);
+        ctx.save();
+        const glow = ctx.createRadialGradient(burn.x, burn.y, 0, burn.x, burn.y, burn.radius);
+        glow.addColorStop(0, `rgba(255, 150, 60, ${0.38 * fade})`);
+        glow.addColorStop(0.65, `rgba(200, 60, 20, ${0.22 * fade})`);
+        glow.addColorStop(1, "rgba(120, 20, 0, 0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath(); ctx.arc(burn.x, burn.y, burn.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(255, 196, 92, ${0.85 * fade})`;
+        for (let i = 0; i < 9; i++) {
+            const angle = i * 2.399 + burn.x * 0.01, r = burn.radius * (0.2 + (i % 4) * 0.2);
+            const x = burn.x + Math.cos(angle) * r, y = burn.y + Math.sin(angle) * r;
+            const h = (reducedMotion.matches ? 9 : 7 + Math.sin(state.time * 9 + i * 1.7) * 4) * fade;
+            ctx.beginPath(); ctx.moveTo(x - 4, y + 3); ctx.quadraticCurveTo(x - 2, y - h * 0.4, x, y - h); ctx.quadraticCurveTo(x + 2, y - h * 0.4, x + 4, y + 3); ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
+    }
     let burstGlows = 0;
     for (const item of state.effects) {
         const progress = reducedMotion.matches && item.kind !== "text" ? 0.65 : 1 - item.life / item.maxLife;
@@ -755,6 +777,15 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
             const sway = reducedMotion.matches ? 0 : Math.sin(item.x + progress * 3) * 6 * progress;
             ctx.strokeText(item.text, item.x + sway, item.y - drift);
             ctx.fillText(item.text, item.x + sway, item.y - drift);
+        } else if (item.kind === "relic-arrow") {
+            const travel = Math.min(1, progress * 2.5), len = item.radius * travel;
+            ctx.globalAlpha = Math.max(0, 1 - progress * 1.2);
+            ctx.translate(item.x, item.y); ctx.rotate(item.angle);
+            ctx.lineWidth = 6; ctx.globalAlpha *= 0.35;
+            ctx.beginPath(); ctx.moveTo(Math.max(0, len - 70), 0); ctx.lineTo(len, 0); ctx.stroke();
+            ctx.globalAlpha /= 0.35; ctx.lineWidth = 2; ctx.strokeStyle = "#effcff";
+            ctx.beginPath(); ctx.moveTo(Math.max(0, len - 34), 0); ctx.lineTo(len, 0); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(len + 6, 0); ctx.lineTo(len - 4, -5); ctx.lineTo(len - 4, 5); ctx.closePath(); ctx.fill();
         } else if (item.kind === "class-skill") {
             drawClassSkillEffect(ctx, item, progress, reducedMotion.matches);
         } else if (item.kind === "beam") {
@@ -953,7 +984,9 @@ export function createGame(root, saveBridge = null) {
     on(window, "keydown", unlockAudio, { capture: true });
     on(root, "click", event => {
         const button = event.target.closest("button");
-        if (event.isTrusted && button && !button.disabled && !button.matches("[data-skill], [data-move]")) audio.play("button");
+        // Buttons whose action already has its own cue (forge purchase, training, cards, tree
+        // nodes, skill slotting) skip the generic click so two sounds never stack.
+        if (event.isTrusted && button && !button.disabled && !button.matches("[data-skill], [data-move], [data-upgrade], [data-mastery-stat], [data-card-id], [data-learn-skill], [data-choose-run-skill], [data-slot-unlocked]")) audio.play("button");
     }, { capture: true });
     on(window, "pagehide", () => audio.setBackground(true));
     const stats = Object.fromEntries([...root.querySelectorAll("[data-stat]")].map(element => [element.dataset.stat, element]));
@@ -976,6 +1009,8 @@ export function createGame(root, saveBridge = null) {
     const draft = root.querySelector("[data-level-draft]");
     const runMenu = root.querySelector("[data-run-menu]");
     const cardButtons = [...root.querySelectorAll("[data-level-card]")];
+    const rerollButton = root.querySelector("[data-card-reroll]");
+    const rerollsUsed = new WeakMap();
     const keys = new Set();
     const pointers = new Map();
     let aim = null;
@@ -1007,6 +1042,10 @@ export function createGame(root, saveBridge = null) {
     const masteryPanel = root.querySelector("[data-mastery]");
     const masteryButtons = [...root.querySelectorAll("[data-mastery-stat]")];
     const forgeNudge = root.querySelector("[data-forge-nudge]");
+    const challengeNudge = root.querySelector("[data-challenge-nudge]");
+    const challengeNudgeText = root.querySelector("[data-challenge-nudge-text]");
+    let challengeNudgeDismissedStage = 0;
+    let bargainOutcome = null;
     let setupAction = null;
     let setupStep = 0;
     const combatView = root.querySelector("[data-combat-view]");
@@ -1234,6 +1273,86 @@ export function createGame(root, saveBridge = null) {
         canvas.focus({ preventScroll: true });
     });
     const mainMenu = root.querySelector("[data-main-menu]");
+    const emberCamp = root.querySelector("[data-ember-camp]");
+    function renderCamp() {
+        const profile = loadProfile();
+        emberCamp.querySelector("[data-camp-balance]").textContent = `${profile.embers} Embers · earned every run, even when you fall.`;
+        const nodes = emberCamp.querySelector("[data-camp-nodes]");
+        nodes.replaceChildren(...Object.entries(CAMP_NODES).map(([key, node]) => {
+            const cost = campCost(key), button = document.createElement("button");
+            button.type = "button";
+            button.className = "quiet-button camp-node";
+            const affordable = cost !== null && profile.embers >= cost;
+            button.setAttribute("aria-disabled", String(!affordable));
+            button.classList.toggle("is-maxed", cost === null);
+            button.classList.toggle("is-unaffordable", cost !== null && !affordable);
+            const name = document.createElement("b"), detail = document.createElement("small"), price = document.createElement("small");
+            name.textContent = `${node.name} ${profile.camp[key]}/${node.max}`;
+            detail.textContent = node.detail;
+            price.textContent = cost === null ? "Maxed" : affordable ? `Buy · ${cost} Embers` : `${cost} Embers · need ${cost - profile.embers} more`;
+            button.append(name, detail, price);
+            button.addEventListener("click", () => { if (buyCampNode(key)) renderCamp(); });
+            return button;
+        }));
+        const found = RELIC_KEYS.filter(key => profile.codex[key]).length;
+        emberCamp.querySelector("[data-codex-hint]").textContent = `${found}/${RELIC_KEYS.length} found. Rare relics can drop from any foe (bosses and elites far more often) and change how a run plays.`;
+        emberCamp.querySelector("[data-camp-codex]").replaceChildren(...RELIC_KEYS.map(key => {
+            const card = document.createElement("div"), name = document.createElement("b"), detail = document.createElement("small");
+            const known = !!profile.codex[key];
+            card.className = `camp-relic${known ? "" : " is-unknown"}`;
+            card.style.setProperty("--relic", RELICS[key].color);
+            name.textContent = known ? RELICS[key].name : "??? Undiscovered relic";
+            detail.textContent = known ? `${RELICS[key].detail} Found ${profile.codex[key]}×.` : "Keep hunting. Bosses drop relics most often.";
+            card.append(name, detail);
+            return card;
+        }));
+        const mastery = emberCamp.querySelector("[data-camp-mastery]");
+        mastery.replaceChildren(...CLASS_ORDER.map(hero => {
+            const row = document.createElement("div"), m = profile.mastery[hero];
+            row.className = "camp-mastery-row";
+            const title = document.createElement("strong");
+            title.textContent = classUnlocked(hero)
+                ? `${HERO_CLASSES[hero].name} · Mastery ${m.level}/${MASTERY_MAX}`
+                : `\u{1F512} ${HERO_CLASSES[hero].name}`;
+            const rewards = document.createElement("small");
+            const next = MASTERY_REWARDS.find(r => r.level > m.level);
+            const label = r => r.kind === "starter" ? `new starting skill (${skillName({ heroClass: hero }, r.value)})` : r.label.replace(/\s*\(cosmetic\)/i, "");
+            rewards.textContent = !classUnlocked(hero) ? CLASS_UNLOCK_HINT[hero]
+                : next ? `Next at ${next.level}: ${label(next)}` : "All rewards unlocked.";
+            row.append(title);
+            if (classUnlocked(hero)) {
+                const bar = document.createElement("div"), fill = document.createElement("i");
+                bar.className = "camp-mastery-bar";
+                fill.style.width = `${m.level >= MASTERY_MAX ? 100 : Math.min(100, m.xp / masteryStep(m.level) * 100)}%`;
+                bar.append(fill);
+                row.append(bar);
+            }
+            row.append(rewards);
+            const trims = unlockedTrims(hero);
+            if (classUnlocked(hero) && trims.length) {
+                const picker = document.createElement("select");
+                picker.setAttribute("aria-label", `${HERO_CLASSES[hero].name} trim`);
+                for (const [value, label] of [["", "Default trim"], ...trims.map(t => [t.value, t.label])]) picker.add(new Option(label, value, false, profile.trim[hero] === value));
+                picker.addEventListener("change", () => setTrim(hero, picker.value));
+                row.append(picker);
+            }
+            return row;
+        }));
+    }
+    on(root.querySelector("[data-open-camp]"), "click", () => { renderCamp(); emberCamp.hidden = false; emberCamp.querySelector("[data-close-camp]").focus({ preventScroll: true }); });
+    on(emberCamp.querySelector("[data-close-camp]"), "click", () => { emberCamp.hidden = true; });
+    function noteProgress() {
+        if (state.training) return;
+        setRelayForks(relayForks(state.heroClass));
+        const discovered = recordRelics(state);
+        if (discovered.length) saveStatus.textContent = `New codex entry: ${discovered.map(key => RELICS[key].name).join(", ")}!`;
+        const earned = creditProgress(state);
+        if (!earned) return;
+        const notes = [];
+        if (earned.levels.length) notes.push(`${HERO_CLASSES[state.heroClass].name} mastery ${earned.levels.at(-1)}!`);
+        for (const hero of earned.unlocked) notes.push(`New class unlocked: ${HERO_CLASSES[hero].name}!`);
+        if (notes.length) saveStatus.textContent = notes.join(" ");
+    }
     let inMainMenu = true;
     let setupFromMain = false;
     root.dataset.mainMenu = "on";
@@ -1257,6 +1376,15 @@ export function createGame(root, saveBridge = null) {
         showMainMenu(false);
         setupFromMain = true;
         openSetup("campaign");
+    });
+    const mainEndless = root.querySelector("[data-main-endless]");
+    on(mainEndless, "click", async () => {
+        if (!(endlessUnlocked || state.campaignComplete === 1)) return;
+        if (state.status !== "ready" && state.status !== "dead"
+            && !await gameConfirm("Start a new Endless run? The current run ends and its score is submitted. Unsaved progress will be replaced.")) return;
+        showMainMenu(false);
+        setupFromMain = true;
+        openSetup("endless");
     });
     on(root.querySelector("[data-main-load]"), "click", () => { showMainMenu(false); loadButton.click(); });
     on(root, 'open-main-panel', () => { showMainMenu(false); });
@@ -1302,9 +1430,17 @@ export function createGame(root, saveBridge = null) {
         if (!saving && setEquipmentStyle(state, select.dataset.equipmentStyle, select.value)) updateHud();
     });
     const challengeButtons = [...root.querySelectorAll("[data-challenge-choice]")];
-    for (const [attribute, accept] of [["data-stage-event-accept", true], ["data-stage-event-skip", false]]) {
-        on(root.querySelector(`[${attribute}]`), "click", async () => {
-            if (saving || !resolveStageEvent(state, accept, DIFFICULTIES[state.difficulty]?.healing ?? 1)) return;
+    const challengePickedFor = (challenge, key) => !challenge.resolved
+        && challenge.stage === Math.floor(state.wave / 5) + 1 && challenge.key === key;
+    for (const [attribute, accept] of [["data-stage-event-accept", true], ["data-stage-event-skip", false]]) for (const eventButton of root.querySelectorAll(`[${attribute}]`)) {
+        on(eventButton, "click", async () => {
+            if (saving) return;
+            const goldBefore = state.gold, flasksBefore = state.player.potions, healthBefore = state.player.health;
+            const name = stageEvent(state).name;
+            if (!resolveStageEvent(state, accept, DIFFICULTIES[state.difficulty]?.healing ?? 1)) return;
+            const gained = state.gold - goldBefore, flasks = flasksBefore - state.player.potions, health = Math.round(state.player.health - healthBefore);
+            bargainOutcome = { wave: state.wave, text: !accept ? `You passed by the ${name.toLowerCase()}.`
+                : `✓ Bargain done: ${[gained > 0 ? `+${gained} gold` : gained < 0 ? `${gained} gold` : "", flasks > 0 ? `-${flasks} flask` : "", health ? `${health > 0 ? "+" : ""}${health} health` : ""].filter(Boolean).join(", ")}.` };
             updateHud();
             if (["camp", "won"].includes(state.status)) await persist(false);
         });
@@ -1362,9 +1498,17 @@ export function createGame(root, saveBridge = null) {
     // Refreshes the setup dialog's class-preview panel text to match whichever class is currently
     // selected in the dropdown, so players can compare stats before starting a run.
     function updateClassPreview() {
+        for (const option of classSelect.options) {
+            const locked = !classUnlocked(option.value);
+            option.disabled = locked;
+            option.textContent = `${locked ? "\u{1F512} " : ""}${HERO_CLASSES[option.value].name}${locked ? " — locked" : ` — Mastery ${loadProfile().mastery[option.value].level}`}`;
+        }
+        if (!classUnlocked(classSelect.value)) classSelect.value = "knight";
         const hero = HERO_CLASSES[classSelect.value];
+        const lockedClasses = CLASS_ORDER.filter(key => !classUnlocked(key));
         classPreview.querySelector("[data-class-title]").textContent = hero.name;
-        classPreview.querySelector("[data-class-description]").textContent = hero.description;
+        classPreview.querySelector("[data-class-description]").textContent = hero.description
+            + (lockedClasses.length ? ` More classes to unlock: ${lockedClasses.map(key => `${HERO_CLASSES[key].name} (${CLASS_UNLOCK_HINT[key]})`).join(" ")}` : "");
         classPreview.querySelector("[data-class-stats]").textContent = `${hero.health} health · ${hero.damage} damage · ${hero.speed} speed · ${hero.armor}% innate armor`;
         classPreview.querySelector("[data-class-skills]").textContent = `${hero.attackName}: ${hero.attackCooldown}s, ${hero.attackReach} range · ${hero.specialName}: ${hero.specialCooldown}s · Dodge: ${hero.dodgeCooldown}s`;
     }
@@ -1391,11 +1535,12 @@ export function createGame(root, saveBridge = null) {
     // unlocked for the previewed class/mode, updates the guard-unlock hint text, and enables/disables
     // the "confirm" button based on whether the currently selected combination is a valid loadout
     // (no skill slotted twice, manual skill actually unlocked, etc. — see arpg-skills.js's validLoadout()).
+    const starterPool = () => [...STARTER_SKILLS, ...extraStarters(classSelect.value)];
     function updateSetupLoadout() {
         const preview = setupPreview();
         for (const option of root.querySelectorAll("[data-setup-skill]")) {
             const key = option.dataset.setupSkill;
-            option.disabled = !STARTER_SKILLS.includes(key);
+            option.disabled = !starterPool().includes(key);
             option.textContent = `${skillName(preview, key)}${option.disabled ? " — Locked" : ""}`;
         }
         for (const button of setupSkillButtons) {
@@ -1403,11 +1548,13 @@ export function createGame(root, saveBridge = null) {
             button.querySelector("[data-starter-skill-name]").textContent = skillName(preview, key);
             button.querySelector("img").setAttribute("src", skillIcon(preview, key));
             button.setAttribute("aria-pressed", String(setupSlots[0].value === key));
+            button.hidden = !starterPool().includes(key);
             button.disabled = saving;
         }
+        if (setupSlots[0].value !== "none" && !starterPool().includes(setupSlots[0].value)) setupSlots[0].value = "none";
         root.querySelector("[data-setup-unlock]").textContent = "Step 1: tap a starting skill. More skills at levels 10 and 20.";
         const loadout = readSetupLoadout();
-        const valid = validLoadout(preview, loadout.manual, loadout.auto) && (setupAction === "continue" || STARTER_SKILLS.includes(loadout.auto[0]));
+        (setupAction === "continue" || starterPool().includes(loadout.auto[0]));
         setupNext.disabled = saving;
         setup.dataset.needsSkill = valid ? "off" : "on";
         if (valid) setup.dataset.skillPrompt = "off";
@@ -1473,7 +1620,7 @@ export function createGame(root, saveBridge = null) {
         setupAction = action;
         setupStep = 0;
         difficultySelect.value = Object.hasOwn(DIFFICULTIES, state.difficulty) ? state.difficulty : "hard";
-        classSelect.value = state.heroClass;
+        classSelect.value = classUnlocked(state.heroClass) || action === "continue" ? state.heroClass : "knight";
         setupSlots[0].value = action === "continue" ? state.loadout.auto[0] : "none";
         setup.hidden = false;
         updateHud();
@@ -1488,13 +1635,16 @@ export function createGame(root, saveBridge = null) {
         if (!setupAction || saving || setupStep !== tutorial.length + 1) return;
         const loadout = readSetupLoadout();
         if (!validLoadout(setupPreview(), loadout.manual, loadout.auto)) return;
-        if (setupAction !== "continue" && !STARTER_SKILLS.includes(loadout.auto[0])) return;
+        if (setupAction !== "continue" && (!starterPool().includes(loadout.auto[0]) || !classUnlocked(classSelect.value))) return;
         void reportScore();
         if (setupAction === "continue") {
             if (!enterEndless(state, difficultySelect.value)) return;
         } else {
             state = setupAction === "endless" ? startEndlessRun(Math.random, difficultySelect.value, classSelect.value) : startRun(Math.random, difficultySelect.value, classSelect.value);
             state.loadout = loadout;
+            applyCampBonuses(state, MAX_FLASKS);
+            state.journal += ` Rare relics can drop from any foe. Codex: ${RELIC_KEYS.filter(key => loadProfile().codex[key]).length}/${RELIC_KEYS.length}.`;
+            creditProgress(state);
             const chosenChallenge = root.querySelector("[data-setup-challenge]")?.value;
             if (chosenChallenge && chosenChallenge !== "none") state.runSystems.challenge = { key: chosenChallenge, stage: 1, elapsed: 0, damage: 0, flasks: 0, resolved: 0 };
             if (releaseRankings) resetToReleaseRankings(state);
@@ -1526,7 +1676,7 @@ export function createGame(root, saveBridge = null) {
     // instead of silently doing nothing (beta feedback: "I can't click start and don't know why").
     function promptForSkill() {
         const loadout = readSetupLoadout();
-        const needsSkill = setupAction !== "continue" && !STARTER_SKILLS.includes(loadout.auto[0]);
+        const needsSkill = setupAction !== "continue" && !starterPool().includes(loadout.auto[0]);
         const atSkillStep = root.dataset.canvasHud === "on" ? setupStep === 0 : setupStep === tutorial.length + 1;
         if (!needsSkill || !atSkillStep) return false;
         setup.dataset.skillPrompt = "on";
@@ -1589,7 +1739,9 @@ export function createGame(root, saveBridge = null) {
         if (element && element.textContent !== next) element.textContent = next;
     };
     function updateHud() {
+        noteProgress();
         const gearPreview = [`Equipped now: damage ${weaponDamage(state)}, physical armor ${armorRating(state).toFixed(1)}%, spell resistance ${resistanceRating(state).toFixed(1)}%, movement ${Math.round(movementSpeed(state))}.`];
+        if (state.runRelics?.length) gearPreview.push(`Rare relics: ${state.runRelics.map(key => `${RELICS[key].name} (${RELICS[key].detail})`).join(" ")}`);
         const equipmentPreview = hudOne('[data-equipment-preview]');
         const gearSignature = gearPreview.join('|');
         if (equipmentPreview.dataset.preview !== gearSignature) {
@@ -1614,8 +1766,19 @@ export function createGame(root, saveBridge = null) {
             }
         }
         const encounter = stageEvent(state);
-        setText(hudOne("[data-stage-event]"), `${encounter.name}: ${encounter.detail} ${eventAvailable(state) ? "One choice at this checkpoint." : "Available before a stage starts at a clear checkpoint; already resolved encounters cannot be repeated."}`);
-        for (const attribute of ["data-stage-event-accept", "data-stage-event-skip"]) root.querySelector(`[${attribute}]`).disabled = saving || !eventAvailable(state);
+        setText(hudOne("[data-stage-event]"), `${encounter.name}: ${eventDetail(state, encounter)} ${eventAvailable(state) ? "One choice at this checkpoint." : "Available before a stage starts at a clear checkpoint; already resolved encounters cannot be repeated."}`);
+        for (const attribute of ["data-stage-event-accept", "data-stage-event-skip"]) for (const eventButton of root.querySelectorAll(`[${attribute}]`)) eventButton.disabled = saving || !eventAvailable(state);
+        const campEvent = hudOne("[data-camp-event]");
+        if (campEvent) {
+            const open = eventAvailable(state);
+            const atCheckpoint = !state.training && state.wave > 0 && state.wave % 5 === 0 && !state.enemies.length
+                && ["paused", "camp", "won"].includes(state.status);
+            campEvent.hidden = !open && !atCheckpoint;
+            setText(hudOne("[data-camp-event-name]"), encounter.name);
+            setText(hudOne("[data-camp-event-detail]"), open ? eventDetail(state, encounter)
+                : bargainOutcome?.wave === state.wave ? bargainOutcome.text : "✓ Already resolved at this checkpoint. A new stranger waits at the next one.");
+            hudOne("[data-camp-event-actions]").hidden = !open;
+        }
         hudOne("[data-open-lore]").hidden = inMainMenu || state.training || state.mode !== "campaign" || state.status === "ready";
         hudOne("[data-main-resume]").disabled = saving || state.status === "ready";
         hudOne('[data-main-resume]').hidden = !['playing', 'paused', 'camp', 'won'].includes(state.status) || !!state.training;
@@ -1808,17 +1971,32 @@ export function createGame(root, saveBridge = null) {
             select.disabled = saving || !canForge;
         }
         const challenge = state.runSystems.challenge;
-        const challengeAvailable = !saving && canForge && !state.training && state.wave % 5 === 0 && state.enemies.length === 0
+        const endlessTravel = state.mode === "endless" && state.status === "playing" && state.travelPending === 1 && !setupAction;
+        const challengeAvailable = !saving && (canForge || endlessTravel) && !state.training && state.wave % 5 === 0 && state.enemies.length === 0
             && !(challenge.stage === Math.floor(state.wave / 5) + 1 && challenge.elapsed > 0);
         for (const button of challengeButtons) {
             button.disabled = !challengeAvailable;
             button.setAttribute("aria-pressed", String(!challenge.resolved && challenge.key === button.dataset.challengeChoice));
+            button.classList.toggle("is-selected", challengePickedFor(challenge, button.dataset.challengeChoice));
         }
         hudOne("[data-challenge-availability]").textContent = challengeAvailable
             ? `Choose for stage ${Math.floor(state.wave / 5) + 1} · Reward: ${100 + (Math.floor(state.wave / 5) + 1) * 50} gold.`
             : state.training ? "Challenges are unavailable in practice. Exit training to return to your run."
             : "Choose before the first wave or at the next five-wave checkpoint. The current stage cannot be changed mid-fight.";
         setText(hudOne("[data-challenge-status]"), `${CHALLENGES[challenge.key]}${challenge.key === "none" ? "" : ` · stage ${challenge.stage} · ${Math.floor(challenge.elapsed)}s · ${challenge.flasks} flasks · ${Math.round(challenge.damage)} health lost${challenge.resolved ? " · resolved" : ""}`}`);
+        const nextStage = Math.floor(state.wave / 5) + 1;
+        const challengePicked = challenge.key !== "none" && challenge.stage === nextStage && !challenge.resolved;
+        challengeNudge.hidden = !challengeAvailable || challengePicked || challengeNudgeDismissedStage === nextStage
+            || !!setupAction || choosing || draftClosing || root.dataset.menuOpen === "on";
+        setText(challengeNudgeText, `Bonus ${100 + nextStage * 50} gold for stage ${nextStage}.`);
+        const campChallenge = hudOne("[data-camp-challenge]");
+        if (campChallenge) {
+            campChallenge.hidden = !challengeAvailable && !(saving && canForge && !state.training && state.wave % 5 === 0 && state.enemies.length === 0);
+            setText(hudOne("[data-camp-challenge-reward]"), `+${100 + nextStage * 50} gold`);
+            setText(hudOne("[data-camp-challenge-status]"), challengePicked
+                ? `✓ Active for stage ${nextStage}: ${CHALLENGES[challenge.key]}. Continue when ready.`
+                : "Tap one to accept. You can change it until you travel.");
+        }
         const summary = runSummary(state, key => skillName(state, key));
         setText(hudOne("[data-summary-text]"), summary);
         hudOne("[data-run-summary]").hidden = state.status === "ready";
@@ -1908,9 +2086,14 @@ export function createGame(root, saveBridge = null) {
         startButton.disabled = saving || checkingUnlock || choosing || !!setupAction || !!state.training;
         restartButton.disabled = saving || choosing || !!setupAction || !!state.training;
         endlessButton.disabled = saving || checkingUnlock || choosing || !!setupAction || !!state.training;
-        endlessButton.hidden = choosing || !(endlessUnlocked || state.status === "won") || (state.mode === "endless" && state.status !== "dead") || state.status === "playing";
-        setText(endlessButton, state.status === "won" ? "Continue into the Endless Watch" : "New Endless Watch run");
+        endlessButton.hidden = choosing || !(endlessUnlocked || state.status === "won") || (state.mode === "endless" && !["dead", "paused", "camp"].includes(state.status)) || state.status === "playing";
+        setText(endlessButton, state.status === "won" ? "Continue into the Endless Watch"
+            : state.mode === "endless" && ["paused", "camp"].includes(state.status) ? "Abandon & start a new Endless run" : "New Endless Watch run");
         launchEndless.disabled = endlessButton.disabled || !(endlessUnlocked || state.campaignComplete === 1);
+        if (mainEndless) {
+            mainEndless.hidden = !(endlessUnlocked || state.campaignComplete === 1) || !!state.training;
+            mainEndless.disabled = saving || checkingUnlock || choosing || !!setupAction;
+        }
         setText(launchEndless, checkingUnlock ? "Checking Endless…" : state.status === "won" ? "Continue Endless" : endlessUnlocked || state.campaignComplete === 1 ? "New Endless run" : "Endless (locked)");
         launchEndless.title = state.status === "won" ? "Continue this campaign character into Endless" : "Unlocked profiles can start a new veteran Endless character here. To keep a completed campaign character, load its victory save first.";
         forgeButton.disabled = saving || !active || choosing || !!setupAction;
@@ -1967,6 +2150,10 @@ export function createGame(root, saveBridge = null) {
             normalizeCardChoices(state);
             text("draft-level", `LEVEL UP! · LEVEL ${state.player.level - state.pendingChoices + 1} · COMBAT PAUSED`);
             text("draft-pending", state.pendingChoices > 1 ? `${state.pendingChoices} level-up choices queued. Select one card for each level.` : "Choose one card. Its bonus stays with this character and save.");
+            const rerollsLeft = Math.max(0, rerollsPerRun() - (rerollsUsed.get(state) ?? 0));
+            rerollButton.hidden = rerollsPerRun() === 0;
+            rerollButton.disabled = saving || rerollsLeft === 0;
+            rerollButton.textContent = `Reroll cards (${rerollsLeft} left)`;
             const signature = `${state.pendingChoices}:${state.cardChoices.join(",")}`;
             if (signature !== shownDraft) {
                 cardButtons.forEach((button, index) => {
@@ -2164,16 +2351,19 @@ export function createGame(root, saveBridge = null) {
     for (const button of treeButtons) {
         const node = button.parentElement;
         const showTooltip = () => node.classList.remove("tooltip-dismissed");
-        on(button, "focus", showTooltip);
-        on(node, "pointerenter", event => { if (event.pointerType !== "touch") showTooltip(); });
+        const previewCta = () => { node.dataset.treeCta = button.getAttribute("aria-disabled") === "true" ? "Not available yet" : "Click to learn"; };
+        on(button, "focus", () => { if (inspectedTreeNode !== button) previewCta(); showTooltip(); });
+        on(node, "pointerenter", event => { if (event.pointerType !== "touch") { previewCta(); showTooltip(); } });
         on(button, "blur", () => {
             if (inspectedTreeNode === button) inspectedTreeNode = null;
             node.classList.remove("tooltip-inspected");
         });
         on(button, "click", event => {
             if ((event.pointerType === "touch" || event.sourceCapabilities?.firesTouchEvents) && inspectedTreeNode !== button) {
+                for (const other of root.querySelectorAll(".tree-node.tooltip-inspected")) other.classList.remove("tooltip-inspected");
                 button.focus({ preventScroll: true });
                 inspectedTreeNode = button;
+                node.dataset.treeCta = button.getAttribute("aria-disabled") === "true" ? "Not available yet" : "Tap again to learn";
                 node.classList.add("tooltip-inspected");
                 showTooltip();
                 return;
@@ -2208,6 +2398,18 @@ export function createGame(root, saveBridge = null) {
         reveal(root.querySelector("[data-forge]"), true);
     });
     on(root.querySelector("[data-open-forge]"), "click", () => forgeButton.click());
+    on(root.querySelector("[data-open-challenges]"), "click", () => {
+        if (saving || setupAction || state.status === "choosing") return;
+        challengeNudgeDismissedStage = Math.floor(state.wave / 5) + 1;
+        if (state.status === "playing") pause();
+        updateHud();
+        alignArena = false;
+        reveal(root.querySelector("[data-challenges]"), true);
+    });
+    on(root.querySelector("[data-dismiss-challenges]"), "click", () => {
+        challengeNudgeDismissedStage = Math.floor(state.wave / 5) + 1;
+        updateHud();
+    });
     for (const button of masteryButtons) on(button, "click", () => {
         if (saving || setupAction || !buyMastery(state, button.dataset.masteryStat)) return;
         forgeFeedback.textContent = state.journal;
@@ -2229,6 +2431,15 @@ export function createGame(root, saveBridge = null) {
         saveStatus.textContent = "Level-up boon selected. Save to keep it, or continue to the next autosaved checkpoint.";
         updateHud();
         if (state.status === "playing") canvas.focus({ preventScroll: true });
+    });
+    on(rerollButton, "click", () => {
+        if (saving || state.status !== "choosing") return;
+        const used = rerollsUsed.get(state) ?? 0;
+        if (used >= rerollsPerRun()) return;
+        rerollsUsed.set(state, used + 1);
+        state.cardChoices = drawLevelCards(state);
+        cardPickReadyAt = performance.now() + 250;
+        updateHud();
     });
     on(restartButton, "click", () => openSetup("campaign"));
     // The single save/load entry point, covering both manual Save/Load button clicks and automatic
@@ -2298,8 +2509,10 @@ export function createGame(root, saveBridge = null) {
             operationSucceeded = result.success;
             if (result.success) root.dataset.hasSave = "on";
             if (result.success) endlessUnlocked = endlessUnlocked || result.endlessUnlocked || result.save?.endlessUnlocked || result.save?.state?.campaignComplete === 1;
+            if (endlessUnlocked) grandfatherClasses(true);
             if (!loadingSave && ["camp", "won"].includes(state.status)) checkpointSaveFailed = !result.success;
             if (result.success && loadingSave) {
+                mergeProfile(result.save?.state?.meta);
                 const restored = restoreSnapshot(result.save);
                 void reportScore();
                 state = restored;
@@ -2354,7 +2567,9 @@ export function createGame(root, saveBridge = null) {
                 const result = await saveBridge.invokeMethodAsync("LoadRun");
                 if (disposed) return;
                 if (result.success) {
+                    mergeProfile(result.save?.state?.meta);
                     endlessUnlocked = !!(result.endlessUnlocked || result.save?.endlessUnlocked || result.save?.state?.campaignComplete === 1);
+                    if (endlessUnlocked) grandfatherClasses(true);
                     root.dataset.hasSave = "on";
                     if (root.dataset.localSaves === "on") saveStatus.textContent = root.dataset.cloudSignedIn === "on"
                         ? "Cloud save available. Choose Load to continue it." : "Device save found. Choose Load to restore it.";

@@ -289,11 +289,12 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .skill-tree[data-hero-class="knight"] { --tree-accent: #f5ab62; --tree-tint: #522b1c; }
 .skill-tree[data-hero-class="ranger"] { --tree-accent: #8fefbd; --tree-tint: #163d2b; }
 .skill-tree[data-hero-class="warden"] { --tree-accent: #a7cfff; --tree-tint: #26364e; }
+.skill-tree[data-hero-class="sorcerer"] { --tree-accent: #c9adff; --tree-tint: #2d2148; }
 .skill-tree[data-hero-class] { border-color: var(--tree-accent); background: radial-gradient(ellipse at 50% 60%, var(--tree-tint), #101c23); }
 .skill-tree[data-hero-class] .tree-node-icon, .skill-tree[data-hero-class] h3 { color: var(--tree-accent); }
 .skill-tree[data-hero-class] .tree-node button.learned { border-color: var(--tree-accent); background: var(--tree-tint); }
 .skill-tree[data-hero-class] .tree-tooltip { border-color: var(--tree-accent); }
-.skill-tree[data-hero-class] .tree-connections .learned { stroke: var(--tree-accent); }
+.skill-tree[data-hero-class] .tree-connections .learned { stroke: var(--tree-accent, #ffe2a4); }
 .skill-tree[data-hero-class="ranger"] .tree-node button { border-radius: 10px 30px; }
 .skill-tree[data-hero-class="ranger"] .tree-connections { stroke-dasharray: 5 3; }
 .skill-tree[data-hero-class="warden"] .tree-node button { border-radius: 8px; border-width: 3px; }
@@ -337,10 +338,38 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .tree-node-left .tree-tooltip { left: 0; transform: none; }
 .tree-node-right .tree-tooltip { left: auto; right: 0; transform: none; }
 .tree-node-capstone .tree-tooltip { top: auto; bottom: calc(100% + 8px); }
+.tree-node button { transition: transform .15s ease, box-shadow .15s ease; }
+.tree-node.tooltip-inspected:not(.tooltip-dismissed) button { transform: scale(1.22); border-color: #ffe2a4; box-shadow: 0 0 0 3px #ffe2a466, 0 0 18px #ffd27a99; animation: tree-inspect-pulse 1.1s ease-in-out infinite; }
+.tree-node.tooltip-inspected:not(.tooltip-dismissed)::after { content: attr(data-tree-cta); position: absolute; left: 50%; top: -30px; transform: translateX(-50%); white-space: nowrap; padding: 4px 10px; border-radius: 999px; background: #ffd27a; color: #1c1408; font-size: 12px; font-weight: 700; pointer-events: none; z-index: 6; }
+@keyframes tree-inspect-pulse { 50% { box-shadow: 0 0 0 6px #ffe2a433, 0 0 26px #ffd27acc; } }
+@media (hover: hover) and (pointer: fine) {
+    .tree-node:not(.tooltip-dismissed):hover button { transform: scale(1.15); border-color: #ffe2a4; box-shadow: 0 0 0 3px #ffe2a466, 0 0 16px #ffd27a88; }
+    .tree-node:not(.tooltip-dismissed):hover::after { content: attr(data-tree-cta); position: absolute; left: 50%; top: -30px; transform: translateX(-50%); white-space: nowrap; padding: 4px 10px; border-radius: 999px; background: #ffd27a; color: #1c1408; font-size: 12px; font-weight: 700; pointer-events: none; z-index: 6; }
+}
+@media (prefers-reduced-motion: reduce) { .tree-node.tooltip-inspected button { animation: none; } }
 .skill-unlock-status { color: #edc581 !important; }
 .skill-unlock-nudge { background: #183a3cf5; border-color: #9ee2d1; }
 .skill-unlock-nudge > span { flex: 1; min-width: 0; }
-.setup-overlay [data-setup-loadout] { margin: 16px 0 22px; text-align: left; }
+.challenge-nudge { bottom: auto; top: 0; background: #3a1d1df2; border-top: 0; border-bottom: 1px solid #ff9b7a; color: #ffd9c6; z-index: 2; animation: challenge-nudge-in .35s ease-out; }
+.challenge-nudge > span { flex: 1; min-width: 0; }
+.challenge-nudge button { min-height: 40px; }
+@keyframes challenge-nudge-in { from { transform: translateY(-100%); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .challenge-nudge { animation: none; } }
+.camp-challenge { margin: 10px 0 6px; padding: 8px 10px; border: 1px solid #ff9b7a66; border-radius: 8px; background: #3a1d1d99; text-align: left; }
+.camp-challenge h3 { margin: 0 0 2px; color: #ffd9c6; font-size: 13px; }
+.camp-challenge-help { margin: 0 0 6px; font-size: 11px; line-height: 1.4; color: #f1d8c8; }
+.camp-challenge-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.camp-challenge-grid button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 44px; padding: 4px 6px; text-align: center; font-size: 12px; }
+.camp-challenge-grid button small { display: block; opacity: .75; font-size: 10px; line-height: 1.2; }
+.camp-challenge-grid button.is-selected { border-color: #ffb36b; background: #7a3a1c; color: #fff; box-shadow: 0 0 0 2px #ffb36b88, 0 0 12px #ff9b5a66; }
+.camp-event { margin: 10px 0 6px; padding: 8px 10px; border: 1px solid #e9c99166; border-radius: 8px; background: #2e281799; text-align: left; }
+.camp-event h3 { margin: 0 0 2px; color: #f3dca6; font-size: 13px; }
+.camp-event-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 6px; }
+.camp-event-actions button { min-height: 40px; font-size: 12px; }
+.camp-event-accept { border-color: #e9c991; color: #ffe7b0; }
+.camp-challenge-status { margin: 6px 0 0; font-size: 11px; color: #ffcf9e; }
+@media (max-width: 600px) { .camp-challenge-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.setup-overlay [data-setup-loadout]
 .setup-overlay [data-setup-unlock] { color: #e9c991; font-size: 12px; line-height: 1.7; }
 @media (max-width: 1100px) {
     .skill-tree-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -469,4 +498,61 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
     .journey-panel .eyebrow { font-size: 8px; }
     .hero-card h2 { font-size: 19px; }
     .game-footer { flex-direction: column; gap: 7px; text-align: center; }
+}
+.arpg ::deep .ember-camp { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: #050b0fdd; }
+.arpg ::deep .ember-camp[hidden] { display: none; }
+.arpg ::deep .ember-camp-card { width: min(560px, 100%); max-height: 100%; overflow-y: auto; display: grid; gap: 10px; padding: 18px; border: 1px solid #c7a56b66; border-radius: 16px; background: #122025; box-shadow: 0 18px 50px #000a; font-size: calc(13px * var(--game-text-scale, 1)); }
+.arpg ::deep .ember-camp-card h2 { margin: 0; font: 24px Georgia, serif; color: #f3dfb9; text-align: center; }
+.arpg ::deep .ember-camp-card h3 { margin: 4px 0 0; font: 15px Georgia, serif; color: #f3dfb9; }
+.arpg ::deep .ember-camp-balance { margin: 0; text-align: center; color: #ffb45c; font-weight: 700; }
+.arpg ::deep .ember-camp-nodes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.arpg ::deep .camp-node { display: grid; gap: 2px; padding: 8px 10px; text-align: left; line-height: 1.3; }
+.arpg ::deep .camp-node b { color: #f3dfb9; }
+.arpg ::deep .camp-node small { opacity: .8; }
+.arpg ::deep .camp-node:disabled { opacity: .55; }
+.arpg ::deep .camp-node.is-unaffordable { opacity: 1; cursor: default; border-style: dashed; }
+.arpg ::deep .ember-camp .camp-node, .arpg ::deep .ember-camp .camp-node:hover, .arpg ::deep .ember-camp .camp-node:focus { background: #0c171b; color: #d8cbb2; border: 1px solid #c7a56b55; box-shadow: none; }
+.arpg ::deep .ember-camp .camp-node:not(.is-unaffordable):not(.is-maxed):hover { background: #17262b; border-color: #ffb45c; }
+.arpg ::deep .ember-camp .camp-node.is-unaffordable { border-style: dashed; border-color: #c7a56b40; background: #0a1316; }
+.arpg ::deep .ember-camp .camp-node:focus-visible { outline: 2px solid #ffb45c88; outline-offset: 1px; }
+.arpg ::deep .camp-node.is-unaffordable small:last-child { color: #e9a07a; }
+.arpg ::deep .camp-node.is-maxed small:last-child { color: #9fe3a4; }
+.arpg ::deep .camp-node small { color: #d8cbb2; }
+.arpg ::deep .ember-camp-hint { margin: 0; font-size: 12px; color: #d8cbb2; }
+.arpg ::deep .ember-camp-codex { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.arpg ::deep .camp-relic { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--relic); border-left-width: 4px; border-radius: 10px; background: #0c171b; }
+.arpg ::deep .camp-relic b { color: var(--relic); }
+.arpg ::deep .camp-relic small { color: #d8cbb2; line-height: 1.3; }
+.arpg ::deep .camp-relic.is-unknown { border-color: #c7a56b33; border-style: dashed; }
+.arpg ::deep .camp-relic.is-unknown b { color: #8c9a96; }
+.arpg ::deep .ember-camp-mastery { display: grid; gap: 6px; }
+.arpg ::deep .camp-mastery-row { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid #c7a56b33; border-radius: 10px; background: #0c171b; }
+.arpg ::deep .camp-mastery-row small { opacity: .8; line-height: 1.35; }
+.arpg ::deep .camp-mastery-bar { height: 5px; border-radius: 3px; background: #ffffff1a; overflow: hidden; }
+.arpg ::deep .camp-mastery-bar i { display: block; height: 100%; background: linear-gradient(90deg, #c7743a, #ffb45c); }
+.arpg ::deep .camp-mastery-row select { justify-self: start; font-size: 12px; }
+.arpg ::deep .ember-camp-card [data-close-camp] { justify-self: center; min-width: 140px; }
+.arpg ::deep .draft-reroll[hidden] { display: none; }
+@media (max-width: 520px), (max-height: 520px) {
+    .arpg ::deep .ember-camp-card { padding: 12px; gap: 8px; }
+    .arpg ::deep .ember-camp-card h2 { font-size: 20px; }
+}
+@media (min-width: 560px) {
+    .arpg ::deep .ember-camp { padding: 6px max(10px, env(safe-area-inset-right)) 6px max(10px, env(safe-area-inset-left)); }
+    .arpg ::deep .ember-camp-card { width: min(900px, 100%); padding: 10px 12px; gap: 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; }
+    .arpg ::deep .ember-camp-card > h2 { grid-column: 1; font-size: 18px; text-align: left; }
+    .arpg ::deep .ember-camp-balance { grid-column: 2; grid-row: 1; align-self: center; text-align: right; }
+    .arpg ::deep .ember-camp-nodes { grid-column: 1 / -1; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+    .arpg ::deep .camp-node { padding: 6px 8px; font-size: 11px; }
+    .arpg ::deep .ember-camp-card h3 { margin: 2px 0 0; font-size: 13px; }
+    .arpg ::deep .ember-camp-card > h3:first-of-type, .arpg ::deep .ember-camp-mastery { grid-column: 1; }
+    .arpg ::deep .ember-camp-card > h3:last-of-type, .arpg ::deep .ember-camp-hint, .arpg ::deep .ember-camp-codex { grid-column: 2; }
+    .arpg ::deep .ember-camp-card > h3:first-of-type { grid-row: 3; }
+    .arpg ::deep .ember-camp-mastery { grid-row: 4 / span 2; gap: 4px; }
+    .arpg ::deep .ember-camp-card > h3:last-of-type { grid-row: 3; }
+    .arpg ::deep .ember-camp-hint { grid-row: 4; font-size: 11px; }
+    .arpg ::deep .ember-camp-codex { grid-row: 5; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+    .arpg ::deep .camp-mastery-row, .arpg ::deep .camp-relic { padding: 5px 8px; gap: 2px; font-size: 11px; }
+    .arpg ::deep .camp-relic small { font-size: 10px; }
+    .arpg ::deep .ember-camp-card [data-close-camp] { grid-column: 1 / -1; min-height: 34px; }
 }

@@ -15,13 +15,28 @@
             <p>Your run stays paused while this menu is open. Save before quitting or closing the app.</p>
             <button type="button" class="ember-button" data-main-resume>Continue run</button>
             <button type="button" class="quiet-button" data-main-new>New campaign</button>
+            <button type="button" class="quiet-button" data-main-endless hidden>New Endless run</button>
             <button type="button" class="quiet-button" data-main-load>Load saved run</button>
             <button type="button" class="quiet-button" data-training>Training grounds</button>
             <button type="button" class="quiet-button" data-main-options>Sound &amp; options</button>
+            <button type="button" class="quiet-button" data-open-camp>Ember Camp</button>
             <div data-main-menu-actions></div>
             <p data-main-status role="status"></p>
             <button type="button" class="quiet-button" data-main-quit>Quit</button>
         </div>
+        <section class="ember-camp" data-ember-camp hidden role="dialog" aria-modal="true" aria-labelledby="ember-camp-title">
+            <div class="ember-camp-card">
+                <h2 id="ember-camp-title">Ember Camp</h2>
+                <p class="ember-camp-balance" data-camp-balance></p>
+                <div class="ember-camp-nodes" data-camp-nodes></div>
+                <h3>Class mastery</h3>
+                <div class="ember-camp-mastery" data-camp-mastery></div>
+                <h3>Relic Codex</h3>
+                <p class="ember-camp-hint" data-codex-hint></p>
+                <div class="ember-camp-codex" data-camp-codex></div>
+                <button type="button" class="ember-button" data-close-camp>Back</button>
+            </div>
+        </section>
     </section>
     <button type="button" class="quiet-button main-menu-return" data-open-main-menu>Main menu</button>
     <button type="button" class="quiet-button campaign-lore-return" data-open-lore>Chapter lore</button>
@@ -106,6 +121,7 @@
                                 }
                             </div>
                             <p class="draft-footer" data-stat="draft-pending" role="status" aria-live="polite"></p>
+                            <button type="button" class="quiet-button draft-reroll" data-card-reroll hidden>Reroll</button>
                             <small>Paused. Offers stay the same after loading.</small>
                         </section>
                         <div class="overlay-card" data-run-menu>
@@ -118,6 +134,25 @@
                                 <p data-killing-blow></p>
                                 <p>Last hits taken (8 s):</p>
                                 <ol data-damage-history></ol>
+                            </section>
+                            <section class="camp-event" data-camp-event hidden aria-labelledby="camp-event-title">
+                                <h3 id="camp-event-title">✦ Stranger at camp: <span data-camp-event-name></span></h3>
+                                <p class="camp-challenge-help" data-camp-event-detail></p>
+                                <div class="camp-event-actions" data-camp-event-actions>
+                                    <button type="button" class="quiet-button camp-event-accept" data-stage-event-accept>Accept bargain</button>
+                                    <button type="button" class="quiet-button" data-stage-event-skip>Pass by</button>
+                                </div>
+                            </section>
+                            <section class="camp-challenge" data-camp-challenge hidden
+                                <h3 id="camp-challenge-title">⚔ Optional challenge for the next stage</h3>
+                                <p class="camp-challenge-help">Keep the rule until the next boss dies for <strong data-camp-challenge-reward></strong>. Breaking it only loses the bonus.</p>
+                                <div class="camp-challenge-grid" role="group" aria-label="Choose a stage challenge">
+                                    <button type="button" class="quiet-button" data-challenge-choice="unscarred"><strong>Unscarred</strong><small>Take no health damage</small></button>
+                                    <button type="button" class="quiet-button" data-challenge-choice="flaskless"><strong>Flaskless</strong><small>Drink no flasks</small></button>
+                                    <button type="button" class="quiet-button" data-challenge-choice="swift"><strong>Swift</strong><small>Clear within 180 combat seconds</small></button>
+                                    <button type="button" class="quiet-button" data-challenge-choice="none"><strong>No challenge</strong><small>Play normally</small></button>
+                                </div>
+                                <p class="camp-challenge-status" data-camp-challenge-status role="status"></p>
                             </section>
                             <button type="button" class="ember-button" data-action="start" disabled>Begin the journey <span>&rarr;</span></button>
                             <button type="button" class="ember-button endless-button" data-action="endless" hidden>Enter the Endless Watch &rarr;</button>
@@ -226,6 +261,11 @@
                         <button type="button" class="quiet-button" data-slot-unlocked>Slot skill</button>
                         <button type="button" class="quiet-button" data-dismiss-unlock aria-label="Dismiss skill unlock reminder">Later</button>
                     </div>
+                    <div class="forge-nudge challenge-nudge" data-challenge-nudge hidden>
+                        <span role="status"><strong>⚔ New challenge available!</strong> <span data-challenge-nudge-text></span></span>
+                        <button type="button" class="quiet-button" data-open-challenges>View challenges</button>
+                        <button type="button" class="quiet-button" data-dismiss-challenges aria-label="Dismiss challenge reminder">Later</button>
+                    </div>
                 </div>
                 <div class="power-strip" aria-label="Active timed power-ups"><span>EMBER BLESSINGS</span><strong data-stat="buffs">No active power-ups</strong></div>
                 <div class="vitals">
@@ -276,7 +316,7 @@
                             <section class="skill-tree" data-tree-skill="@skill" hidden="@CombatSkills.Contains(skill)">
                                 <h3 data-skill-name="@skill">@skill</h3>
                                 <p data-skill-description="@skill"></p>
-                                <p class="tree-path">Hover or focus for details. On touch, tap to inspect, then tap again to learn. Each rank costs 1 point.</p>
+                                <p class="tree-path">Tap a node to preview it, then tap again to learn. With a mouse, hover to preview and click to learn. Each rank costs 1 point.</p>
                                 <button type="button" class="quiet-button tree-respec" data-respec-tree="@skill" disabled>Reset tree</button>
                                 <div class="skill-tree-map" role="group" aria-label="Upgrade branches">
                                     <svg class="tree-connections" viewBox="0 0 300 300" preserveAspectRatio="none" aria-hidden="true">
@@ -417,7 +457,7 @@
                     <h2 id="challenges-title">Stage challenges</h2>
                     <button type="button" class="ember-button" data-resume-combat disabled>Return to battle</button>
                     <div class="challenge-options">
-                        <p>Optional bonus gold for one stage. Failing costs nothing.</p>
+                        <p>How it works: at each checkpoint (every 5 waves) pick one rule for the next stage. Keep it until that stage's boss dies to earn bonus gold. Breaking it only loses the bonus. You can't switch mid-stage.</p>
                         <div class="training-skill-grid" role="group" aria-label="Choose a stage challenge">
                             <button type="button" class="quiet-button" data-challenge-choice="none">No challenge</button>
                             <button type="button" class="quiet-button" data-challenge-choice="unscarred">Unscarred — take no health damage</button>
@@ -468,7 +508,7 @@
 
 @code {
     private static readonly string[] CombatSkills = ["nova", "burst", "guard", "chain", "frost", "reap", "meteor", "siphon", "nullwave"];
-    private static readonly string[] StarterSkills = ["nova", "chain", "reap"];
+    private static readonly string[] StarterSkills = ["nova", "chain", "reap", "frost", "meteor", "siphon"];
     private static readonly string[] AllSkills = ["attack", "nova", "burst", "guard", "dodge", "potion", "chain", "frost", "reap", "meteor", "siphon", "nullwave"];
     // Reference to the root <div class="arpg"> element — handed to the JS module so it can query
     // everything else it needs (canvas, buttons, overlays) by selector instead of us wiring each

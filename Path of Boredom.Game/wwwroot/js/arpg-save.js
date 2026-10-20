@@ -20,6 +20,8 @@ import { HERO_CLASSES } from "./arpg-classes.js";
 import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
 import { SKILL_KEYS, SLOTTABLE_SKILLS, TREE_NODES, NEW_SKILLS, skillCapacity, skillPointsLeft, skillUnlocked, validLoadout } from "./arpg-skills.js";
 import { EQUIPMENT_STYLES, CHALLENGES } from "./arpg-run-systems.js";
+import { exportProfile } from "./arpg-meta.js";
+import { validRunRelics } from "./arpg-relics.js";
 
 // Field-name lists used with numbers() below, grouped by the kind of save-state object they belong
 // to — kept as flat arrays so each numbers() call site doesn't need to spell out every field name inline.
@@ -113,6 +115,7 @@ export function restoreSnapshot(snapshot, random = Math.random) {
         });
         require(state.playerShots.length <= 48 && (state.heroClass === "ranger" || state.playerShots.length === 0));
     }
+    state.runRelics = validRunRelics(saved.runRelics);
     state.difficulty = snapshot.version < 5 ? "legacy" : saved.difficulty;
     state.rankingMode = snapshot.version < 5 ? "legacy" : saved.rankingMode;
     require(state.difficulty === "legacy" || Object.hasOwn(DIFFICULTIES, state.difficulty));
@@ -351,8 +354,8 @@ export function captureSnapshot(state) {
         projectiles: state.projectiles.filter(projectile => projectile.life > 0),
         loot: state.loot.filter(drop => drop.life > 0)
     } });
-    const { random, effects, damageHistory, ...saved } = restored;
-    const snapshot = { version: 20, state: saved };
+    const { random, effects, damageHistory, burns, ...saved } = restored;
+    const snapshot = { version: 20, state: { ...saved, meta: exportProfile() } };
     require(new TextEncoder().encode(JSON.stringify(snapshot)).length <= 64 * 1024);
     return snapshot;
 }

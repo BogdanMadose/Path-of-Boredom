@@ -59,6 +59,7 @@
 
   <ItemGroup>
     <None Include="tests\ember-camp-landscape.test.mjs" />
+    <None Include="tests\endless-challenge-hold.test.mjs" />
     <None Include="tests\relics.test.mjs" />
   </ItemGroup>
 

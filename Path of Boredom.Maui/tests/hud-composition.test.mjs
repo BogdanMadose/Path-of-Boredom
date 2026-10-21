@@ -31,7 +31,7 @@ try {
   for(const message of ['LOW HEALTH — tap flask','LOW HEALTH — no flasks; evade']) {
    healthWarning.textContent=message;
    const pause=root.querySelector('.mm-pause-tab').getBoundingClientRect(),notice=healthWarning.getBoundingClientRect();
-   check(pause.left===14&&pause.top===72,'Pause aligns with CSS-pixel flask row');
+   check(pause.left===6&&pause.top===50,'Pause sits at the screen edge under the compact HUD');
    check(!overlaps(pause,notice),'Low-health warning clears Pause');
    check(notice.left>=0&&notice.right<=w&&notice.top>=0&&notice.bottom<=h,'Low-health warning fits');
    check(healthWarning.scrollWidth<=healthWarning.clientWidth,'Warning text is not clipped');

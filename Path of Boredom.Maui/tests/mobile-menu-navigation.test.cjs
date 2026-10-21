@@ -98,6 +98,7 @@ assert.deepEqual(informationPanels, ['rankings'], 'information menus must initia
 const saveActions = source.slice(source.indexOf('    function addSaveActions('), source.indexOf('    function buildAccount('));
 const element = () => ({
     children: [], dataset: {}, listeners: {},
+    get lastChild() { return this.children[this.children.length - 1]; },
     appendChild(child) { this.children.push(child); },
     setAttribute() {},
     addEventListener(type, listener) { this.listeners[type] = listener; }
@@ -139,14 +140,14 @@ originals.save.disabled = true;
 openingMenu.children[0].children[0].listeners.click();
 assert.equal(clicked.length, 4, 'disabled original controls must not be activated');
 const pauseConstruction = source.slice(source.indexOf('    function buildPause('), source.indexOf('    function addSaveActions('));
-context.el = (tag, className, text) => ({ ...element(), textContent: text });
+context.el = (tag, className, text) => Object.assign(element(), { textContent: text });
 vm.runInContext(pauseConstruction, context);
 const pauseHost = element();
 context.buildPause(pauseHost);
-const pauseCard = pauseHost.children[0].children[0];
-const community = pauseCard.children.find(child => child.children[0]?.textContent === 'Community');
-const notesPlaceholder = community.children.find(child => child.textContent === 'Patch notes - Coming soon');
-assert.ok(notesPlaceholder, 'patch notes must remain visible as a coming-soon menu button');
-assert.equal(notesPlaceholder.disabled, true);
-assert.equal(notesPlaceholder.listeners.click, undefined, 'the placeholder must not open patch history');
+const walk = node => [node, ...(node.children ?? []).flatMap(walk)];
+const community = walk(pauseHost).find(child => child.children?.[0]?.textContent === 'Community');
+assert.ok(community, 'pause menu has a Community group');
+const labels = community.children.map(child => child.textContent);
+assert.ok(labels.includes('Rankings') && labels.includes('Chapter lore'), 'Community lists Rankings and Chapter lore');
+assert.ok(!labels.includes('Patch notes - Coming soon'), 'patch-notes placeholder is retired');
 console.log('PASS: opening and pause menus expose save/load/sign-in; panel navigation preserves pause and blocks during saves');

@@ -40,7 +40,7 @@ if (!fs.existsSync(edge)) {
             const box = card.getBoundingClientRect();
             if (box.top < -1 || box.bottom > innerHeight + 1 || box.left < -1 || box.right > innerWidth + 1) report.push('card outside viewport ' + JSON.stringify([box.top, box.bottom, box.left, box.right]));
             if (card.scrollWidth > card.clientWidth + 1) report.push('horizontal overflow ' + (card.scrollWidth - card.clientWidth));
-            if (card.scrollHeight > card.clientHeight + 1 && getComputedStyle(card).overflowY !== 'auto') report.push('content cut off without scrolling');
+            if (card.scrollHeight > card.clientHeight + 1) report.push('camp needs scrolling ' + card.scrollHeight + '/' + card.clientHeight);
             for (const el of card.querySelectorAll('button, .camp-relic, .camp-mastery-row')) {
                 const r = el.getBoundingClientRect();
                 if (r.width > box.width + 1) report.push('element wider than card: ' + el.textContent.trim().slice(0, 20));
@@ -58,7 +58,7 @@ if (!fs.existsSync(edge)) {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const failures = [];
     try {
-        for (const [width, height] of [[640, 360], [740, 360], [915, 412]]) {
+        for (const [width, height] of [[640, 360], [740, 360], [915, 412], [1280, 720], [1366, 768], [1920, 1080]]) {
             const output = await dumpBrowserDom(edge, ['--virtual-time-budget=3000', `--window-size=${width + 24},${height + 92}`, `http://127.0.0.1:${server.address().port}/`]);
             const result = (output.match(/data-result="([^"]*)"/)?.[1] ?? 'no result').replaceAll('&amp;', '&');
             const problems = result.split(' | ').filter(item => item && !item.startsWith('INFO'));
@@ -67,5 +67,5 @@ if (!fs.existsSync(edge)) {
         }
     } finally { await new Promise(resolve => server.close(resolve)); }
     assert.deepEqual(failures, [], failures.join('\n'));
-    console.log('PASS: Ember Camp fits landscape phones (in-card scrolling, no horizontal overflow, Back reachable)');
+    console.log('PASS: Ember Camp fits landscape phones and desktop without scrolling or horizontal overflow, Back visible');
 }

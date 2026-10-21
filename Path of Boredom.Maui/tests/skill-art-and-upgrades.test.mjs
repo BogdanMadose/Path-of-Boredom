@@ -117,7 +117,7 @@ for (const hero of Object.keys(CLASS_SKILLS)) {
     }, querySelector(selector) { return selector === 'img' ? this.image : this.name; }, setAttribute(name, value) { this.attrs[name] = value; } }));
     const messages = {};
     const context = vm.createContext({ setupSlots, setupSkillButtons, STARTER_SKILLS, skillName, skillIcon, validLoadout,
-        combatSkillDefinition, skillTagline, saving: false, setupAction: 'campaign', setupNext: {}, setup: { dataset: {} },
+        combatSkillDefinition, skillTagline, saving: false, setupAction: 'campaign', setupNext: {}, setup: { dataset: {} }, starterPool: () => STARTER_SKILLS,
         setupPreview: () => state, readSetupLoadout: () => ({ manual: 'none', auto: [setupSlots[0].value, 'none', 'none', 'none'] }),
         root: { querySelectorAll: () => STARTER_SKILLS.map(key => ({ dataset: { setupSkill: key } })),
             querySelector: selector => messages[selector] ??= {} }, on: (button, type, action) => { button[type] = action; }

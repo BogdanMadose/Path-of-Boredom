@@ -7,7 +7,8 @@ import { captureSnapshot } from '../../Path of Boredom.Game/wwwroot/js/arpg-save
 
 const source = fs.readFileSync(new URL('../../Path of Boredom.Game/wwwroot/js/arpg.js', import.meta.url), 'utf8');
 const flow = source.slice(source.indexOf('    let practiceReturn = null;'), source.indexOf('    let promptOpen = false;'));
-const button = dataset => ({ dataset, listeners: {}, addEventListener(event, callback) { this.listeners[event] = callback; } });
+const button = dataset => ({ dataset, listeners: {}, addEventListener(event, callback) { this.listeners[event] = callback; },
+    querySelector() { return button({}); }, querySelectorAll() { return []; } });
 const setup = button({}), exit = button({}), start = button({});
 const skills = SLOTTABLE_SKILLS.map(trainingSkill => button({ trainingSkill }));
 const original = startRun(() => 0.99, 'hard', 'ranger');

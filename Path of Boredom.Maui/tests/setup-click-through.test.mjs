@@ -39,6 +39,9 @@ if (!fs.existsSync(edge)) {
         const on = (target, event, handler) => target.addEventListener(event, handler);
         const clearInput = () => {}, updateHud = () => {}, scheduleArenaLayout = () => {}, reportScore = async () => {}, showMainMenu = () => {};
         const togglePause = () => {}, enterEndless = () => true, resetToReleaseRankings = () => {};
+        const { classUnlocked, extraStarters, applyCampBonuses, rerollsPerRun, CLASS_UNLOCK_HINT, CLASS_ORDER, loadProfile, masteryStep, MASTERY_MAX, MASTERY_REWARDS, unlockedTrims, setTrim, creditProgress } = meta;
+        const MAX_FLASKS = 5, RELIC_KEYS = relics.RELIC_KEYS;
+        const skillTagline = skills.skillTagline ?? (() => "");
         ${tutorialCode}
         ${setupCode}
         return { openSetup, get state() { return state; }, get step() { return setupStep; }, tutorial };`;
@@ -48,6 +51,8 @@ if (!fs.existsSync(edge)) {
         <script>window.addEventListener('error', event => document.body.dataset.result = 'script error: ' + event.message);</script>
         <script type="module">
         import * as skills from "/js/arpg-skills.js";
+        import * as meta from "/js/arpg-meta.js";
+        import * as relics from "/js/arpg-relics.js";
         import { HERO_CLASSES } from "/js/arpg-classes.js";
         import { DIFFICULTIES } from "/js/arpg-difficulty.js";
         import { LAST_WAVE } from "/js/arpg-campaign.js";
@@ -56,9 +61,9 @@ if (!fs.existsSync(edge)) {
         const check = (ok, message) => { if (!ok) throw new Error(message); };
         try {
             const root = document.querySelector(".arpg");
-            const game = new Function("root", "skills", "HERO_CLASSES", "DIFFICULTIES", "LAST_WAVE", "startRun", "startEndlessRun",
+            const game = new Function("root", "skills", "meta", "relics", "HERO_CLASSES", "DIFFICULTIES", "LAST_WAVE", "startRun", "startEndlessRun",
                 "const { STARTER_SKILLS, validLoadout, skillName, skillIcon, combatSkillDefinition } = skills;" + ${JSON.stringify(harness)})
-                (root, skills, HERO_CLASSES, DIFFICULTIES, LAST_WAVE, startRun, startEndlessRun);
+                (root, skills, meta, relics, HERO_CLASSES, DIFFICULTIES, LAST_WAVE, startRun, startEndlessRun);
             const setup = root.querySelector("[data-setup]"), next = root.querySelector("[data-setup-next]"), skip = root.querySelector("[data-setup-skip]");
             const visible = element => element.getBoundingClientRect().height > 0;
             const description = () => root.querySelector("[data-setup-description]").textContent;

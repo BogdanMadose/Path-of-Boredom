@@ -228,6 +228,42 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
         return new(true, "Run saved to your Google account. Continue on any device.", EndlessUnlocked: receipt.EndlessUnlocked);
     }
 
+    public async Task<string?> SaveProfileAsync(string json)
+    {
+        if (Encoding.UTF8.GetByteCount(json) > 8 * 1024) return null;
+        await gate.WaitAsync();
+        try
+        {
+            await EnsureInitializedAsync();
+            if (!initialized) return null;
+            using var request = await RequestAsync(HttpMethod.Put, "/game/profile");
+            if (request is null) return null;
+            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var response = await SendAsync(request);
+            if (response is null) return null;
+            if (response.StatusCode == HttpStatusCode.Conflict) return await response.Content.ReadAsStringAsync();
+            return response.IsSuccessStatusCode ? string.Empty : null;
+        }
+        catch (Exception exception) when (IsRecoverable(exception)) { return null; }
+        finally { gate.Release(); }
+    }
+
+    public async Task<string?> LoadProfileAsync()
+    {
+        await gate.WaitAsync();
+        try
+        {
+            await EnsureInitializedAsync();
+            if (!initialized) return null;
+            using var request = await RequestAsync(HttpMethod.Get, "/game/profile");
+            if (request is null) return null;
+            using var response = await SendAsync(request);
+            return response?.IsSuccessStatusCode == true ? await response.Content.ReadAsStringAsync() : null;
+        }
+        catch (Exception exception) when (IsRecoverable(exception)) { return null; }
+        finally { gate.Release(); }
+    }
+
     public async Task<GameSaveResult> LoadAsync()
     {
         await gate.WaitAsync();

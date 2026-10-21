@@ -93,7 +93,7 @@ const beforeSpam = context.sources.length;
 for (let i = 0; i < 100; i++) audio.play('hit');
 assert.equal(context.sources.length - beforeSpam, 1, 'impact spam is throttled');
 for (let i = 0; i < 100; i++) { context.currentTime += 0.5; audio.play('hit'); }
-assert.equal(context.sources.length - beforeSpam, 16, 'effects have a hard overlapping voice limit');
+assert.equal(context.sources.length - beforeSpam, 10, 'effects have a hard overlapping voice limit');
 context.finish();
 
 context.currentTime += 1;

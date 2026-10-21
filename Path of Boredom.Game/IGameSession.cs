@@ -33,4 +33,11 @@ public interface IGameSession
 
     /// <summary>Fetches a leaderboard slice, or null when unavailable.</summary>
     Task<IReadOnlyList<RankingRow>?> GetRankingsAsync(string difficulty, string mode, string heroClass = "all", string patch = RankingRules.CurrentPatch);
+
+    /// <summary>Uploads the account meta profile (Embers, mastery, unlocks, codex). Returns the stored
+    /// profile JSON when the server holds a newer one, an empty string on success, or null when unavailable.</summary>
+    Task<string?> SaveProfileAsync(string json) => Task.FromResult<string?>(null);
+
+    /// <summary>Downloads the account meta profile JSON, or null when none/unavailable.</summary>
+    Task<string?> LoadProfileAsync() => Task.FromResult<string?>(null);
 }

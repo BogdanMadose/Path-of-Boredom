@@ -21,7 +21,7 @@ try {
   bar.style.setProperty('--menu-shortcuts-top','52px');
   const a=pause.getBoundingClientRect();
   check(Math.abs(a.top-flaskBottom-6)<1,'pause clears flask row by six pixels');
-  check(Math.abs(a.left-healthLeft)<1,'pause aligns with health bar');
+  check(Math.abs(a.left-6)<1,'pause sits at the left screen edge');
   check(a.width===48 && a.height===44,'compact pause target');
   check(a.left>=0 && a.top>=0 && a.right<=w && a.bottom<=h,'pause fits');
   for(const side of ['left','right']) {

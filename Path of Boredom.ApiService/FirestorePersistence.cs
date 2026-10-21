@@ -12,6 +12,7 @@ public sealed class FirestorePersistence(FirestoreDb database)
     public FirestoreDb Database => database;
     public static string Key(string subject) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(subject)));
     public DocumentReference Save(string subject) => database.Collection("saves").Document(Key(subject));
+    public DocumentReference Profile(string subject) => database.Collection("profiles").Document(Key(subject));
     public DocumentReference Ranking(string subject) => database.Collection("rankings").Document(Key(subject));
     public DocumentReference Account(string subject) => database.Collection("accounts").Document(Key(subject));
     public DocumentReference DisplayName(string name) => database.Collection("displayNames").Document(Key(name.ToUpperInvariant()));
@@ -39,6 +40,7 @@ public sealed class FirestorePersistence(FirestoreDb database)
             if (claim is { Exists: true } && claim.GetValue<string>("owner") == Key(subject))
                 transaction.Delete(reservation!);
             transaction.Delete(Save(subject));
+            transaction.Delete(Profile(subject));
             transaction.Delete(Ranking(subject));
             transaction.Set(Account(subject), new Dictionary<string, object>
             {

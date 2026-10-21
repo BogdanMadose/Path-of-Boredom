@@ -334,6 +334,37 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         finally { gate.Release(); }
     }
 
+    public async Task<string?> SaveProfileAsync(string json)
+    {
+        if (System.Text.Encoding.UTF8.GetByteCount(json) > 8 * 1024) return null;
+        await gate.WaitAsync();
+        try
+        {
+            if (token is null) return null;
+            using var request = Request(HttpMethod.Put, "game/profile");
+            request.Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            using var response = await SendAsync(request);
+            if (response.StatusCode == HttpStatusCode.Conflict) return await response.Content.ReadAsStringAsync();
+            return response.IsSuccessStatusCode ? string.Empty : null;
+        }
+        catch (Exception exception) when (IsRecoverable(exception)) { return null; }
+        finally { gate.Release(); }
+    }
+
+    public async Task<string?> LoadProfileAsync()
+    {
+        await gate.WaitAsync();
+        try
+        {
+            if (token is null) return null;
+            using var request = Request(HttpMethod.Get, "game/profile");
+            using var response = await SendAsync(request);
+            return response.IsSuccessStatusCode ? await response.Content.ReadAsStringAsync() : null;
+        }
+        catch (Exception exception) when (IsRecoverable(exception)) { return null; }
+        finally { gate.Release(); }
+    }
+
     public async Task<GameSaveResult> SaveAsync(JsonElement snapshot)
     {
         await gate.WaitAsync();

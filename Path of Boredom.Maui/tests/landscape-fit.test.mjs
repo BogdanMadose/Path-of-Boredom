@@ -128,7 +128,7 @@ if (!fs.existsSync(edge)) {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const failures = [];
     try {
-        for (const [width, height] of [[640, 360], [740, 360], [915, 412]]) {
+        for (const [width, height] of [[640, 360], [740, 360], [915, 412], [1280, 720], [1366, 768], [1920, 1080]]) {
             // Headless Edge reserves 24px x 92px of window chrome; compensate so the page itself is phone-sized.
             const output = await dumpBrowserDom(edge, ['--virtual-time-budget=3000', `--window-size=${width + 24},${height + 92}`, `http://127.0.0.1:${server.address().port}/`]);
             const result = output.match(/data-result="([^"]*)"/)?.[1];

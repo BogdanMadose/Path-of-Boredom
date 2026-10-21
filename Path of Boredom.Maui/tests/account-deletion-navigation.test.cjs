@@ -10,7 +10,7 @@ async function run() {
     const root = { dataset: { cloudSignedIn: 'on', gameStatus: 'paused' }, dispatchEvent(event) { events.push(event.type); } };
     let submissions = 0;
     const context = vm.createContext({
-        root, releaseRankings: true, disposed: false, accountGeneration: 0, reporting: false,
+        root, releaseRankings: true, disposed: false, accountGeneration: 0, reporting: false, syncProfile() {},
         pendingScores: new Map([['old', {}]]), reportedScores: new Map([['old', 100]]),
         rankingStatus: { textContent: '' }, saveStatus: { textContent: '' },
         title: {}, description: {}, startButton: {}, restartButton: {},

@@ -84,6 +84,7 @@ app.UseRateLimiter();
 
 // Endpoint groups defined in GameSaveEndpoints.cs and RankingEndpoints.cs respectively.
 app.MapGameSaves();
+app.MapPlayerProfile();
 app.MapRankings();
 app.MapPlayerAccount();
 app.MapAppleSignIn();

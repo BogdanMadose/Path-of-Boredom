@@ -22,7 +22,7 @@
     <!-- Reverse-DNS id. This is permanent once published: Google Play keys a listing to it and it
          can never be changed or reused afterwards. -->
     <ApplicationId>com.madbone.pathofboredom</ApplicationId>
-    <ApplicationDisplayVersion>0.9.0</ApplicationDisplayVersion>
+    <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
 
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
@@ -55,6 +55,11 @@
     <!-- Balance-test output, not app content (iOS rejects it as bundle resources). -->
     <Content Remove="tests\**" />
     <None Remove="tests\**" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <!-- Apple privacy manifest; required for App Store submission. -->
+    <BundleResource Include="Platforms\iOS\PrivacyInfo.xcprivacy" LogicalName="PrivacyInfo.xcprivacy" />
   </ItemGroup>
 
   <ItemGroup>

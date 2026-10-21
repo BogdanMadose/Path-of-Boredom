@@ -256,7 +256,7 @@ export function continueJourney(state) {
     if (state.status === "camp") {
         state.status = "playing";
         state.travelPending = 1;
-        state.resumeDelay = state.mode === "endless" ? 6 : 3;
+        state.resumeDelay = 3;
         return true;
     }
     return false;
@@ -369,7 +369,7 @@ function hurtPlayer(state, damage, source = "Unknown attack") {
     effect(state, "text", player.x, player.y - 35, type === "magical" ? "#c6a4ff" : "#ff9384", `-${Math.ceil(taken)} ${type === "magical" ? "MAG" : "PHY"}`);
     if (taken > 0 && player.health > 0 && hasRelic(state, "thorn")) {
         effect(state, "ring", player.x, player.y, RELICS.thorn.color, "", 110);
-        for (const enemy of state.enemies) if (enemy.health > 0 && distance(player, enemy) < 110 + enemy.radius) hitEnemy(state, enemy, Math.round(weaponDamage(state) * 0.5), true, "relic");
+        for (const enemy of state.enemies) if (enemy.health > 0 && distance(player, enemy) < 110 + enemy.radius) hitEnemy(state, enemy, Math.round(weaponDamage(state) * 0.25), true, "relic");
     }
     if (player.health === 0) {
         state.status = "dead";
@@ -408,11 +408,12 @@ function killEnemy(state, enemy) {
     state.kills++;
     if (state.training) return;
     if (enemy.kind === "boss") awardBossRelic(state);
-    if (hasRelic(state, "leech")) state.player.health = Math.min(state.player.maxHealth, state.player.health + state.player.maxHealth * 0.015);
+    if (hasRelic(state, "leech")) state.player.health = Math.min(state.player.maxHealth, state.player.health + state.player.maxHealth * 0.005);
     const relic = rollRelic(state, enemy);
     if (relic) {
         effect(state, "burst", enemy.x, enemy.y, RELICS[relic].color, "", 90);
         effect(state, "text", state.player.x, state.player.y - 60, RELICS[relic].color, `RARE RELIC: ${RELICS[relic].name.toUpperCase()}`);
+        state.relicBanner = { key: relic, at: state.time };
         state.journal = `Rare relic found! ${RELICS[relic].name}: ${RELICS[relic].detail} Active for the rest of this run and added to your Relic Codex.`;
     }
     if (enemy.elite || enemy.kind === "boss") {
@@ -779,7 +780,7 @@ export function useSkill(state, skill, automatic = false) {
     const color = skill === "nova" && nodes.ignition && state.heroClass === "knight" ? "#ff8b32" : hero.color;
     const art = (radius, angle = p.facing) => {
         const item = effect(state, "class-skill", p.x, p.y, color, "", radius, angle);
-        Object.assign(item, { heroClass: state.heroClass, skill, rank: nodes.amplitude ?? nodes.focus ?? nodes.barrier ?? 0 });
+        Object.assign(item, { heroClass: state.heroClass, skill, rank: (nodes.amplitude ?? nodes.focus ?? nodes.barrier ?? nodes.edge ?? 0) + (nodes.resonance ?? nodes.overdrive ?? nodes.sweep ?? 0) });
         return item;
     };
     if (NEW_SKILLS[skill]) {
@@ -798,7 +799,7 @@ export function useSkill(state, skill, automatic = false) {
         } else if (state.heroClass === "ranger") {
             firePlayerArrows(state, [0], damage(1 + state.upgrades.cleave * 0.08), reach, 0, skill, facing);
         } else {
-            effect(state, "slash", p.x, p.y, color, "", reach, facing);
+            Object.assign(effect(state, "slash", p.x, p.y, color, "", reach, facing), { edge: nodes.edge, arc: 1.3 + nodes.sweep * 0.12, rhythm: nodes.rhythm });
             for (const enemy of state.enemies) {
                 const angle = Math.atan2(enemy.y - p.y, enemy.x - p.x) - facing;
                 if (distance(p, enemy) < reach + enemy.radius && Math.cos(angle) > 0.25 - state.upgrades.cleave * 0.02) {
@@ -812,7 +813,7 @@ export function useSkill(state, skill, automatic = false) {
         const reach = skillReach(state, "nova");
         if (hasRelic(state, "cinder")) {
             state.burns ??= [];
-            state.burns.push({ x: p.x, y: p.y, radius: Math.min(160, reach * 0.6), life: 3, tick: 0, damage: Math.round(weaponDamage(state) * 0.35) });
+            state.burns.push({ x: p.x, y: p.y, radius: Math.min(160, reach * 0.6), life: 3, tick: 0, damage: Math.round(weaponDamage(state) * 0.2) });
             if (state.burns.length > 6) state.burns.shift();
         }
         if (state.heroClass === "ranger") {
@@ -887,7 +888,7 @@ export function useSkill(state, skill, automatic = false) {
             const targets = state.enemies.filter(enemy => enemy.health > 0 && distance(p, enemy) < 420).sort((a, b) => distance(p, a) - distance(p, b)).slice(0, 3);
             for (const enemy of targets) {
                 effect(state, "relic-arrow", p.x, p.y, RELICS.quiver.color, "", distance(p, enemy), Math.atan2(enemy.y - p.y, enemy.x - p.x));
-                hitEnemy(state, enemy, Math.round(weaponDamage(state) * 0.8), true, "relic");
+                hitEnemy(state, enemy, Math.round(weaponDamage(state) * 0.4), true, "relic");
             }
         }
     } else {
@@ -903,19 +904,12 @@ export function useSkill(state, skill, automatic = false) {
         effect(state, "heal", p.x, p.y, emergency && nodes.triage ? "#ffcd79" : "#9de8ad", "", 24 + nodes.concentration * 5);
         if (hasRelic(state, "echo")) {
             effect(state, "expand", p.x, p.y, RELICS.echo.color, "", 160);
-            for (const enemy of state.enemies) if (enemy.health > 0 && distance(p, enemy) < 160 + enemy.radius) hitEnemy(state, enemy, Math.round(weaponDamage(state) * 1.5), true, "relic");
+            for (const enemy of state.enemies) if (enemy.health > 0 && distance(p, enemy) < 160 + enemy.radius) hitEnemy(state, enemy, Math.round(weaponDamage(state) * 0.75), true, "relic");
         }
         state.journal = "A moment of warmth. Refill flasks at checkpoints or the forge, not on level-up.";
     }
     p[skill] *= automatic ? AUTO_COOLDOWN : 1;
-    if (skill === "attack" && nodes.edge) effect(state, "empower", p.x, p.y, hero.color, "", 35 + nodes.edge * 9, nodes.edge);
-    if (skill === "attack" && nodes.sweep) effect(state, "expand", p.x, p.y, hero.color, "", 55 + nodes.sweep * 15);
-    if (skill === "attack" && nodes.rhythm) effect(state, "wind", p.x, p.y, hero.color, "", 40 + nodes.rhythm * 8, p.facing);
-    if (skill === "nova" && nodes.amplitude) effect(state, "empower", p.x, p.y, hero.color, "", 45 + nodes.amplitude * 12, nodes.amplitude);
-    if (skill === "nova" && nodes.resonance) effect(state, "expand", p.x, p.y, color, "", 65 + nodes.resonance * 20);
     if (skill === "nova" && nodes.ignition && state.heroClass === "knight") effect(state, "fire", p.x, p.y, "#ff8b32", "", 90);
-    if (skill === "burst" && nodes.focus) effect(state, "empower", p.x, p.y, hero.color, "", 45 + nodes.focus * 12, nodes.focus);
-    if (skill === "burst" && nodes.overdrive) effect(state, "sparks", p.x, p.y, hero.color, "", 45 + nodes.overdrive * 8);
     return true;
 }
 
@@ -1157,7 +1151,7 @@ function collectLoot(state, dt, collectAll = false) {
         }
         if (!collectAll && distance(p, drop) > 28) continue;
         drop.life = 0;
-        if (drop.kind === "gold") state.gold += Math.round(goldReward(drop.value, state.boons.fortune) * (hasRelic(state, "midas") ? 1.3 : 1));
+        if (drop.kind === "gold") state.gold += Math.round(goldReward(drop.value, state.boons.fortune) * (hasRelic(state, "midas") ? 1.15 : 1));
         else if (drop.kind === "flask") {
             const full = p.potions >= MAX_FLASKS;
             if (full) p.health = Math.min(p.maxHealth, p.health + p.maxHealth * 0.08 * difficultyFor(state).healing);

@@ -508,7 +508,7 @@
             var bounds = canvas.getBoundingClientRect();
             bar.style.setProperty('--menu-shortcuts-top', (bounds.top + 52) + 'px');
             if (pause) {
-                pause.style.setProperty('--pause-hud-top', (bounds.top + 72) + 'px');
+                pause.style.setProperty('--pause-hud-top', (bounds.top + 50) + 'px');
                 pause.style.setProperty('--pause-hud-left', (bounds.left + 14) + 'px');
             }
         }

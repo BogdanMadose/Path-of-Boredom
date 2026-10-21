@@ -354,7 +354,7 @@ export function captureSnapshot(state) {
         projectiles: state.projectiles.filter(projectile => projectile.life > 0),
         loot: state.loot.filter(drop => drop.life > 0)
     } });
-    const { random, effects, damageHistory, burns, ...saved } = restored;
+    const { random, effects, damageHistory, burns, relicBanner, ...saved } = restored;
     const snapshot = { version: 20, state: { ...saved, meta: exportProfile() } };
     require(new TextEncoder().encode(JSON.stringify(snapshot)).length <= 64 * 1024);
     return snapshot;

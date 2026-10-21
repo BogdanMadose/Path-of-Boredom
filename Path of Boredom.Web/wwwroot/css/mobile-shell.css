@@ -729,7 +729,7 @@
     body.mobile-shell .setup-overlay .difficulty-picker { gap: 2px; font-size: 11px; }
     body.mobile-shell .setup-overlay .starter-skill-pool button { min-height: 36px; }
     @media (max-height: 420px) {
-        body.mobile-shell .setup-overlay .forge-feedback { display: none; }
+        body.mobile-shell .setup-overlay .forge-feedback { -webkit-line-clamp: 2; }
         body.mobile-shell .setup-overlay h2 { display: none; }
     }
     body.mobile-shell .setup-overlay[data-tutorial="on"] .eyebrow,

@@ -84,7 +84,7 @@ export function createGameAudio(environment = globalThis) {
     function voice(channel, start, duration, pitch, endPitch, level, type = "sine", filter = null, options = {}) {
         if (!context || context.state !== "running" || disposed || failed || background || settings.muted
             || settings[channel] <= 0 || voices.size >= 48
-            || (channel === "effects" && [...voices].filter(item => item.channel === channel).length >= 16)) return;
+            || (channel === "effects" && [...voices].filter(item => item.channel === channel).length >= 10)) return;
         const music = channel === "music";
         const { attack = music ? 0.02 : 0.008, sustain = 0, reverb = music ? 0.3 : 0.12, echo = 0,
             pan = music ? 0 : (Math.random() - 0.5) * 0.25 } = options;
@@ -112,8 +112,8 @@ export function createGameAudio(environment = globalThis) {
             if (type === "noise") source.buffer = noise;
             else {
                 source.type = type;
-                source.frequency.setValueAtTime(Math.max(20, pitch), start);
-                source.frequency.exponentialRampToValueAtTime(Math.max(20, endPitch), start + duration);
+                source.frequency.setValueAtTime(Math.min(2400, Math.max(20, pitch)), start);
+                source.frequency.exponentialRampToValueAtTime(Math.min(2400, Math.max(20, endPitch)), start + duration);
                 if (unison > 1) source.detune?.setValueAtTime((i / (unison - 1) - 0.5) * 2 * spread, start);
             }
             source.connect(input);
@@ -281,7 +281,7 @@ export function createGameAudio(environment = globalThis) {
                 const glue = context.createDynamicsCompressor();
                 set(glue.threshold, -24); set(glue.knee, 18); set(glue.ratio, 3); set(glue.attack, 0.02); set(glue.release, 0.25);
                 const limiter = context.createDynamicsCompressor();
-                set(limiter.threshold, -6); set(limiter.knee, 0); set(limiter.ratio, 20); set(limiter.attack, 0.002); set(limiter.release, 0.1);
+                set(limiter.threshold, -10); set(limiter.knee, 0); set(limiter.ratio, 20); set(limiter.attack, 0.001); set(limiter.release, 0.15);
                 const canFilter = typeof context.createBiquadFilter === "function";
                 const filterNode = (type, cutoff, q) => {
                     if (!canFilter) return context.createGain();
@@ -290,9 +290,9 @@ export function createGameAudio(environment = globalThis) {
                 const lowpass = (cutoff, q = 0.5) => filterNode("lowpass", cutoff, q);
                 const highpass = cutoff => filterNode("highpass", cutoff, 0.5);
                 // Music: low-cut the mud, soft high roll-off for warmth.
-                const musicLow = highpass(35), musicWarm = lowpass(6500, 0.4);
+                const musicLow = highpass(35), musicWarm = lowpass(4800, 0.4);
                 musicGain.connect(musicLow); musicLow.connect(musicWarm); musicWarm.connect(master);
-                const effectsWarm = lowpass(7000, 0.4);
+                const effectsWarm = lowpass(4500, 0.4);
                 effectsGain.connect(effectsWarm); effectsWarm.connect(master);
                 // Algorithmic hall reverb: decaying stereo noise impulse convolved with sends.
                 const impulse = (seconds, decay) => {

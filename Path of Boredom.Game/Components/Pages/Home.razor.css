@@ -533,6 +533,8 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .arpg ::deep .camp-mastery-row select { justify-self: start; font-size: 12px; }
 .arpg ::deep .ember-camp-card [data-close-camp] { justify-self: center; min-width: 140px; }
 .arpg ::deep .draft-reroll[hidden] { display: none; }
+.arpg ::deep [data-choose-run-skill][data-recommended="on"] { position: relative; border-color: #ffd27a; box-shadow: 0 0 0 1px #ffd27a88, 0 0 14px #ffd27a44; }
+.arpg ::deep [data-choose-run-skill][data-recommended="on"]::after { content: "★ Synergy"; position: absolute; top: -8px; right: 8px; padding: 1px 6px; border-radius: 8px; background: #ffd27a; color: #2a1c08; font: 700 10px/1.4 system-ui, sans-serif; }
 @media (max-width: 520px), (max-height: 520px) {
     .arpg ::deep .ember-camp-card { padding: 12px; gap: 8px; }
     .arpg ::deep .ember-camp-card h2 { font-size: 20px; }
@@ -555,4 +557,18 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
     .arpg ::deep .camp-mastery-row, .arpg ::deep .camp-relic { padding: 5px 8px; gap: 2px; font-size: 11px; }
     .arpg ::deep .camp-relic small { font-size: 10px; }
     .arpg ::deep .ember-camp-card [data-close-camp] { grid-column: 1 / -1; min-height: 34px; }
+}
+.arpg ::deep .ember-camp-card [data-close-camp] { position: sticky; bottom: 0; z-index: 2; box-shadow: 0 -8px 12px #122025; }
+@media (max-height: 520px) {
+    .arpg ::deep .ember-camp { padding-block: 4px; }
+    .arpg ::deep .ember-camp-card { padding: 6px 10px; gap: 4px; }
+    .arpg ::deep .ember-camp-card > h2 { font-size: 16px; }
+    .arpg ::deep .ember-camp-hint { display: none; }
+    .arpg ::deep .camp-node { padding: 4px 6px; font-size: 10px; line-height: 1.2; }
+    .arpg ::deep .camp-relic small { display: none; }
+    .arpg ::deep .camp-node small:not(:last-child) { display: none; }
+    .arpg ::deep .camp-mastery-row small { font-size: 9px; line-height: 1.2; }
+    .arpg ::deep .ember-camp-codex { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .arpg ::deep .camp-mastery-row, .arpg ::deep .camp-relic { padding: 3px 6px; font-size: 10px; }
+    .arpg ::deep .ember-camp-card [data-close-camp] { min-height: 30px; }
 }

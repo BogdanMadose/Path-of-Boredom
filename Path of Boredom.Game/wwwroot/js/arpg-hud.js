@@ -110,34 +110,44 @@ export function drawHud(ctx, state, options = {}) {
     const barWidth = Math.min(BAR_W, width * 0.3);
     ctx.textBaseline = "alphabetic";
 
+    const compact = !!options.cssWidth;
+    const scrimHeight = compact ? 50 : 76, barHeight = compact ? 14 : BAR_H;
     // Top scrim keeps the bars legible over bright floors without hiding the playfield.
-    const scrim = ctx.createLinearGradient(0, 0, 0, 76);
-    scrim.addColorStop(0, "#0b1114e0");
+    const scrim = ctx.createLinearGradient(0, 0, 0, scrimHeight);
+    scrim.addColorStop(0, compact ? "#0b1114b0" : "#0b1114e0");
     scrim.addColorStop(1, "#0b111400");
     ctx.fillStyle = scrim;
-    ctx.fillRect(0, 0, width, 76);
+    ctx.fillRect(0, 0, width, scrimHeight);
 
-    const top = PAD + 16;
+    const top = compact ? 18 : PAD + 16;
     const health = p.maxHealth > 0 ? p.health / p.maxHealth : 0;
-    bar(ctx, PAD, top, barWidth, BAR_H, health, "#722e31", "#cd6357",
+    bar(ctx, PAD, top, barWidth, barHeight, health, "#722e31", "#cd6357",
         "VITALITY", `${Math.max(0, Math.ceil(p.health))} / ${Math.ceil(p.maxHealth)}`);
 
     // XP and level live on the PLAYER, not on state (see gainExperience in arpg-engine.js).
     const xpNeeded = p.nextLevel || 0;
     const xp = xpNeeded > 0 ? p.xp / xpNeeded : 0;
-    bar(ctx, width - PAD - barWidth, top, barWidth, BAR_H, xp, "#314c66", "#71afc6",
+    bar(ctx, width - PAD - barWidth, top, barWidth, barHeight, xp, "#314c66", "#71afc6",
         "EXPERIENCE", `${Math.floor(p.xp || 0)} / ${xpNeeded}`);
 
-    medallion(ctx, width / 2, top + BAR_H / 2, p.level || 1);
+    medallion(ctx, width / 2, top + barHeight / 2, p.level || 1);
 
     // Flasks: pips rather than a number, readable at a glance mid-fight.
     const flasks = p.potions || 0;
-    const pipY = top + BAR_H + 13;
+    const pipY = top + barHeight + (compact ? 9 : 13);
     for (let i = 0; i < (options.maxFlasks || 5); i++) {
         ctx.beginPath();
-        ctx.arc(PAD + 6 + i * 16, pipY, 5, 0, Math.PI * 2);
+        ctx.arc(PAD + 6 + i * 16, pipY, compact ? 4 : 5, 0, Math.PI * 2);
         ctx.fillStyle = i < flasks ? "#c46d62" : "#2a3336";
         ctx.fill();
+    }
+    if (options.stage) {
+        ctx.textAlign = "right"; ctx.textBaseline = "middle";
+        ctx.font = "700 15px system-ui, sans-serif";
+        ctx.strokeStyle = "#071018"; ctx.lineWidth = 4; ctx.fillStyle = "#f1d49b";
+        ctx.strokeText(options.stage, width - PAD, pipY + 3, barWidth);
+        ctx.fillText(options.stage, width - PAD, pipY + 3, barWidth);
+        ctx.textBaseline = "alphabetic";
     }
     if (options.boss) {
         const boss = options.boss, bossWidth = Math.min(360, width * 0.3);
@@ -169,7 +179,7 @@ export function drawHud(ctx, state, options = {}) {
         ctx.textAlign = "center";
         ctx.font = "600 12px system-ui, sans-serif";
         ctx.fillStyle = "#e0bd84";
-        ctx.fillText(options.buffs.toUpperCase(), width / 2, options.boss ? 122 : top + BAR_H + 22, width * 0.3);
+        ctx.fillText(options.buffs.toUpperCase(), width / 2, options.boss ? 122 : top + barHeight + 22, width * 0.3);
     }
     if (options.checkpoint) {
         ctx.textAlign = "center";
@@ -193,7 +203,7 @@ export function drawHudCached(ctx, state, options = {}) {
     const boss = options.boss;
     const key = [canvas.width, canvas.height, options.cssWidth, options.cssHeight, Math.ceil(p.health), Math.ceil(p.maxHealth),
         Math.floor(p.xp || 0), p.nextLevel, p.level, p.potions, options.maxFlasks, boss ? boss.name + ":" + Math.ceil(boss.health) + ":" + boss.maxHealth : "",
-        options.buffs || "", options.checkpoint || ""].join("|");
+        options.buffs || "", options.checkpoint || "", options.stage || ""].join("|");
     if (!hudLayer || hudLayer.width !== canvas.width || hudLayer.height !== canvas.height) {
         hudLayer = document.createElement("canvas");
         hudLayer.width = canvas.width; hudLayer.height = canvas.height;

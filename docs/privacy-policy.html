@@ -28,12 +28,12 @@
 
 <body>
     <h1>Privacy Policy for Path of Boredom</h1>
-    <p class="updated">Last updated: 24 September 2026</p>
+    <p class="updated">Last updated: 21 October 2026</p>
 
     <p>
         Path of Boredom ("the game") is a hobby game developed by MadBone. This policy explains what
         data the game collects, why, and who it is shared with. It applies to the Android app
-        (<code>com.madbone.pathofboredom</code>) and to the browser version of the game.
+        (<code>com.madbone.pathofboredom</code>), the iOS app, and the browser version of the game.
     </p>
 
     <h2>Summary</h2>
@@ -78,8 +78,10 @@
                 <td>Game progress and run data</td>
                 <td>
                     Your character, level, equipment, upgrades, chosen skills, score and progress
-                    through the campaign, so a run can be resumed and ranked. This is game data, not
-                    information about you personally.
+                    through the campaign, so a run can be resumed and ranked, plus account-wide
+                    progress (Embers, Ember Camp upgrades, class mastery and discovered relics) so it
+                    follows you between devices. This is game data, not information about you
+                    personally.
                 </td>
             </tr>
         </tbody>
@@ -101,9 +103,10 @@
 
     <h2>How the data is stored</h2>
     <p>
-        Saved games and leaderboard entries are stored on a server operated by the developer, as
-        ordinary files. Account identifiers are stored in hashed form where they are used to name
-        those files. Data is sent between the app and the server over HTTPS.
+        Saved games, account progress and leaderboard entries are stored in Google Cloud Firestore,
+        operated for the developer by Google Cloud, which acts as a data processor. Data is sent
+        between the app and the server over HTTPS. Game settings and a local copy of your progress
+        are also kept on your device.
     </p>
     <p>
         This is a small hobby project rather than a commercial service. It is run on a best-effort
@@ -123,6 +126,10 @@
             your data is governed by their own privacy policies.
         </li>
         <li>
+            <strong>Google Cloud</strong> &mdash; hosts the game's server and database on the
+            developer's behalf. It does not use the data for its own purposes.
+        </li>
+        <li>
             <strong>Other players</strong> &mdash; your display name, score, class and the build used
             for a ranked run are visible on the in-game leaderboard. Nothing else is shown publicly.
             Do not sign in with an account whose display name you are not willing to show there.
@@ -140,9 +147,15 @@
 
     <h2>Your rights and deleting your data</h2>
     <p>
-        You can ask for your saved game, leaderboard entry and account identifier to be deleted, or
-        ask for a copy of the data held about you. Requests are handled manually, so please allow a
-        reasonable amount of time. Contact details are below.
+        You can delete your account and all data held about it at any time from inside the game:
+        open <strong>Account &amp; cloud</strong> and choose <strong>Delete account</strong>. This
+        permanently removes your saved game, account progress, leaderboard entries and account
+        identifier from the server. Instructions are also available on the
+        <a href="delete-account.html">account deletion page</a>.
+    </p>
+    <p>
+        You can also ask for a copy of the data held about you, or request deletion by email, using
+        the contact details below.
     </p>
     <p>
         You can also stop the app from holding further data at any time by signing out and

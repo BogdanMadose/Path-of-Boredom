@@ -34,6 +34,9 @@ public sealed record RankingRow(int Rank, string Player, long Score, DateTimeOff
 /// <param name="ManualSkill">The skill currently bound to the manual-cast slot (Q).</param>
 /// <param name="AutoSkills">The (up to 2) skills bound to auto-cast slots.</param>
 /// <param name="Equipment">Gear and trade-offs at submission time; absent on older records.</param>
+/// <param name="PhysicalArmor">Physical armor</param>
+/// <param name="Relics">Dropped relics</param>
+/// <param name="SpellResistance">Magic resistance</param>
 public sealed record RankingBuild(long Level, IReadOnlyList<RankingUpgrade> Upgrades, string ManualSkill, IReadOnlyList<string> AutoSkills, RankingEquipment? Equipment = null, IReadOnlyList<string>? Relics = null, double? PhysicalArmor = null, double? SpellResistance = null);
 
 /// <summary>Equipped gear ratings and styles, separate from forge ranks.</summary>

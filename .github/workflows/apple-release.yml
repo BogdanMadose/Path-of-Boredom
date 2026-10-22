@@ -120,7 +120,6 @@ jobs:
             -p:PackageSigningKey="3rd Party Mac Developer Installer" \
             -p:CodesignProvision="$(security cms -D -i $RUNNER_TEMP/mac.provisionprofile | plutil -extract Name raw -)" \
             -p:UseHardenedRuntime=true \
-            "-p:RuntimeIdentifiers=maccatalyst-arm64%3Bmaccatalyst-x64" \
             -p:ValidateXcodeVersion=false -clp:ErrorsOnly -o artifacts/mac 2>&1 | tee mac-build.log \
             || { echo "::group::Mac build errors"; grep -E "error|Error" mac-build.log | sort -u | head -40; echo "::endgroup::"; exit 1; }
 

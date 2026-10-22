@@ -37,16 +37,23 @@ jobs:
           # Skip partially installed Xcodes (missing iPhoneOS/MacOSX SDKs break actool).
           XCODE=""
           for x in $(ls -d /Applications/Xcode_*.app | grep -v beta | sort -V -r); do
-            P="$x/Contents/Developer/Platforms"
-            if [ -d "$P/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk" ] && [ -d "$P/MacOSX.platform/Developer/SDKs/MacOSX.sdk" ]; then
+            D="$x/Contents/Developer"
+            if DEVELOPER_DIR="$D" xcrun --sdk macosx --show-sdk-path >/dev/null 2>&1 \
+              && DEVELOPER_DIR="$D" xcrun --sdk iphoneos --show-sdk-path >/dev/null 2>&1 \
+              && DEVELOPER_DIR="$D" xcrun --sdk macosx -find actool >/dev/null 2>&1; then
               XCODE="$x"; break
             fi
-            echo "Skipping $x (SDKs missing)"
+            echo "Skipping $x (SDKs/actool unusable)"
           done
           [ -n "$XCODE" ] || { echo "No complete Xcode found"; exit 1; }
+          XCODE=$(cd "$XCODE" && pwd -P)
           echo "Using $XCODE"
           sudo xcode-select -s "$XCODE"
+          # Make the .NET iOS SDK use the same Xcode instead of its own lookup.
+          echo "DEVELOPER_DIR=$XCODE/Contents/Developer" >> "$GITHUB_ENV"
+          echo "MD_APPLE_SDK_ROOT=$XCODE" >> "$GITHUB_ENV"
           xcodebuild -version
+          xcrun --sdk macosx --show-sdk-path
 
       - uses: actions/setup-dotnet@v4
         with:

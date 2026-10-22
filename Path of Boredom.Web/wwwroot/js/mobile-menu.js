@@ -33,6 +33,7 @@
     var panels = {};
     var openName = null;
     var resumeAfterMenu = false;
+    var fromShortcut = false;
     var returnToMain = false;
     var accountFromMain = false;
 
@@ -77,6 +78,7 @@
                 returnToMain = false;
             }
             else if (name === "account" && ["ready", "dead", "won"].includes(document.querySelector(".arpg").dataset.gameStatus)) closePanel(false);
+            else if (fromShortcut) closePanel();
             else if (information) openPanel("pause");
             else closePanel();
         });
@@ -297,6 +299,7 @@
         document.body.classList.remove("mm-panel-open");
         root.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: false, resume: resume && resumeAfterMenu } }));
         resumeAfterMenu = false;
+        fromShortcut = false;
         // Returning to combat: the engine's own "resume" control is the authority on unpausing,
         // so we only restore focus and let the player decide.
         var canvas = document.querySelector(".arena-viewport canvas");
@@ -359,7 +362,7 @@
             badge.dataset.mmBadge = entry.name;
             badge.hidden = true;
             tab.appendChild(badge);
-            tab.addEventListener("click", function () { openPanel(entry.name); });
+            tab.addEventListener("click", function () { var was = openName; openPanel(entry.name); fromShortcut = !was && openName === entry.name; });
             bar.appendChild(tab);
         });
 

@@ -304,9 +304,9 @@
         display: none !important;
     }
     body.mobile-shell .challenge-nudge {
-        position: absolute; top: max(8px, env(safe-area-inset-top)); left: 50%; right: auto; bottom: auto; transform: translateX(-50%);
-        width: min(560px, calc(100% - 24px)); border: 1px solid #ff9b7a; border-radius: 10px; z-index: 40; pointer-events: auto;
-        box-shadow: 0 6px 24px #000a; font-size: 13px; animation: mobile-challenge-in .35s ease-out;
+        position: absolute; top: 50%; left: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%);
+        width: min(520px, calc(100% - 24px)); border: 1px solid #ff9b7a; border-radius: 12px; z-index: 40; pointer-events: auto;
+        box-shadow: 0 8px 32px #000c; font-size: 14px; animation: none;
     }
     body.mobile-shell .challenge-nudge button { min-height: 40px; padding: 0 12px; }
 

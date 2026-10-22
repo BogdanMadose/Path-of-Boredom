@@ -12,21 +12,21 @@
 // If you're chasing "why did my character take damage it shouldn't have", look in arpg-engine.js.
 // If it's "why does it look wrong on screen", look in arpg-graphics.js. If it's "why doesn't this
 // button/panel do anything", it's almost certainly wiring that's missing in this file.
-import { WIDTH, HEIGHT, createState, startRun, startEndlessRun, step, togglePause, useSkill, weaponDamage, armorRating, upgradeCost, buyUpgrade, continueJourney, enterEndless, chooseLevelCard } from "./arpg-engine.js";
+import { WIDTH, HEIGHT, createState, startRun, startEndlessRun, step, togglePause as engineTogglePause, useSkill, weaponDamage, armorRating, upgradeCost, buyUpgrade, continueJourney, enterEndless, chooseLevelCard } from "./arpg-engine.js";
 import { captureSnapshot, restoreSnapshot } from "./arpg-save.js";
 import { captureRankingBuild, resetToReleaseRankings } from "./arpg-ranking.js";
 import { upgradePreview } from "./arpg-upgrade-preview.js";
 import { MAPS, LAST_WAVE, UPGRADES, POWER_UPS, threatForWave, mapForWave, mapIndexForWave } from "./arpg-campaign.js";
 import { LEVEL_CARDS, normalizeCardChoices } from "./arpg-cards.js";
 import { DIFFICULTIES } from "./arpg-difficulty.js";
-import { MASTERY, MAX_FLASKS, forgeSkillSelected, forgeComplete, masteryCost, buyMastery, chargeLaneEnd } from "./arpg-engine.js";
+import { MASTERY, MAX_FLASKS, grantExperience, forgeSkillSelected, forgeComplete, masteryCost, buyMastery, chargeLaneEnd } from "./arpg-engine.js";
 import { movementSpeed, criticalChance, criticalDamage, skillReach, cooldownRecovery } from "./arpg-engine.js";
 import { HERO_CLASSES, classFor } from "./arpg-classes.js";
 import { resistanceRating } from "./arpg-engine.js";
 import { enemyDefense, skillDamageType } from "./arpg-damage.js";
 import { BOSS_RELICS, BUILD_SYNERGIES, codexEntries, stageEvent, eventAvailable, eventDetail, resolveStageEvent, buildSynergy, discoverChapter, checkpointReport } from "./arpg-adventures.js";
 import { bindPreferences } from "./arpg-preferences.js";
-import { drawBossDanger, bossWarning } from "./arpg-boss-patterns.js";
+import { drawBossDanger, bossWarning, drawBossStrike, drawBossProjectile } from "./arpg-boss-patterns.js";
 import { drawMob } from "./arpg-mob-art.js";
 import { CAMP_NODES, CLASS_ORDER, CLASS_UNLOCK_HINT, MASTERY_MAX, MASTERY_REWARDS, masteryStep, loadProfile, onProfileChange, grandfatherClasses, classUnlocked, campCost, buyCampNode, extraStarters, relayForks, unlockedTrims, setTrim, applyCampBonuses, rerollsPerRun, creditProgress, mergeProfile, exportProfile } from "./arpg-meta.js";
 import { setRelayForks } from "./arpg-engine.js";
@@ -504,12 +504,16 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
         const burning = map.hazard !== "slow" && phase >= 4 && enemiesAlive;
         const warning = map.hazard !== "slow" && phase >= 2 && !burning && enemiesAlive;
         if (burning || warning) drawGlow(ctx, hazard.x, hazard.y, hazard.radius * 1.35, map.accent, burning ? 0.38 : 0.2 + 0.1 * Math.sin(state.time * 8));
+        const idle = !burning && !warning;
+        ctx.save();
+        if (idle) ctx.globalAlpha *= 0.45;
         circle(ctx, hazard.x, hazard.y, hazard.radius, map.hazard === "slow" ? map.accent + "20" : burning ? map.accent + "77" : warning ? map.accent + "44" : "#4e333366");
         ctx.strokeStyle = preferences.contrast ? "#fff3cc" : map.accent;
-        ctx.lineWidth = preferences.contrast ? 4 : 2;
+        ctx.lineWidth = preferences.contrast ? 4 : idle ? 1.5 : 2;
         ctx.beginPath(); ctx.arc(hazard.x, hazard.y, hazard.radius, 0, Math.PI * 2); ctx.stroke();
         ctx.textAlign = "center"; ctx.font = "10px 'Segoe UI', sans-serif"; ctx.fillStyle = map.accent;
         ctx.fillText(map.hazard === "slow" ? "SLOW" : burning ? map.hazard.toUpperCase() : warning ? "DANGER SOON" : `${map.hazard.toUpperCase()} SEAL`, hazard.x, hazard.y + 4);
+        ctx.restore();
         if (burning) {
             for (let i = 0; i < 8; i++) {
                 const angle = i * Math.PI / 4 + state.time;
@@ -744,7 +748,9 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
         ctx.strokeStyle = item.color;
         ctx.fillStyle = item.color;
         ctx.lineWidth = 3 * (1 - progress) + 1;
-        if (item.kind === 'boss-intro') {
+        if (item.kind === 'boss-strike') {
+            drawBossStrike(ctx, item, progress);
+        } else if (item.kind === 'boss-intro') {
             ctx.globalAlpha = Math.min(1, item.life, (item.maxLife - item.life) * 3);
             ctx.font = '16px Georgia, serif'; ctx.textAlign = 'center';
             const lines = item.text.split(' · ');
@@ -853,6 +859,15 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
             }
             ctx.fill();
         } else {
+            if (item.hostile) {
+                ctx.save();
+                ctx.globalAlpha = 0.28 * (1 - progress);
+                ctx.fillStyle = item.color;
+                ctx.beginPath(); ctx.arc(item.x, item.y, Math.max(1, item.radius * Math.min(1, progress * 1.6)), 0, Math.PI * 2); ctx.fill();
+                ctx.globalAlpha = 1 - progress * 0.7; ctx.lineWidth = 5; ctx.strokeStyle = "#fff3dc";
+                ctx.beginPath(); ctx.arc(item.x, item.y, Math.max(1, item.radius * Math.min(1, progress * 1.6)), 0, Math.PI * 2); ctx.stroke();
+                ctx.restore();
+            }
             ctx.save();
             ctx.globalAlpha *= 0.2;
             ctx.lineWidth = 16 * (1 - progress) + 2;
@@ -869,6 +884,7 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
         ctx.restore();
     }
     for (const bolt of state.projectiles) {
+        if (bolt.boss) { drawBossProjectile(ctx, bolt, state.time, lite); continue; }
         ctx.save();
         const speed = Math.hypot(bolt.vx, bolt.vy) || 1;
         drawGlow(ctx, bolt.x, bolt.y, 26, "#ff3d70", 0.45);
@@ -953,6 +969,7 @@ export function createGame(root, saveBridge = null) {
     const on = (target, event, handler, options = {}) => target.addEventListener(event, handler, { ...options, signal: controller.signal });
     const audio = createGameAudio();
     const preferences = bindPreferences(root);
+    const togglePause = target => engineTogglePause(target, root.dataset.quickTravel === "true");
     const buttonFeedback = bindButtonFeedback(root);
     const audioMute = root.querySelector("[data-audio-mute]");
     const audioMusic = root.querySelector("[data-audio-music]");
@@ -966,7 +983,7 @@ export function createGame(root, saveBridge = null) {
         if (audioStatus) audioStatus.textContent = !(window.AudioContext || window.webkitAudioContext)
             ? "Audio is unavailable in this browser. Visual warnings remain active."
             : settings.muted ? "Audio muted. Visual warnings remain active."
-            : `Music ${Math.round(settings.music * 100)}% · Effects ${Math.round(settings.effects * 100)}%. Audio starts after interaction and stops in the background.`;
+            : `Music ${Math.round(settings.music * 100)}% · Effects ${Math.round(settings.effects * 100)}%.`;
     }
     updateAudioControls();
     for (const [element, key] of [[audioMute, "muted"], [audioMusic, "music"], [audioEffects, "effects"]]) {
@@ -1021,6 +1038,7 @@ export function createGame(root, saveBridge = null) {
     let last = 0;
     let hudTime = 0;
     let canvasCssWidth = 0, canvasCssHeight = 0, idleDrawTime = 0, idleDrawKey = "";
+    let stageFade = 0, stageFadeMap = null, stageFadeTime = 0, suppressTravelFade = false;
     let shownStatus = "ready";
     let disposed = false;
     let saving = false;
@@ -1440,12 +1458,12 @@ export function createGame(root, saveBridge = null) {
     for (const [attribute, accept] of [["data-stage-event-accept", true], ["data-stage-event-skip", false]]) for (const eventButton of root.querySelectorAll(`[${attribute}]`)) {
         on(eventButton, "click", async () => {
             if (saving) return;
-            const goldBefore = state.gold, flasksBefore = state.player.potions, healthBefore = state.player.health;
+            const goldBefore = state.gold, flasksBefore = state.player.potions, healthBefore = state.player.health, levelBefore = state.player.level;
             const name = stageEvent(state).name;
-            if (!resolveStageEvent(state, accept, DIFFICULTIES[state.difficulty]?.healing ?? 1)) return;
-            const gained = state.gold - goldBefore, flasks = flasksBefore - state.player.potions, health = Math.round(state.player.health - healthBefore);
+            if (!resolveStageEvent(state, accept, DIFFICULTIES[state.difficulty]?.healing ?? 1, MAX_FLASKS, amount => grantExperience(state, amount))) return;
+            const gained = state.gold - goldBefore, flasks = flasksBefore - state.player.potions, health = Math.round(state.player.health - healthBefore), levels = state.player.level - levelBefore;
             bargainOutcome = { wave: state.wave, text: !accept ? `You passed by the ${name.toLowerCase()}.`
-                : `✓ Bargain done: ${[gained > 0 ? `+${gained} gold` : gained < 0 ? `${gained} gold` : "", flasks > 0 ? `-${flasks} flask` : "", health ? `${health > 0 ? "+" : ""}${health} health` : ""].filter(Boolean).join(", ")}.` };
+                : `✓ Bargain done: ${[gained > 0 ? `+${gained} gold` : gained < 0 ? `${gained} gold` : "", flasks > 0 ? `-${flasks} flask` : "", health ? `${health > 0 ? "+" : ""}${health} health` : "", levels > 0 ? `+${levels} level${levels > 1 ? "s" : ""} — choose your boon${levels > 1 ? "s" : ""}` : ""].filter(Boolean).join(", ")}.` };
             updateHud();
             if (["camp", "won"].includes(state.status)) await persist(false);
         });
@@ -1747,7 +1765,7 @@ export function createGame(root, saveBridge = null) {
     function updateHud() {
         noteProgress();
         const gearPreview = [`Equipped now: damage ${weaponDamage(state)}, physical armor ${armorRating(state).toFixed(1)}%, spell resistance ${resistanceRating(state).toFixed(1)}%, movement ${Math.round(movementSpeed(state))}.`];
-        if (state.runRelics?.length) gearPreview.push(`Rare relics: ${state.runRelics.map(key => `${RELICS[key].name} (${RELICS[key].detail})`).join(" ")}`);
+        if (state.runRelics?.length) for (const key of state.runRelics) gearPreview.push(`Relic · ${RELICS[key].name}: ${RELICS[key].detail}`);
         const equipmentPreview = hudOne('[data-equipment-preview]');
         const gearSignature = gearPreview.join('|');
         if (equipmentPreview.dataset.preview !== gearSignature) {
@@ -1992,7 +2010,8 @@ export function createGame(root, saveBridge = null) {
         setText(hudOne("[data-challenge-status]"), `${CHALLENGES[challenge.key]}${challenge.key === "none" ? "" : ` · stage ${challenge.stage} · ${Math.floor(challenge.elapsed)}s · ${challenge.flasks} flasks · ${Math.round(challenge.damage)} health lost${challenge.resolved ? " · resolved" : ""}`}`);
         const nextStage = Math.floor(state.wave / 5) + 1;
         const challengePicked = challenge.key !== "none" && challenge.stage === nextStage && !challenge.resolved;
-        challengeNudge.hidden = !challengeAvailable || challengePicked || challengeNudgeDismissedStage === nextStage
+        challengeNudge.hidden = !endlessTravel || !challengeAvailable || challengePicked || challengeNudgeDismissedStage === nextStage
+            || inMainMenu || !loreReader.hidden
             || !!setupAction || choosing || draftClosing || root.dataset.menuOpen === "on";
         holdForChallenge = endlessTravel && !challengeNudge.hidden;
         setText(challengeNudgeText, `Bonus ${100 + nextStage * 50} gold for stage ${nextStage}.`);
@@ -2111,7 +2130,9 @@ export function createGame(root, saveBridge = null) {
             .map(key => ({ key: `mastery:${key}`, rank: state.mastery[key] }))
             : Object.entries(UPGRADES).filter(([key, upgrade]) => forgeSkillSelected(state, key) && state.upgrades[key] < upgrade.max && state.gold >= upgradeCost(state, key))
                 .map(([key]) => ({ key: `forge:${key}`, rank: state.upgrades[key] }));
-        const notifyForge = forgeNotification(state, offers, root.dataset.menuPanel === "forge");
+        const cheapestOffer = completedForge ? cheapestTraining
+            : Math.min(...Object.keys(UPGRADES).filter(key => forgeSkillSelected(state, key) && state.upgrades[key] < UPGRADES[key].max).map(key => upgradeCost(state, key)));
+        const notifyForge = forgeNotification(state, offers, root.dataset.menuPanel === "forge", cheapestOffer);
         forgeNudge.hidden = state.status !== "playing" || state.resumeDelay > 0 || draftClosing || !!setupAction || !notifyForge || !skillUnlockNotice.hidden;
         forgeButton.classList.toggle("forge-available", active && !choosing && !setupAction && notifyForge);
         root.dataset.forgeAvailable = active && !choosing && !setupAction && notifyForge ? "on" : "off";
@@ -2233,7 +2254,7 @@ export function createGame(root, saveBridge = null) {
             if (["paused", "camp", "won", "dead"].includes(state.status)) void reportScore();
             shownStatus = state.status;
             overlay.hidden = !!setupAction || (state.status === "playing" || checkpointInBackground) && !draftClosing;
-            restartButton.hidden = !["paused", "camp"].includes(state.status);
+            restartButton.hidden = !["paused", "camp"].includes(state.status) || (state.mode === "endless" && !endlessButton.hidden);
             deathMainMenu.hidden = state.status !== "dead";
             if (state.status !== "playing") {
                 clearInput();
@@ -2310,7 +2331,7 @@ export function createGame(root, saveBridge = null) {
     function begin() {
         if (saving || checkingUnlock || setupAction || !loreReader.hidden || state.status === "choosing") return;
         if (state.status === "paused") togglePause(state);
-        else if (state.status === "camp") continueJourney(state);
+        else if (state.status === "camp") continueJourney(state, root.dataset.quickTravel === "true");
         else {
             openSetup("campaign");
             return;
@@ -2417,7 +2438,6 @@ export function createGame(root, saveBridge = null) {
         if (state.status === "playing") pause();
         updateHud();
         alignArena = false;
-        reveal(root.querySelector("[data-challenges]"), true);
     });
     on(root.querySelector("[data-dismiss-challenges]"), "click", () => {
         challengeNudgeDismissedStage = Math.floor(state.wave / 5) + 1;
@@ -2475,7 +2495,7 @@ export function createGame(root, saveBridge = null) {
             const snapshot = captureSnapshot(state);
             const wave = state.wave;
             const local = root.dataset.localSaves === "on" && root.dataset.cloudSignedIn !== "on";
-            continueJourney(state);
+            continueJourney(state, root.dataset.quickTravel === "true");
             clearInput();
             last = performance.now();
             checkpointSaveFailed = false;
@@ -2533,9 +2553,12 @@ export function createGame(root, saveBridge = null) {
                 if (releaseRankings) resetToReleaseRankings(state);
                 checkpointSaveFailed = false;
                 if (state.mode === "endless" && state.status === "camp") {
-                    continueJourney(state);
+                    continueJourney(state, root.dataset.quickTravel === "true");
+                    if (root.dataset.quickTravel === "true") state.resumeDelay = 1.5;
                     togglePause(state);
+                    challengeNudgeDismissedStage = Math.floor(state.wave / 5) + 1;
                 }
+                stageFade = 0; stageFadeMap = null; suppressTravelFade = true;
                 difficultySelect.value = Object.hasOwn(DIFFICULTIES, state.difficulty) ? state.difficulty : "hard";
                 checkpointHandled = ["camp", "won"].includes(state.status) ? `${state.mode}:${state.wave}` : null;
                 shownStatus = "";
@@ -2557,7 +2580,7 @@ export function createGame(root, saveBridge = null) {
             if (!disposed) {
                 saving = false;
                 if (advanceEndless) {
-                    continueJourney(state);
+                    continueJourney(state, root.dataset.quickTravel === "true");
                     clearInput();
                     last = performance.now();
                     if (document.hidden || !document.hasFocus()) togglePause(state);
@@ -2765,7 +2788,19 @@ export function createGame(root, saveBridge = null) {
             idleDrawTime = now;
             idleDrawKey = idleKey;
             render(ctx, floors[mapIndexForWave(state.wave)], state, bossTop, preferences.settings, canvasHud);
-            drawCountdown(ctx, state, canvasHud);
+            if (root.dataset.quickTravel !== "true") drawCountdown(ctx, state, canvasHud);
+            // Stage change: fade the old land to black and the new one in instead of a hard cut.
+            const drawnMap = mapIndexForWave(state.wave);
+            const smoothTravel = root.dataset.quickTravel === "true";
+            if (!state.travelPending) suppressTravelFade = false;
+            if (smoothTravel && !suppressTravelFade && state.travelPending && state.status === "playing") stageFade = Math.max(stageFade, Math.min(1, 1 - (state.resumeDelay - 1.5) / 0.7));
+            else if (smoothTravel && !suppressTravelFade && drawnMap !== stageFadeMap && stageFadeMap !== null) stageFade = Math.max(stageFade, 1);
+            stageFadeMap = drawnMap;
+            if (stageFade > 0) {
+                ctx.save(); ctx.globalAlpha = Math.min(1, stageFade); ctx.fillStyle = "#050c11"; ctx.fillRect(0, 0, WIDTH, HEIGHT); ctx.restore();
+                if (!state.travelPending) stageFade = Math.max(0, stageFade - (now - (stageFadeTime || now)) / 600);
+            }
+            stageFadeTime = now;
             if (canvasHud) {
                 const boss = state.enemies.find(enemy => enemy.kind === "boss" && enemy.health > 0);
                 const map = mapForWave(state.wave);

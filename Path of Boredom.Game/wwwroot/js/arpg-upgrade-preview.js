@@ -55,7 +55,7 @@ const fields = {
     weapon: ["damage"], armor: ["armor", "resistance", "health"], cleave: ["attackHit", "attackInterval", "attackReach"],
     nova: ["specialHit", "specialInterval", "specialReach"], burst: ["burstHit", "burstInterval", "burstReach"],
     guard: ["guardHit", "guardInterval", "guardReach", "protection"], dodge: ["dodgeInterval", "immunity"], flask: ["healing"],
-    critChance: ["crit"], critDamage: ["critDamage"], might: ["damage"], vitality: ["health"],
+    critChance: ["crit"], critDamage: ["critDamage"], might: ["damage"], vitality: ["health"], warding: ["resistance"],
     recovery: ["recovery", "specialInterval", ...Object.keys(NEW_SKILLS).map(skill => `${skill}Interval`)], area: ["attackReach", "specialReach", "burstReach", "guardReach"], speed: ["speed"],
     ...Object.fromEntries(Object.keys(NEW_SKILLS).map(skill => [skill, [`${skill}Hit`, `${skill}Interval`, `${skill}Reach`]]))
 };

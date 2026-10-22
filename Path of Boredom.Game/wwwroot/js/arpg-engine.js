@@ -29,7 +29,7 @@ import { newRunSystems, equipmentStyle, resolveChallenge } from "./arpg-run-syst
 import { bossProfile } from "./arpg-bosses.js";
 import { skillDamageType, incomingDamageType, mitigateDamage, enemyDamageType, hazardDamageType, enemyDefense } from "./arpg-damage.js";
 import { newAdventures, awardBossRelic, discoverChapter, buildSynergy } from "./arpg-adventures.js";
-import { bossDanger } from "./arpg-boss-patterns.js";
+import { bossDanger, bossShapes } from "./arpg-boss-patterns.js";
 import { RELICS, hasRelic, rollRelic } from "./arpg-relics.js";
 import { observeBossRecovery, beginBossRecovery } from './arpg-boss-combat.js';
 // Logical canvas resolution (not the real on-screen pixel size — arpg-graphics.js scales this to
@@ -51,7 +51,8 @@ export const MASTERY = {
     area: { name: "Widening ember", detail: "+1% reach: caps at 1,000 for arrows, 220 for melee attacks, 340 for pulses and 500 for melee bursts" },
     speed: { name: "Endless stride", detail: "+1% movement speed; does not change dodge distance" },
     critChance: { name: "Unerring spark", detail: "+0.5 percentage points critical chance; total chance capped at 75%" },
-    critDamage: { name: "Endless ruin", detail: "+2 percentage points critical damage" }
+    critDamage: { name: "Endless ruin", detail: "+2 percentage points critical damage" },
+    warding: { name: "Warding sigil", detail: "+0.5 percentage points spell resistance; total capped at 60%" }
 };
 // How far from the canvas edge the player and enemies are clamped to.
 const MARGIN = 42;
@@ -126,7 +127,7 @@ export const weaponDamage = state => Math.round((state.player.damage + state.mas
 // Damage reduction rating, capped at 60% — combines class base armor, equipped armor rarity, forge
 // armor rank, and the Unbroken vow boon.
 export const armorRating = state => clamp(classFor(state).armor + state.player.armorBonus * 0.6 + state.upgrades.armor * 3 + state.boons.bulwark * 1.5 + equipmentStyle(state, "armor").armor + state.adventures.relics[0] * 2 + buildSynergy(state).armor, 0, 60);
-export const resistanceRating = state => clamp((classFor(state).resistance ?? 0) + state.player.armorBonus * 0.3 + state.upgrades.armor * 1.5 + state.boons.bulwark * 0.75 + (state.adventures.relics[1] + state.adventures.relics[5]) * 2 + buildSynergy(state).resistance, 0, 60);
+export const resistanceRating = state => clamp((classFor(state).resistance ?? 0) + state.player.armorBonus * 0.3 + state.upgrades.armor * 1.5 + state.boons.bulwark * 0.75 + (state.adventures.relics[1] + state.adventures.relics[5]) * 2 + (state.mastery.warding ?? 0) * 0.5 + buildSynergy(state).resistance, 0, 60);
 // Current movement speed: class base speed, boosted by the Haste power-up, Wayfarer's instinct
 // boon, Endless stride mastery, and the dodge tree's "afterstep" burst-of-speed window.
 export const movementSpeed = state => classFor(state).speed * (state.buffs.haste > 0 ? 1.35 : 1) * (1 + state.boons.stride * 0.04 + state.mastery.speed * 0.01 + state.adventures.relics[3] * 0.02 + buildSynergy(state).speed) * (state.player.afterstep > 0 ? 1.2 : 1) * equipmentStyle(state, "armor").speed;
@@ -153,7 +154,8 @@ export const upgradeCost = (state, key) => UPGRADES[key] ? Math.round(UPGRADES[k
 const FORGE_SKILLS = { cleave: "attack", nova: "nova", burst: "burst", guard: "guard", dodge: "dodge", flask: "potion", ...Object.fromEntries(Object.keys(NEW_SKILLS).map(skill => [skill, skill])) };
 export const forgeSkillSelected = (state, key) => Object.hasOwn(UPGRADES, key)
     && (!FORGE_SKILLS[key] || skillSelected(state, FORGE_SKILLS[key]));
-export const forgeComplete = state => Object.entries(UPGRADES).filter(([key]) => forgeSkillSelected(state, key)).every(([key, value]) => state.upgrades[key] >= value.max);
+export const forgeComplete = state => Object.values(state.mastery).some(rank => rank > 0)
+    || Object.entries(UPGRADES).filter(([key]) => forgeSkillSelected(state, key)).every(([key, value]) => state.upgrades[key] >= value.max);
 // Gold price of the next rank of a mastery stat — starts at 1000 and grows by 100 per rank already
 // owned. Falls back to Infinity for unrecognized keys or if the cost would overflow safe-integer
 // range (guards against pathological long Endless runs).
@@ -243,7 +245,8 @@ export function chooseLevelCard(state, key) {
     } else {
         state.cardChoices = [];
         state.enemies = state.enemies.filter(enemy => enemy.health > 0);
-        if (!state.enemies.length && !pendingSpawns(state) && state.wave > 0 && state.wave % WAVES_PER_MAP === 0) finishCheckpoint(state);
+        if (state.choiceReturn) { state.status = state.choiceReturn; state.choiceReturn = null; }
+        else if (!state.enemies.length && !pendingSpawns(state) && state.wave > 0 && state.wave % WAVES_PER_MAP === 0) finishCheckpoint(state);
         else state.status = needsSkillChoice(state) ? "paused" : "playing";
     }
     return true;
@@ -252,11 +255,13 @@ export function chooseLevelCard(state, key) {
 // Leaves a checkpoint camp and heads toward the next wave. Doesn't spawn the wave immediately —
 // instead sets travelPending/resumeDelay so step() shows a brief "traveling" transition before
 // spawnWave() actually fires.
-export function continueJourney(state) {
+export function continueJourney(state, quick = false) {
     if (state.status === "camp") {
         state.status = "playing";
         state.travelPending = 1;
-        state.resumeDelay = 3;
+        state.resumeDelay = quick ? 2.2 : 3;
+        state.quickTravel = quick ? 1 : 0;
+        state.smoothResume = quick ? 1 : 0;
         return true;
     }
     return false;
@@ -323,11 +328,12 @@ export function startEndlessRun(random = Math.random, difficulty = "hard", heroC
 
 // Flips between playing and paused. On resuming, grants a brief resumeDelay grace window so a
 // player un-pausing doesn't get instantly hit by something that was already mid-attack when paused.
-export function togglePause(state) {
+export function togglePause(state, quick = false) {
     if (state.status === "playing") state.status = "paused";
     else if (state.status === "paused") {
         state.status = "playing";
-        state.resumeDelay = Math.max(state.resumeDelay, 2.5);
+        state.resumeDelay = quick ? state.resumeDelay : Math.max(state.resumeDelay, 2.5);
+        if (!quick) state.smoothResume = 0;
     }
 }
 
@@ -340,6 +346,10 @@ const DEATH_COLORS = { husk: "#9aa38a", brute: "#a39d8c", sentinel: "#b58aa0", r
     summoner: "#c3a2ec", cantor: "#a4e9bb", hexer: "#ef96cf", reaver: "#9fd7e6", lancer: "#f0b56e", bomber: "#ff9a5c", duelist: "#85e6eb", artillerist: "#b99ce0" };
 const effectPool = [];
 export function recycleEffect(item) { if (effectPool.length < 256) effectPool.push(item); }
+function hostilePulse(item) {
+    item.hostile = 1;
+    item.life = item.maxLife = 0.55;
+}
 function effect(state, kind, x, y, color, text = "", radius = 0, angle = 0) {
     const life = kind === "text" ? 0.9 : kind === "burst" ? 0.6 : 0.35;
     const item = effectPool.pop() ?? {};
@@ -380,14 +390,17 @@ function hurtPlayer(state, damage, source = "Unknown attack") {
 // Adds XP (scaled up slightly at higher levels so late-game grinding isn't punishing) and resolves
 // any number of level-ups that XP amount triggers. Each level-up grants a flat health/damage bump
 // and queues a boon card choice; if any choices are pending, forces status to "choosing".
+export const grantExperience = (state, amount) => gainExperience(state, amount);
 function gainExperience(state, amount) {
     const player = state.player;
-    player.xp += Math.round(amount * 1.1 * (1 + Math.min(0.6, Math.max(0, player.level - 15) * 0.03)));
+    const late = Math.min(1.5, Math.max(0, player.level - 15) * 0.03 + Math.max(0, player.level - 25) * 0.05);
+    const depth = Math.min(1, Math.max(0, state.wave - LAST_WAVE) * 0.02);
+    player.xp += Math.round(amount * 1.1 * (1 + late) * (1 + depth));
     while (player.xp >= player.nextLevel) {
         player.xp -= player.nextLevel;
         player.level++;
         state.pendingChoices++;
-        player.nextLevel = Math.min(25000, Math.round(player.nextLevel * (player.level > 15 ? 1.22 : 1.35)));
+        player.nextLevel = Math.min(20000, Math.round(player.nextLevel * (player.level > 25 ? 1.1 : player.level > 15 ? 1.22 : 1.35)));
         player.maxHealth += 8;
         player.damage += 3;
         effect(state, "ring", player.x, player.y, "#f2d390", "", 100);
@@ -396,6 +409,7 @@ function gainExperience(state, amount) {
     }
     if (state.pendingChoices > 0) {
         if (!state.cardChoices.length) state.cardChoices = drawLevelCards(state);
+        if (state.status !== "choosing" && (state.status !== "playing" || state.travelPending)) state.choiceReturn = state.status;
         state.status = "choosing";
     }
 }
@@ -1066,7 +1080,8 @@ function spawnWave(state) {
         state.projectiles = [];
         state.playerShots = [];
         state.effects = [];
-        Object.assign(state.player, { x: WIDTH / 2, y: HEIGHT / 2, vx: 0, vy: 0, invulnerable: 1 });
+        if (!state.quickTravel) Object.assign(state.player, { x: WIDTH / 2, y: HEIGHT / 2, vx: 0, vy: 0, invulnerable: 1 });
+        else Object.assign(state.player, { vx: 0, vy: 0, invulnerable: 1 });
     }
     const depth = Math.max(0, state.wave - LAST_WAVE);
     const difficulty = difficultyFor(state);
@@ -1077,7 +1092,12 @@ function spawnWave(state) {
     const formation = encounterFormation(state.wave);
     const baseCount = (bossWave ? 10 + act * 3 : 7 + localWave * 3 + act * 3) + Math.floor(depth / 4) + difficulty.extra;
     const earlyToughness = state.wave <= 4 ? 1.3 : state.wave <= 8 ? 1.15 : 1;
-    const count = Math.min(40, Math.max(5, Math.round(baseCount * (state.wave >= 6 ? encounter.count : 1))));
+    const count = Math.min(40 + Math.min(10, Math.floor(depth / 15)), Math.max(5, Math.round(baseCount * (state.wave >= 6 ? encounter.count : 1))));
+    // Deep Endless pressure: ranged heroes can kite indefinitely, so enemies get tougher, faster and hit harder.
+    const rangedHero = ["ranger", "sorcerer"].includes(state.heroClass);
+    const deepHealth = 1 + (rangedHero ? depth * 0.004 : depth * 0.002);
+    const deepDamage = 1 + depth * 0.006;
+    const deepSpeed = Math.min(rangedHero ? 0.3 : 0.2, depth * 0.002);
     for (let i = 0; i < count; i++) {
         const boss = bossWave && i === 0;
         const kind = boss ? "boss" : encounterKind(state.wave, i);
@@ -1100,13 +1120,13 @@ function spawnWave(state) {
         const spawned = state.enemies[state.enemies.length - 1];
         spawned.appearanceAt = state.time + Math.min(0.45, i * 0.015);
         const traits = Object.keys(ELITE_MODIFIERS).filter(key => key !== "none");
-        spawned.modifier = elite && state.wave >= 11 && state.random() < 0.35
+        spawned.modifier = elite && state.wave >= 11 && state.random() < Math.min(0.55, 0.35 + depth * 0.002)
             ? traits[Math.floor(state.random() * traits.length)] : "none";
         spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * difficulty.health
             * (boss && state.mode === "endless" ? 2.6 + depth * 0.06 : 1));
-        spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * earlyToughness);
-        spawned.damage = Math.round(spawned.damage * difficulty.damage * (earlyToughness > 1 ? 1.1 : 1));
-        spawned.speed = Math.min(210, spawned.speed) * difficulty.speed * (1 + Math.min(0.15, depth * 0.0015));
+        spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * earlyToughness * deepHealth);
+        spawned.damage = Math.round(spawned.damage * difficulty.damage * (earlyToughness > 1 ? 1.1 : 1) * deepDamage);
+        spawned.speed = Math.min(210 + Math.min(90, depth), spawned.speed) * difficulty.speed * (1 + Math.max(Math.min(0.15, depth * 0.0015), deepSpeed));
     }
     const opening = Math.max(3, Math.ceil(count * 0.35));
     const waveStart = state.enemies.length - count;
@@ -1115,7 +1135,7 @@ function spawnWave(state) {
     state.spawnQueueWave = state.wave;
     if (bossWave) {
         const reveal = effect(state, 'boss-intro', WIDTH / 2, 100, map.accent, `${map.boss} · ${bossProfile(state.wave).title}`);
-        reveal.life
+        reveal.life = reveal.maxLife = 3;
     }
     state.journal = bossWave ? `${map.boss} awakens. Escape the slam${act ? " and its projectile volley" : ""}!`
         : localWave === 1 && act > 0 ? `${map.name}. The next stage begins. ${map.description}`
@@ -1131,6 +1151,7 @@ function fireVolley(state, enemy, angle, offsets, speed) {
         if (state.projectiles.length >= 48) break;
         state.projectiles.push({ x: enemy.x, y: enemy.y, vx: Math.cos(angle + offset) * speed, vy: Math.sin(angle + offset) * speed,
             life: 3, damage: enemy.damage, source: `${enemyDamageType(enemy.kind, "projectile", mapIndexForWave(state.wave)) === "magical" ? "[MAG]" : "[PHY]"} ${enemyDamageSource(enemy, "projectile")}` });
+        if (enemy.kind === "boss") state.projectiles[state.projectiles.length - 1].boss = mapIndexForWave(state.wave) + 1;
     }
 }
 
@@ -1141,10 +1162,11 @@ function fireVolley(state, enemy, angle, offsets, speed) {
 // player's current gear if strictly better (otherwise auto-salvaged for a small gold refund).
 function collectLoot(state, dt, collectAll = false) {
     const p = state.player;
+    const waveCleared = state.wave > 0 && !state.enemies.some(enemy => enemy.health > 0) && !pendingSpawns(state);
     for (const drop of state.loot) {
         if (drop.life <= 0) continue;
         const d = distance(p, drop);
-        if (d < (state.buffs.magnet > 0 ? 270 : 95) + state.boons.harvest * 16 && d > 1) {
+        if ((waveCleared || d < (state.buffs.magnet > 0 ? 270 : 95) + state.boons.harvest * 16) && d > 1) {
             const travel = Math.min(d, (1200 + d * 6) * dt);
             drop.x += (p.x - drop.x) / d * travel;
             drop.y += (p.y - drop.y) / d * travel;
@@ -1203,6 +1225,21 @@ function finishCheckpoint(state) {
     if (challengeReward) state.journal += ` Challenge complete: +${challengeReward} gold.`;
 }
 
+// While enemies are held during a smooth resume/travel, the hero can still walk and face around.
+function driftPlayer(state, input, dt) {
+    const p = state.player;
+    let dx = input.x || 0, dy = input.y || 0;
+    const length = Math.hypot(dx, dy);
+    if (length > 0) { dx /= length; dy /= length; p.facing = Math.atan2(dy, dx); }
+    const speed = movementSpeed(state), smoothing = 1 - Math.exp(-dt * 13);
+    p.vx += (dx * speed - p.vx) * smoothing;
+    p.vy += (dy * speed - p.vy) * smoothing;
+    p.stridePhase = (p.stridePhase ?? 0) + Math.hypot(p.vx, p.vy) * dt * 0.08;
+    p.x = clamp(p.x + p.vx * dt, MARGIN, WIDTH - MARGIN);
+    p.y = clamp(p.y + p.vy * dt, MARGIN, HEIGHT - MARGIN);
+}
+
+
 // The single per-frame simulation entry point, called once per animation frame by arpg.js's render
 // loop with elapsed real time and the current input snapshot (movement axes, aim point, action
 // buttons). Does nothing unless status is "playing". `dt` is clamped to 0.05s so a lag spike can't
@@ -1220,7 +1257,9 @@ export function step(state, input, elapsed) {
             state.travelPending = 0;
             spawnWave(state);
             state.intermission = 3.5;
+            if (state.quickTravel) { state.resumeDelay = 0; state.quickTravel = 0; state.smoothResume = 0; }
         }
+        if (state.smoothResume) driftPlayer(state, input, dt);
         return;
     }
     state.time = (state.time + dt) % 3600;
@@ -1366,7 +1405,7 @@ export function step(state, input, elapsed) {
             if (enemy.winding > 0) {
                 enemy.winding = Math.max(0, enemy.winding - dt);
                 if (!enemy.winding) {
-                    effect(state, "ring", enemy.x, enemy.y, "#ffc36d", "", 110);
+                    hostilePulse(effect(state, "ring", enemy.x, enemy.y, "#ffc36d", "", 110));
                     if (d < 110 + p.radius) hurtPlayer(state, enemy.damage * 2, enemyDamageSource(enemy, "explosion"));
                     enemy.health = 0;
                     if (state.status === "playing") killEnemy(state, enemy);
@@ -1394,7 +1433,8 @@ export function step(state, input, elapsed) {
                 enemy.winding = Math.max(0, enemy.winding - dt);
                 if (enemy.winding === 0) {
                     const angle = Math.atan2(enemy.attackY - enemy.y, enemy.attackX - enemy.x);
-                    effect(state, "ring", enemy.x, enemy.y, mapForWave(state.wave).accent, "", identity.radius);
+                    const strike = effect(state, "boss-strike", enemy.x, enemy.y, mapForWave(state.wave).accent, "", identity.radius);
+                    strike.shapes = bossShapes(identity, enemy); strike.bossId = identity.id; strike.life = strike.maxLife = 0.75;
                     if (bossDanger(identity, enemy, p)) hurtPlayer(state, Math.round(enemy.damage * 1.5), `${enemyDamageType("boss", "slam", mapIndexForWave(state.wave)) === "magical" ? "[MAG]" : "[PHY]"} ${enemyDamageSource(enemy, "slam")}`);
                     if (combat.pattern === 2 && combat.phase >= 2) fireVolley(state, enemy, angle, identity.fan, identity.speed);
                     if (combat.pattern === 3 && combat.phase >= 3) fireVolley(state, enemy, angle, Array.from({ length: identity.rays }, (_, i) => i * Math.PI * 2 / identity.rays), identity.speed * 0.85);
@@ -1411,10 +1451,16 @@ export function step(state, input, elapsed) {
             }
             enemy.slam -= dt;
             if (enemy.slam <= 0 && enemy.attackWindup === 0) {
-                combat.pattern = combat.pattern % 3 + 1;
-                enemy.attackX = p.x;
-                enemy.attackY = p.y;
-                enemy.winding = 1.1;
+                // Smarter bosses: in later phases they pick the pattern that suits the player's range
+                // and aim where the player is heading rather than where they stand.
+                const far = d > 320;
+                if (combat.phase >= 2 && far && combat.pattern === 3) combat.pattern = 2;
+                else if (combat.phase >= 2 && !far && combat.pattern === 1) combat.pattern = 3;
+                else combat.pattern = combat.pattern % 3 + 1;
+                const lead = combat.phase >= 3 ? 0.55 : combat.phase === 2 ? 0.35 : 0.15;
+                enemy.attackX = clamp(p.x + (p.vx || 0) * lead, MARGIN, WIDTH - MARGIN);
+                enemy.attackY = clamp(p.y + (p.vy || 0) * lead, MARGIN, HEIGHT - MARGIN);
+                enemy.winding = combat.phase >= 3 ? 0.95 : 1.1;
                 continue;
             }
         }
@@ -1445,7 +1491,7 @@ export function step(state, input, elapsed) {
                 continue;
             }
             if (enemy.kind === "artillerist") {
-                effect(state, "ring", enemy.attackX, enemy.attackY, "#d39bff", "", 90);
+                hostilePulse(effect(state, "ring", enemy.attackX, enemy.attackY, "#d39bff", "", 90));
                 if (Math.hypot(p.x - enemy.attackX, p.y - enemy.attackY) < 90 + p.radius) hurtPlayer(state, enemy.damage * 1.4, enemyDamageSource(enemy, "mortar blast"));
                 enemy.cooldown = 3.8;
                 enemy.swing = 0.3;

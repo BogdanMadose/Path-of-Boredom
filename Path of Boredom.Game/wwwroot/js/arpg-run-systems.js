@@ -16,8 +16,23 @@ export const CHALLENGES = {
     none: "No challenge",
     unscarred: "Take no health damage this stage",
     flaskless: "Clear this stage without drinking a flask",
-    swift: "Clear this stage within 180 combat seconds"
+    swift: "Clear this stage within 180 combat seconds",
+    blitz: "Clear this stage within 120 combat seconds",
+    steadfast: "Take less than half your maximum health as damage this stage",
+    ascetic: "No flasks and clear within 240 combat seconds"
 };
+const CHALLENGE_BONUS = { blitz: 1.5, ascetic: 1.5 };
+export function challengeSucceeded(state, challenge = state.runSystems.challenge) {
+    switch (challenge.key) {
+        case "unscarred": return challenge.damage === 0;
+        case "flaskless": return challenge.flasks === 0;
+        case "blitz": return challenge.elapsed <= 120;
+        case "steadfast": return challenge.damage < state.player.maxHealth * 0.5;
+        case "ascetic": return challenge.flasks === 0 && challenge.elapsed <= 240;
+        default: return challenge.elapsed <= 180;
+    }
+}
+export const challengeReward = challenge => Math.round((100 + challenge.stage * 50) * (CHALLENGE_BONUS[challenge.key] ?? 1));
 export function newRunSystems() {
     return {
         equipment: { weapon: "balanced", armor: "balanced" },
@@ -46,10 +61,8 @@ export function resolveChallenge(state) {
     const challenge = state.runSystems.challenge;
     if (challenge.resolved || challenge.key === "none" || challenge.stage !== Math.ceil(state.wave / 5)) return 0;
     challenge.resolved = 1;
-    const success = challenge.key === "unscarred" ? challenge.damage === 0
-        : challenge.key === "flaskless" ? challenge.flasks === 0 : challenge.elapsed <= 180;
-    if (!success) return 0;
-    const reward = 100 + challenge.stage * 50;
+    if (!challengeSucceeded(state, challenge)) return 0;
+    const reward = challengeReward(challenge);
     state.gold += reward;
     state.runSystems.summary.challenges++;
     return reward;

@@ -17,11 +17,17 @@ export const bossWarningPosition = (enemy, bossTop, width = 1100, height = 650) 
 
 export const automaticCheckpoint = (state, failed = false) => state.mode === "endless" && state.status === "camp" && !failed;
 
-export function forgeNotification(state, offers, acknowledge = false) {
+export function forgeNotification(state, offers, acknowledge = false, cheapest = Infinity) {
     let seen = forgeSeen.get(state);
     if (!seen) { seen = new Map(); forgeSeen.set(state, seen); }
-    if (acknowledge) for (const offer of offers) seen.set(offer.key, offer.rank);
-    return offers.some(offer => seen.get(offer.key) !== offer.rank);
+    if (acknowledge) {
+        for (const offer of offers) seen.set(offer.key, offer.rank);
+        seen.set("gold", state.gold);
+    }
+    // Re-notify when something new became affordable, or once enough new gold arrived to buy another rank.
+    const goldAtSeen = seen.get("gold");
+    const earnedAgain = offers.length > 0 && goldAtSeen !== undefined && Number.isFinite(cheapest) && state.gold - goldAtSeen >= cheapest;
+    return earnedAgain || offers.some(offer => seen.get(offer.key) !== offer.rank);
 }
 
 export function bossHudTop(canvas, menu, mobile = false, height = 650) {

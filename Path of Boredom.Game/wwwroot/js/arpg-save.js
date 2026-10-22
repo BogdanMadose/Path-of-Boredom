@@ -122,7 +122,7 @@ export function restoreSnapshot(snapshot, random = Math.random) {
     require(["campaign", "endless", "ascended", "legacy"].includes(state.rankingMode));
     require(state.difficulty !== "legacy" || state.rankingMode === "legacy");
     if (snapshot.version >= 6) {
-        Object.assign(state.mastery, numbers(saved.mastery, snapshot.version < 8 ? ["might", "vitality", "recovery"] : Object.keys(MASTERY)));
+        Object.assign(state.mastery, numbers(saved.mastery, snapshot.version < 8 ? ["might", "vitality", "recovery"] : Object.keys(MASTERY).filter(key => key !== "warding" || saved.mastery?.warding !== undefined)));
         for (const rank of Object.values(state.mastery)) integer(rank, 0, Number.MAX_SAFE_INTEGER);
         require(Number.isSafeInteger(Object.values(state.mastery).reduce((total, rank) => total + rank, 0)));
         state.scoreBaseline = saved.scoreBaseline;
@@ -351,10 +351,10 @@ export function captureSnapshot(state) {
         ...state,
         playerShots: state.playerShots.filter(shot => shot.life > 0),
         enemies: state.enemies.filter(enemy => enemy.health > 0),
-        projectiles: state.projectiles.filter(projectile => projectile.life > 0),
+        projectiles: state.projectiles.filter(projectile => projectile.life > 0).map(({ boss, ...projectile }) => projectile),
         loot: state.loot.filter(drop => drop.life > 0)
     } });
-    const { random, effects, damageHistory, burns, relicBanner, ...saved } = restored;
+    const { random, effects, damageHistory, burns, relicBanner, quickTravel, smoothResume, choiceReturn, ...saved } = restored;
     const snapshot = { version: 20, state: { ...saved, meta: exportProfile() } };
     require(new TextEncoder().encode(JSON.stringify(snapshot)).length <= 64 * 1024);
     return snapshot;

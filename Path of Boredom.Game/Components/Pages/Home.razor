@@ -150,6 +150,9 @@
                                     <button type="button" class="quiet-button" data-challenge-choice="unscarred"><strong>Unscarred</strong><small>Take no health damage</small></button>
                                     <button type="button" class="quiet-button" data-challenge-choice="flaskless"><strong>Flaskless</strong><small>Drink no flasks</small></button>
                                     <button type="button" class="quiet-button" data-challenge-choice="swift"><strong>Swift</strong><small>Clear within 180 combat seconds</small></button>
+                                    <button type="button" class="quiet-button" data-challenge-choice="blitz"><strong>Blitz</strong><small>Clear within 120s · +50% gold</small></button>
+                                    <button type="button" class="quiet-button" data-challenge-choice="steadfast"><strong>Steadfast</strong><small>Lose under half max health</small></button>
+                                    <button type="button" class="quiet-button" data-challenge-choice="ascetic"><strong>Ascetic</strong><small>No flasks, within 240s · +50% gold</small></button>
                                     <button type="button" class="quiet-button" data-challenge-choice="none"><strong>No challenge</strong><small>Play normally</small></button>
                                 </div>
                                 <p class="camp-challenge-status" data-camp-challenge-status role="status"></p>
@@ -246,6 +249,9 @@
                                         <option value="unscarred">Unscarred — take no health damage</option>
                                         <option value="flaskless">Flaskless — drink no flasks</option>
                                         <option value="swift">Swift — clear within 180 combat seconds</option>
+                                        <option value="blitz">Blitz — clear within 120 combat seconds (+50% gold)</option>
+                                        <option value="steadfast">Steadfast — lose under half max health</option>
+                                        <option value="ascetic">Ascetic — no flasks, within 240 seconds (+50% gold)</option>
                                     </select>
                                 </label>
                                 <p class="forge-feedback" data-setup-loadout-feedback role="status"></p>
@@ -263,9 +269,9 @@
                         <button type="button" class="quiet-button" data-dismiss-unlock aria-label="Dismiss skill unlock reminder">Later</button>
                     </div>
                     <div class="forge-nudge challenge-nudge" data-challenge-nudge hidden>
-                        <span role="status"><strong>⚔ New challenge available!</strong> <span data-challenge-nudge-text></span></span>
+                        <span role="status"><strong>⚔ New challenge available! The game waits for your choice.</strong> <span data-challenge-nudge-text></span></span>
                         <button type="button" class="quiet-button" data-open-challenges>View challenges</button>
-                        <button type="button" class="quiet-button" data-dismiss-challenges aria-label="Dismiss challenge reminder">Later</button>
+                        <button type="button" class="quiet-button" data-dismiss-challenges aria-label="Dismiss challenge reminder">Skip &amp; continue</button>
                     </div>
                 </div>
                 <div class="power-strip" aria-label="Active timed power-ups"><span>EMBER BLESSINGS</span><strong data-stat="buffs">No active power-ups</strong></div>
@@ -317,7 +323,7 @@
                             <section class="skill-tree" data-tree-skill="@skill" hidden="@CombatSkills.Contains(skill)">
                                 <h3 data-skill-name="@skill">@skill</h3>
                                 <p data-skill-description="@skill"></p>
-                                <p class="tree-path">Tap a node to preview it, then tap again to learn. With a mouse, hover to preview and click to learn. Each rank costs 1 point.</p>
+                                <p class="tree-path">Tap a node to preview it, then tap again to learn. Each rank costs 1 point.</p>
                                 <button type="button" class="quiet-button tree-respec" data-respec-tree="@skill" disabled>Reset tree</button>
                                 <div class="skill-tree-map" role="group" aria-label="Upgrade branches">
                                     <svg class="tree-connections" viewBox="0 0 300 300" preserveAspectRatio="none" aria-hidden="true">
@@ -405,6 +411,7 @@
                             <button type="button" data-mastery-stat="speed" disabled><strong>Endless stride</strong><span>+1% movement speed; dodge distance unchanged</span><small data-mastery-label></small></button>
                             <button type="button" data-mastery-stat="critChance" disabled><strong>Unerring spark</strong><span>+0.5 percentage points critical chance; 75% total cap</span><small data-mastery-label></small></button>
                             <button type="button" data-mastery-stat="critDamage" disabled><strong>Endless ruin</strong><span>+2 percentage points critical damage</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="warding" disabled><strong>Warding sigil</strong><span>+0.5 percentage points spell resistance; 60% total cap</span><small data-mastery-label></small></button>
                         </div>
                     </section>
                 </section>
@@ -448,6 +455,7 @@
                             <label><input type="checkbox" data-preference="shake" /> Screen shake</label>
                             <label><input type="checkbox" data-preference="contrast" /> High-contrast warnings</label>
                             <label><input type="checkbox" data-preference="batterySaver" /> Battery saver (30 fps)</label>
+                            <label><input type="checkbox" data-preference="quickTravel" /> Skip stage travel (no 3s wait)</label>
                             <small>Saved on this device.</small>
                         </fieldset>
                         <h3 data-options-section="codex">Campaign codex</h3>
@@ -464,6 +472,9 @@
                             <button type="button" class="quiet-button" data-challenge-choice="unscarred">Unscarred — take no health damage</button>
                             <button type="button" class="quiet-button" data-challenge-choice="flaskless">Flaskless — drink no flasks</button>
                             <button type="button" class="quiet-button" data-challenge-choice="swift">Swift — clear within 180 combat seconds</button>
+                            <button type="button" class="quiet-button" data-challenge-choice="blitz">Blitz — clear within 120 combat seconds (+50% gold)</button>
+                            <button type="button" class="quiet-button" data-challenge-choice="steadfast">Steadfast — lose under half max health</button>
+                            <button type="button" class="quiet-button" data-challenge-choice="ascetic">Ascetic — no flasks, within 240 seconds (+50% gold)</button>
                         </div>
                         <p data-challenge-availability role="status"></p>
                         <p data-challenge-status role="status"></p>

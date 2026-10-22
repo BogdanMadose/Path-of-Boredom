@@ -39,12 +39,32 @@ const STYLES = [
 const MENU_STYLE = { name: "menu", bpm: 60, root: 50, scale: [0, 2, 4, 5, 7, 9, 11], chords: [0, 5, 3, 4],
     melody: ["4...2...0.....1.", "2...4...7...5..."], lead: "sine", leadLen: 2, leadLevel: 0.05,
     bass: "x.......", drums: "................", signature: "pluck" };
+// Each realm's boss gets its own dark mode, tempo, groove, lead and menace layer.
+const BOSS_STYLES = [
+    { bpm: 118, root: 38, scale: [0, 1, 3, 5, 7, 8, 10], chords: [0, 1, 0, 6], lead: "sawtooth", menace: "anvil",
+        leads: ["0.1.0...3.1.0...", "0...6.5.1...0..."], drums: "k..k..s.k.k...s." },
+    { bpm: 84, root: 36, scale: [0, 1, 3, 4, 6, 8, 10], chords: [0, 4, 0, 1], lead: "triangle", menace: "drone",
+        leads: ["0.......1...0...", "4...3...1......."], drums: "k......k..s....." },
+    { bpm: 146, root: 40, scale: [0, 2, 3, 5, 7, 8, 11], chords: [0, 5, 6, 4], lead: "square", menace: "stab",
+        leads: ["0.2.3.4.6.4.3.2.", "7.6.4.3.4.3.2.0."], drums: "k.k.s.k.kkk.s.kk" },
+    { bpm: 100, root: 41, scale: [0, 1, 4, 5, 7, 8, 10], chords: [0, 1, 5, 1], lead: "sine", menace: "bell",
+        leads: ["7...8...7...4...", "5...4...1...0..."], drums: "k.......s..k...." },
+    { bpm: 124, root: 37, scale: [0, 2, 4, 6, 8, 10], chords: [0, 3, 0, 2], lead: "triangle", menace: "arp",
+        leads: ["0.3.0.3.1.4.1.4.", "5.2.5.2.4.1.4.1."], drums: "k.h.s.h.k.k.s.h." },
+    { bpm: 136, root: 35, scale: [0, 1, 3, 5, 6, 8, 10], chords: [0, 1, 4, 1], lead: "sawtooth", menace: "drone",
+        leads: ["0..1..0..4..6...", "6..4..1..0..1..."], drums: "k.kk.s.kk.k.s.kk" }
+];
 const degree = (scale, n) => scale[((n % scale.length) + scale.length) % scale.length] + 12 * Math.floor(n / scale.length);
 
 export function createGameAudio(environment = globalThis) {
     let settings = { ...DEFAULT_AUDIO_SETTINGS };
     try { settings = audioSettings(JSON.parse(environment.localStorage?.getItem(SETTINGS_KEY) ?? "null")); } catch { /* Audio preferences are optional. */ }
     let context, musicGain, effectsGain, master, noise, musicReverb, effectsReverb, musicEcho, echoDelay;
+    // Phones get a lighter graph (no unison stacks, one short reverb) and a deeper schedule buffer
+    // so the audio thread never underruns, which is what makes music crackle on mobile.
+    const agent = environment.navigator?.userAgent ?? "";
+    const lite = environment.navigator?.userAgentData?.mobile === true || /Android|iPhone|iPad|iPod|Mobile/i.test(agent);
+    const lookahead = lite ? 0.6 : 0.3;
     let disposed = false, failed = false, background = false, active = false, boss = false, area = 0, menu = false;
     let effectWindow = 0, effectCount = 0;
     let timer = null, nextNote = 0, beat = 0, previous = null, previousState = null;
@@ -83,12 +103,12 @@ export function createGameAudio(environment = globalThis) {
     // panned, and feed shared reverb/echo buses so nothing sounds like a dry, raw oscillator.
     function voice(channel, start, duration, pitch, endPitch, level, type = "sine", filter = null, options = {}) {
         if (!context || context.state !== "running" || disposed || failed || background || settings.muted
-            || settings[channel] <= 0 || voices.size >= 48
-            || (channel === "effects" && [...voices].filter(item => item.channel === channel).length >= 10)) return;
+            || settings[channel] <= 0
+            || [...voices].filter(item => item.channel === channel).length >= (channel === "effects" ? 10 : lite ? 18 : 36)) return;
         const music = channel === "music";
         const { attack = music ? 0.02 : 0.008, sustain = 0, reverb = music ? 0.3 : 0.12, echo = 0,
             pan = music ? 0 : (Math.random() - 0.5) * 0.25 } = options;
-        const unison = type === "noise" ? 1 : Math.max(1, options.unison ?? 1), spread = options.spread ?? 8;
+        const unison = type === "noise" || lite ? 1 : Math.max(1, options.unison ?? 1), spread = options.spread ?? 8;
         const nodes = [], sources = [];
         const gain = context.createGain();
         nodes.push(gain);
@@ -181,7 +201,7 @@ export function createGameAudio(environment = globalThis) {
         if (boss) { scheduleBoss(style, now); return; }
         const spacing = 60 / style.bpm / 2;
         echoDelay?.delayTime.setTargetAtTime(spacing * 3, now, 0.1);
-        while (nextNote < now + 0.25) {
+        while (nextNote < now + lookahead) {
             const step = beat % 16, bar = Math.floor(beat / 16);
             const chord = style.chords[bar % style.chords.length];
             const chordRoot = style.root + degree(style.scale, chord);
@@ -220,29 +240,45 @@ export function createGameAudio(environment = globalThis) {
     // Boss fights get their own driving epic track built on the act's key and scale: filtered power
     // chords, a pumping bass, a backbeat, a doubled lead with echo, a choir-like pad and tom fills.
     function scheduleBoss(style, now) {
-        const spacing = 60 / (132 + area * 4) / 2;
+        style = BOSS_STYLES[area] ?? BOSS_STYLES[0];
+        const spacing = 60 / style.bpm / 2;
         echoDelay?.delayTime.setTargetAtTime(spacing * 3, now, 0.1);
-        const leads = ["0.2.4...4.5.4.2.", "4.5.7...9.7.5.4.", "7...6.4.5...4.2.", "2.4.5.7.9...7..."];
-        while (nextNote < now + 0.25) {
+        const leads = style.leads;
+        while (nextNote < now + lookahead) {
             const step = beat % 16, bar = Math.floor(beat / 16);
-            const chord = [0, 5, 3, 4][bar % 4];
+            const chord = style.chords[bar % style.chords.length];
             const chordRoot = style.root + degree(style.scale, chord);
+            // Menace layer: tritone drones, anvil hits, dissonant stabs, cold bells or a creeping arp.
+            if (style.menace === "drone" && step === 0 && bar % 2 === 0) {
+                tone(style.root - 12, nextNote, spacing * 32, 0.03, "sawtooth", 1, { attack: spacing * 6, sustain: 0.7, reverb: 0.6 });
+                tone(style.root - 6, nextNote, spacing * 32, 0.014, "sawtooth", 1, { attack: spacing * 10, sustain: 0.7, reverb: 0.6 });
+            } else if (style.menace === "anvil" && step === 12 && bar % 2 === 1) {
+                tone(style.root + 30, nextNote, 0.6, 0.016, "triangle", 1, { attack: 0.004, reverb: 0.5 });
+                tone(style.root + 31, nextNote, 0.5, 0.01, "sine", 1, { attack: 0.004, reverb: 0.5 });
+            } else if (style.menace === "stab" && (step === 6 || step === 14) && bar % 2 === 1) {
+                tone(chordRoot + 6, nextNote, spacing * 1.5, 0.02, "sawtooth", 1, { attack: 0.006, reverb: 0.3 });
+                tone(chordRoot + 7, nextNote, spacing * 1.5, 0.016, "sawtooth", 1, { attack: 0.006, reverb: 0.3 });
+            } else if (style.menace === "bell" && step === 8) {
+                tone(style.root + 24 + 6, nextNote, 2.4, 0.016, "sine", 1, { attack: 0.005, reverb: 0.8, echo: 0.3, pan: bar % 2 ? 0.35 : -0.35 });
+            } else if (style.menace === "arp" && step % 2 === 1) {
+                tone(chordRoot + 24 + [0, 6, 1, 6][(step >> 1) % 4], nextNote, 0.25, 0.01, "triangle", 1, { attack: 0.005, reverb: 0.5, pan: (step >> 1) % 2 ? 0.3 : -0.3 });
+            }
             if (step === 0 || step === 8) {
                 for (const [offset, level, pan] of [[-12, 0.03, -0.3], [-5, 0.024, 0.3], [0, 0.018, 0]])
                     tone(chordRoot + offset, nextNote, spacing * 7.5, level, "sawtooth", 1, { attack: 0.01, sustain: 0.6, unison: 2, spread: 10, reverb: 0.3, pan });
             }
             tone(chordRoot - 24, nextNote, spacing * 0.95, 0.07, "triangle", 1, { attack: 0.006, reverb: 0.05 });
             if (step === 0) pad(nextNote, spacing * 17, [chordRoot + 12, style.root + 12 + degree(style.scale, chord + 2), style.root + 12 + degree(style.scale, chord + 4)], 0.011, 1300);
-            const symbol = bar % 8 < 2 ? "." : leads[bar % 4][step];
+            const symbol = bar % 8 < 2 ? "." : leads[bar % 2][step];
             if (symbol !== ".") {
                 const pitch = style.root + 12 + degree(style.scale, parseInt(symbol, 36));
-                tone(pitch, nextNote, spacing * 2.2, 0.026, "sawtooth", 1, { attack: 0.012, unison: 2, spread: 8, echo: 0.3, reverb: 0.4 });
+                tone(pitch, nextNote, spacing * 2.2, style.lead === "square" ? 0.016 : 0.026, style.lead, 1, { attack: 0.012, unison: 2, spread: 8, echo: 0.3, reverb: 0.4 });
                 tone(pitch + 12, nextNote, spacing * 2.2, 0.01, "triangle", 1, { attack: 0.012, echo: 0.3, reverb: 0.5 });
             }
             const fill = bar % 4 === 3 && step >= 12;
             if (fill) tom(nextNote, 52 - (step - 12) * 3, 0.07);
             else {
-                const drum = "k.k.s..kk.k.s..k"[step];
+                const drum = style.drums[step];
                 if (drum === "k") kick(nextNote, 0.11);
                 else if (drum === "s") snare(nextNote, 0.04);
             }
@@ -262,7 +298,7 @@ export function createGameAudio(environment = globalThis) {
                 scheduleMusic();
                 timer = environment.setInterval(() => {
                     try { scheduleMusic(); } catch { failed = true; stopMusic(); stopVoices(); }
-                }, 100);
+                }, lite ? 150 : 100);
             } catch { failed = true; stopMusic(); stopVoices(); }
         }
     }
@@ -272,7 +308,7 @@ export function createGameAudio(environment = globalThis) {
             if (!context) {
                 const AudioContext = environment.AudioContext || environment.webkitAudioContext;
                 if (!AudioContext) return;
-                context = new AudioContext();
+                try { context = new AudioContext(lite ? { latencyHint: "playback" } : undefined); } catch { context = new AudioContext(); }
                 master = context.createGain();
                 musicGain = context.createGain();
                 effectsGain = context.createGain();
@@ -313,8 +349,8 @@ export function createGameAudio(environment = globalThis) {
                     input.connect(clean); clean.connect(convolver); convolver.connect(damp); damp.connect(tail); tail.connect(output);
                     return input;
                 };
-                musicReverb = makeReverb(3.2, 2.6, 0.55, musicGain);
-                effectsReverb = makeReverb(1.3, 3, 0.45, effectsGain);
+                musicReverb = makeReverb(lite ? 1.6 : 3.2, 2.6, 0.55, musicGain);
+                effectsReverb = lite ? musicReverb : makeReverb(1.3, 3, 0.45, effectsGain);
                 // Tempo-synced ping-pong-ish echo with darkening feedback.
                 musicEcho = context.createGain();
                 if (typeof context.createDelay === "function") {
@@ -404,6 +440,12 @@ export function createGameAudio(environment = globalThis) {
                 tone(0, 0, 0.1, 0.012, "noise", 0.01, band(3000, 1500, 0.8));
             }
             else if (cue === "warning") { tone(220, 220, 0.25, 0.08, "sine", 0, null, { attack: 0.01, reverb: 0.3 }); tone(330, 220, 0.3, 0.06, "sine", 0.2, null, { attack: 0.01, reverb: 0.3 }); }
+            else if (cue === "slam") {
+                // Mid-range body so phone speakers reproduce it; soft attacks avoid clicks.
+                tone(420, 140, 0.4, 0.11, "triangle", 0, low(2600, 600), { attack: 0.005, reverb: 0.4 });
+                tone(180, 70, 0.5, 0.1, "sine", 0, null, { attack: 0.005, reverb: 0.2 });
+                tone(0, 0, 0.35, 0.08, "noise", 0, band(1800, 350, 0.9), { attack: 0.005, reverb: 0.35 });
+            }
             else if (cue === "death") {
                 tone(220, 35, 1, 0.12, "sawtooth", 0, low(1500, 120));
                 tone(0, 0, 0.6, 0.05, "noise", 0, low(800, 80));
@@ -477,6 +519,7 @@ export function createGameAudio(environment = globalThis) {
             for (const [enemy, warning] of current.warnings) {
                 const before = previous.warnings.get(enemy);
                 if (before && ((!before.warning && warning.warning) || warning.phase > before.phase)) play("warning");
+                if (before && before.warning && !warning.warning) play("slam");
             }
         }
         previous = current;

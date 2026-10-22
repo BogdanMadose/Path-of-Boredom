@@ -200,11 +200,41 @@ function heroPaints(ctx, type, ranger, warden) {
 // Mastery cosmetic: a trim-coloured shoulder line and chest gem drawn over the cached body sprite.
 function drawTrimAccent(ctx, trim) {
     ctx.save();
-    ctx.strokeStyle = trim; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(-12, -10); ctx.quadraticCurveTo(0, -15, 12, -10); ctx.stroke();
+    // Spiked pauldrons in the trim colour.
+    for (const side of [-1, 1]) {
+        ctx.fillStyle = trim; ctx.strokeStyle = "#10191f"; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(side * 8, -12); ctx.quadraticCurveTo(side * 19, -15, side * 20, -5);
+        ctx.lineTo(side * 25, -11); ctx.lineTo(side * 21, -1); ctx.lineTo(side * 9, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.strokeStyle = trim; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-12, -10); ctx.quadraticCurveTo(0, -16, 12, -10); ctx.stroke();
+    // Crest over the head.
     ctx.fillStyle = trim; ctx.strokeStyle = "#10191f"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(3.5, -1); ctx.lineTo(0, 4); ctx.lineTo(-3.5, -1); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-5, -24); ctx.lineTo(-2.5, -33); ctx.lineTo(0, -27); ctx.lineTo(2.5, -33); ctx.lineTo(5, -24); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Glowing chest gem (soft halo without shadowBlur, which is costly on mobile canvases).
+    ctx.save(); ctx.globalAlpha *= 0.35; ctx.beginPath(); ctx.arc(0, -1, 8, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(4.5, -1); ctx.lineTo(0, 5); ctx.lineTo(-4.5, -1); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
+}
+// Ground aura and long trimmed banner-cape drawn under the hero when a trim is equipped.
+function drawTrimUnderlay(ctx, trim, time, reduced, flutter) {
+    ctx.save();
+    const pulse = reduced ? 0.5 : 0.5 + Math.sin(time * 3) * 0.2;
+    ctx.globalAlpha *= 0.35 + pulse * 0.3; ctx.strokeStyle = trim; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(0, 8, 28, 15, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha *= 0.5; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.ellipse(0, 8, 32, 18, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    return () => {
+        ctx.save();
+        ctx.fillStyle = trim + "cc"; ctx.strokeStyle = "#10191f"; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(9, 0);
+        ctx.lineTo(12 + flutter, 38); ctx.lineTo(5 + flutter * 0.6, 33); ctx.lineTo(0 + flutter * 0.5, 41); ctx.lineTo(-5 + flutter * 0.6, 33); ctx.lineTo(-12 + flutter, 38);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "#ffffff66"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, 4); ctx.lineTo(flutter * 0.5, 36); ctx.stroke();
+        ctx.restore();
+    };
 }
 
 export function drawHero(ctx, actor, hero, stride, strike, time, reduced, trim = "") {
@@ -212,6 +242,7 @@ export function drawHero(ctx, actor, hero, stride, strike, time, reduced, trim =
         ctx.save(); ctx.rotate(actor.facing + Math.PI / 2);
         if (actor.invulnerable > 0) ctx.globalAlpha *= reduced ? 0.8 : 0.72 + Math.sin(time * 18) * 0.12;
         const flutter = reduced ? 0 : Math.sin(time * 6) * 1.5 + stride * 1.5;
+        if (trim) drawTrimUnderlay(ctx, trim, time, reduced, flutter)();
         for (const side of [-1, 1]) {
             polygon(ctx, [[side * 4, 14 + stride * side * 3], [side * 10, 14 + stride * side * 3], [side * 10, 29 + stride * side * 3], [side * 4, 29 + stride * side * 3]], '#25303e', '#8b80a255', 1);
         }
@@ -238,6 +269,11 @@ export function drawHero(ctx, actor, hero, stride, strike, time, reduced, trim =
     if (actor.invulnerable > 0) ctx.globalAlpha *= reduced ? 0.8 : 0.72 + Math.sin(time * 18) * 0.12;
     ctx.rotate(actor.facing + Math.PI / 2);
     const flutter = reduced ? 0 : Math.sin(time * 6) * 2 + stride * 2;
+    if (trim) {
+        ctx.save(); ctx.rotate(-(actor.facing + Math.PI / 2));
+        const banner = drawTrimUnderlay(ctx, trim, time, reduced, flutter);
+        ctx.restore(); banner();
+    }
     const paints = heroPaints(ctx, hero.weaponType, ranger, warden);
     const cloak = paints.cloak;
     ctx.fillStyle = cloak; ctx.strokeStyle = "#10191f"; ctx.lineWidth = 1.5;

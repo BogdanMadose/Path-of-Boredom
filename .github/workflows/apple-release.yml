@@ -32,7 +32,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.4.app
+        run: |
+          # The .NET iOS workload pins a minimum Xcode; use the newest one on the runner.
+          XCODE=$(ls -d /Applications/Xcode_*.app | grep -v beta | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -63,32 +68,45 @@ jobs:
           fi
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$IOS_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/ios.mobileprovision
+          install_profile() {
+            local file=$1 ext=$2 uuid
+            uuid=$(security cms -D -i "$file" | plutil -extract UUID raw -)
+            for dir in ~/Library/MobileDevice/Provisioning\ Profiles ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles; do
+              mkdir -p "$dir"; cp "$file" "$dir/$uuid.$ext"
+            done
+          }
+          echo "$IOS_PROVISIONING_PROFILE" | base64 --decode > $RUNNER_TEMP/ios.mobileprovision
+          install_profile $RUNNER_TEMP/ios.mobileprovision mobileprovision
           if [ -n "$MAC_PROVISIONING_PROFILE" ]; then
-            echo "$MAC_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/mac.provisionprofile
+            echo "$MAC_PROVISIONING_PROFILE" | base64 --decode > $RUNNER_TEMP/mac.provisionprofile
+            install_profile $RUNNER_TEMP/mac.provisionprofile provisionprofile
           fi
+          security find-identity -v -p codesigning "$KEYCHAIN"
 
       - name: Build iOS (.ipa)
         run: |
+          set -o pipefail
           dotnet publish "$PROJECT" -f net9.0-ios -c Release -p:RuntimeIdentifier=ios-arm64 \
             -p:ArchiveOnBuild=true -p:ApplicationVersion=${{ inputs.build_number }} \
             -p:CodesignKey="Apple Distribution" \
-            -p:CodesignProvision="$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/ios.mobileprovision | plutil -extract Name raw -)" \
-            -o artifacts/ios
+            -p:CodesignProvision="$(security cms -D -i $RUNNER_TEMP/ios.mobileprovision | plutil -extract Name raw -)" \
+            -clp:ErrorsOnly -o artifacts/ios 2>&1 | tee ios-build.log \
+            || { echo "::group::iOS build errors"; grep -E "error|Error" ios-build.log | sort -u | head -40; echo "::endgroup::"; exit 1; }
 
       - name: Build Mac App Store (.pkg)
         run: |
-          if [ ! -f ~/Library/MobileDevice/Provisioning\ Profiles/mac.provisionprofile ]; then echo "No Mac profile; skipping"; exit 0; fi
+          if [ ! -f $RUNNER_TEMP/mac.provisionprofile ]; then echo "No Mac profile; skipping"; exit 0; fi
+          set -o pipefail
           dotnet publish "$PROJECT" -f net9.0-maccatalyst -c Release \
             -p:CreatePackage=true -p:EnableCodeSigning=true -p:EnablePackageSigning=true \
             -p:ApplicationVersion=${{ inputs.build_number }} \
             -p:CodesignKey="Apple Distribution" \
             -p:PackageSigningKey="3rd Party Mac Developer Installer" \
-            -p:CodesignProvision="$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/mac.provisionprofile | plutil -extract Name raw -)" \
+            -p:CodesignProvision="$(security cms -D -i $RUNNER_TEMP/mac.provisionprofile | plutil -extract Name raw -)" \
             -p:UseHardenedRuntime=true \
             "-p:RuntimeIdentifiers=maccatalyst-arm64%3Bmaccatalyst-x64" \
-            -o artifacts/mac
+            -clp:ErrorsOnly -o artifacts/mac 2>&1 | tee mac-build.log \
+            || { echo "::group::Mac build errors"; grep -E "error|Error" mac-build.log | sort -u | head -40; echo "::endgroup::"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:

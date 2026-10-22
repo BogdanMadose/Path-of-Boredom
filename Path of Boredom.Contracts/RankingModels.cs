@@ -192,7 +192,7 @@ public static class RankingRules
             && build.Upgrades.Count(upgrade => upgrade.Category == "tree") <= 48
             && build.Upgrades.Count(upgrade => upgrade.Category == "forge") <= 16
             && build.Upgrades.Count(upgrade => upgrade.Category == "card") <= 20
-            && build.Upgrades.Count(upgrade => upgrade.Category == "mastery") <= 7;
+            && build.Upgrades.Count(upgrade => upgrade.Category == "mastery") <= 8;
     }
 
     /// <summary>

@@ -17,7 +17,7 @@ public static class NativeAppleSignIn
         var api = apiBaseUrl.TrimEnd('/');
         try
         {
-#if IOS
+#if IOS || MACCATALYST
             var result = await AppleSignInAuthenticator.AuthenticateAsync(new AppleSignInAuthenticator.Options
             {
                 IncludeEmailScope = false,

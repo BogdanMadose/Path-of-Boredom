@@ -371,3 +371,6 @@ FodyWeavers.xsd
 *.cer
 *.csr
 
+
+# Local release outputs (bundles, symbols, upload certificate)
+Play-Release/

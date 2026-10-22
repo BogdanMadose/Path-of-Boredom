@@ -49,7 +49,14 @@ if (!fs.existsSync(edge)) {
             const back = q('[data-close-camp]');
             card.scrollTop = card.scrollHeight;
             const b = back.getBoundingClientRect();
-            if (b.bottom > innerHeight + 1 || b.height < 30) report.push('Back button unreachable/too small ' + b.bottom + '/' + b.height);
+            for (const s of card.querySelectorAll('.camp-node small, .camp-relic small')) {
+                const r = s.getBoundingClientRect(), p = s.parentElement.getBoundingClientRect();
+                if (r.height < 8 || r.bottom > p.bottom + 1 || r.bottom > box.bottom + 1) report.push('description hidden: ' + s.textContent.trim().slice(0, 20));
+                if (r.right > b.left && r.left < b.right && r.bottom > b.top && r.top < b.bottom) report.push('Back covers text: ' + s.textContent.trim().slice(0, 20));
+            }
+            if (b.bottom > innerHeight + 1 || b.height < 22) report.push('Back button unreachable/too small ' + b.bottom + '/' + b.height);
+            const codexBox = q('[data-camp-codex]').getBoundingClientRect(), codexTitle = card.querySelector(':scope > h3:last-of-type').getBoundingClientRect();
+            if (codexBox.top - codexTitle.bottom > 60) report.push('empty gap above codex ' + Math.round(codexBox.top - codexTitle.bottom));
             report.push('INFO scroll ' + card.scrollHeight + '/' + card.clientHeight);
         } catch (e) { report.push('ERR ' + e.message); }
         document.body.dataset.result = report.join(' | ');

@@ -33,7 +33,10 @@
             }
             else
             {
-                <button type="button" class="mm-pause-option" disabled="@(!cloud.AccountStatus.Configured)" @onclick="SignIn">@(cloud.AccountStatus.Deleted ? "Create a new game account with Google" : "Continue with Google")</button>
+                @if (!OperatingSystem.IsIOS() && !OperatingSystem.IsMacCatalyst())
+                {
+                    <button type="button" class="mm-pause-option" disabled="@(!cloud.AccountStatus.Configured)" @onclick="SignIn">@(cloud.AccountStatus.Deleted ? "Create a new game account with Google" : "Continue with Google")</button>
+                }
                 <button type="button" class="mm-pause-option mm-apple" disabled="@(!cloud.AccountStatus.Configured)" @onclick="SignInApple">&#63743; Sign in with Apple</button>
                 @if (cloud.AccountStatus.Deleted)
                 {

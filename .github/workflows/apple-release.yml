@@ -1,0 +1,118 @@
+name: Apple release builds
+
+# Manual run: builds a signed iOS .ipa and a signed Mac App Store .pkg and (optionally) uploads both
+# to App Store Connect / TestFlight. Required repository secrets:
+#   IOS_CERTIFICATE_P12          base64 of an "Apple Distribution" certificate (.p12); also signs the Mac app
+#   IOS_CERTIFICATE_PASSWORD     password of that .p12
+#   MAC_INSTALLER_P12            base64 of a "Mac Installer Distribution" certificate (.p12)
+#   MAC_INSTALLER_PASSWORD       password of that .p12
+#   IOS_PROVISIONING_PROFILE     base64 of the iOS App Store provisioning profile (.mobileprovision)
+#   MAC_PROVISIONING_PROFILE     base64 of the Mac Catalyst App Store provisioning profile (.provisionprofile)
+#   APPSTORE_API_KEY_ID / APPSTORE_API_ISSUER_ID / APPSTORE_API_PRIVATE_KEY   App Store Connect API key
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: "Build number (CFBundleVersion), must increase every upload"
+        required: true
+        type: string
+      upload:
+        description: "Upload to App Store Connect"
+        type: boolean
+        default: true
+
+env:
+  PROJECT: "Path of Boredom.Maui/Path of Boredom.Maui.csproj"
+
+jobs:
+  apple:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install MAUI workloads
+        run: dotnet workload install maui-ios maui-maccatalyst maui-android
+
+      - name: Import certificates and profiles
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.IOS_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          MAC_INSTALLER_P12: ${{ secrets.MAC_INSTALLER_P12 }}
+          MAC_INSTALLER_PASSWORD: ${{ secrets.MAC_INSTALLER_PASSWORD }}
+          IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+          MAC_PROVISIONING_PROFILE: ${{ secrets.MAC_PROVISIONING_PROFILE }}
+        run: |
+          KEYCHAIN=$RUNNER_TEMP/signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 24)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > $RUNNER_TEMP/dist.p12
+          security import $RUNNER_TEMP/dist.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          if [ -n "$MAC_INSTALLER_P12" ]; then
+            echo "$MAC_INSTALLER_P12" | base64 --decode > $RUNNER_TEMP/installer.p12
+            security import $RUNNER_TEMP/installer.p12 -P "$MAC_INSTALLER_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          fi
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$IOS_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/ios.mobileprovision
+          if [ -n "$MAC_PROVISIONING_PROFILE" ]; then
+            echo "$MAC_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/mac.provisionprofile
+          fi
+
+      - name: Build iOS (.ipa)
+        run: |
+          dotnet publish "$PROJECT" -f net9.0-ios -c Release -p:RuntimeIdentifier=ios-arm64 \
+            -p:ArchiveOnBuild=true -p:ApplicationVersion=${{ inputs.build_number }} \
+            -p:CodesignKey="Apple Distribution" \
+            -p:CodesignProvision="$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/ios.mobileprovision | plutil -extract Name raw -)" \
+            -o artifacts/ios
+
+      - name: Build Mac App Store (.pkg)
+        run: |
+          if [ ! -f ~/Library/MobileDevice/Provisioning\ Profiles/mac.provisionprofile ]; then echo "No Mac profile; skipping"; exit 0; fi
+          dotnet publish "$PROJECT" -f net9.0-maccatalyst -c Release \
+            -p:CreatePackage=true -p:EnableCodeSigning=true -p:EnablePackageSigning=true \
+            -p:ApplicationVersion=${{ inputs.build_number }} \
+            -p:CodesignKey="Apple Distribution" \
+            -p:PackageSigningKey="3rd Party Mac Developer Installer" \
+            -p:CodesignProvision="$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/mac.provisionprofile | plutil -extract Name raw -)" \
+            -p:UseHardenedRuntime=true \
+            "-p:RuntimeIdentifiers=maccatalyst-arm64%3Bmaccatalyst-x64" \
+            -o artifacts/mac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apple-builds-${{ inputs.build_number }}
+          path: |
+            artifacts/ios/*.ipa
+            artifacts/mac/*.pkg
+
+      - name: Upload to App Store Connect
+        if: ${{ inputs.upload }}
+        env:
+          ASC_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$ASC_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8
+          for ipa in artifacts/ios/*.ipa; do
+            xcrun altool --upload-app -t ios -f "$ipa" --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+          done
+          for pkg in artifacts/mac/*.pkg; do
+            [ -f "$pkg" ] && xcrun altool --upload-app -t macos -f "$pkg" --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+          done
+
+      - name: Clean up keychain
+        if: always()
+        run: security delete-keychain $RUNNER_TEMP/signing.keychain-db || true

@@ -257,7 +257,7 @@ public static class GameSaveEndpoints
             if (!state.TryGetProperty("scoreBaseline", out var baseline) || baseline.ValueKind != JsonValueKind.Number || !baseline.TryGetInt64(out var startScore)
                 || !state.GetProperty("kills").TryGetInt64(out var kills) || startScore < 0 || startScore > kills
                 || !state.TryGetProperty("mastery", out var mastery) || !Numbers(mastery, masteryKeys)
-                || mastery.EnumerateObject().Count() != masteryKeys.Length) return false;
+                || mastery.EnumerateObject().Count() != masteryKeys.Length + (version >= 8 && mastery.TryGetProperty("warding", out var warding) && warding.ValueKind == JsonValueKind.Number ? 1 : 0)) return false;
             long total = 0;
 
             foreach (var stat in mastery.EnumerateObject())

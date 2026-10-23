@@ -1516,28 +1516,6 @@
         line-height: 1.2;
     }
 
-    /* Close button sits at the top-right of the modal. */
-    body.mobile-shell .main-play-menu .play-modal-close {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        width: 32px;
-        min-height: 32px;
-        height: 32px;
-        padding: 0;
-        border: 1px solid #c7a56b44;
-        border-radius: 50%;
-        background: #0b1519;
-        color: #f1e5cc;
-        font-size: 18px;
-        line-height: 1;
-    }
-
-    /* Leave room for the close button. */
-    body.mobile-shell .main-play-menu {
-        padding-top: 48px;
-    }
-
     @keyframes play-modal-enter {
         from {
             opacity: 0;
@@ -1561,7 +1539,7 @@
             width: min(300px, calc(100vw - 24px));
             max-height: calc(100dvh - 16px);
             gap: 4px;
-            padding: 38px 12px 10px;
+            padding: 12px 10px;
         }
 
         body.mobile-shell .main-menu-card .main-play-menu button {

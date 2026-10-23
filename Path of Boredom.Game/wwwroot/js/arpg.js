@@ -2136,8 +2136,6 @@ export function createGame(root, saveBridge = null) {
         restartButton.disabled = saving || choosing || !!setupAction;
         endlessButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
         endlessButton.hidden = choosing || !(endlessUnlocked || state.status === "won") || (state.mode === "endless" && !["dead", "paused", "camp"].includes(state.status)) || state.status === "playing";
-        setText(endlessButton, state.status === "won" ? "Continue into the Endless Watch"
-            : state.mode === "endless" && ["paused", "camp"].includes(state.status) ? "Abandon & start a new Endless run" : "New Endless Watch run");
         launchEndless.disabled = endlessButton.disabled || !(endlessUnlocked || state.campaignComplete === 1);
         if (mainEndless) {
             mainEndless.hidden = !(endlessUnlocked || state.campaignComplete === 1);
@@ -2406,12 +2404,23 @@ export function createGame(root, saveBridge = null) {
     on(startButton, "click", begin);
     on(pauseButton, "click", pause);
     on(endlessButton, "click", () => {
-        if (saving || checkingUnlock || setupAction || state.status === "choosing" || !(endlessUnlocked || state.campaignComplete === 1)) return;
+        if (saving || checkingUnlock || setupAction || state.status === "choosing") return;
+
+        // A completed campaign can continue into Endless.
+        if (state.status === "won") {
+            openSetup("continue");
+            return;
+        }
+
+        if (!(endlessUnlocked || state.campaignComplete === 1)) return;
+
+        // Existing Endless runs must offer the restart-mode chooser.
         if (state.mode === "endless" && ["paused", "camp"].includes(state.status)) {
             showRestartModeChooser();
             return;
         }
-        openSetup(state.status === "won" ? "continue" : "endless");
+
+        openSetup("endless");
     });
     on(launchEndless, "click", () => endlessButton.click());
     on(root.querySelector("[data-slot-unlocked]"), "click", () => openSkills.click());
@@ -2538,8 +2547,7 @@ export function createGame(root, saveBridge = null) {
         const chooser = document.querySelector("[data-restart-mode-chooser]");
 
         if (!chooser) {
-            // Safe fallback if the chooser markup is unavailable.
-            openSetup("campaign");
+            console.error("Restart mode chooser is missing from the current game root.");
             return;
         }
 

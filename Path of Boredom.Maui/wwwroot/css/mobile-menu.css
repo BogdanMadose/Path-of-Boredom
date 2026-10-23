@@ -1060,4 +1060,152 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
+        /* Main menu: balanced landscape composition */
+    body.mobile-shell .main-menu-card {
+        width: min(920px, 94vw);
+        max-height: calc(100dvh - 24px);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        align-content: center;
+        gap: 10px;
+        padding: 20px 24px;
+    }
+
+    /* Keep the game title and status messages spanning the full layout */
+    body.mobile-shell .main-menu-card > h1,
+    body.mobile-shell .main-menu-card > p,
+    body.mobile-shell .main-menu-card > [data-main-status],
+    body.mobile-shell .main-menu-card > .mm-save-status {
+        grid-column: 1 / -1;
+    }
+
+    body.mobile-shell .main-menu-card > h1 {
+        margin: 0 0 4px;
+        text-align: center;
+        font-size: 24px;
+    }
+
+    /* Main actions get consistent, comfortable targets */
+    body.mobile-shell .main-menu-card button {
+        min-width: 0;
+        min-height: 46px;
+        margin: 0;
+        overflow-wrap: anywhere;
+    }
+
+    /* Continue is the primary action when a run is available */
+    body.mobile-shell .main-menu-card [data-main-resume] {
+        grid-column: 1 / -1;
+        min-height: 54px;
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    /* Secondary actions */
+    body.mobile-shell .main-menu-card [data-main-options],
+    body.mobile-shell .main-menu-card [data-main-panel="rankings"] {
+        font-size: 12px;
+    }
+
+    /* Save status should read as quiet information, not another menu action */
+    body.mobile-shell .main-menu-card [data-main-status] {
+        margin: 2px 0;
+        text-align: center;
+        font-size: 11px;
+        color: #9fb7ae;
+    }
+
+    /* Short landscape screens */
+    @media (max-height: 480px) {
+        body.mobile-shell .main-menu-card {
+            width: min(920px, 96vw);
+            gap: 7px;
+            padding: 10px 18px;
+        }
+
+        body.mobile-shell .main-menu-card > h1 {
+            font-size: 20px;
+        }
+
+        body.mobile-shell .main-menu-card button {
+            min-height: 38px;
+        }
+
+        body.mobile-shell .main-menu-card [data-main-resume] {
+            min-height: 44px;
+        }
+    }
+
+    /* Pause menu — landscape-first hierarchy */
+    body.mobile-shell .mm-pause-card {
+        width: min(1000px, 94vw);
+        max-height: calc(100dvh - 24px);
+        grid-template-columns: minmax(230px, 0.8fr) minmax(0, 1.4fr);
+        gap: 16px;
+        padding: 18px;
+    }
+
+    body.mobile-shell .mm-pause-side {
+        align-items: stretch;
+        justify-content: center;
+        gap: 12px;
+    }
+
+    body.mobile-shell .mm-pause-side h2 {
+        font-size: clamp(21px, 2.4vw, 28px);
+    }
+
+    body.mobile-shell .mm-pause-side .mm-resume {
+        min-height: 52px;
+        font-size: 15px;
+        font-weight: 700;
+    }
+
+    body.mobile-shell .mm-pause-side .mm-run-recap {
+        max-height: 5.6em;
+        overflow: hidden;
+        font-size: 11px;
+        line-height: 1.5;
+    }
+
+    body.mobile-shell .mm-pause-groups {
+        gap: 10px;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    body.mobile-shell .mm-menu-group {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 10px;
+    }
+
+    body.mobile-shell .mm-menu-group h3 {
+        grid-column: 1 / -1;
+    }
+
+    body.mobile-shell .mm-pause-card .mm-pause-option {
+        min-height: 44px;
+        overflow-wrap: anywhere;
+    }
+
+    @media (max-height: 420px) {
+        body.mobile-shell .mm-pause-card {
+            max-height: calc(100dvh - 12px);
+            padding: 10px 14px;
+            gap: 10px;
+        }
+
+        body.mobile-shell .mm-pause-side,
+        body.mobile-shell .mm-pause-groups {
+            gap: 6px;
+        }
+
+        body.mobile-shell .mm-pause-card .mm-pause-option {
+            min-height: 36px;
+        }
+
+        body.mobile-shell .mm-pause-side .mm-resume {
+            min-height: 42px;
+        }
+    }
 }

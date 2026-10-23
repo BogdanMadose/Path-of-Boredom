@@ -375,3 +375,5 @@ FodyWeavers.xsd
 
 # Local release outputs (bundles, symbols, upload certificate)
 Play-Release/
+/deployment
+/docs/google-cloud-and-play-guide.md

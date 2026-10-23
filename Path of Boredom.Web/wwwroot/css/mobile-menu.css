@@ -196,7 +196,11 @@
         overflow: hidden;
         overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch;
-        padding: 0 12px calc(12px + env(safe-area-inset-bottom));
+        padding:
+            0
+            max(12px, env(safe-area-inset-right, 0px))
+            calc(12px + env(safe-area-inset-bottom, 0px))
+            max(12px, env(safe-area-inset-left, 0px));
     }
 
     body.mobile-shell .mm-panel.mm-open {

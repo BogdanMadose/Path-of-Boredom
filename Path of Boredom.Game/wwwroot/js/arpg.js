@@ -2404,9 +2404,18 @@ export function createGame(root, saveBridge = null) {
     on(startButton, "click", begin);
     on(pauseButton, "click", pause);
     on(endlessButton, "click", () => {
+        console.log("[Endless] CLICKED", {
+            status: state.status,
+            mode: state.mode,
+            saving,
+            checkingUnlock,
+            setupAction,
+            endlessUnlocked,
+            campaignComplete: state.campaignComplete
+        });
+
         if (saving || checkingUnlock || setupAction || state.status === "choosing") return;
 
-        // A completed campaign can continue into Endless.
         if (state.status === "won") {
             openSetup("continue");
             return;
@@ -2414,8 +2423,8 @@ export function createGame(root, saveBridge = null) {
 
         if (!(endlessUnlocked || state.campaignComplete === 1)) return;
 
-        // Existing Endless runs must offer the restart-mode chooser.
         if (state.mode === "endless" && ["paused", "camp"].includes(state.status)) {
+            console.log("[Endless] Opening restart chooser");
             showRestartModeChooser();
             return;
         }
@@ -2546,12 +2555,20 @@ export function createGame(root, saveBridge = null) {
     function showRestartModeChooser() {
         const chooser = document.querySelector("[data-restart-mode-chooser]");
 
-        if (!chooser) {
-            console.error("Restart mode chooser is missing from the current game root.");
-            return;
-        }
+        console.log("[Endless] Chooser lookup", {
+            found: !!chooser,
+            rootConnected: root.isConnected,
+            chooserHidden: chooser?.hidden
+        });
+
+        if (!chooser) return;
 
         chooser.hidden = false;
+
+        console.log("[Endless] Chooser opened", {
+            hidden: chooser.hidden,
+            display: getComputedStyle(chooser).display
+        });
 
         const campaignButton = chooser.querySelector('[data-restart-mode="campaign"]');
         const endlessButton = chooser.querySelector('[data-restart-mode="endless"]');

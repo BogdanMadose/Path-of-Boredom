@@ -265,6 +265,47 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 @media (prefers-reduced-motion: reduce) { .forge-available::after { animation: none; } }
 .endless-button { display: block; margin: 12px auto 0; background: linear-gradient(135deg, #56365c, #382a4a); border-color: #b99cd7; }
 .endless-button:hover:not(:disabled) { background: #624372; }
+.restart-mode-overlay {
+    z-index: 20;
+    padding: 16px;
+    overflow-y: auto;
+    touch-action: pan-y;
+}
+
+.restart-mode-card {
+    width: min(440px, 100%);
+    max-height: 100%;
+    overflow-y: auto;
+    text-align: center;
+}
+
+.restart-mode-card h2 {
+    margin: 8px 0 12px;
+    color: #f3dfb9;
+    font-family: Georgia, serif;
+}
+
+.restart-mode-card > p:not(.eyebrow) {
+    color: #bdc9c6;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.restart-mode-options {
+    display: grid;
+    gap: 10px;
+    margin: 18px 0 10px;
+}
+
+.restart-mode-options button,
+.restart-mode-card > [data-restart-cancel] {
+    width: 100%;
+    min-height: 44px;
+}
+
+.restart-mode-card > [data-restart-cancel] {
+    margin-top: 4px;
+}
 .story-card { background: linear-gradient(135deg, #59422c18, #101b2310); }
 .story-card > p:not(.eyebrow) { font: 13px/1.8 Georgia, serif; color: #c9c1b1; }
 .story-card small { color: #d1ac71; font-size: 10px; letter-spacing: 1px; }
@@ -291,6 +332,63 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .death-report ol { max-height: 160px; overflow-y: auto; overscroll-behavior: contain; padding-left: 24px; font-size: 12px; line-height: 1.7; }
 .death-report li { margin-bottom: 6px; overflow-wrap: anywhere; }
 .death-report .fatal-hit { color: #ffad97; font-weight: 700; }
+.run-summary {
+    min-width: 0;
+}
+
+.run-summary h4 {
+    margin: 10px 0 6px;
+    color: #edc581;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+}
+
+.run-summary-overview ul,
+.run-summary-damage ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.run-summary-overview li {
+    padding: 5px 8px;
+    border: 1px solid #c7a56b33;
+    border-radius: 5px;
+    background: #101b20;
+    color: #e5dfd3;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.run-summary-damage li {
+    color: #cbd5cf;
+    font-size: 11px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.run-summary-damage ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 12px;
+}
+
+@media (max-width: 540px) {
+    .run-summary {
+        padding: 10px;
+    }
+
+    .run-summary-overview ul {
+        gap: 5px;
+    }
+
+    .run-summary-damage ul {
+        grid-template-columns: 1fr;
+    }
+}
 .arpg[data-game-status="dead"] [data-overlay] { grid-template-rows: minmax(0, 1fr); touch-action: pan-y; }
 .arpg[data-game-status="dead"] [data-run-menu] { box-sizing: border-box; min-height: 0; max-height: 100%; overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #c7a56b #14212a; }
 .arpg[data-game-status="dead"] .death-report, .arpg[data-game-status="dead"] .death-report ol { max-height: none; overflow: visible; }

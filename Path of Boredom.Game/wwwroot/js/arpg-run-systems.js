@@ -69,7 +69,26 @@ export function resolveChallenge(state) {
 }
 export function runSummary(state, skillLabel = key => key) {
     const summary = state.runSystems.summary;
-    const damage = Object.entries(summary.damage).filter(([, value]) => value > 0)
-        .sort((a, b) => b[1] - a[1]).map(([key, value]) => `${skillLabel(key)}: ${Math.round(value)}`).join(" · ");
-    return `Run so far: ${Math.floor(summary.seconds / 60)}m ${Math.floor(summary.seconds % 60)}s · ${summary.stages} stages cleared · ${state.kills} kills · ${summary.flasks} flasks used · ${summary.spent} gold spent · ${summary.challenges} challenges completed. Damage dealt: ${damage || "none yet"}.`;
+
+    const overview = [
+        `${Math.floor(summary.seconds / 60)}m ${Math.floor(summary.seconds % 60)}s`,
+        `${summary.stages} stages`,
+        `${state.kills} kills`,
+        `${summary.flasks} flasks used`,
+        `${summary.spent} gold spent`,
+        `${summary.challenges} challenges completed`
+    ];
+
+    const damage = Object.entries(summary.damage)
+        .filter(([, value]) => value > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([key, value]) => ({
+            name: skillLabel(key),
+            value: Math.round(value)
+        }));
+
+    return {
+        overview,
+        damage
+    };
 }

@@ -2010,9 +2010,43 @@ export function createGame(root, saveBridge = null) {
                 : "Tap one to accept. You can change it until you travel.");
         }
         const summary = runSummary(state, key => skillName(state, key));
-        setText(hudOne("[data-summary-text]"), summary);
+
+        const overviewList = hudOne("[data-summary-overview]");
+        const damageList = hudOne("[data-summary-damage]");
+
+        overviewList.replaceChildren();
+
+        for (const item of summary.overview) {
+            const li = document.createElement("li");
+            li.textContent = item;
+            overviewList.append(li);
+        }
+
+        damageList.replaceChildren();
+
+        if (summary.damage.length) {
+            for (const item of summary.damage) {
+                const li = document.createElement("li");
+                li.textContent = `${item.name}: ${item.value}`;
+                damageList.append(li);
+            }
+        } else {
+            const li = document.createElement("li");
+            li.textContent = "No damage recorded yet.";
+            damageList.append(li);
+        }
+
         hudOne("[data-run-summary]").hidden = state.status === "ready";
-        setText(hudOne("[data-forge-summary]"), summary);
+
+        // Preserve the existing Forge summary as a compact text string.
+        setText(
+            hudOne("[data-forge-summary]"),
+            `${summary.overview.join(" · ")}. Damage dealt: ${
+                summary.damage.length
+                    ? summary.damage.map(item => `${item.name}: ${item.value}`).join(" · ")
+                    : "none yet"
+            }.`
+        );
         retrySave.hidden = !checkpointSaveFailed || !["camp", "won"].includes(state.status) || !!setupAction;
         retrySave.disabled = saving || checkingUnlock || !saveBridge;
         setText(retrySave, saving ? "Retrying checkpoint save…" : "Retry checkpoint save");
@@ -2478,6 +2512,47 @@ export function createGame(root, saveBridge = null) {
         updateHud();
         if (state.status === "playing") canvas.focus({ preventScroll: true });
     });
+    function showRestartModeChooser() {
+        const chooser = document.querySelector("[data-restart-mode-chooser]");
+
+        if (!chooser) {
+            // Safe fallback if the chooser markup is unavailable.
+            openSetup("campaign");
+            return;
+        }
+
+        chooser.hidden = false;
+
+        const campaignButton = chooser.querySelector('[data-restart-mode="campaign"]');
+        const endlessButton = chooser.querySelector('[data-restart-mode="endless"]');
+
+        if (campaignButton) {
+            campaignButton.onclick = () => {
+                chooser.hidden = true;
+                openSetup("campaign");
+            };
+        }
+
+        if (endlessButton) {
+            endlessButton.hidden = !(endlessUnlocked || state.campaignComplete === 1);
+            endlessButton.onclick = () => {
+                if (!(endlessUnlocked || state.campaignComplete === 1)) {
+                    return;
+                }
+
+                chooser.hidden = true;
+                openSetup("endless");
+            };
+        }
+
+        const cancelButton = chooser.querySelector("[data-restart-cancel]");
+
+        if (cancelButton) {
+            cancelButton.onclick = () => {
+                chooser.hidden = true;
+            };
+        }
+    }
     on(rerollButton, "click", () => {
         if (saving || state.status !== "choosing") return;
         const used = rerollsUsed.get(state) ?? 0;
@@ -2487,7 +2562,19 @@ export function createGame(root, saveBridge = null) {
         cardPickReadyAt = performance.now() + 250;
         updateHud();
     });
-    on(restartButton, "click", () => openSetup("campaign"));
+    on(restartButton, "click", () => {
+        if (saving || checkingUnlock || setupAction || state.status === "choosing") {
+            return;
+        }
+
+        // Campaign is the only option until Endless has been unlocked.
+        if (!endlessUnlocked && state.campaignComplete !== 1) {
+            openSetup("campaign");
+            return;
+        }
+
+        showRestartModeChooser();
+    });    
     // The single save/load entry point, covering both manual Save/Load button clicks and automatic
     // checkpoint autosaves (`automatic = true`, called right after finishCheckpoint() transitions the
     // run to "camp"/"won"). Pauses first so the state being saved can't change mid-save. On load,

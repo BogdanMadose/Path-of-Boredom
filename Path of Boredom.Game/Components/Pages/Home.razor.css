@@ -269,16 +269,21 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
     position: fixed;
     inset: 0;
     z-index: 1000;
+
     display: grid;
     place-items: center;
     padding: 16px;
+
+    /* Darken and blur everything behind the dialog */
+    background: rgba(3, 8, 12, 0.58);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+
     overflow-y: auto;
-    background: #050b0fcc;
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
-    touch-action: pan-y;
     overscroll-behavior: contain;
-    animation: restart-overlay-in .25s ease-out both;
+    touch-action: pan-y;
+
+    animation: restart-overlay-in 0.25s ease-out both;
 }
 
 .restart-mode-overlay[hidden] {

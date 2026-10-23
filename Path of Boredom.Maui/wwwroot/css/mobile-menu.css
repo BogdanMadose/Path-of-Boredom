@@ -1437,328 +1437,141 @@
         }
     }
 
-    /* ---------- MAIN MENU: prevent title clipping ---------- */
+    /* =========================================================
+    PLAY OPTIONS — CENTERED MODAL
+    ========================================================= */
 
+    /* Keep the original Main Menu unchanged behind the modal. */
     body.mobile-shell .main-menu {
-        box-sizing: border-box;
+        isolation: isolate;
+    }
+
+    /* Dim and blur the Main Menu while Play options are open. */
+    body.mobile-shell .main-menu:has(.main-play-menu:not([hidden]))::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        background: rgb(3 8 11 / 72%);
+        backdrop-filter: blur(7px);
+        -webkit-backdrop-filter: blur(7px);
+    }
+
+    /* The Play button remains in the original menu.
+    Only the options container becomes the modal. */
+    body.mobile-shell .main-menu-card .main-play-menu {
+        position: fixed;
+        z-index: 11;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+
         display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 0;
-        overflow: hidden;
-    }
+        flex-direction: column;
+        align-items: stretch;
 
-    body.mobile-shell .main-menu-card {
+        width: min(340px, calc(100vw - 32px));
+        max-width: calc(100vw - 32px);
+        max-height: calc(100dvh - 32px);
         box-sizing: border-box;
-        width: min(420px, 100%);
-        min-width: 0;
-        max-width: 100%;
-        height: auto;
-        min-height: 0;
-        max-height: 100%;
-        align-content: center;
-        justify-content: center;
-        gap: clamp(3px, 1vh, 7px);
-        padding: clamp(6px, 1.5vh, 12px) clamp(10px, 3vw, 18px);
+
+        gap: 8px;
+        padding: 18px;
+
         overflow: hidden;
+        overflow-y: hidden;
+
+        border: 1px solid #c7a56b99;
+        border-radius: 16px;
+        background: linear-gradient(160deg, #192a2c, #0b1217);
+        box-shadow:
+            0 24px 80px rgb(0 0 0 / 65%),
+            0 0 0 1px rgb(255 224 170 / 5%);
+
+        animation: play-modal-enter 160ms ease-out;
     }
 
-    body.mobile-shell .main-menu-card > h1 {
-        min-width: 0;
-        margin: 0;
-        font-size: clamp(16px, 3.6vh, 24px);
-        line-height: 1.08;
-        overflow-wrap: anywhere;
-    }
-
-    body.mobile-shell .main-menu-card button {
-        box-sizing: border-box;
-        width: 100%;
-        min-width: 0;
-        min-height: clamp(28px, 6.5vh, 40px);
-        margin: 0;
-        padding: 4px 8px;
-        font-size: 12px;
-        line-height: 1.1;
-    }
-
-    body.mobile-shell .main-play-menu {
-        min-width: 0;
-        gap: clamp(3px, 0.8vh, 6px);
-        padding: clamp(4px, 1vh, 8px);
-    }
-
-    body.mobile-shell .main-menu-card [data-main-resume][hidden],
-    body.mobile-shell .main-play-menu[hidden] {
+    /* Hidden must override the modal display declaration. */
+    body.mobile-shell .main-menu-card .main-play-menu[hidden] {
         display: none !important;
     }
 
-    /* Landscape: place Play options beside the main actions. */
-    @media (orientation: landscape) and (min-width: 520px) {
-        body.mobile-shell .main-menu-card {
-            width: min(680px, 100%);
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-            align-content: center;
-        }
-
-        body.mobile-shell .main-menu-card > h1,
-        body.mobile-shell .main-menu-card > p,
-        body.mobile-shell .main-menu-card > [data-main-status],
-        body.mobile-shell .main-menu-card > .mm-save-status {
-            grid-column: 1 / -1;
-        }
-
-        body.mobile-shell .main-menu-card [data-main-menu-actions] {
-            grid-column: 1;
-            min-width: 0;
-            align-self: center;
-        }
-
-        body.mobile-shell .main-menu-card .main-play-menu {
-            grid-column: 2;
-            align-self: center;
-        }
-    }
-
-    /* Extra-short screens. */
-    @media (max-height: 420px) {
-        body.mobile-shell .main-menu-card {
-            gap: 3px;
-            padding: 5px 12px;
-        }
-
-        body.mobile-shell .main-menu-card > h1 {
-            font-size: 16px;
-        }
-
-        body.mobile-shell .main-menu-card button {
-            min-height: 27px;
-            padding: 3px 7px;
-            font-size: 11px;
-        }
-    }
-
-
-    /* ---------- PANELS: reserve space for headers and tabs ---------- */
-
-    body.mobile-shell .mm-panel.mm-open {
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: 52px 44px minmax(0, 1fr) auto;
-        gap: 4px 8px;
-        padding:
-            0
-            max(8px, env(safe-area-inset-right, 0px))
-            max(6px, env(safe-area-inset-bottom, 0px))
-            max(8px, env(safe-area-inset-left, 0px));
-    }
-
-    body.mobile-shell .mm-panel .mm-head {
-        box-sizing: border-box;
-        min-width: 0;
-        min-height: 0;
-        margin: 0 -8px;
-        padding:
-            calc(4px + env(safe-area-inset-top, 0px))
-            8px
-            4px;
-    }
-
-    body.mobile-shell .mm-panel .mm-head h2 {
-        min-width: 0;
-        font-size: 16px;
-    }
-
-    body.mobile-shell .mm-panel .mm-close {
-        flex: 0 0 36px;
-        width: 36px;
-        height: 36px;
-    }
-
-
-    /* ---------- TABS: keep them separate from the cards ---------- */
-
-    body.mobile-shell .mm-panel .mm-subtabs {
-        box-sizing: border-box;
-        min-width: 0;
-        min-height: 0;
-        height: 40px;
-        gap: 4px;
-        padding: 2px 0;
-        align-items: stretch;
-    }
-
-    body.mobile-shell .mm-panel .mm-subtab {
-        box-sizing: border-box;
-        min-width: 0;
-        min-height: 34px;
-        height: 34px;
-        padding: 4px 8px;
-        font-size: 11px;
-    }
-
-
-    /* ---------- FORGE: keep cards below the tabs ---------- */
-
-    body.mobile-shell .mm-panel .forge-panel,
-    body.mobile-shell .mm-panel .mastery-panel {
-        box-sizing: border-box;
-        min-width: 0;
-        min-height: 0;
-        overflow: hidden;
-        padding: 0 4px;
-    }
-
-    body.mobile-shell .mm-panel .forge-panel > .forge-grid,
-    body.mobile-shell .mm-panel .mastery-panel .forge-grid {
-        box-sizing: border-box;
-        min-width: 0;
-        min-height: 0;
-        height: 100%;
-        overflow: hidden;
-        align-content: stretch;
-        align-items: stretch;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        grid-auto-rows: minmax(0, 1fr);
-        gap: 4px;
-        padding: 4px;
-        overscroll-behavior: none;
-    }
-
-    body.mobile-shell .mm-panel .forge-panel > .forge-grid button,
-    body.mobile-shell .mm-panel .mastery-panel .forge-grid button {
-        box-sizing: border-box;
-        min-width: 0;
-        min-height: 0;
-        height: 100%;
-        padding: 4px;
-        gap: 2px;
-        overflow: hidden;
+    /* Modal heading. */
+    body.mobile-shell .main-play-menu .play-modal-title {
+        margin: 0 0 4px;
+        color: #f1e5cc;
+        font: 400 21px/1.2 Georgia, serif;
         text-align: center;
     }
 
-    body.mobile-shell .mm-panel .forge-panel > .forge-grid button span:not([data-upgrade-preview]),
-    body.mobile-shell .mm-panel .mastery-panel .forge-grid button span:not([data-upgrade-preview]) {
+    /* Every option gets a full-width, consistent button. */
+    body.mobile-shell .main-menu-card .main-play-menu button {
+        flex: 0 0 auto;
+        width: 100%;
         min-width: 0;
-        white-space: normal;
-        overflow-wrap: anywhere;
-        line-height: 1.15;
-        font-size: 10px;
-    }
-
-    body.mobile-shell .mm-panel .forge-panel > .forge-grid [data-upgrade-preview],
-    body.mobile-shell .mm-panel .mastery-panel .forge-grid [data-upgrade-preview] {
-        min-width: 0;
-        white-space: normal;
-        overflow-wrap: anywhere;
-        line-height: 1.1;
-        font-size: 9px;
-    }
-
-
-    /* ---------- SKILLS: fit the selected tree into its content area ---------- */
-
-    body.mobile-shell .mm-panel .skill-tree-map {
-        box-sizing: border-box;
-        min-height: 0;
-        height: clamp(100px, calc(100dvh - 240px), 190px);
-        max-height: 100%;
+        min-height: 42px;
         margin: 0;
-        overflow: hidden;
+        padding: 9px 12px;
+        font-size: 13px;
+        line-height: 1.2;
     }
 
-    body.mobile-shell .mm-panel .tree-node,
-    body.mobile-shell .mm-panel .tree-node button {
-        box-sizing: border-box;
-        width: 52px;
+    /* Close button sits at the top-right of the modal. */
+    body.mobile-shell .main-play-menu .play-modal-close {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 32px;
+        min-height: 32px;
+        height: 32px;
+        padding: 0;
+        border: 1px solid #c7a56b44;
+        border-radius: 50%;
+        background: #0b1519;
+        color: #f1e5cc;
+        font-size: 18px;
+        line-height: 1;
     }
 
-    body.mobile-shell .mm-panel .tree-node button {
-        height: 52px;
-        padding: 3px;
-        border-radius: 12px;
+    /* Leave room for the close button. */
+    body.mobile-shell .main-play-menu {
+        padding-top: 48px;
     }
 
-    body.mobile-shell .mm-panel .loadout-grid {
-        box-sizing: border-box;
-        min-width: 0;
-        min-height: 0;
-        gap: 6px;
+    @keyframes play-modal-enter {
+        from {
+            opacity: 0;
+            transform: translate(-50%, -47%);
+        }
+
+        to {
+            opacity: 1;
+            transform: translate(-50%, -50%);
+        }
     }
 
-    body.mobile-shell .mm-panel .loadout-grid label {
-        min-width: 0;
-        gap: 3px;
-        font-size: 11px;
+    @media (prefers-reduced-motion: reduce) {
+        body.mobile-shell .main-menu-card .main-play-menu {
+            animation: none;
+        }
     }
 
-    body.mobile-shell .mm-panel .loadout-grid select,
-    body.mobile-shell .mm-panel select {
-        box-sizing: border-box;
-        min-width: 0;
-        min-height: 36px;
-        padding: 4px;
-        font-size: 12px;
-    }
-
-
-    /* ---------- SHORT LANDSCAPE SCREENS ---------- */
-
-    @media (orientation: landscape) and (max-height: 480px) {
-        body.mobile-shell .mm-panel.mm-open {
-            grid-template-rows: 42px 36px minmax(0, 1fr) auto;
-            gap: 2px 6px;
+    @media (max-height: 420px) {
+        body.mobile-shell .main-menu-card .main-play-menu {
+            width: min(300px, calc(100vw - 24px));
+            max-height: calc(100dvh - 16px);
+            gap: 4px;
+            padding: 38px 12px 10px;
         }
 
-        body.mobile-shell .mm-panel .mm-head {
-            padding-top: 2px;
-            padding-bottom: 2px;
+        body.mobile-shell .main-menu-card .main-play-menu button {
+            min-height: 32px;
+            padding: 5px 8px;
+            font-size: 11px;
         }
 
-        body.mobile-shell .mm-panel .mm-head h2 {
-            font-size: 14px;
-        }
-
-        body.mobile-shell .mm-panel .mm-close {
-            flex-basis: 32px;
-            width: 32px;
-            height: 32px;
-        }
-
-        body.mobile-shell .mm-panel .mm-subtabs {
-            height: 34px;
-            padding: 1px 0;
-        }
-
-        body.mobile-shell .mm-panel .mm-subtab {
-            min-height: 30px;
-            height: 30px;
-            padding: 3px 6px;
-            font-size: 10px;
-        }
-
-        body.mobile-shell .mm-panel .skill-tree-map {
-            height: clamp(80px, calc(100dvh - 150px), 140px);
-        }
-
-        body.mobile-shell .mm-panel .tree-node,
-        body.mobile-shell .mm-panel .tree-node button {
-            width: 44px;
-        }
-
-        body.mobile-shell .mm-panel .tree-node button {
-            height: 44px;
-            padding: 2px;
-        }
-
-        body.mobile-shell .mm-panel .forge-panel > .forge-grid,
-        body.mobile-shell .mm-panel .mastery-panel .forge-grid {
-            gap: 3px;
-            padding: 2px;
-        }
-
-        body.mobile-shell .mm-panel .forge-panel > .forge-grid button,
-        body.mobile-shell .mm-panel .mastery-panel .forge-grid button {
-            padding: 3px;
+        body.mobile-shell .main-play-menu .play-modal-title {
+            font-size: 17px;
         }
     }
 }

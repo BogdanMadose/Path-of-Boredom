@@ -1393,16 +1393,55 @@ export function createGame(root, saveBridge = null) {
     const mainPlay = root.querySelector("[data-main-play]");
     const mainPlayMenu = root.querySelector("[data-main-play-menu]");
 
-    on(mainPlay, "click", () => {
-        const open = mainPlayMenu.hidden;
+    if (mainPlay && mainPlayMenu && mainMenu) {
+        // Add the modal heading and close button once.
+        if (!mainPlayMenu.querySelector(".play-modal-close")) {
+            const title = document.createElement("h2");
+            title.className = "play-modal-title";
+            title.textContent = "Choose Your Game";
 
-        mainPlayMenu.hidden = !open;
-        mainPlay.setAttribute("aria-expanded", String(open));
+            const close = document.createElement("button");
+            close.type = "button";
+            close.className = "play-modal-close";
+            close.setAttribute("aria-label", "Close Play menu");
+            close.textContent = "×";
 
-        if (open) {
-            root.querySelector("[data-main-new]").focus({ preventScroll: true });
+            mainPlayMenu.prepend(title);
+            mainPlayMenu.prepend(close);
+
+            close.addEventListener("click", closePlayMenu);
         }
-    });
+
+        function closePlayMenu() {
+            mainPlayMenu.hidden = true;
+            mainPlay.setAttribute("aria-expanded", "false");
+            mainPlay.focus({ preventScroll: true });
+        }
+
+        mainPlay.addEventListener("click", () => {
+            const open = mainPlayMenu.hidden;
+
+            mainPlayMenu.hidden = !open;
+            mainPlay.setAttribute("aria-expanded", String(open));
+        });
+
+        // Clicking the dimmed area closes the modal.
+        mainMenu.addEventListener("click", event => {
+            if (
+                !mainPlayMenu.hidden &&
+                event.target === mainMenu
+            ) {
+                closePlayMenu();
+            }
+        });
+
+        // Escape closes the modal on desktop.
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape" && !mainPlayMenu.hidden) {
+                closePlayMenu();
+            }
+        });
+    }
 
     on(root.querySelector("[data-close-play-menu]"), "click", () => {
         mainPlayMenu.hidden = true;

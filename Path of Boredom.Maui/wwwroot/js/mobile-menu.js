@@ -532,7 +532,8 @@
         Array.prototype.forEach.call(root.querySelectorAll('[data-main-panel]'), function (button) {
             var allowed = ['playing', 'paused', 'camp'].includes(root.dataset.gameStatus)
                 || button.dataset.mainPanel === 'rankings' && ['ready', 'dead', 'won'].includes(root.dataset.gameStatus);
-            button.hidden = button.dataset.mainPanel !== 'rankings' && !['playing', 'paused', 'camp', 'won'].includes(root.dataset.gameStatus);
+            button.hidden = button.dataset.mainPanel !== 'rankings'
+                && (root.dataset.mainMenu === 'on' || !['playing', 'paused', 'camp', 'won'].includes(root.dataset.gameStatus));
             button.disabled = root.dataset.saveBusy === 'on' || !allowed;
         });
         Array.prototype.forEach.call(layer.querySelectorAll(".mm-tab"), function (tab) {
@@ -602,7 +603,8 @@
         addSaveActions(root.querySelector("[data-run-menu]"), root);
         var mainCard = root.querySelector('[data-main-menu-actions]');
         addSaveActions(mainCard, root);
-        ['rankings', 'skills', 'forge'].forEach(function (name) {            var button = el('button', 'mm-pause-option', { skills: 'Skills & loadout', forge: 'Forge & equipment', challenges: 'Stage challenges', rankings: 'Rankings' }[name]);
+        ['rankings'].forEach(function (name) {
+            var button = el('button', 'mm-pause-option', 'Rankings');
             button.type = 'button';
             button.dataset.mainPanel = name;
             button.addEventListener('click', function () {

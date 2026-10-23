@@ -2407,7 +2407,7 @@ export function createGame(root, saveBridge = null) {
     on(pauseButton, "click", pause);
     on(endlessButton, "click", () => {
         if (saving || checkingUnlock || setupAction || state.status === "choosing" || !(endlessUnlocked || state.campaignComplete === 1)) return;
-        openSetup(state.status === "won" ? "continue" : "endless");
+        showRestartModeChooser();
     });
     on(launchEndless, "click", () => endlessButton.click());
     on(root.querySelector("[data-slot-unlocked]"), "click", () => openSkills.click());

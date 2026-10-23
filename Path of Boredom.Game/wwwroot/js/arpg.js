@@ -2067,14 +2067,34 @@ export function createGame(root, saveBridge = null) {
         hudOne("[data-open-forge]").disabled = forgeButton.disabled;
         text("forge-hint", completedForge ? `Stat training from ${cheapestTraining.toLocaleString()} gold.` : "Forge upgrade available!");
         masteryPanel.hidden = !completedForge;
+
         for (const button of masteryButtons) {
             const key = button.dataset.masteryStat;
             const cost = masteryCost(state, key);
-            setText(button.querySelector("[data-mastery-label]"), `Rank ${state.mastery[key]} / ${cost.toLocaleString()} gold`);
-            button.disabled = saving || !canForge || !completedForge || state.gold < cost || !Number.isFinite(cost);
-            button.title = MASTERY[key].detail;
-            if (canForge && completedForge) showUpgradePreview(button, key, true);
+            const preview = upgradePreview(state, key, true);
+            const capped = preview.capped;
+
+            setText(
+                button.querySelector("[data-mastery-label]"),
+                capped ? "CAPPED" : `Rank ${state.mastery[key]} / ${cost.toLocaleString()} gold`
+            );
+
+            button.disabled = saving
+                || !canForge
+                || !completedForge
+                || capped
+                || state.gold < cost
+                || !Number.isFinite(cost);
+
+            button.title = capped
+                ? `${MASTERY[key].detail} — Maximum effective value reached.`
+                : MASTERY[key].detail;
+
+            if (canForge && completedForge) {
+                showUpgradePreview(button, key, true);
+            }
         }
+
         if (choosing !== draftVisible) {
             draftVisible = choosing;
             if (choosing) {
@@ -2392,7 +2412,9 @@ export function createGame(root, saveBridge = null) {
         updateHud();
     });
     for (const button of masteryButtons) on(button, "click", () => {
-        if (saving || setupAction || !buyMastery(state, button.dataset.masteryStat)) return;
+        const key = button.dataset.masteryStat;
+        if (saving || setupAction || upgradePreview(state, key, true).capped || !buyMastery(state, key)) return;
+        
         forgeFeedback.textContent = state.journal;
         saveStatus.textContent = "Stat trained. Save to keep your progress.";
         updateHud();

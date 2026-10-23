@@ -1394,23 +1394,6 @@ export function createGame(root, saveBridge = null) {
     const mainPlayMenu = root.querySelector("[data-main-play-menu]");
 
     if (mainPlay && mainPlayMenu && mainMenu) {
-        // Add the modal heading and close button once.
-        if (!mainPlayMenu.querySelector(".play-modal-close")) {
-            const title = document.createElement("h2");
-            title.className = "play-modal-title";
-            title.textContent = "Choose Your Game";
-
-            const close = document.createElement("button");
-            close.type = "button";
-            close.className = "play-modal-close";
-            close.setAttribute("aria-label", "Close Play menu");
-            close.textContent = "×";
-
-            mainPlayMenu.prepend(title);
-            mainPlayMenu.prepend(close);
-
-            close.addEventListener("click", closePlayMenu);
-        }
 
         function closePlayMenu() {
             mainPlayMenu.hidden = true;

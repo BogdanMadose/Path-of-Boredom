@@ -1,13 +1,12 @@
-using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Security.Claims;
-using System.Text;
-using System.Text.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Path_of_Boredom.Game;
 using Path_of_Boredom.ServiceDefaults;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
 
 namespace Path_of_Boredom.Web;
 
@@ -222,8 +221,10 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
         expectedRevision = observedRevision = receipt.Revision;
         observedSave = JsonSerializer.SerializeToElement(new
         {
-            version = snapshot.GetProperty("version"), state = snapshot.GetProperty("state"),
-            endlessUnlocked = receipt.EndlessUnlocked, revision = receipt.Revision
+            version = snapshot.GetProperty("version"),
+            state = snapshot.GetProperty("state"),
+            endlessUnlocked = receipt.EndlessUnlocked,
+            revision = receipt.Revision
         });
         return new(true, "Run saved to your Google account. Continue on any device.", EndlessUnlocked: receipt.EndlessUnlocked);
     }

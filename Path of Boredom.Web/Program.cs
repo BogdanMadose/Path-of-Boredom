@@ -1,11 +1,11 @@
-using Path_of_Boredom.Web;
-using Path_of_Boredom.Web.Components;
-using System.Security.Claims;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.WebUtilities;
+using Path_of_Boredom.Web;
+using Path_of_Boredom.Web.Components;
+using System.Security.Claims;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -56,7 +56,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
             // offline + consent so Google issues a refresh token and the ID token can be renewed.
             var uri = QueryHelpers.AddQueryString(context.RedirectUri, new Dictionary<string, string?>
             {
-                ["access_type"] = "offline", ["prompt"] = "select_account consent"
+                ["access_type"] = "offline",
+                ["prompt"] = "select_account consent"
             });
             context.Response.Redirect(uri);
             return Task.CompletedTask;

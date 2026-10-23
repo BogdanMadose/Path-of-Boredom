@@ -1,9 +1,9 @@
+using Path_of_Boredom.Game;
+using Path_of_Boredom.ServiceDefaults;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Path_of_Boredom.Game;
-using Path_of_Boredom.ServiceDefaults;
 
 namespace Path_of_Boredom.Maui;
 
@@ -417,8 +417,10 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         // Refresh the display copy without changing its bounded state.
         observedSave = JsonSerializer.SerializeToElement(new
         {
-            version = snapshot.GetProperty("version"), state = snapshot.GetProperty("state"),
-            endlessUnlocked = receipt.EndlessUnlocked, revision = receipt.Revision
+            version = snapshot.GetProperty("version"),
+            state = snapshot.GetProperty("state"),
+            endlessUnlocked = receipt.EndlessUnlocked,
+            revision = receipt.Revision
         });
         return new(true, "Device save uploaded. Future saves sync until sign-out, expiry or a revision conflict.", EndlessUnlocked: receipt.EndlessUnlocked);
     }

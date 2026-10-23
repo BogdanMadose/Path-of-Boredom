@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Path_of_Boredom.ServiceDefaults;
+using System.Security.Claims;
 
 namespace Path_of_Boredom.ApiService;
 

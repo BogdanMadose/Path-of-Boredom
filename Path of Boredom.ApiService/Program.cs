@@ -1,10 +1,8 @@
-using Path_of_Boredom.ApiService;
-using Microsoft.AspNetCore.Authentication;
-using Path_of_Boredom.ServiceDefaults;
 using Google.Cloud.Firestore;
-using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Authentication;
+using Path_of_Boredom.ApiService;
 using System.Security.Claims;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 

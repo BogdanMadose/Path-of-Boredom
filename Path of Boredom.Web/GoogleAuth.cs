@@ -1,6 +1,6 @@
+using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Options;
 
 namespace Path_of_Boredom.Web;
 

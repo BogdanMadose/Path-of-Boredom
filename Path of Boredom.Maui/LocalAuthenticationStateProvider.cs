@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
+using System.Security.Claims;
 
 namespace Path_of_Boredom.Maui;
 

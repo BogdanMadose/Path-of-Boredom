@@ -1,7 +1,7 @@
-using System.Text;
-using System.Text.Json;
 using Path_of_Boredom.Game;
 using Path_of_Boredom.ServiceDefaults;
+using System.Text;
+using System.Text.Json;
 
 namespace Path_of_Boredom.Maui;
 

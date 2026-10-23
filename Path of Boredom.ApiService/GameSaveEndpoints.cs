@@ -97,8 +97,13 @@ public static class GameSaveEndpoints
             catch (JsonException exception)
             {
                 app.Logger.LogWarning(exception, "Save request JSON parsing failed. Bytes: {Bytes}; reference: {Reference}", length, context.TraceIdentifier);
-                return Results.BadRequest(new { code = "InvalidSaveJson",
-                    message = "Invalid save request JSON.", supportedVersion = CurrentSaveVersion, reference = context.TraceIdentifier });
+                return Results.BadRequest(new
+                {
+                    code = "InvalidSaveJson",
+                    message = "Invalid save request JSON.",
+                    supportedVersion = CurrentSaveVersion,
+                    reference = context.TraceIdentifier
+                });
             }
 
             using (document)
@@ -110,19 +115,31 @@ public static class GameSaveEndpoints
                 if (root.ValueKind != JsonValueKind.Object
                     || !root.TryGetProperty("version", out var version) || version.ValueKind != JsonValueKind.Number
                     || !version.TryGetInt32(out var number))
-                    return Results.BadRequest(new { code = "InvalidSaveEnvelope",
-                        message = "The save version is missing or invalid.", supportedVersion = CurrentSaveVersion });
+                    return Results.BadRequest(new
+                    {
+                        code = "InvalidSaveEnvelope",
+                        message = "The save version is missing or invalid.",
+                        supportedVersion = CurrentSaveVersion
+                    });
                 // A version above CurrentSaveVersion means the client is newer than this API build
                 // (deploy drift — see the README's deployment notes); below 1 is simply invalid.
                 if (number is < 1 or > CurrentSaveVersion)
-                    return Results.BadRequest(new { code = "UnsupportedSaveVersion",
-                        message = "This API does not support the submitted save format.", supportedVersion = CurrentSaveVersion });
+                    return Results.BadRequest(new
+                    {
+                        code = "UnsupportedSaveVersion",
+                        message = "This API does not support the submitted save format.",
+                        supportedVersion = CurrentSaveVersion
+                    });
                 // The actual deep validation wall — see IsValidState below. Anything that fails here is
                 // either a genuine client bug, a tampered request, or (most commonly during development)
                 // this validation logic falling out of sync with a client-side game state change.
                 if (!root.TryGetProperty("state", out var state) || !IsValidState(state, number))
-                    return Results.BadRequest(new { code = "InvalidSaveState",
-                        message = "The submitted run failed save validation.", supportedVersion = CurrentSaveVersion });
+                    return Results.BadRequest(new
+                    {
+                        code = "InvalidSaveState",
+                        message = "The submitted run failed save validation.",
+                        supportedVersion = CurrentSaveVersion
+                    });
 
                 try
                 {
@@ -224,8 +241,8 @@ public static class GameSaveEndpoints
         // the projectiles they fired (see ValidEnemyCombat below) — v14 feature, defaults to a
         // harmless placeholder for earlier saves that don't have the concept at all.
         long volleySequence = 2;
-        if (version >= 14 && (!Numbers(state, "volleySequence") 
-            || !state.GetProperty("volleySequence").TryGetInt64(out volleySequence) 
+        if (version >= 14 && (!Numbers(state, "volleySequence")
+            || !state.GetProperty("volleySequence").TryGetInt64(out volleySequence)
             || volleySequence < 2)) return false;
         // rankingPatch tags which patch produced this save/run, feeding the "pre004 vs 004" split
         // on the rankings leaderboard (see RankingRules.PatchName).
@@ -525,7 +542,7 @@ public static class GameSaveEndpoints
                 _ => nodes
             };
             if (!tree.TryGetProperty(skill, out var branch) || !Numbers(branch, branchKeys) || branch.EnumerateObject().Count() != branchKeys.Length) return false;
-            
+
             for (var index = 0; index < branchKeys.Length; index++)
             {
                 // Node 0 (the "root" of the branch) caps at rank 3; node 2 is a single-rank

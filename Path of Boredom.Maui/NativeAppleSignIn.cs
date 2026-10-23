@@ -1,5 +1,3 @@
-using System.Net.Http.Json;
-
 namespace Path_of_Boredom.Maui;
 
 /// <summary>

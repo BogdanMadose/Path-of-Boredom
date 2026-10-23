@@ -1,12 +1,11 @@
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Encodings.Web;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Encodings.Web;
 
 namespace Path_of_Boredom.ApiService;
 

@@ -1,5 +1,5 @@
-using System.Text.Json;
 using Path_of_Boredom.ServiceDefaults;
+using System.Text.Json;
 
 namespace Path_of_Boredom.Game;
 

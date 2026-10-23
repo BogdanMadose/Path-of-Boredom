@@ -13,12 +13,18 @@
         <div class="main-menu-card">
             <h1 id="main-menu-title">Path of Boredom</h1>
             <p>Your run stays paused while this menu is open. Save before closing the app.</p>
-            <button type="button" class="ember-button" data-main-resume>Continue run</button>
-            <button type="button" class="quiet-button" data-main-new>New campaign</button>
-            <button type="button" class="quiet-button" data-main-endless hidden>New Endless run</button>
-            <button type="button" class="quiet-button" data-main-load>Load saved run</button>
-            <button type="button" class="quiet-button" data-main-options>Sound &amp; options</button>
-            <button type="button" class="quiet-button" data-open-camp>Ember Camp</button>
+            <button type="button" class="ember-button" data-main-resume hidden>Continue</button>
+            <button type="button" class="quiet-button" data-main-play aria-expanded="false" aria-controls="main-play-menu">Play</button>
+
+            <div class="main-play-menu" id="main-play-menu" data-main-play-menu hidden>
+                <button type="button" class="quiet-button" data-main-new>Campaign</button>
+                <button type="button" class="quiet-button" data-main-endless hidden>Endless</button>
+                <button type="button" class="quiet-button" data-main-load>Load saved run</button>
+                <button type="button" class="quiet-button" data-close-play-menu>Back</button>
+            </div>
+
+            <button type="button" class="quiet-button" data-open-camp>Account Progression</button>
+            <button type="button" class="quiet-button" data-main-options>Options</button>
             <div data-main-menu-actions></div>
             <p data-main-status role="status"></p>
         </div>

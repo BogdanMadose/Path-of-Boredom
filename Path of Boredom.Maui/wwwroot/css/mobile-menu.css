@@ -79,7 +79,24 @@
     body.mobile-shell .main-menu-card .mm-save-status:empty { display: none; }
     body.mobile-shell .main-menu-card .mm-save-status { grid-column: 1 / -1; margin: 0; font-size: 11px; }
     body.mobile-shell .main-menu-card button { min-height: 40px; margin: 0; font-size: 13px; }
+    body.mobile-shell .main-play-menu {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 6px;
+        padding: 8px;
+        border: 1px solid #c7a56b44;
+        border-radius: 10px;
+        background: #0b1519;
+    }
 
+    body.mobile-shell .main-play-menu[hidden] {
+        display: none !important;
+    }
+
+    body.mobile-shell .main-play-menu button {
+        width: 100%;
+    }
     body.mobile-shell .mm-tab {
         flex: 1;
         display: flex;

@@ -610,16 +610,6 @@
         addSaveActions(root.querySelector("[data-run-menu]"), root);
         var mainCard = root.querySelector('[data-main-menu-actions]');
         addSaveActions(mainCard, root);
-        ['rankings'].forEach(function (name) {
-            var button = el('button', 'mm-pause-option', 'Rankings');
-            button.type = 'button';
-            button.dataset.mainPanel = name;
-            button.addEventListener('click', function () {
-                root.dispatchEvent(new CustomEvent('open-main-panel', { detail: { panel: name } }));
-                openPanel(name);
-            });
-            mainCard.appendChild(button);
-        });
         buildBar();
         Array.prototype.forEach.call(root.querySelectorAll(".skill-bar [data-skill]"), function (button) {
             var art = button.dataset.skillIcon || treeArt(root.querySelector('[data-tree-skill="' + button.dataset.skill + '"]'));

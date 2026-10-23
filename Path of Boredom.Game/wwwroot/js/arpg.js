@@ -1389,6 +1389,27 @@ export function createGame(root, saveBridge = null) {
         root.dispatchEvent(new CustomEvent("main-menu-open"));
         showMainMenu(true);
     });
+       
+    const mainPlay = root.querySelector("[data-main-play]");
+    const mainPlayMenu = root.querySelector("[data-main-play-menu]");
+
+    on(mainPlay, "click", () => {
+        const open = mainPlayMenu.hidden;
+
+        mainPlayMenu.hidden = !open;
+        mainPlay.setAttribute("aria-expanded", String(open));
+
+        if (open) {
+            root.querySelector("[data-main-new]").focus({ preventScroll: true });
+        }
+    });
+
+    on(root.querySelector("[data-close-play-menu]"), "click", () => {
+        mainPlayMenu.hidden = true;
+        mainPlay.setAttribute("aria-expanded", "false");
+        mainPlay.focus({ preventScroll: true });
+    });
+    
     on(root.querySelector("[data-main-resume]"), "click", () => { showMainMenu(false); if (state.status === "paused") begin(); });
     on(root.querySelector("[data-main-new]"), "click", async () => {
         if (state.status !== "ready" && !await gameConfirm("Start a new campaign? Unsaved progress in the current run will be replaced.")) return;
@@ -2414,7 +2435,7 @@ export function createGame(root, saveBridge = null) {
     for (const button of masteryButtons) on(button, "click", () => {
         const key = button.dataset.masteryStat;
         if (saving || setupAction || upgradePreview(state, key, true).capped || !buyMastery(state, key)) return;
-        
+
         forgeFeedback.textContent = state.journal;
         saveStatus.textContent = "Stat trained. Save to keep your progress.";
         updateHud();

@@ -2205,19 +2205,39 @@ export function createGame(root, saveBridge = null) {
     // Adds/updates the small "+X damage" style preview label shown on a forge/mastery button so
     // players can see the concrete effect of their next purchase before spending gold; also flags
     // buttons whose underlying stat has hit its display cap (e.g. skillReach's per-skill maximums).
+
     function showUpgradePreview(button, key, mastery = false) {
         const preview = upgradePreview(state, key, mastery);
         let label = button.querySelector("[data-upgrade-preview]");
+
         if (!label) {
             label = document.createElement("span");
             label.dataset.upgradePreview = "";
             label.className = "upgrade-preview";
             button.append(label);
         }
-        if (label.textContent !== preview.text) label.textContent = preview.text;
+
+        if (label.textContent !== preview.text) {
+            label.textContent = preview.text;
+        }
+
         button.classList.toggle("at-stat-cap", preview.capped);
-        button.title += ` ${preview.text}`;
+
+        // Preserve the original tooltip instead of appending duplicate preview text.
+        if (!button.dataset.baseTitle) {
+            button.dataset.baseTitle = button.title;
+        }
+
+        const title = button.dataset.baseTitle;
+        const nextTitle = preview.text
+            ? `${title}${title ? " — " : ""}${preview.text}`
+            : title;
+
+        if (button.title !== nextTitle) {
+            button.title = nextTitle;
+        }
     }
+
     // Toggles pause via the engine, syncing input state and focus. Guarded against firing while a
     // save is in flight or the setup dialog is open, since pausing mid-save or mid-dialog would be confusing.
     function pause() {

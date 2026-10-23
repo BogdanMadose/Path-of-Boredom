@@ -515,12 +515,19 @@
             var text = saveStatus?.textContent || "Offline play · saves stay on this device.";
             if (status.textContent !== text) status.textContent = text;
         });
+
         var summary = root.querySelector("[data-summary-text]");
         Array.prototype.forEach.call(root.querySelectorAll("[data-mobile-run-summary]"), function (status) {
-            var text = summary?.textContent || "";
+            var raw = summary?.textContent || "";
+            var match = raw.match(/^Run so far:\s*(\d+m(?:\s+\d+s)?)\s*·\s*(\d+)\s+stages cleared\s*·\s*([\d,]+)\s+kills/);
+            var text = match
+                ? `${match[1]} · ${match[2]} stages · ${match[3]} kills`
+                : raw.split(". Damage dealt:")[0];
+
             if (status.textContent !== text) status.textContent = text;
             status.hidden = !text;
         });
+
         var resume = root.querySelector(".mm-resume");
         if (resume) resume.disabled = root.dataset.saveBusy === "on";
         var lore = root.querySelector('[data-mobile-lore]');

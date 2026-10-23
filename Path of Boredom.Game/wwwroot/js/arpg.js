@@ -949,6 +949,14 @@ function drawCountdown(ctx, state, mobile = false) {
 // returns without blocking — the actual gameplay happens later via the requestAnimationFrame loop
 // defined further down in this function.
 export function createGame(root, saveBridge = null) {
+    console.log("=== RUN SUMMARY DOM DIAGNOSTIC ===");
+    console.log("Game root:", root);
+    console.log("Root connected:", root.isConnected);
+    console.log("Summary inside root:", !!root.querySelector("[data-run-summary]"));
+    console.log("Overview inside root:", !!root.querySelector("[data-summary-overview]"));
+    console.log("Damage inside root:", !!root.querySelector("[data-summary-damage]"));
+    console.log("Summary in document:", !!document.querySelector("[data-run-summary]"));
+    console.log("==================================");
     const loadingReadyAt = performance.now() + 2500;
     const canvas = root.querySelector("canvas");
     const releaseRankings = root.dataset.rankingBoard === "release";

@@ -332,12 +332,20 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .death-report ol { max-height: 160px; overflow-y: auto; overscroll-behavior: contain; padding-left: 24px; font-size: 12px; line-height: 1.7; }
 .death-report li { margin-bottom: 6px; overflow-wrap: anywhere; }
 .death-report .fatal-hit { color: #ffad97; font-weight: 700; }
+.death-report.run-summary {
+    min-height: 150px;
+}
 .run-summary {
     min-width: 0;
 }
 
+.run-summary-overview{
+    padding-bottom: 6px;
+}
+
 .run-summary h4 {
-    margin: 10px 0 6px;
+    margin-bottom: 5px;
+    margin-top: 0;
     color: #edc581;
     font-size: 12px;
     letter-spacing: 0.5px;
@@ -360,7 +368,7 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
     background: #101b20;
     color: #e5dfd3;
     font-size: 11px;
-    line-height: 1.4;
+    line-height: 1.5;
 }
 
 .run-summary-damage li {

@@ -2022,9 +2022,9 @@ export function createGame(root, saveBridge = null) {
 
         if (summaryElement && overviewList && damageList) {
             overviewList.replaceChildren(
-                ...summary.overview.map(item => {
+                ...summary.overview.map((item, index) => {
                     const li = document.createElement("li");
-                    li.textContent = item;
+                    li.textContent = (index > 0 ? "\u00B7 " : "") + item.replace(/\d{4,}/g, value => Number(value).toLocaleString("en-US"))
                     return li;
                 })
             );
@@ -2034,7 +2034,7 @@ export function createGame(root, saveBridge = null) {
             if (summary.damage.length > 0) {
                 for (const item of summary.damage) {
                     const li = document.createElement("li");
-                    li.textContent = `${item.name}: ${item.value}`;
+                    li.textContent = `${item.name}: ${Number(item.value).toLocaleString("en-US")}`;
                     damageList.append(li);
                 }
             } else {

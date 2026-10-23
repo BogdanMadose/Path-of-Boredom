@@ -20,7 +20,6 @@ export const hasRelic = (state, key) => Array.isArray(state.runRelics) && state.
 
 // Rolls a relic drop for a kill. Returns the relic key granted (and marks it active), or null.
 export function rollRelic(state, enemy) {
-    if (state.training) return null;
     const odds = enemy.kind === "boss" ? RELIC_ODDS.boss : enemy.elite ? RELIC_ODDS.elite : RELIC_ODDS.normal;
     if (state.random() >= odds) return null;
     state.runRelics ??= [];

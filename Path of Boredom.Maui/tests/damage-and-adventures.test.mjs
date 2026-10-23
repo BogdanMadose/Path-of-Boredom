@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { startRun, startTraining, startEndlessRun, step, useSkill, armorRating, resistanceRating, weaponDamage } from '../../Path of Boredom.Game/wwwroot/js/arpg-engine.js';
+import { startRun, startEndlessRun, step, useSkill, armorRating, resistanceRating, weaponDamage } from '../../Path of Boredom.Game/wwwroot/js/arpg-engine.js';
 import { enemyDamageType, hazardDamageType, skillDamageType, mitigateDamage, incomingDamageType } from '../../Path of Boredom.Game/wwwroot/js/arpg-damage.js';
 import { awardBossRelic, resolveStageEvent, discoverChapter, buildSynergy } from '../../Path of Boredom.Game/wwwroot/js/arpg-adventures.js';
 import { captureSnapshot, restoreSnapshot } from '../../Path of Boredom.Game/wwwroot/js/arpg-save.js';
@@ -34,7 +34,6 @@ for (const version of [18, 19]) {
     assert.deepEqual(restored.adventures.relics, [0,0,0,0,0,0]);
 }
 const invalid = structuredClone(saved); invalid.state.adventures.relics[0] = 2; assert.throws(() => restoreSnapshot(invalid));
-const practice = startTraining(() => 0.99, 'hard', 'sorcerer'); awardBossRelic(practice); assert.equal(practice.adventures.relics.reduce((a,b)=>a+b), 0);
 for (const type of ['[PHY]', '[MAG]']) {
     const run = startRun(() => 0.99, 'hard', 'sorcerer'); run.resumeDelay = 0;
     run.upgrades.armor = 5; run.player.maxHealth = run.player.health = 1000;

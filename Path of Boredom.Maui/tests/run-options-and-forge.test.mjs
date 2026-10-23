@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import http from 'node:http';
 import { dumpBrowserDom } from './browser-dom.mjs';
-import { startRun, startEndlessRun, startTraining, step, useSkill, buyUpgrade, forgeSkillSelected, forgeComplete, skillReach, upgradeCost } from '../../Path of Boredom.Game/wwwroot/js/arpg-engine.js';
+import { startRun, startEndlessRun, step, useSkill, buyUpgrade, forgeSkillSelected, forgeComplete, skillReach, upgradeCost } from '../../Path of Boredom.Game/wwwroot/js/arpg-engine.js';
 import { NEW_SKILLS, skillName } from '../../Path of Boredom.Game/wwwroot/js/arpg-skills.js';
 import { UPGRADES } from '../../Path of Boredom.Game/wwwroot/js/arpg-campaign.js';
 import { levelCardAvailable } from '../../Path of Boredom.Game/wwwroot/js/arpg-cards.js';
@@ -96,8 +96,6 @@ const invalid = structuredClone(current);
 invalid.state.upgrades.chain = 9;
 assert.throws(() => restoreSnapshot(invalid));
 
-const practice = startTraining(() => 0.99);
-assert.throws(() => captureSnapshot(practice), 'training cannot be saved');
 const options = startRun(() => 0.99);
 options.status = 'paused';
 assert.equal(setEquipmentStyle(options, 'weapon', 'heavy'), true);
@@ -110,18 +108,16 @@ assert.equal(restoreSnapshot(captureSnapshot(options)).runSystems.equipment.weap
 
 const script = fs.readFileSync(new URL('../wwwroot/js/mobile-menu.js', import.meta.url), 'utf8');
 const sync = script.slice(script.indexOf('    function syncBadges('), script.indexOf('    // ---- Init'));
-const save = { textContent: 'Device save ready' }, summary = { textContent: 'Training session: damage 123' };
-const originalTraining = { hidden: true, disabled: false }, originalExit = { hidden: false, disabled: false };
-const proxies = ['training', 'exit-training'].map(action => ({ dataset: { practiceProxy: action } }));
+const save = { textContent: 'Device save ready' }, summary = { textContent: 'Run so far: damage 123' };
 const status = { textContent: '' }, mirroredSummary = { textContent: '', hasAttribute: name => name === 'data-mobile-run-summary' };
 status.hasAttribute = () => false;
 const sourceRoot = {
     isConnected: true, dataset: { gameStatus: 'paused', saveBusy: 'off' },
     querySelector(selector) {
-        return ({ '[data-training]': originalTraining, '[data-exit-training]': originalExit, '[data-save-status]': save, '[data-summary-text]': summary })[selector] ?? null;
+        return ({ '[data-save-status]': save, '[data-summary-text]': summary })[selector] ?? null;
     },
     querySelectorAll(selector) {
-        return ({ '[data-practice-proxy]': proxies, '.mm-save-status': [status, mirroredSummary], '[data-mobile-run-summary]': [mirroredSummary] })[selector] ?? [];
+        return ({ '.mm-save-status': [status, mirroredSummary], '[data-mobile-run-summary]': [mirroredSummary] })[selector] ?? [];
     }
 };
 const tabs = [{ click() {} }, {}], badge = {};
@@ -135,27 +131,17 @@ const context = vm.createContext({
 });
 vm.runInContext(sync, context);
 context.syncBadges();
-assert.equal(proxies[0].hidden, true);
-assert.equal(proxies[1].hidden, false);
-assert.equal(proxies[1].disabled, false);
 assert.equal(status.textContent, save.textContent);
 assert.equal(mirroredSummary.textContent, summary.textContent, 'save status must never overwrite the run summary');
-sourceRoot.dataset.saveBusy = 'on';
-context.syncBadges();
-assert.equal(proxies[1].disabled, true);
-originalTraining.hidden = false; originalExit.hidden = true;
 summary.textContent = 'Run so far: 5 stages';
-sourceRoot.dataset.saveBusy = 'off';
 context.syncBadges();
-assert.equal(proxies[0].hidden, false);
-assert.equal(proxies[1].hidden, true);
 assert.equal(mirroredSummary.textContent, summary.textContent);
 
 const css = fs.readFileSync(new URL('../wwwroot/css/mobile-menu.css', import.meta.url), 'utf8');
 assert.match(css, /forge-panel \.mm-subtabs \{ grid-template-columns: repeat\(3,/);
 assert.match(css, /forge-panel:not\(\[data-mobile-section="systems"\]\) > \.equipment-options \{ display: none;/);
 assert.match(css, /\.mm-panel \.run-options,[^}]*min-height: 0;[^}]*overflow-y: auto;/);
-console.log('PASS: selected-skill Forge/card availability, real combat bonuses, previews, scrolls, mastery gating, v16/v17 migration, training save isolation and synchronized mobile Pause options');
+console.log('PASS: selected-skill Forge/card availability, real combat bonuses, previews, scrolls, mastery gating, v16/v17 migration and synchronized mobile Pause options');
 
 const edge = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
 if (fs.existsSync(edge)) {
@@ -182,31 +168,15 @@ if (fs.existsSync(edge)) {
                 panel.classList.add('mm-open'); forgePanel.classList.remove('mm-open');
                 check(!panel.querySelector('[data-equipment-style]') && !panel.querySelector('[data-challenge-choice]'), 'options must be separate from equipment and challenges');
                 check(options.clientHeight > 0 && getComputedStyle(options).overflowY === 'auto', 'Run options must have a usable scrolling container');
-                for (const section of ['sound', 'controls', 'training', 'codex']) {
+                for (const section of ['sound', 'controls', 'codex']) {
                     panel.dataset.mobileSection = section;
                     if (width > height && height >= 360) check(options.scrollHeight <= options.clientHeight + 1, 'landscape options tab must fit without scrolling: ' + section + ' ' + width + 'x' + height + ' @' + scale + ' (' + options.scrollHeight + '>' + options.clientHeight + ')');
                 }
-                panel.dataset.mobileSection = 'training';
+                panel.dataset.mobileSection = 'controls';
                 const bounds = options.getBoundingClientRect();
                 check(bounds.bottom <= panel.getBoundingClientRect().bottom && bounds.top >= 58, 'Run options must fit below the header');
                 for (const select of options.querySelectorAll('select')) check(select.getBoundingClientRect().right <= bounds.right + 1, 'select must not overflow');
-                options.scrollTop = options.scrollHeight;
-                check(!options.querySelector('[data-training]'), 'training must start only from main menu');
-                const picker = options.querySelector('[data-training-picker]');
-                picker.hidden = false;
-                options.querySelector('[data-exit-training]').hidden = false;
-                check(!picker.querySelector('select'), 'practice abilities must not open a native dropdown');
-                check(picker.querySelectorAll('[data-training-skill]').length === 9, 'all nine abilities available inline');
-                for (const button of picker.querySelectorAll('[data-training-skill]')) {
-                    const rect = button.getBoundingClientRect();
-                    check(rect.width > 0 && rect.left >= bounds.left && rect.right <= bounds.right + 1, 'practice buttons fit within Run options');
-                }
-                options.scrollTop += options.querySelector('[data-exit-training]').getBoundingClientRect().top - options.getBoundingClientRect().top;
-                const exit = options.querySelector('[data-exit-training]').getBoundingClientRect();
-                check(exit.top >= bounds.top - 1 && exit.bottom <= bounds.bottom + 1, 'exit training must be reachable');
-                check(panel.getBoundingClientRect().height === height, 'training setup must not expand the panel');
-                picker.hidden = true;
-                options.querySelector('[data-exit-training]').hidden = true;
+                check(panel.getBoundingClientRect().height === height, 'Run options must not expand the panel');
                 options.scrollTop = 0;
                 panel.classList.remove('mm-open'); forgePanel.classList.add('mm-open');
                 forgePanel.style.width = width + 'px'; forgePanel.style.height = height + 'px';

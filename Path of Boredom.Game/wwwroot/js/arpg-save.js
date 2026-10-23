@@ -344,7 +344,6 @@ export function restoreSnapshot(snapshot, random = Math.random) {
 // the server would reject anyway. Also enforces the same 64KB payload cap the API enforces, so an
 // oversized save is caught client-side with time to react rather than failing after a network round trip.
 export function captureSnapshot(state) {
-    require(!state.training);
     require(["playing", "paused", "camp", "won", "choosing"].includes(state.status));
     const restored = restoreSnapshot({ version: 20, state: {
         skillSchedule: state.skillSchedule,

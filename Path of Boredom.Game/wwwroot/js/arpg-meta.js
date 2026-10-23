@@ -172,7 +172,7 @@ export const rerollsPerRun = () => loadProfile().camp.reroll;
 const codexSeen = new WeakMap();
 export function recordRelics(state) {
     const relics = state?.runRelics;
-    if (!Array.isArray(relics) || state.training) return [];
+    if (!Array.isArray(relics)) return [];
     const seen = codexSeen.get(state) ?? new Set();
     codexSeen.set(state, seen);
     const fresh = [];
@@ -194,7 +194,7 @@ const credited = new WeakMap();
 // Call every HUD update. Credits new kills/stages as Embers + class mastery XP, records campaign
 // victories and unlocks classes. Returns a summary of anything newly earned, or null.
 export function creditProgress(state) {
-    if (!state || state.training || !["playing", "paused", "camp", "won", "dead", "choosing"].includes(state.status)) return null;
+    if (!state || !["playing", "paused", "camp", "won", "dead", "choosing"].includes(state.status)) return null;
     const stages = state.runSystems?.summary?.stages ?? 0;
     const seen = credited.get(state);
     if (!seen) { credited.set(state, { kills: state.kills, stages, won: state.status === "won" }); return null; }

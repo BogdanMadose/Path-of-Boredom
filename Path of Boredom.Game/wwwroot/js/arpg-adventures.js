@@ -22,11 +22,11 @@ export const eventReward = (state, event = stageEvent(state)) => (event.reward ?
 export const eventDetail = (state, event = stageEvent(state)) => event.detail.replace('{gold}', eventReward(state, event));
 export const newAdventures = () => ({ relics: [0, 0, 0, 0, 0, 0], chapters: [0, 0, 0, 0, 0, 0], eventStage: -1 });
 export function discoverChapter(state) {
-    if (state.training || state.mode !== 'campaign' || state.wave < 1) return;
+    if (state.mode !== 'campaign' || state.wave < 1) return;
     state.adventures.chapters[mapIndexForWave(state.wave)] = 1;
 }
 export const stageEvent = state => STAGE_EVENTS[Math.floor(state.wave / 5) % STAGE_EVENTS.length];
-export const eventAvailable = state => !state.training && ['paused', 'camp', 'won'].includes(state.status)
+export const eventAvailable = state => ['paused', 'camp', 'won'].includes(state.status)
     && state.wave % 5 === 0 && state.enemies.length === 0 && state.adventures.eventStage !== Math.floor(state.wave / 5);
 export function resolveStageEvent(state, accept, healing = 1, maxFlasks = 5, gainXp = null) {
     if (!eventAvailable(state)) return false;
@@ -49,7 +49,6 @@ export function resolveStageEvent(state, accept, healing = 1, maxFlasks = 5, gai
     return true;
 }
 export function awardBossRelic(state) {
-    if (state.training) return;
     const index = mapIndexForWave(state.wave);
     if (!state.adventures.relics[index]) {
         state.adventures.relics[index] = 1;
@@ -80,6 +79,6 @@ export function checkpointReport(state) {
     const result = challenge.key === 'none' || challenge.stage !== Math.ceil(state.wave / 5) ? 'No challenge selected.'
         : challenge.resolved ? `${challenge.key}: ${success ? `completed (+${challengeReward(challenge)} gold)` : 'failed (no penalty)'}.` : `${challenge.key}: not yet resolved.`;
     const event = stageEvent(state);
-    return `${MAPS[index].boss} defeated. Relic: ${state.adventures.relics[index] ? `${BOSS_RELICS[index].name} — ${BOSS_RELICS[index].detail}` : 'none earned in practice' } Challenge: ${result} Event: ${event.name} — ${event.detail} ${eventAvailable(state) ? 'Available now; accept or skip in Stage encounter.' : 'Already resolved or unavailable.'}`;
+    return `${MAPS[index].boss} defeated. Relic: ${state.adventures.relics[index] ? `${BOSS_RELICS[index].name} — ${BOSS_RELICS[index].detail}` : 'none earned' } Challenge: ${result} Event: ${event.name} — ${event.detail} ${eventAvailable(state) ? 'Available now; accept or skip in Stage encounter.' : 'Already resolved or unavailable.'}`;
 }
 export const codexEntries = state => MAPS.map((map, index) => ({ map, index })).filter(({ index }) => state.adventures.chapters[index]);

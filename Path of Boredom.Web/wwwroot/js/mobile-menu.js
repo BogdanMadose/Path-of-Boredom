@@ -262,10 +262,10 @@
 
     // Run options split into tabs so each section fits a landscape phone screen without scrolling.
     function buildOptions(source) {
-        var panel = makePanel("options", "Run options — sound & practice", source);
+        var panel = makePanel("options", "Run options — sound & controls", source);
         var tabs = el("div", "mm-subtabs");
-        var sections = ["sound", "controls", "training", "codex"];
-        ["Sound", "Controls", "Training", "Codex"].forEach(function (name, index) {
+        var sections = ["sound", "controls", "codex"];
+        ["Sound", "Controls", "Codex"].forEach(function (name, index) {
             var button = el("button", "mm-subtab", name);
             button.type = "button";
             button.setAttribute("aria-selected", String(index === 0));
@@ -278,7 +278,7 @@
     }
 
     function selectOptionsSection(source, section) {
-        var sections = ["sound", "controls", "training", "codex"];
+        var sections = ["sound", "controls", "codex"];
         source.dataset.mobileSection = section;
         Array.prototype.forEach.call(source.querySelector(".mm-subtabs").children, function (tab, index) {
             tab.setAttribute("aria-selected", String(sections[index] === section));
@@ -395,20 +395,17 @@
         card.appendChild(groups);
         side.appendChild(el("div", "mm-pause-emblem"));
         var heading = el("h2", null, "The hollow can wait.");
-        heading.dataset.practiceHeading = "";
         side.appendChild(heading);
         var explanation = el("p", null, "Combat and game timers are paused.");
-        explanation.dataset.practiceExplanation = "";
         side.appendChild(explanation);
         var resume = el("button", "mm-resume", "Return to battle");
-        resume.dataset.practiceResume = "";
         resume.type = "button";
         resume.addEventListener("click", function () {
             resumeAfterMenu = true;
             closePanel(true);
         });
         side.appendChild(resume);
-        var labels = { skills: "Skills & loadout", forge: "Forge & equipment", options: "Run options — sound & practice", challenges: "Stage challenges — bonus gold", rankings: "Rankings", notes: "Patch notes - Coming soon" };
+        var labels = { skills: "Skills & loadout", forge: "Forge & equipment", options: "Run options — sound & controls", challenges: "Stage challenges — bonus gold", rankings: "Rankings", notes: "Patch notes - Coming soon" };
         [{ title: "Character", names: ["skills", "forge", "challenges", "options"] }, { title: "Community", names: ["rankings"] }].forEach(function (group) {
             var section = el("section", "mm-menu-group");
             section.appendChild(el("h3", null, group.title));
@@ -436,17 +433,6 @@
             original.click();
         });
         community.appendChild(lore);
-        ["exit-training"].forEach(function (action) {
-            var button = el("button", "mm-pause-option", action === "training" ? "Set up practice — keeps your run" : "Exit training — return to my run");
-            button.type = "button";
-            button.dataset.practiceProxy = action;
-            button.addEventListener("click", function () {
-                var original = root.querySelector("[data-" + action + "]");
-                if (!original || original.disabled || original.hidden) return;
-                original.click();
-            });
-            side.appendChild(button);
-        });
         var summary = el("p", "mm-save-status mm-run-recap");
         summary.dataset.mobileRunSummary = "";
         side.appendChild(summary);
@@ -518,7 +504,7 @@
         Array.prototype.forEach.call(root.querySelectorAll("[data-mobile-save-action]"), function (button) {
             var original = root.querySelector('[data-action="' + button.dataset.mobileSaveAction + '"]');
             button.disabled = !original || original.disabled;
-            if (button.dataset.mobileSaveAction === 'save') button.hidden = !['playing', 'paused', 'camp', 'won'].includes(root.dataset.gameStatus) || root.dataset.training === 'on';
+            if (button.dataset.mobileSaveAction === 'save') button.hidden = !['playing', 'paused', 'camp', 'won'].includes(root.dataset.gameStatus);
             button.textContent = button.dataset.mobileSaveAction === "save"
                 ? root.dataset.cloudSignedIn === "on" ? "Save to cloud" : "Save on device"
                 : root.dataset.cloudSignedIn === "on" ? "Load cloud save" : "Load device save";
@@ -528,11 +514,6 @@
             if (status.hasAttribute("data-mobile-run-summary")) return;
             var text = saveStatus?.textContent || "Offline play · saves stay on this device.";
             if (status.textContent !== text) status.textContent = text;
-        });
-        Array.prototype.forEach.call(root.querySelectorAll("[data-practice-proxy]"), function (button) {
-            var original = root.querySelector("[data-" + button.dataset.practiceProxy + "]");
-            button.hidden = !original || original.hidden;
-            button.disabled = !original || original.disabled || root.dataset.saveBusy === "on";
         });
         var summary = root.querySelector("[data-summary-text]");
         Array.prototype.forEach.call(root.querySelectorAll("[data-mobile-run-summary]"), function (status) {
@@ -551,18 +532,9 @@
         Array.prototype.forEach.call(root.querySelectorAll('[data-main-panel]'), function (button) {
             var allowed = ['playing', 'paused', 'camp'].includes(root.dataset.gameStatus)
                 || button.dataset.mainPanel === 'rankings' && ['ready', 'dead', 'won'].includes(root.dataset.gameStatus);
-            button.hidden = button.dataset.mainPanel !== 'rankings' && (!['playing', 'paused', 'camp', 'won'].includes(root.dataset.gameStatus) || root.dataset.training === 'on');
+            button.hidden = button.dataset.mainPanel !== 'rankings' && !['playing', 'paused', 'camp', 'won'].includes(root.dataset.gameStatus);
             button.disabled = root.dataset.saveBusy === 'on' || !allowed;
         });
-        var practicing = root.dataset.training === "on";
-        var practiceHeading = root.querySelector("[data-practice-heading]");
-        var practiceExplanation = root.querySelector("[data-practice-explanation]");
-        var practiceResume = root.querySelector("[data-practice-resume]");
-        if (practiceHeading) practiceHeading.textContent = practicing ? "Training paused" : "The hollow can wait.";
-        if (practiceExplanation) practiceExplanation.textContent = practicing
-            ? "Your real run is paused and unchanged. Practice earns no XP, loot, saves, or rankings; fatal hits restore health. Use Run options to change your practice ability, or Exit training below to return to your run."
-            : "Combat and game timers are paused.";
-        if (practiceResume) practiceResume.textContent = practicing ? "Resume practice" : "Return to battle";
         Array.prototype.forEach.call(layer.querySelectorAll(".mm-tab"), function (tab) {
             tab.disabled = root.dataset.saveBusy === "on" || !["playing", "paused", "camp"].includes(root.dataset.gameStatus);
             if (tab.dataset.mmTab === 'pause') tab.hidden = root.dataset.mainMenu === 'on' || !['playing', 'paused', 'camp'].includes(root.dataset.gameStatus);
@@ -657,16 +629,6 @@
         root.addEventListener("main-menu-open", function () { closePanel(false); returnToMain = false; accountFromMain = false; });
         root.addEventListener('open-main-panel', function () { returnToMain = true; });
         root.addEventListener("open-run-options", function (event) { returnToMain = event.detail?.fromMain === true; openPanel("options"); });
-        root.addEventListener("training-menu", function (event) {
-            if (event.detail?.action === "setup") {
-                if (openName !== "options") openPanel("options");
-                selectOptionsSection(panels.options.root, "training");
-                root.querySelector("[data-start-training]")?.focus({ preventScroll: true });
-            } else if (event.detail?.action === "start" || event.detail?.action === "exit") {
-                closePanel(false);
-            }
-            syncBadges();
-        });
         root.addEventListener("mobile-save-result", function (event) {
             if (event.detail?.success && event.detail.loadingSave && openName) closePanel(false);
             syncBadges();

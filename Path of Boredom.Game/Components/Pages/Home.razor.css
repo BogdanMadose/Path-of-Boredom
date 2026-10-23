@@ -400,13 +400,11 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .audio-settings input[type="checkbox"] { width: auto; accent-color: #e3c277; }
 .audio-settings label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
 .audio-settings p { font-size: 11px; line-height: 1.6; color: #a8a99d; }
-.training-card { min-width: 0; padding: 8px 12px; margin-block: 8px; border: 1px solid #b79b6255; border-radius: 6px; }
 .options-panel, .challenges-panel { min-width: 0; margin-top: 16px; padding: 18px; background: #141d20; border: 1px solid #b79b6255; border-radius: 6px; }
 .options-panel h2, .challenges-panel h2 { font: 24px Georgia, serif; color: #f3dfb9; }
 .equipment-options label { display: grid; gap: 4px; margin-block: 8px; }
 .equipment-options select { min-width: 0; max-width: 100%; }
 .challenge-options p { line-height: 1.6; }
-.training-card p, .training-card small { line-height: 1.6; overflow-wrap: anywhere; }
 .training-skill-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .training-skill-grid button { min-width: 0; white-space: normal; overflow-wrap: anywhere; padding: 10px; }
 .training-skill-grid button[aria-pressed="true"] { border-color: #efc77a; background: #303327; color: #f3dfb9; }

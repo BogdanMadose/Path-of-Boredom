@@ -43,7 +43,6 @@ import { arenaHazards, hazardPhase } from "./arpg-hazards.js";
 import { turnToward } from "./arpg-facing.js";
 import { automaticCheckpoint, forgeNotification, bossHudTop, combatControlStatus, bossWarningPosition } from "./arpg-ui-state.js";
 import { encounterForWave } from "./arpg-encounters.js";
-import { startTraining } from "./arpg-engine.js";
 import { paintGround } from "./arpg-ground.js";
 import { setEquipmentStyle, acceptChallenge, CHALLENGES, EQUIPMENT_STYLES, runSummary } from "./arpg-run-systems.js";
 import { createGameAudio } from "./arpg-audio.js";
@@ -1205,7 +1204,6 @@ export function createGame(root, saveBridge = null) {
     // during the same run don't keep resending an unchanged or lower score. On failure, leaves the
     // pending entry queued so the next reportScore() call (e.g. on the next checkpoint/kill) retries automatically.
     async function reportScore() {
-        if (state.training) return;
         if (!saveBridge || disposed || releaseRankings && root.dataset.cloudSignedIn !== "on") return;
         if (state.status !== "ready" && state.rankingMode !== "legacy" && Object.hasOwn(DIFFICULTIES, state.difficulty)) {
             const key = `${state.rankingPatch}:${state.difficulty}:${state.rankingMode}:${state.heroClass}`;
@@ -1258,12 +1256,11 @@ export function createGame(root, saveBridge = null) {
         delete root.dataset.stickX;
         delete root.dataset.stickY;
     }
-    let practiceReturn = null;
     const loreReader = root.querySelector("[data-lore-reader]");
     const loreSeen = new WeakMap();
     let loreResume = false;
     function openLore(chapterWave = state.status === "camp" && state.wave % 5 === 0 ? state.wave : Math.max(1, state.wave)) {
-        if (saving || setupAction || inMainMenu || state.training || state.mode !== "campaign" || !["playing", "paused", "camp", "won"].includes(state.status)) return;
+        if (saving || setupAction || inMainMenu || state.mode !== "campaign" || !["playing", "paused", "camp", "won"].includes(state.status)) return;
         loreResume = state.status === "playing";
         if (loreResume) togglePause(state);
         const chapter = mapForWave(chapterWave);
@@ -1320,7 +1317,7 @@ export function createGame(root, saveBridge = null) {
             card.className = `camp-relic${known ? "" : " is-unknown"}`;
             card.style.setProperty("--relic", RELICS[key].color);
             name.textContent = known ? RELICS[key].name : "??? Undiscovered relic";
-            detail.textContent = known ? `${RELICS[key].detail} Found ${profile.codex[key]}×.` : "Keep hunting. Bosses drop relics most often.";
+            detail.textContent = known ? `${RELICS[key].detail} Found ${profile.codex[key]}×.` : "Keep hunting.";
             card.append(name, detail);
             return card;
         }));
@@ -1360,7 +1357,6 @@ export function createGame(root, saveBridge = null) {
     on(root.querySelector("[data-open-camp]"), "click", () => { renderCamp(); emberCamp.hidden = false; emberCamp.querySelector("[data-close-camp]").focus({ preventScroll: true }); });
     on(emberCamp.querySelector("[data-close-camp]"), "click", () => { emberCamp.hidden = true; });
     function noteProgress() {
-        if (state.training) return;
         setRelayForks(relayForks(state.heroClass));
         const discovered = recordRelics(state);
         if (discovered.length) saveStatus.textContent = `New codex entry: ${discovered.map(key => RELICS[key].name).join(", ")}!`;
@@ -1416,39 +1412,6 @@ export function createGame(root, saveBridge = null) {
         root.dispatchEvent(new CustomEvent("open-run-options", { detail: { fromMain: true } }));
         if (root.dataset.canvasHud !== "on") root.querySelector("[data-run-options]").scrollIntoView({ block: "start" });
     });
-    on(root.querySelector("[data-main-quit]"), "click", async () => {
-        if (!await gameConfirm("Quit the app? Unsaved progress will be lost. Cancel and save your run first if needed.")) return;
-        const quit = saveBridge && await saveBridge.invokeMethodAsync("QuitApplication");
-        if (!quit) root.querySelector("[data-main-status]").textContent = "This browser cannot be closed by the game. Save your run, then close the tab.";
-    });
-    for (const button of root.querySelectorAll("[data-training]")) on(button, "click", () => {
-        if (saving || checkingUnlock || setupAction || state.training || state.status === "choosing") return;
-        if (state.status === "playing") togglePause(state);
-        void reportScore();
-        practiceReturn = state;
-        inMainMenu = false;
-        mainMenu.hidden = true;
-        root.dataset.mainMenu = "off";
-        state = startTraining(Math.random, state.difficulty === "legacy" ? "hard" : state.difficulty, state.heroClass);
-        state.status = "paused";
-        checkpointHandled = null;
-        shownStatus = "";
-        clearInput();
-        updateHud();
-        root.dispatchEvent(new CustomEvent("training-menu", { detail: { action: "setup" } }));
-    });
-    for (const button of root.querySelectorAll("[data-exit-training]")) on(button, "click", () => {
-        if (!practiceReturn || saving) return;
-        state = practiceReturn;
-        practiceReturn = null;
-        checkpointHandled = null;
-        shownStatus = "";
-        clearInput();
-        last = performance.now();
-        updateHud();
-        root.dispatchEvent(new CustomEvent("training-menu", { detail: { action: "exit" } }));
-        showMainMenu(true);
-    });
     for (const select of root.querySelectorAll("[data-equipment-style]")) on(select, "change", () => {
         if (!saving && setEquipmentStyle(state, select.dataset.equipmentStyle, select.value)) updateHud();
     });
@@ -1471,24 +1434,6 @@ export function createGame(root, saveBridge = null) {
     for (const button of challengeButtons) on(button, "click", () => {
         if (!saving) acceptChallenge(state, button.dataset.challengeChoice);
         updateHud();
-    });
-    const practiceSkills = [...root.querySelectorAll("[data-training-skill]")];
-    for (const button of practiceSkills) on(button, "click", () => {
-        const skill = button.dataset.trainingSkill;
-        if (!state.training || saving || state.status !== "paused" || !SLOTTABLE_SKILLS.includes(skill)) return;
-        const previous = state.loadout.auto[0];
-        state.loadout.auto = state.loadout.auto.map(key => key === skill ? previous : key);
-        state.loadout.auto[0] = skill;
-        updateHud();
-    });
-    on(root.querySelector("[data-start-training]"), "click", () => {
-        if (!state.training || saving || state.status !== "paused") return;
-        root.dispatchEvent(new CustomEvent("training-menu", { detail: { action: "start" } }));
-        togglePause(state);
-        clearInput();
-        last = performance.now();
-        updateHud();
-        canvas.focus({ preventScroll: true });
     });
     let promptOpen = false;
     function gameConfirm(message) {
@@ -1637,7 +1582,6 @@ export function createGame(root, saveBridge = null) {
     // pre-fills the dialog with sensible defaults (the current run's settings when continuing, or
     // fresh defaults for a brand-new run), and always starts back at step 0.
     function openSetup(action) {
-        if (state.training) return;
         if (saving || checkingUnlock || setupAction || state.status === "choosing") return;
         if (state.status === "playing") togglePause(state);
         clearInput();
@@ -1776,7 +1720,7 @@ export function createGame(root, saveBridge = null) {
             ? `${checkpointReport(state)} ${checkpointSaveFailed ? "Checkpoint save failed — retry before leaving." : saving ? "Saving checkpoint…" : "Review your run and save before continuing."}`
             : "At each five-wave checkpoint, review the boss relic, challenge result, and optional encounter here.";
         setText(hudOne("[data-build-synergy]"), buildSynergy(state).detail);
-        setText(hudOne("[data-boss-relics]"), BOSS_RELICS.filter((_, index) => state.adventures.relics[index]).map(relic => `${relic.name}: ${relic.detail}`).join(" · ") || "Defeat each area boss to earn a unique, non-stacking relic. Practice grants none.");
+        setText(hudOne("[data-boss-relics]"), BOSS_RELICS.filter((_, index) => state.adventures.relics[index]).map(relic => `${relic.name}: ${relic.detail}`).join(" · ") || "Defeat each area boss to earn a unique, non-stacking relic.");
         const codex = hudOne("[data-campaign-codex]");
         const signature = state.adventures.chapters.join("");
         if (codex.dataset.entries !== signature) {
@@ -1795,7 +1739,7 @@ export function createGame(root, saveBridge = null) {
         const campEvent = hudOne("[data-camp-event]");
         if (campEvent) {
             const open = eventAvailable(state);
-            const atCheckpoint = !state.training && state.wave > 0 && state.wave % 5 === 0 && !state.enemies.length
+            const atCheckpoint = state.wave > 0 && state.wave % 5 === 0 && !state.enemies.length
                 && ["paused", "camp", "won"].includes(state.status);
             campEvent.hidden = !open && !atCheckpoint;
             setText(hudOne("[data-camp-event-name]"), encounter.name);
@@ -1803,10 +1747,10 @@ export function createGame(root, saveBridge = null) {
                 : bargainOutcome?.wave === state.wave ? bargainOutcome.text : "✓ Already resolved at this checkpoint. A new stranger waits at the next one.");
             hudOne("[data-camp-event-actions]").hidden = !open;
         }
-        hudOne("[data-open-lore]").hidden = inMainMenu || state.training || state.mode !== "campaign" || state.status === "ready";
+        hudOne("[data-open-lore]").hidden = inMainMenu || state.mode !== "campaign" || state.status === "ready";
         hudOne("[data-main-resume]").disabled = saving || state.status === "ready";
-        hudOne('[data-main-resume]').hidden = !['playing', 'paused', 'camp', 'won'].includes(state.status) || !!state.training;
-        hudOne("[data-main-load]").disabled = saving || checkingUnlock || !saveBridge || !!state.training;
+        hudOne('[data-main-resume]').hidden = !['playing', 'paused', 'camp', 'won'].includes(state.status);
+        hudOne("[data-main-load]").disabled = saving || checkingUnlock || !saveBridge;
         root.dataset.gameStatus = setupAction ? "setup" : state.status;
         root.dataset.saveBusy = saving || checkingUnlock ? "on" : "off";
         const p = state.player;
@@ -1945,7 +1889,7 @@ export function createGame(root, saveBridge = null) {
         text("boon-count", acquired.reduce((total, [, rank]) => total + rank, 0));
         text("boons", acquired.length ? acquired.map(([key, rank]) => `${LEVEL_CARDS[key].name} x${rank}`).join(" / ") : "Level up to choose your first lasting boon.");
         const bestScore = releaseRankings ? state.kills - state.scoreBaseline : state.kills;
-        if (!state.training && bestScore > best) {
+        if (bestScore > best) {
             best = bestScore;
             try { localStorage.setItem(bestKey, String(best)); } catch { /* Best score is optional. */ }
         }
@@ -1996,7 +1940,7 @@ export function createGame(root, saveBridge = null) {
         }
         const challenge = state.runSystems.challenge;
         const endlessTravel = state.mode === "endless" && state.status === "playing" && state.travelPending === 1 && !setupAction;
-        const challengeAvailable = !saving && (canForge || endlessTravel) && !state.training && state.wave % 5 === 0 && state.enemies.length === 0
+        const challengeAvailable = !saving && (canForge || endlessTravel) && state.wave % 5 === 0 && state.enemies.length === 0
             && !(challenge.stage === Math.floor(state.wave / 5) + 1 && challenge.elapsed > 0);
         for (const button of challengeButtons) {
             button.disabled = !challengeAvailable;
@@ -2004,8 +1948,7 @@ export function createGame(root, saveBridge = null) {
             button.classList.toggle("is-selected", challengePickedFor(challenge, button.dataset.challengeChoice));
         }
         hudOne("[data-challenge-availability]").textContent = challengeAvailable
-            ? `Choose for stage ${Math.floor(state.wave / 5) + 1} · Reward: ${100 + (Math.floor(state.wave / 5) + 1) * 50} gold.`
-            : state.training ? "Challenges are unavailable in practice. Exit training to return to your run."
+            ? `Choose for stage ${Math.floor(state.wave / 5) + 1} � Reward: ${100 + (Math.floor(state.wave / 5) + 1) * 50} gold.`
             : "Choose before the first wave or at the next five-wave checkpoint. The current stage cannot be changed mid-fight.";
         setText(hudOne("[data-challenge-status]"), `${CHALLENGES[challenge.key]}${challenge.key === "none" ? "" : ` · stage ${challenge.stage} · ${Math.floor(challenge.elapsed)}s · ${challenge.flasks} flasks · ${Math.round(challenge.damage)} health lost${challenge.resolved ? " · resolved" : ""}`}`);
         const nextStage = Math.floor(state.wave / 5) + 1;
@@ -2017,7 +1960,7 @@ export function createGame(root, saveBridge = null) {
         setText(challengeNudgeText, `Bonus ${100 + nextStage * 50} gold for stage ${nextStage}.`);
         const campChallenge = hudOne("[data-camp-challenge]");
         if (campChallenge) {
-            campChallenge.hidden = !challengeAvailable && !(saving && canForge && !state.training && state.wave % 5 === 0 && state.enemies.length === 0);
+            campChallenge.hidden = !challengeAvailable && !(saving && canForge && state.wave % 5 === 0 && state.enemies.length === 0);
             setText(hudOne("[data-camp-challenge-reward]"), `+${100 + nextStage * 50} gold`);
             setText(hudOne("[data-camp-challenge-status]"), challengePicked
                 ? `✓ Active for stage ${nextStage}: ${CHALLENGES[challenge.key]}. Continue when ready.`
@@ -2027,20 +1970,6 @@ export function createGame(root, saveBridge = null) {
         setText(hudOne("[data-summary-text]"), summary);
         hudOne("[data-run-summary]").hidden = state.status === "ready";
         setText(hudOne("[data-forge-summary]"), summary);
-        for (const button of hudAll("[data-training]")) { button.hidden = !!state.training; button.disabled = saving || checkingUnlock || !!setupAction || choosing; }
-        for (const button of hudAll("[data-exit-training]")) {
-            button.hidden = !state.training;
-            button.disabled = saving;
-        }
-        root.dataset.training = state.training ? "on" : "off";
-        hudOne("[data-training-picker]").hidden = !state.training;
-        for (const button of practiceSkills) {
-            button.disabled = saving || state.status !== "paused";
-            button.setAttribute("aria-pressed", String(state.loadout.auto[0] === button.dataset.trainingSkill));
-        }
-        hudOne("[data-start-training]").disabled = saving || state.status !== "paused";
-        hudOne("[data-training-detail]").textContent = state.training
-            ? `${skillName(state, state.loadout.auto[0])}: ${combatSkillDefinition(state, state.loadout.auto[0])?.detail ?? EXTRA_SKILLS[state.heroClass][state.loadout.auto[0]]?.detail ?? hero.description} Active skills: ${selectedSkills(state).map(key => skillName(state, key)).join(" · ")}.` : "";
         retrySave.hidden = !checkpointSaveFailed || !["camp", "won"].includes(state.status) || !!setupAction;
         retrySave.disabled = saving || checkingUnlock || !saveBridge;
         setText(retrySave, saving ? "Retrying checkpoint save…" : "Retry checkpoint save");
@@ -2054,7 +1983,6 @@ export function createGame(root, saveBridge = null) {
         for (const button of hudAll("[data-resume-combat]")) {
             button.hidden = state.mode === "endless" && state.status === "camp";
             button.disabled = saving || !!setupAction || !["paused", "camp"].includes(state.status);
-            setText(button, state.training ? "Resume practice" : state.status === "camp" ? "Travel to next stage" : "Return to battle");
         }
         openSkills.disabled = saving || !!setupAction || !active || choosing;
         text("skill-points", `${skillPointsLeft(state)} points available · ${skillPointsEarned(state)}/${MAX_SKILL_POINTS} earned`);
@@ -2109,15 +2037,15 @@ export function createGame(root, saveBridge = null) {
         focusViewButton.disabled = !!setupAction;
         recenterButton.disabled = !!setupAction;
         startButton.hidden = state.mode === "endless" && state.status === "camp";
-        startButton.disabled = saving || checkingUnlock || choosing || !!setupAction || !!state.training;
-        restartButton.disabled = saving || choosing || !!setupAction || !!state.training;
-        endlessButton.disabled = saving || checkingUnlock || choosing || !!setupAction || !!state.training;
+        startButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
+        restartButton.disabled = saving || choosing || !!setupAction;
+        endlessButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
         endlessButton.hidden = choosing || !(endlessUnlocked || state.status === "won") || (state.mode === "endless" && !["dead", "paused", "camp"].includes(state.status)) || state.status === "playing";
         setText(endlessButton, state.status === "won" ? "Continue into the Endless Watch"
             : state.mode === "endless" && ["paused", "camp"].includes(state.status) ? "Abandon & start a new Endless run" : "New Endless Watch run");
         launchEndless.disabled = endlessButton.disabled || !(endlessUnlocked || state.campaignComplete === 1);
         if (mainEndless) {
-            mainEndless.hidden = !(endlessUnlocked || state.campaignComplete === 1) || !!state.training;
+            mainEndless.hidden = !(endlessUnlocked || state.campaignComplete === 1);
             mainEndless.disabled = saving || checkingUnlock || choosing || !!setupAction;
         }
         setText(launchEndless, checkingUnlock ? "Checking Endless…" : state.status === "won" ? "Continue Endless" : endlessUnlocked || state.campaignComplete === 1 ? "New Endless run" : "Endless (locked)");
@@ -2220,7 +2148,7 @@ export function createGame(root, saveBridge = null) {
             if (canForge && selected && rank < max) showUpgradePreview(button, key);
             else setText(button.querySelector("[data-upgrade-preview]"), rank >= max ? "Fully forged" : "");
         }
-        if (saveButton) saveButton.disabled = saving || checkingUnlock || !saveBridge || !active || !!setupAction || !!state.training;
+        if (saveButton) saveButton.disabled = saving || checkingUnlock || !saveBridge || !active || !!setupAction;
         const choosingSkill = active && !choosing && !setupAction && needsSkillChoice(state);
         skillChoice.hidden = !choosingSkill || root.dataset.menuOpen === "on";
         const owned = selectedSkills(state);
@@ -2232,7 +2160,7 @@ export function createGame(root, saveBridge = null) {
             button.dataset.recommended = synergy ? "on" : "off";
             button.title = synergy ? `Recommended: completes ${synergy.name} (${synergy.detail})` : "";
         }
-        if (loadButton) loadButton.disabled = saving || checkingUnlock || !saveBridge || !!setupAction || !!state.training;
+        if (loadButton) loadButton.disabled = saving || checkingUnlock || !saveBridge || !!setupAction;
         setText(pauseButton.firstChild, state.status === "paused" ? "Resume " : "Pause ");
         if (state.status !== shownStatus) {
             const report = hudOne("[data-death-report]");
@@ -2264,14 +2192,13 @@ export function createGame(root, saveBridge = null) {
                 const won = state.status === "won";
                 const camp = state.status === "camp";
                 const watch = state.mode === "endless";
-                kicker.textContent = state.training ? "PRACTICE — YOUR REAL RUN IS SAFE" : paused ? "A MOMENT OF RESPITE" : won ? "ALL SIX DAWNS RESTORED" : camp ? (watch ? "WATCH CHECKPOINT" : `DAWN ${dawns} RECOVERED`) : "THE WATCH REMEMBERS";
-                title.textContent = state.training ? "Training arena" : paused ? "The hollow can wait." : won ? "A dawn of our own." : camp ? (watch ? "The watch endures." : `${map.boss} has fallen.`) : "Your ember fades.";
-                description.textContent = state.training ? "Practice is separate from your run: no XP, loot, saves, or rankings. Fatal hits restore health. Open Run options to choose an ability, then Start practice. Exit training restores your original run paused."
-                    : paused ? "Your run is paused. Spend gold at the forge below, save your progress, or return to battle."
+                kicker.textContent = paused ? "A MOMENT OF RESPITE" : won ? "ALL SIX DAWNS RESTORED" : camp ? (watch ? "WATCH CHECKPOINT" : `DAWN ${dawns} RECOVERED`) : "THE WATCH REMEMBERS";
+                title.textContent = paused ? "The hollow can wait." : won ? "A dawn of our own." : camp ? (watch ? "The watch endures." : `${map.boss} has fallen.`) : "Your ember fades.";
+                description.textContent = paused ? "Your run is paused. Spend gold at the forge below, save your progress, or return to battle."
                     : camp || won ? (watch ? `Echo ${state.wave - LAST_WAVE} cleared. All loot collected, partial healing and two flask charges granted. Saving this stage, then continuing automatically. If saving fails, use Save to retry.` : map.ending)
                     : `${state.kills} enemies slain / ${state.gold} gold / Level ${p.level}. ${watch ? "Load your last checkpoint, or begin a fresh watch." : "Forge your equipment, dodge warning zones, and seek fallen upgrade scrolls."}`;
                 startButton.textContent = paused ? "Return to battle" : camp ? (watch ? "Continue the watch" : `Travel to ${mapForWave(state.wave + 1).name}`) : "Begin a new campaign";
-                if (!setupAction && root.dataset.menuOpen !== "on" && !state.training && !(camp && watch)) (won ? endlessButton : startButton).focus({ preventScroll: true });
+                if (!setupAction && root.dataset.menuOpen !== "on" && !(camp && watch)) (won ? endlessButton : startButton).focus({ preventScroll: true });
             }
         }
     }
@@ -2488,7 +2415,6 @@ export function createGame(root, saveBridge = null) {
     // Any failure (network error, invalid save shape) leaves the current in-memory run completely
     // unchanged — nothing here can lose progress, only fail to persist it.
     async function persist(loadingSave, automatic = false) {
-        if (state.training) return;
         if (saving || checkingUnlock || setupAction) return;
         if (automatic && !loadingSave && saveBridge && state.mode === "endless" && state.status === "camp") {
             // Endless checkpoints save in the background so the watch never appears frozen.
@@ -2760,7 +2686,7 @@ export function createGame(root, saveBridge = null) {
         if (typeof updateCanvasResolution === "function" && root.dataset?.batterySaver !== lastSaverMode) updateCanvasResolution();
         if (last && now - last < minFrameMs) { frame = requestAnimationFrame(animate); return; }
         const chapterWave = state.travelPending || state.wave === 0 ? state.wave + 1 : state.wave;
-        if (!inMainMenu && loreReader.hidden && !saving && !setupAction && !state.training && state.mode === "campaign" && state.status === "playing" && chapterWave % 5 === 1) {
+        if (!inMainMenu && loreReader.hidden && !saving && !setupAction && state.mode === "campaign" && state.status === "playing" && chapterWave % 5 === 1) {
             const chapter = mapIndexForWave(chapterWave);
             let seen = loreSeen.get(state);
             if (!seen) { seen = new Set(); loreSeen.set(state, seen); }
@@ -2806,7 +2732,7 @@ export function createGame(root, saveBridge = null) {
                 const map = mapForWave(state.wave);
                 drawHudCached(ctx, state, { maxFlasks: MAX_FLASKS, cssWidth: canvasCssWidth, cssHeight: canvasCssHeight,
                     boss: boss ? { ...boss, name: map.boss, accent: map.accent } : null,
-                    stage: state.training || !state.wave ? "" : state.mode === "endless"
+                    stage: !state.wave ? "" : state.mode === "endless"
                         ? `Endless \u00b7 Wave ${Math.max(1, state.wave - LAST_WAVE)}`
                         : `Stage ${Math.ceil(state.wave / 5)} \u00b7 Wave ${state.wave}/${LAST_WAVE}`,
                     checkpoint: automaticCheckpoint(state, checkpointSaveFailed) ? "Stage cleared \u00b7 saving checkpoint\u2026" : "" });

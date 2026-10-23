@@ -73,14 +73,12 @@
     }
     body.mobile-shell .main-menu-card > h1,
     body.mobile-shell .main-menu-card > p,
-    body.mobile-shell .main-menu-card [data-main-quit] { grid-column: 1 / -1; margin: 0; }
     body.mobile-shell .main-menu-card > h1 { font-size: 22px; text-align: center; }
     body.mobile-shell .main-menu-card > p:not([data-main-status]) { display: none; }
     body.mobile-shell .main-menu-card > p:empty,
     body.mobile-shell .main-menu-card .mm-save-status:empty { display: none; }
     body.mobile-shell .main-menu-card .mm-save-status { grid-column: 1 / -1; margin: 0; font-size: 11px; }
     body.mobile-shell .main-menu-card button { min-height: 40px; margin: 0; font-size: 13px; }
-    body.mobile-shell .main-menu-card [data-main-quit] { order: 99; }
 
     body.mobile-shell .mm-tab {
         flex: 1;
@@ -509,7 +507,6 @@
     body.mobile-shell .options-panel .run-options [data-options-section] { display: none; }
     body.mobile-shell .options-panel[data-mobile-section="sound"] .run-options [data-options-section="sound"],
     body.mobile-shell .options-panel[data-mobile-section="controls"] .run-options [data-options-section="controls"],
-    body.mobile-shell .options-panel[data-mobile-section="training"] .run-options [data-options-section="training"],
     body.mobile-shell .options-panel[data-mobile-section="codex"] .run-options [data-options-section="codex"] { display: block; }
     body.mobile-shell .options-panel[data-mobile-section="controls"] .run-options [data-options-section="controls"] {
         display: grid;
@@ -536,7 +533,6 @@
     body.mobile-shell .options-panel .run-options fieldset small,
     body.mobile-shell .options-panel .run-options [data-forge-summary] { margin: 2px 0; font-size: 12px; }
     body.mobile-shell .options-panel .run-options h3 { margin: 0 0 4px; }
-    body.mobile-shell .options-panel .run-options .training-card p { margin: 2px 0; }
     body.mobile-shell .options-panel .run-options [data-options-section="controls"] { row-gap: 0; }
     body.mobile-shell .options-panel .run-options [data-options-section="controls"] label { min-height: 26px; margin-block: 1px; font-size: 12px; }
     body.mobile-shell .options-panel .run-options [data-options-section="controls"] small { display: none; }
@@ -549,10 +545,8 @@
     body.mobile-shell .challenges-panel .training-skill-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     body.mobile-shell .options-panel.mm-open .run-options { grid-row: 3; }
     body.mobile-shell .mm-panel .run-options [data-forge-summary] { overflow-wrap: anywhere; }
-    body.mobile-shell .mm-panel .training-card { max-width: 100%; min-width: 0; }
     body.mobile-shell .mm-panel .training-skill-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     body.mobile-shell .mm-panel .training-skill-grid button { width: 100%; margin: 0; font-size: 12px; }
-    body.mobile-shell .mm-panel .training-card small { display: block; font-size: 12px; color: #bed5cc; }
     body.mobile-shell .mm-panel .mastery-panel { grid-row: 3; grid-column: 1 / -1; overflow-y: auto; min-height: 0; }
     body.mobile-shell .mm-panel .mastery-panel .forge-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     body.mobile-shell .mm-panel .forge-grid span:not([data-upgrade-preview]) { display: none; }
@@ -952,12 +946,7 @@
     }
     body.mobile-shell .main-menu-card [data-main-resume][hidden] { display: none; }
     body.mobile-shell .main-menu-card [data-main-status] { color: #9fb7ae; font-size: 11px; text-align: center; }
-    body.mobile-shell .main-menu-card [data-main-quit] {
-        min-height: 34px;
-        background: transparent;
-        border-color: #c7a56b2a;
-        color: #b9c6bf;
-    }
+
     @media (max-height: 360px) {
         body.mobile-shell .mm-pause-card { padding: 10px 14px; gap: 10px; max-height: calc(100dvh - 8px); }
         body.mobile-shell .mm-pause-side, body.mobile-shell .mm-pause-groups { gap: 6px; }

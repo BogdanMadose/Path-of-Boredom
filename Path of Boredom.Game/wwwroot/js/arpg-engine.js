@@ -201,16 +201,6 @@ export function buyUpgrade(state, key) {
     return true;
 }
 
-export function startTraining(random = Math.random, difficulty = "hard", heroClass = "knight") {
-    const state = startRun(random, difficulty, heroClass);
-    state.training = true;
-    state.player.level = 20;
-    state.player.maxHealth = state.player.health = classFor(state).health + 72;
-    state.loadout.auto = ["nova", "burst", "guard", "none"];
-    state.journal = "Training: repeatable waves, fatal hits restore health, no loot, XP, saves or rankings. Exit to return to your run.";
-    return state;
-}
-
 // Actually increments a forge upgrade's rank and applies one-off side effects (armor grants bonus
 // max health immediately; flask grants a full refill). Shared by buyUpgrade() (gold purchase) and
 // collectLoot() (free "upgrade" loot drops) — if already maxed, converts into a flat gold refund
@@ -372,7 +362,6 @@ function hurtPlayer(state, damage, source = "Unknown attack") {
     const taken = Math.min(player.health, damage);
     player.health = Math.max(0, player.health - damage);
     state.runSystems.challenge.damage += taken;
-    if (state.training && player.health === 0) player.health = player.maxHealth;
     state.damageHistory.push({ source, damage: taken, age: 0, lethal: player.health === 0 });
     if (state.damageHistory.length > 12) state.damageHistory.shift();
     player.invulnerable = 0.3;
@@ -420,7 +409,6 @@ function gainExperience(state, amount) {
 // random-chance triggers). Loot list is hard-capped at 64 — if exceeded, auto-collects everything.
 function killEnemy(state, enemy) {
     state.kills++;
-    if (state.training) return;
     if (enemy.kind === "boss") awardBossRelic(state);
     if (hasRelic(state, "leech")) state.player.health = Math.min(state.player.maxHealth, state.player.health + state.player.maxHealth * 0.005);
     const relic = rollRelic(state, enemy);
@@ -1567,7 +1555,6 @@ export function step(state, input, elapsed) {
         } else {
             state.intermission -= dt;
             if (state.intermission <= 0) {
-                if (state.training) { state.wave = 0; state.player.potions = MAX_FLASKS; }
                 spawnWave(state);
                 state.intermission = 3.5;
             }

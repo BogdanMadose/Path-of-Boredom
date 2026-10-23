@@ -49,7 +49,7 @@ export function setEquipmentStyle(state, slot, key) {
 }
 export function acceptChallenge(state, key) {
     const traveling = state.status === "playing" && state.travelPending === 1;
-    if (state.training || !Object.hasOwn(CHALLENGES, key) || !(["paused", "camp"].includes(state.status) || traveling)) return false;
+    if (!Object.hasOwn(CHALLENGES, key) || !(["paused", "camp"].includes(state.status) || traveling)) return false;
     if (state.wave % 5 !== 0 || state.enemies.length) return false;
     const stage = Math.floor(state.wave / 5) + 1;
     const previous = state.runSystems.challenge;
@@ -71,5 +71,5 @@ export function runSummary(state, skillLabel = key => key) {
     const summary = state.runSystems.summary;
     const damage = Object.entries(summary.damage).filter(([, value]) => value > 0)
         .sort((a, b) => b[1] - a[1]).map(([key, value]) => `${skillLabel(key)}: ${Math.round(value)}`).join(" · ");
-    return `${state.training ? "Training session" : "Run so far"}: ${Math.floor(summary.seconds / 60)}m ${Math.floor(summary.seconds % 60)}s · ${summary.stages} stages cleared · ${state.kills} kills · ${summary.flasks} flasks used · ${summary.spent} gold spent · ${summary.challenges} challenges completed. Damage dealt: ${damage || "none yet"}.`;
+    return `Run so far: ${Math.floor(summary.seconds / 60)}m ${Math.floor(summary.seconds % 60)}s · ${summary.stages} stages cleared · ${state.kills} kills · ${summary.flasks} flasks used · ${summary.spent} gold spent · ${summary.challenges} challenges completed. Damage dealt: ${damage || "none yet"}.`;
 }

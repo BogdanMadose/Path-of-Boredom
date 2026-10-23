@@ -2011,42 +2011,55 @@ export function createGame(root, saveBridge = null) {
         }
         const summary = runSummary(state, key => skillName(state, key));
 
+        const summaryElement = hudOne("[data-run-summary]");
         const overviewList = hudOne("[data-summary-overview]");
         const damageList = hudOne("[data-summary-damage]");
 
-        overviewList.replaceChildren();
+        if (summaryElement && overviewList && damageList) {
+            overviewList.replaceChildren(
+                ...summary.overview.map(item => {
+                    const li = document.createElement("li");
+                    li.textContent = item;
+                    return li;
+                })
+            );
 
-        for (const item of summary.overview) {
-            const li = document.createElement("li");
-            li.textContent = item;
-            overviewList.append(li);
-        }
+            damageList.replaceChildren();
 
-        damageList.replaceChildren();
-
-        if (summary.damage.length) {
-            for (const item of summary.damage) {
+            if (summary.damage.length > 0) {
+                for (const item of summary.damage) {
+                    const li = document.createElement("li");
+                    li.textContent = `${item.name}: ${item.value}`;
+                    damageList.append(li);
+                }
+            } else {
                 const li = document.createElement("li");
-                li.textContent = `${item.name}: ${item.value}`;
+                li.textContent = "No damage recorded yet.";
                 damageList.append(li);
             }
+
+            summaryElement.hidden = state.status === "ready";
         } else {
-            const li = document.createElement("li");
-            li.textContent = "No damage recorded yet.";
-            damageList.append(li);
+            console.error("Run summary DOM elements are missing.", {
+                rootConnected: root.isConnected,
+                summaryElement,
+                overviewList,
+                damageList
+            });
         }
 
-        hudOne("[data-run-summary]").hidden = state.status === "ready";
+        const forgeSummary = hudOne("[data-forge-summary]");
 
-        // Preserve the existing Forge summary as a compact text string.
-        setText(
-            hudOne("[data-forge-summary]"),
-            `${summary.overview.join(" · ")}. Damage dealt: ${
-                summary.damage.length
-                    ? summary.damage.map(item => `${item.name}: ${item.value}`).join(" · ")
-                    : "none yet"
-            }.`
-        );
+        if (forgeSummary) {
+            setText(
+                forgeSummary,
+                `${summary.overview.join(" · ")}. Damage dealt: ${
+                    summary.damage.length > 0
+                        ? summary.damage.map(item => `${item.name}: ${item.value}`).join(" · ")
+                        : "none yet"
+                }`
+            );
+        }
         retrySave.hidden = !checkpointSaveFailed || !["camp", "won"].includes(state.status) || !!setupAction;
         retrySave.disabled = saving || checkingUnlock || !saveBridge;
         setText(retrySave, saving ? "Retrying checkpoint save…" : "Retry checkpoint save");

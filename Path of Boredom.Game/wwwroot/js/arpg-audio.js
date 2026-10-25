@@ -429,7 +429,7 @@ export function createGameAudio(environment = globalThis) {
                 tone(784, 784, 0.7, 0.03, "sine", 0.08, null, { attack: 0.03, reverb: 0.5 });
                 tone(1047, 1047, 0.8, 0.02, "triangle", 0.16, low(3000), { attack: 0.03, reverb: 0.6 });
             } else if (cue === "loot") {
-                // Coin: soft chime pair with a bell overtone and a short shimmer tail.
+                // Better equipment: soft chime pair with a bell overtone and a short shimmer tail.
                 tone(1568, 1568, 0.35, 0.03, "sine", 0, null, { attack: 0.003, reverb: 0.35 });
                 tone(2093, 2093, 0.5, 0.025, "sine", 0.07, null, { attack: 0.003, reverb: 0.4 });
                 tone(5230, 5230, 0.2, 0.004, "sine", 0.07, null, { attack: 0.002, reverb: 0.4 });
@@ -511,7 +511,7 @@ export function createGameAudio(environment = globalThis) {
             if (current.level > previous.level) play("level");
             if (current.boons > previous.boons || current.selected > previous.selected || current.training > previous.training) play("choice");
             if (current.upgrades > previous.upgrades) play("forge");
-            if (current.gold > previous.gold || current.weapon > previous.weapon || current.armor > previous.armor) play("loot");
+            if (current.weapon > previous.weapon || current.armor > previous.armor) play("loot");
             if (current.damage > previous.damage) play("hit");
             for (const [key, cooldown] of Object.entries(current.cooldowns)) {
                 if (cooldown > (previous.cooldowns[key] ?? 0) + 0.01) play(key === "attack" ? "attack" : key === "dodge" ? "dodge" : key === "potion" ? "heal" : "skill", state.heroClass, key);

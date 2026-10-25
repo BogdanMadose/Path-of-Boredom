@@ -527,8 +527,8 @@
             closePanel(true);
         });
         side.appendChild(resume);
-        var labels = { skills: "Skills & loadout", forge: "Forge & equipment", options: "Options", challenges: "Stage challenges — bonus gold", rankings: "Rankings" };
-        [{ title: "Character", names: ["skills", "forge", "challenges", "options"] }, { title: "Community", names: ["rankings"] }].forEach(function (group) {
+        var labels = { skills: "Skills & loadout", forge: "Forge & equipment", options: "Options", rankings: "Rankings" };
+        [{ title: "Character", names: ["skills", "forge", "options"] }, { title: "Community", names: ["rankings"] }].forEach(function (group) {
             var section = el("section", "mm-menu-group");
             section.appendChild(el("h3", null, group.title));
             group.names.forEach(function (name) {
@@ -558,6 +558,17 @@
         var summary = el("p", "mm-save-status mm-run-recap");
         summary.dataset.mobileRunSummary = "";
         side.appendChild(summary);
+        var stageRecap = el("div", "mm-stage-recap");
+        stageRecap.setAttribute("aria-label", "Current stage choices");
+        [["Bargain", "stageBargain"], ["Challenge", "stageChallenge"]].forEach(function (entry) {
+            var row = el("p", "mm-stage-recap-row");
+            row.appendChild(el("strong", null, entry[0]));
+            var value = el("span");
+            value.dataset[entry[1]] = "";
+            row.appendChild(value);
+            stageRecap.appendChild(row);
+        });
+        side.appendChild(stageRecap);
         section.appendChild(card);
     }
 
@@ -632,6 +643,15 @@
 
             if (status.textContent !== text) status.textContent = text;
             status.hidden = !text;
+        });
+
+        Array.prototype.forEach.call(root.querySelectorAll(".mm-stage-recap"), function (recap) {
+            var bargain = recap.querySelector("[data-stage-bargain]");
+            var challenge = recap.querySelector("[data-stage-challenge]");
+            var bargainText = root.dataset.stageBargain || "Not chosen";
+            var challengeText = root.dataset.stageChallenge || "Not chosen";
+            if (bargain && bargain.textContent !== bargainText) bargain.textContent = bargainText;
+            if (challenge && challenge.textContent !== challengeText) challenge.textContent = challengeText;
         });
 
         var resume = root.querySelector(".mm-resume");

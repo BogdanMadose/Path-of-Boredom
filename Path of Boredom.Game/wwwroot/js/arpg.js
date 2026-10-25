@@ -1381,25 +1381,59 @@ export function createGame(root, saveBridge = null) {
         if (event.key === "Escape" && patchNotes && !patchNotes.hidden) setPatchNotesOpen(false);
     });
 
+    let renderedRelicCodexSignature = null;
+    const runRelicCodexSignature = () => {
+        const relics = Array.isArray(state.runRelics) ? state.runRelics : [];
+        return RELIC_KEYS.map(key => relics.includes(key) ? 1 : 0).join(":");
+    };
+
     function renderRelicCodex() {
-        const profile = loadProfile();
         const codex = root.querySelector("[data-relic-codex]");
         const hint = root.querySelector("[data-codex-hint]");
         if (!codex || !hint) return;
-        const signature = RELIC_KEYS.map(key => profile.codex[key] || 0).join(":");
-        if (codex.dataset.entries === signature) return;
+        const foundThisRun = new Set(Array.isArray(state.runRelics)
+            ? state.runRelics.filter(key => RELIC_KEYS.includes(key))
+            : []);
+        const signature = runRelicCodexSignature();
+        if (codex.dataset.entries === signature) {
+            renderedRelicCodexSignature = signature;
+            return;
+        }
         codex.dataset.entries = signature;
-        const found = RELIC_KEYS.filter(key => profile.codex[key]).length;
-        hint.textContent = `${found}/${RELIC_KEYS.length} discovered. Relic bonuses apply to the current run; discoveries are kept here.`;
+        renderedRelicCodexSignature = signature;
+        const found = RELIC_KEYS.filter(key => foundThisRun.has(key)).length;
+        hint.textContent = `${found}/${RELIC_KEYS.length} found this run. Other relics stay unknown until recovered.`;
         codex.replaceChildren(...RELIC_KEYS.map(key => {
             const card = document.createElement("div"), name = document.createElement("b"), detail = document.createElement("small");
-            const known = !!profile.codex[key];
+            const known = foundThisRun.has(key);
             card.className = `camp-relic${known ? "" : " is-unknown"}`;
             card.style.setProperty("--relic", RELICS[key].color);
-            name.textContent = known ? RELICS[key].name : "??? Undiscovered relic";
-            detail.textContent = known ? `${RELICS[key].detail} Found ${profile.codex[key]}×.` : "Keep hunting.";
+            name.textContent = known ? RELICS[key].name : "Unknown relic";
+            detail.textContent = known ? RELICS[key].detail : "Not found this run.";
             card.append(name, detail);
             return card;
+        }));
+    }
+
+    function renderRunRelicSummary() {
+        const list = hudOne("[data-run-relics]");
+        if (!list) return;
+        const keys = RELIC_KEYS.filter(key => state.runRelics?.includes(key));
+        const signature = keys.join(":");
+        if (list.dataset.entries === signature) return;
+        list.dataset.entries = signature;
+        if (!keys.length) {
+            list.textContent = "No relics collected this run yet.";
+            return;
+        }
+        list.replaceChildren(...keys.map(key => {
+            const chip = document.createElement("span");
+            chip.className = "run-relic-chip";
+            chip.textContent = RELICS[key].name;
+            chip.title = RELICS[key].detail;
+            chip.setAttribute("aria-label", `${RELICS[key].name}: ${RELICS[key].detail}`);
+            chip.style.setProperty("--relic", RELICS[key].color);
+            return chip;
         }));
     }
 
@@ -1464,7 +1498,7 @@ export function createGame(root, saveBridge = null) {
     function noteProgress() {
         setRelayForks(relayForks(state.heroClass));
         const discovered = recordRelics(state);
-        if (discovered.length) renderRelicCodex();
+        if (runRelicCodexSignature() !== renderedRelicCodexSignature) renderRelicCodex();
         if (discovered.length) saveStatus.textContent = `New codex entry: ${discovered.map(key => RELICS[key].name).join(", ")}!`;
         const earned = creditProgress(state);
         if (!earned) return;
@@ -1591,7 +1625,7 @@ export function createGame(root, saveBridge = null) {
             const name = stageEvent(state).name;
             if (!resolveStageEvent(state, accept, DIFFICULTIES[state.difficulty]?.healing ?? 1, MAX_FLASKS, amount => grantExperience(state, amount))) return;
             const gained = state.gold - goldBefore, flasks = flasksBefore - state.player.potions, health = Math.round(state.player.health - healthBefore), levels = state.player.level - levelBefore;
-            bargainOutcome = { wave: state.wave, text: !accept ? `You passed by the ${name.toLowerCase()}.`
+            bargainOutcome = { wave: state.wave, checkpoint: Math.floor(state.wave / 5), accepted: accept, text: !accept ? `You passed by the ${name.toLowerCase()}.`
                 : `✓ Bargain done: ${[gained > 0 ? `+${gained} gold` : gained < 0 ? `${gained} gold` : "", flasks > 0 ? `-${flasks} flask` : "", health ? `${health > 0 ? "+" : ""}${health} health` : "", levels > 0 ? `+${levels} level${levels > 1 ? "s" : ""} — choose your boon${levels > 1 ? "s" : ""}` : ""].filter(Boolean).join(", ")}.` };
             updateHud();
             if (["camp", "won"].includes(state.status)) await persist(false);
@@ -1919,9 +1953,7 @@ export function createGame(root, saveBridge = null) {
             : "At each five-wave checkpoint, review the boss relic, challenge result, and optional encounter here.";
         setText(hudOne("[data-build-synergy]"), buildSynergy(state).detail);
         setText(hudOne("[data-boss-relics]"), BOSS_RELICS.filter((_, index) => state.adventures.relics[index]).map(relic => `${relic.name}: ${relic.detail}`).join(" · ") || "No boss relics earned this run yet.");
-        setText(hudOne("[data-run-relics]"), state.runRelics?.length
-            ? state.runRelics.map(key => `${RELICS[key].name}: ${RELICS[key].detail}`).join(" · ")
-            : "No relics collected this run yet.");
+        renderRunRelicSummary();
         const codex = hudOne("[data-campaign-codex]");
         const signature = state.adventures.chapters.join("");
         if (codex.dataset.entries !== signature) {
@@ -2155,6 +2187,24 @@ export function createGame(root, saveBridge = null) {
             : "Choose before the first wave or at the next five-wave checkpoint. The current stage cannot be changed mid-fight.";
         setText(hudOne("[data-challenge-status]"), `${CHALLENGES[challenge.key]}${challenge.key === "none" ? "" : ` · stage ${challenge.stage} · ${Math.floor(challenge.elapsed)}s · ${challenge.flasks} flasks · ${Math.round(challenge.damage)} health lost${challenge.resolved ? " · resolved" : ""}`}`);
         const nextStage = Math.floor(state.wave / 5) + 1;
+        const bargainCheckpoint = Math.floor(state.wave / 5);
+        const bargainResolved = state.adventures.eventStage === bargainCheckpoint;
+        const bargainChoice = bargainOutcome?.checkpoint === bargainCheckpoint
+            ? bargainOutcome.accepted ? "accepted" : "passed"
+            : state.journal.startsWith(`${encounter.name}:`)
+                ? state.journal.includes("passed by safely") ? "passed" : "accepted"
+                : "resolved";
+        root.dataset.stageBargain = `${encounter.name} · ${bargainResolved ? bargainChoice : "not chosen"}`;
+        const challengeName = {
+            none: "No challenge", unscarred: "Unscarred", flaskless: "Flaskless", swift: "Swift",
+            blitz: "Blitz", steadfast: "Steadfast", ascetic: "Ascetic"
+        }[challenge.key] || "No challenge";
+        const challengeForNextStage = challenge.stage === nextStage;
+        root.dataset.stageChallenge = challengeForNextStage
+            ? `${challengeName} · stage ${nextStage}${state.status === "camp" ? " selected" : challenge.resolved ? " resolved" : " active"}`
+            : challenge.stage > 0
+                ? `${challengeName} · stage ${challenge.stage} resolved; stage ${nextStage} not chosen`
+                : `No challenge chosen · stage ${nextStage}`;
         const challengePicked = challenge.key !== "none" && challenge.stage === nextStage && !challenge.resolved;
         challengeNudge.hidden = !endlessTravel || !challengeAvailable || challengePicked || challengeNudgeDismissedStage === nextStage
             || inMainMenu || !loreReader.hidden
@@ -2452,7 +2502,7 @@ export function createGame(root, saveBridge = null) {
             if (["paused", "camp", "won", "dead"].includes(state.status)) void reportScore();
             shownStatus = state.status;
             overlay.hidden = inMainMenu || !!setupAction || (state.status === "playing" || checkpointInBackground) && !draftClosing;
-            restartButton.hidden = !["paused", "camp"].includes(state.status) || (state.mode === "endless" && !endlessButton.hidden);
+            restartButton.hidden = !["paused", "camp"].includes(state.status) || !endlessButton.hidden;
             deathMainMenu.hidden = state.status !== "dead";
             if (state.status !== "playing") {
                 clearInput();

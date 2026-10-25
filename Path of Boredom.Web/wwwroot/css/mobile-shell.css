@@ -1167,4 +1167,268 @@ body.mobile-shell [data-run-menu] .camp-challenge-status { margin: 2px 0 0; font
     body.mobile-shell .death-report li:nth-child(n+3) { display: none; }
 }
 
+/* Keep the pause recap and relic details in the short landscape canvas without scrolling. */
+@media (orientation: landscape) and (max-height: 480px) {
+    body.mobile-shell .arpg[data-game-status="paused"] [data-overlay] {
+        overflow: hidden;
+        padding: 6px max(8px, var(--safe-right)) 6px max(8px, var(--safe-left));
+        scrollbar-gutter: auto;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: auto auto auto auto auto minmax(58px, auto) auto auto;
+        grid-auto-flow: row;
+        align-content: center;
+        justify-content: stretch;
+        gap: 4px 8px;
+        width: min(820px, 100%);
+        max-width: 820px;
+        max-height: 100%;
+        min-height: 0;
+        padding: 6px 8px;
+        overflow: hidden;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .sigil,
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > [data-overlay-description],
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .unlock-note,
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > [data-loading] { display: none !important; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .eyebrow,
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > h2 {
+        grid-column: 1 / -1;
+        margin: 0;
+        text-align: center;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .eyebrow { font-size: 9px; line-height: 1; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > h2 { font-size: 16px; line-height: 1.05; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > h2 br { display: none; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .death-report:not(.run-summary) { display: none !important; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-summary {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-row: 3;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 2px 8px;
+        min-width: 0;
+        max-height: 58px;
+        margin: 0;
+        padding: 4px 7px;
+        overflow: hidden;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-summary h4 { margin: 0 0 2px; font-size: 9px; line-height: 1; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-summary-overview,
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-summary-damage { min-width: 0; padding: 0; overflow: hidden; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-summary-overview ul { gap: 2px 4px; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-summary-overview li,
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-summary-damage li { font-size: 8px; line-height: 1.1; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-summary-overview li { padding: 1px 3px; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-summary-damage ul { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 5px; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-summary-damage li:nth-child(n+5) { display: none; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > button:not([data-death-main-menu]) {
+        grid-row: 4;
+        grid-column: span 1;
+        min-width: 0;
+        min-height: 36px;
+        margin: 0;
+        padding: 3px 6px;
+        font-size: 11px;
+        line-height: 1.05;
+        white-space: normal;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > [data-retry-save] { grid-column: 1 / -1; grid-row: 4; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .mm-save-actions { display: contents; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .mm-save-actions > button {
+        grid-row: 5;
+        grid-column: span 1;
+        min-width: 0;
+        min-height: 32px;
+        margin: 0;
+        padding: 2px 5px;
+        font-size: 10px;
+        line-height: 1.05;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-build-details {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-row: 6;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 2px 8px;
+        min-width: 0;
+        min-height: 30px;
+        max-height: 84px;
+        margin: 0;
+        padding: 4px 7px;
+        overflow: hidden;
+        font-size: 9px;
+        line-height: 1.1;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-build-details summary {
+        grid-column: 1 / -1;
+        min-width: 0;
+        font-size: 10px;
+        line-height: 1;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-build-details p {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 3;
+        -webkit-line-clamp: 3;
+        min-width: 0;
+        max-height: 3.3em;
+        margin: 0;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        font-size: 8px;
+        line-height: 1.1;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-build-details > .run-relic-list {
+        grid-column: 3;
+        grid-row: 2;
+        align-content: start;
+        gap: 2px;
+        max-height: 3.3em;
+        overflow: hidden;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-relic-chip {
+        max-width: 100%;
+        padding: 1px 4px;
+        overflow: hidden;
+        font-size: 8px;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-build-details:not([open]) > :not(summary) { display: none !important; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .checkpoint-note,
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .mm-save-status {
+        grid-column: 1 / -1;
+        min-width: 0;
+        max-height: 1.2em;
+        margin: 0;
+        overflow: hidden;
+        font-size: 8px;
+        line-height: 1.1;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .checkpoint-note { grid-row: 7; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .mm-save-status { grid-row: 8; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > [data-death-main-menu] { grid-row: 5; }
+}
+
 @keyframes mobile-challenge-in { from { opacity: 0; margin-top: -24px; } }
+
+/* Intermission: put the encounter and challenge beside each other, with one clear action row. */
+@media (orientation: landscape) and (max-height: 480px) {
+    body.mobile-shell .arpg[data-game-status="camp"] [data-overlay] {
+        overflow: hidden;
+        padding: 5px max(8px, var(--safe-right)) 5px max(8px, var(--safe-left));
+    }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] {
+        display: grid;
+        grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr);
+        grid-template-rows: auto auto minmax(0, 1fr) auto auto auto auto;
+        align-content: center;
+        gap: 3px 8px;
+        width: min(820px, 100%);
+        max-width: 820px;
+        max-height: 100%;
+        min-height: 0;
+        padding: 4px 8px;
+        overflow: hidden;
+    }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .sigil,
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > [data-overlay-description],
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .unlock-note,
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > [data-loading] { display: none !important; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .eyebrow,
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > h2 {
+        grid-column: 1 / -1;
+        margin: 0;
+        text-align: center;
+    }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .eyebrow { grid-row: 1; font-size: 9px; line-height: 1; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > h2 { grid-row: 2; font-size: 17px; line-height: 1.05; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > h2 br { display: none; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .camp-event {
+        grid-column: 1;
+        grid-row: 3;
+        align-self: start;
+        max-height: none;
+        min-height: 0;
+        margin: 0;
+        padding: 7px 9px;
+        overflow: hidden;
+    }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .camp-challenge {
+        grid-column: 2;
+        grid-row: 3;
+        max-height: none;
+        min-height: 0;
+        margin: 0;
+        padding: 6px 8px;
+        overflow: hidden;
+    }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .camp-event h3,
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .camp-challenge h3 { margin: 0 0 3px; font-size: 11px; line-height: 1.1; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .camp-event p,
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .camp-challenge > p { margin: 0 0 4px; font-size: 9px; line-height: 1.2; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] .camp-event-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] .camp-event-actions button { min-height: 32px; padding: 3px 5px; font-size: 9px; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] .camp-challenge-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] .camp-challenge-grid button { min-height: 32px; padding: 3px 5px; font-size: 10px; line-height: 1.05; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] .camp-challenge-grid button small { margin-top: 2px; font-size: 8px; line-height: 1.1; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] .camp-challenge-status { margin: 3px 0 0; font-size: 8px; line-height: 1.1; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > button[data-action="start"],
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > button[data-action="endless"],
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > button[data-action="restart"] {
+        grid-row: 4;
+        grid-column: span 1;
+        min-width: 0;
+        min-height: 36px;
+        margin: 0;
+        padding: 3px 7px;
+        font-size: 11px;
+        line-height: 1.05;
+    }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .run-summary {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-row: 5;
+        grid-template-columns: minmax(0, 1fr);
+        min-width: 0;
+        max-height: 38px;
+        margin: 0;
+        padding: 3px 7px;
+        overflow: hidden;
+    }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .run-summary h4 { margin: 0 0 2px; font-size: 9px; line-height: 1; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] .run-summary-overview { min-width: 0; padding: 0; overflow: hidden; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] .run-summary-overview ul { display: flex; flex-wrap: wrap; gap: 2px 6px; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] .run-summary-overview li { padding: 0; font-size: 8px; line-height: 1.1; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] .run-summary-damage { display: none; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .run-build-details {
+        grid-column: 1 / -1;
+        grid-row: 6;
+        min-width: 0;
+        max-height: 2.2em;
+        margin: 0;
+        padding: 4px 7px;
+        overflow: hidden;
+        font-size: 9px;
+        line-height: 1.1;
+    }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .run-build-details[open] { max-height: 4.6em; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .run-build-details p { display: -webkit-box; -webkit-box-orient: vertical; line-clamp: 1; -webkit-line-clamp: 1; margin: 2px 0 0; overflow: hidden; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .checkpoint-note,
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .mm-save-status {
+        grid-column: 1 / -1;
+        min-width: 0;
+        max-height: 1.2em;
+        margin: 0;
+        overflow: hidden;
+        font-size: 8px;
+        line-height: 1.1;
+    }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .checkpoint-note { grid-row: 7; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .mm-save-status { grid-row: 8; }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] .mm-save-actions { display: none; }
+}

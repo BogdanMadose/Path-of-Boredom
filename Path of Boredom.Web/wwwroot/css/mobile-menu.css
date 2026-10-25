@@ -1859,3 +1859,179 @@
         body.mobile-shell .challenges-panel .training-skill-grid button { min-height: 30px; padding: 2px 4px; font-size: 9px; }
     }
 }
+
+body.mobile-shell .mm-pause-card .mm-stage-recap {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    margin: 0;
+    padding: 7px 9px;
+    border: 1px solid #c7a56b45;
+    border-radius: 10px;
+    background: #0c171bcc;
+}
+body.mobile-shell .mm-pause-card .mm-stage-recap-row {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 6px;
+    min-width: 0;
+    margin: 0;
+    color: #d8cbb2;
+    font-size: 11px;
+    line-height: 1.2;
+}
+body.mobile-shell .mm-pause-card .mm-stage-recap-row strong { color: #f1d49b; }
+body.mobile-shell .mm-pause-card .mm-stage-recap-row span {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    min-width: 0;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+}
+
+/* The interactive panels are sized as a viewport layout in landscape. Skill categories are
+   thirteen tabs at most, so place them in two rows instead of clipping a one-row strip. */
+@media (orientation: landscape) and (max-height: 480px) {
+    body.mobile-shell .mm-panel.mm-open {
+        grid-template-rows: 42px 42px minmax(0, 1fr);
+        gap: 4px 8px;
+        padding: max(4px, var(--safe-top)) max(8px, var(--safe-right)) max(4px, var(--safe-bottom)) max(8px, var(--safe-left));
+    }
+    body.mobile-shell .mm-head { min-height: 0; padding-block: 2px; }
+    body.mobile-shell .mm-head h2 { font-size: 15px; }
+    body.mobile-shell .mm-close { width: 36px; height: 36px; }
+    body.mobile-shell .mm-panel .mm-subtabs {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: minmax(0, 1fr);
+        grid-auto-flow: column;
+        min-width: 0;
+        min-height: 0;
+        height: 42px;
+        gap: 3px;
+        overflow: hidden;
+        padding: 0;
+    }
+    body.mobile-shell .mm-panel .mm-subtab {
+        display: flex;
+        flex: initial;
+        flex-direction: row;
+        justify-content: center;
+        min-width: 0;
+        min-height: 0;
+        width: 100%;
+        height: 100%;
+        gap: 4px;
+        padding: 2px 4px;
+        overflow: hidden;
+        font-size: 10px;
+        line-height: 1;
+        white-space: nowrap;
+    }
+    body.mobile-shell .forge-panel .mm-subtabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    body.mobile-shell .options-panel[data-mobile-option-count="4"] .mm-subtabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    body.mobile-shell .options-panel[data-mobile-option-count="5"] .mm-subtabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    body.mobile-shell .skills-panel.mm-open { grid-template-rows: 42px 54px minmax(0, 1fr); }
+    body.mobile-shell .skills-panel .mm-subtabs {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+        grid-auto-flow: row;
+        height: 54px;
+    }
+    body.mobile-shell .skills-panel .mm-subtab {
+        flex-direction: column;
+        gap: 1px;
+        padding: 1px 2px;
+        font-size: 9px;
+    }
+    body.mobile-shell .skills-panel .mm-subtab .mm-skill-art { width: 14px; height: 14px; object-fit: contain; }
+    body.mobile-shell .skills-panel .mm-subtab .mm-subtab-icon { font-size: 12px; line-height: 1; }
+    body.mobile-shell .skills-panel .mm-subtab-label {
+        display: block;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1;
+    }
+    body.mobile-shell .options-panel.mm-open {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: 42px 42px minmax(0, 1fr);
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-row: 3;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto minmax(0, 1fr);
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        min-height: 0;
+        align-self: stretch;
+        gap: 3px;
+        padding: 2px 4px;
+        overflow: hidden;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > h3,
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-codex-hint],
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-relic-codex] {
+        grid-column: 1 / -1;
+        min-width: 0;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > h3 { font-size: 12px; line-height: 1; }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-codex-hint] { font-size: 9px; line-height: 1.1; }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-relic-codex] {
+        display: grid;
+        grid-row: 3;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+        align-content: stretch;
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        min-height: 0;
+        gap: 4px;
+        overflow: hidden;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .camp-relic {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        align-content: start;
+        min-width: 0;
+        min-height: 0;
+        padding: 4px 6px;
+        gap: 2px;
+        overflow: hidden;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .camp-relic b {
+        overflow: hidden;
+        font-size: 10px;
+        line-height: 1.05;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .camp-relic small {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        -webkit-line-clamp: 2;
+        min-width: 0;
+        overflow: hidden;
+        font-size: 9px;
+        line-height: 1.1;
+        overflow-wrap: anywhere;
+    }
+    body.mobile-shell .mm-panel .skill-tree-grid,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid,
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid,
+    body.mobile-shell .mm-panel .run-options,
+    body.mobile-shell .mm-panel .equipment-options,
+    body.mobile-shell .mm-panel .challenge-options,
+    body.mobile-shell .mm-panel .mm-detail {
+        overflow: hidden;
+        overscroll-behavior: none;
+    }
+}

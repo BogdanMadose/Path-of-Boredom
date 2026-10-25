@@ -9,6 +9,12 @@ if (!fs.existsSync(edge)) {
     console.log('SKIP: landscape fit checks require Microsoft Edge');
 } else {
     const home = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/Home.razor', import.meta.url), 'utf8');
+    const menu = fs.readFileSync(new URL('../wwwroot/js/mobile-menu.js', import.meta.url), 'utf8');
+    const engine = fs.readFileSync(new URL('../../Path of Boredom.Game/wwwroot/js/arpg.js', import.meta.url), 'utf8');
+    assert.doesNotMatch(menu, /names:\s*\["skills", "forge", "challenges", "options"\]/, 'the pause menu does not open a second stage challenge picker');
+    assert.match(menu, /data-stage-bargain/, 'the pause recap includes the chosen bargain');
+    assert.match(menu, /data-stage-challenge/, 'the pause recap includes the chosen challenge');
+    assert.match(engine, /restartButton\.hidden\s*=\s*[^;]*!endlessButton\.hidden/, 'intermission only shows one restart destination');
     const slice = (start, end) => home.slice(home.indexOf(start), home.indexOf(end));
     const expand = markup => markup
         .replace(/@foreach \(var skill in (CombatSkills|StarterSkills)\)\s*\{([\s\S]*?)\n\s*\}/g, (_, list, inner) =>
@@ -34,10 +40,49 @@ if (!fs.existsSync(edge)) {
         <div class="arena-overlay" data-test="level">${levelDraft}</div>
         <div class="arena-overlay" data-test="death">${runMenu}</div>
         <div class="arena-overlay" data-test="camp" style="display:none">${runMenu}</div>
+        <div class="arena-overlay" data-test="run-summary" style="display:none">${runMenu}</div>
         <div class="arena-overlay" data-test="pause"><div class="mm-pause-card"><div class="mm-pause-side"><div class="mm-pause-emblem"></div><h2>The hollow can wait.</h2><p>Combat and game timers are paused.</p><button class="mm-resume">Return to battle</button><p class="mm-save-status mm-run-recap">Run so far: 2m 28s · 2 stages cleared · 185 kills · 0 flasks used · 195 gold spent · 0 challenges completed. Damage dealt: Cleave: 33406 · Cinder relay: 7610 · Blazing cross: 1060.</p><button class="mm-pause-option mm-pause-footer">Main menu</button></div><div class="mm-pause-groups"><section class="mm-menu-group"><h3>Character</h3><button class="mm-pause-option">Skills &amp; loadout</button><button class="mm-pause-option">Forge &amp; equipment</button><button class="mm-pause-option">Stage challenges — bonus gold</button><button class="mm-pause-option">Options</button></section><section class="mm-menu-group"><h3>Community</h3><button class="mm-pause-option">Rankings</button><button class="mm-pause-option">Chapter lore</button></section><section class="mm-menu-group mm-progress-group"><h3>Progress</h3><div class="mm-save-actions"><button class="mm-pause-option">Save to cloud</button><button class="mm-pause-option">Load cloud save</button></div><p class="mm-save-status">Level-up boon selected. Save to keep it, or continue to the next autosaved checkpoint.</p></section></div></div></div>${skillChoice}${setup}${saveDialog}</div><script>
         const report = [];
         const gameRoot = document.querySelector('.arpg');
         const saveDialog = document.querySelector('.save-slots-dialog');
+        const stageRecap = document.createElement('div');
+        stageRecap.className = 'mm-stage-recap';
+        stageRecap.innerHTML = '<p class="mm-stage-recap-row"><strong>Bargain</strong><span>Lost pilgrim · accepted</span></p><p class="mm-stage-recap-row"><strong>Challenge</strong><span>Unscarred · stage 2 active</span></p>';
+        document.querySelector('[data-test="pause"] .mm-pause-side').appendChild(stageRecap);
+        const skillPanel = document.createElement('section');
+        skillPanel.className = 'skills-panel mm-panel';
+        skillPanel.dataset.layoutCheck = 'skills';
+        skillPanel.innerHTML = '<div class="mm-head"><h2>Paths of power</h2><button class="mm-close">×</button></div><div class="mm-subtabs"></div><div class="skill-tree-grid"><section class="skill-tree"><div class="skill-tree-map"></div></section></div><aside class="mm-detail">Selected path detail</aside>';
+        const skillTabs = skillPanel.querySelector('.mm-subtabs');
+        for (const label of ['Loadout', 'Knight', 'Ranger', 'Warden', 'Sorcerer', 'Warlock', 'Druid', 'Paladin', 'Assassin', 'Berserker', 'Monk', 'Archer', 'Reaper']) {
+            const tab = document.createElement('button'); tab.className = 'mm-subtab';
+            tab.innerHTML = '<span class="mm-subtab-icon">✦</span><span class="mm-subtab-label"></span>';
+            tab.querySelector('.mm-subtab-label').textContent = label;
+            skillTabs.appendChild(tab);
+        }
+        gameRoot.appendChild(skillPanel);
+        const relicPanel = document.createElement('section');
+        relicPanel.className = 'options-panel mm-panel';
+        relicPanel.dataset.layoutCheck = 'relics';
+        relicPanel.dataset.mobileOptionCount = '5';
+        relicPanel.dataset.mobileSection = 'relics';
+        relicPanel.innerHTML = '<div class="mm-head"><h2>Options</h2><button class="mm-close">×</button></div><div class="mm-subtabs"></div><div class="run-options"><h3 data-options-section="relics">Relic codex</h3><p data-codex-hint="" data-options-section="relics">2/6 found this run. Other relics stay unknown until recovered.</p><div class="ember-camp-codex" data-relic-codex data-options-section="relics"></div></div>';
+        const optionTabs = relicPanel.querySelector('.mm-subtabs');
+        for (const label of ['Sound', 'Controls', 'Lore', 'Relics', 'Account']) {
+            const tab = document.createElement('button'); tab.className = 'mm-subtab';
+            tab.innerHTML = '<span class="mm-subtab-icon">✦</span><span class="mm-subtab-label"></span>';
+            tab.querySelector('.mm-subtab-label').textContent = label;
+            optionTabs.appendChild(tab);
+        }
+        const relicCodex = relicPanel.querySelector('[data-relic-codex]');
+        for (let i = 0; i < 6; i++) {
+            const card = document.createElement('div'); card.className = 'camp-relic' + (i < 2 ? '' : ' is-unknown');
+            card.innerHTML = '<b></b><small></small>';
+            card.querySelector('b').textContent = i < 2 ? ['Cinder Heart', 'Phantom Quiver'][i] : 'Unknown relic';
+            card.querySelector('small').textContent = i < 2 ? 'A run relic effect.' : 'Not found this run.';
+            relicCodex.appendChild(card);
+        }
+        gameRoot.appendChild(relicPanel);
         saveDialog.querySelector('[data-save-slot-list]').innerHTML = Array.from({length:5}, (_, i) => '<button class="save-slot-card"><strong>Slot ' + (i + 1) + ' · Ember Knight</strong><span>Campaign · Dawn ' + (i + 1) + ' · Level 12</span><small>Hard · saved a few minutes ago</small></button>').join('');
         const fill = (selector, text) => document.querySelectorAll(selector).forEach(e => e.textContent = text);
         fill('[data-card-category]', 'CRITICAL CHANCE'); fill('[data-card-name]', 'A shattering dawn');
@@ -78,15 +123,33 @@ if (!fs.existsSync(edge)) {
         camp.querySelector('[data-camp-challenge]').hidden = false;
         camp.querySelector('[data-camp-challenge-status]').textContent = 'Tap one to accept. You can change it until you travel.';
         camp.querySelector('[data-run-summary]').hidden = false;
+        camp.querySelector('.run-build-details').open = true;
         camp.querySelector('[data-summary-overview]').innerHTML = '<li>14m 22s</li><li>6 stages</li><li>512 kills</li><li>3 flasks used</li><li>9,240 gold spent</li><li>4 challenges</li>';
         camp.querySelector('[data-summary-damage]').innerHTML = Array.from({ length: 8 }, (_, i) => '<li>Ember nova: ' + (900 - i * 50) + '</li>').join('');
-        camp.querySelector('[data-action="restart"]').hidden = false;
+        camp.querySelector('[data-action="endless"]').hidden = false;
+        camp.querySelector('[data-action="restart"]').hidden = true;
         camp.querySelector('[data-loading]').hidden = true;
+        const pauseSummary = document.querySelector('[data-test="run-summary"]');
+        const pauseMenu = pauseSummary.querySelector('[data-run-menu]');
+        pauseSummary.querySelector('[data-run-summary]').hidden = false;
+        pauseSummary.querySelector('[data-summary-overview]').innerHTML = '<li>14m 22s</li><li>6 stages</li><li>512 kills</li><li>3 flasks used</li>';
+        pauseSummary.querySelector('[data-summary-damage]').innerHTML = '<li>Ember nova: 900</li><li>Cinder relay: 850</li><li>Blazing cross: 700</li><li>Arcane bloom: 650</li>';
+        pauseSummary.querySelector('[data-build-synergy]').textContent = 'Cinder relay and arcane bloom feed one another.';
+        pauseSummary.querySelector('[data-boss-relics]').textContent = 'No boss relics earned this run yet.';
+        const runRelics = pauseSummary.querySelector('[data-run-relics]');
+        runRelics.replaceChildren(...['Cinder Heart', 'Phantom Quiver', 'Leech Fang', 'Bramble Crown', 'Gilded Tooth', 'Echo Vial'].map(label => {
+            const chip = document.createElement('span'); chip.className = 'run-relic-chip'; chip.textContent = label; return chip;
+        }));
+        pauseSummary.querySelector('.run-build-details').open = true;
+        const saveActions = document.createElement('div'); saveActions.className = 'mm-save-actions';
+        for (const label of ['Save to cloud', 'Load cloud save']) { const button = document.createElement('button'); button.textContent = label; saveActions.appendChild(button); }
+        pauseMenu.appendChild(saveActions);
+        const saveStatus = document.createElement('p'); saveStatus.className = 'mm-save-status'; saveStatus.textContent = 'Last checkpoint saved a moment ago.'; pauseMenu.appendChild(saveStatus);
         const actions = document.querySelector('[data-main-menu-actions]');
         for (const label of ['Save on device', 'Options', 'Rankings']) {
             const button = document.createElement('button'); button.className = 'mm-pause-option'; button.textContent = label; actions.appendChild(button);
         }
-        const overlays = { level: '[data-test="level"]', death: '[data-test="death"]', camp: '[data-test="camp"]', skill: '[data-skill-choice]', setup: '[data-setup]', tutorial: '[data-setup]', main: '.main-menu', pause: '[data-test="pause"]', save: '.save-slots-dialog' };
+        const overlays = { level: '[data-test="level"]', death: '[data-test="death"]', camp: '[data-test="camp"]', summary: '[data-test="run-summary"]', skill: '[data-skill-choice]', setup: '[data-setup]', tutorial: '[data-setup]', main: '.main-menu', pause: '[data-test="pause"]', save: '.save-slots-dialog' };
         window.measure = () => {
             for (const [name, selector] of Object.entries(overlays)) {
                 gameRoot.dataset.mainMenu = name === 'main' ? 'on' : 'off';
@@ -108,7 +171,7 @@ if (!fs.existsSync(edge)) {
                     }
                 }
                 const card = overlay.querySelector('[data-run-menu], .overlay-card, .level-draft, .main-menu-card, .mm-account-body, .mm-pause-card, .save-slots-card') ?? overlay;
-                const noScroll = new Set([overlay, card, ...overlay.querySelectorAll('.mm-pause-card, .mm-pause-groups, .mm-run-recap, .death-report, .death-report ol, .run-summary, .save-slots-card, .save-slot-list, .save-slot-card, .restart-mode-card')]);
+                const noScroll = new Set([overlay, card, ...overlay.querySelectorAll('.mm-pause-card, .mm-pause-groups, .mm-run-recap, .mm-stage-recap, .death-report, .death-report ol, .run-summary, .run-build-details, .run-relic-list, .save-slots-card, .save-slot-list, .save-slot-card, .restart-mode-card')]);
                 for (const element of noScroll) {
                     const overflow = getComputedStyle(element).overflowY;
                     if (overflow === 'auto' || overflow === 'scroll') report.push(name + ' has scrollable interactive content: ' + element.className + ' (' + overflow + ')');
@@ -134,6 +197,41 @@ if (!fs.existsSync(edge)) {
                     const rect = button.getBoundingClientRect();
                     if (rect.height && rect.bottom > bottom + 1) report.push(name + ' button off-screen: ' + button.textContent.trim().slice(0, 30));
                 }
+                if (name === 'summary') {
+                    const details = overlay.querySelector('.run-build-details'), list = overlay.querySelector('.run-relic-list'), detailsBounds = details.getBoundingClientRect();
+                    if (innerHeight <= 480) {
+                        if (details.scrollHeight > details.clientHeight + 1) report.push('expanded run relic details do not fit');
+                        if (list.children.length !== 6) report.push('pause summary omitted found run relics');
+                        for (const relic of list.children) {
+                            const box = relic.getBoundingClientRect();
+                            if (!box.height || box.left < detailsBounds.left - 1 || box.right > detailsBounds.right + 1 || box.bottom > detailsBounds.bottom + 1) report.push('found relic hidden in pause summary');
+                        }
+                    }
+                }
+                if (name === 'pause') {
+                    const recap = overlay.querySelector('.mm-stage-recap');
+                    if (!recap || recap.querySelectorAll('.mm-stage-recap-row').length !== 2) report.push('pause menu is missing the bargain/challenge recap');
+                    for (const row of recap.querySelectorAll('.mm-stage-recap-row')) {
+                        const box = row.getBoundingClientRect();
+                        if (!box.height || box.left < overlay.getBoundingClientRect().left || box.right > overlay.getBoundingClientRect().right || box.bottom > overlay.getBoundingClientRect().bottom) report.push('pause bargain/challenge recap is not visible');
+                    }
+                }
+                if (name === 'camp') {
+                    const choices = [...overlay.querySelectorAll('[data-action="start"], [data-action="endless"], [data-action="restart"]')].filter(button => !button.hidden);
+                    if (choices.length !== 2) report.push('intermission shows duplicate restart actions (' + choices.length + ' actions)');
+                    if (innerHeight <= 480) {
+                        const challenge = overlay.querySelector('[data-camp-challenge]'), grid = challenge.querySelector('.camp-challenge-grid');
+                        const buttons = [...grid.querySelectorAll('button')];
+                        const columns = new Set(buttons.map(button => Math.round(button.getBoundingClientRect().left)));
+                        const rows = new Set(buttons.map(button => Math.round(button.getBoundingClientRect().top)));
+                        if (buttons.length !== 7 || columns.size !== 3 || rows.size !== 3) report.push('intermission challenge choices are clipped or not arranged as a readable 3 by 3 grid');
+                        const bounds = challenge.getBoundingClientRect();
+                        for (const button of buttons) {
+                            const box = button.getBoundingClientRect();
+                            if (!box.height || box.left < bounds.left - 1 || box.right > bounds.right + 1 || box.top < bounds.top - 1 || box.bottom > bounds.bottom + 1) report.push('intermission challenge choice is hidden');
+                        }
+                    }
+                }
                 if (name === 'death') {
                     const restartDialog = overlay.querySelector('.restart-mode-overlay');
                     const restartCard = restartDialog.querySelector('.restart-mode-card');
@@ -152,6 +250,42 @@ if (!fs.existsSync(edge)) {
                     if (!overlay.querySelector('[data-setup-skip]').getBoundingClientRect().height) report.push('tutorial skip hidden');
                 }
             }
+            skillPanel.classList.add('mm-open');
+            const skillBounds = skillPanel.getBoundingClientRect(), skillTabsBounds = skillTabs.getBoundingClientRect();
+            if (innerHeight <= 480) {
+                if (skillPanel.scrollHeight > skillPanel.clientHeight + 1) report.push('skills panel overflows its landscape viewport');
+                if (skillTabs.scrollWidth > skillTabs.clientWidth + 1 || skillTabs.scrollHeight > skillTabs.clientHeight + 1) report.push('skill tabs overflow their fitted two-row area');
+                if (skillBounds.top < -1 || skillBounds.bottom > innerHeight + 1 || skillBounds.left < -1 || skillBounds.right > innerWidth + 1) report.push('skills panel outside viewport');
+                const tabRows = new Set([...skillTabs.children].map(tab => Math.round(tab.getBoundingClientRect().top)));
+                if (skillTabs.children.length !== 13 || tabRows.size !== 2) report.push('skill categories are clipped or not arranged into two landscape rows');
+                for (const tab of skillTabs.children) {
+                    const box = tab.getBoundingClientRect(), label = tab.querySelector('.mm-subtab-label').getBoundingClientRect();
+                    if (!box.height || box.left < skillTabsBounds.left - 1 || box.right > skillTabsBounds.right + 1 || box.bottom > skillTabsBounds.bottom + 1) report.push('skill tab outside its tab area');
+                    if (label.width && (label.left < box.left - 1 || label.right > box.right + 1 || label.bottom > box.bottom + 1)) report.push('skill tab label clipped: ' + tab.textContent.trim());
+                }
+            }
+            skillPanel.classList.remove('mm-open');
+            relicPanel.classList.add('mm-open');
+            const relicBounds = relicPanel.getBoundingClientRect(), codexBounds = relicCodex.getBoundingClientRect();
+            if (innerHeight <= 480) {
+                if (relicPanel.scrollHeight > relicPanel.clientHeight + 1) report.push('relic options panel overflows its landscape viewport');
+                if (relicCodex.scrollWidth > relicCodex.clientWidth + 1 || relicCodex.scrollHeight > relicCodex.clientHeight + 1) report.push('relic codex scrolls instead of fitting');
+                if (relicBounds.left < -1 || relicBounds.right > innerWidth + 1 || relicBounds.top < -1 || relicBounds.bottom > innerHeight + 1) report.push('relic options panel outside viewport');
+                const optionTabsBounds = optionTabs.getBoundingClientRect();
+                if (optionTabs.scrollWidth > optionTabs.clientWidth + 1 || optionTabs.children.length !== 5) report.push('options tabs overflow their landscape row');
+                for (const tab of optionTabs.children) {
+                    const box = tab.getBoundingClientRect(), label = tab.querySelector('.mm-subtab-label').getBoundingClientRect();
+                    if (box.left < optionTabsBounds.left - 1 || box.right > optionTabsBounds.right + 1 || box.bottom > optionTabsBounds.bottom + 1) report.push('options tab outside its tab area');
+                    if (label.width && (label.left < box.left - 1 || label.right > box.right + 1 || label.bottom > box.bottom + 1)) report.push('options tab label clipped: ' + tab.textContent.trim());
+                }
+                const relicRows = new Set([...relicCodex.children].map(card => Math.round(card.getBoundingClientRect().top)));
+                if (relicCodex.children.length !== 6 || relicRows.size !== 2) report.push('all six relic cards must fit in a three by two grid');
+                for (const card of relicCodex.children) {
+                    const box = card.getBoundingClientRect();
+                    if (!box.height || box.left < codexBounds.left - 1 || box.right > codexBounds.right + 1 || box.bottom > codexBounds.bottom + 1) report.push('relic card outside its visible grid');
+                }
+            }
+            relicPanel.classList.remove('mm-open');
             document.body.dataset.result = report.length ? report.join(' | ') : 'PASS';
         };
         try { measure(); } catch (e) { document.body.dataset.result = 'ERR ' + e.message; }
@@ -160,7 +294,7 @@ if (!fs.existsSync(edge)) {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const failures = [];
     try {
-        for (const [width, height] of [[640, 360], [740, 360], [915, 412], [1280, 720], [1366, 768], [1920, 1080]]) {
+        for (const [width, height] of [[640, 360], [740, 360], [844, 390], [915, 412], [1280, 720], [1366, 768], [1920, 1080]]) {
             // Headless Edge reserves 24px x 92px of window chrome; compensate so the page itself is phone-sized.
             const output = await dumpBrowserDom(edge, ['--virtual-time-budget=3000', `--window-size=${width + 24},${height + 92}`, `http://127.0.0.1:${server.address().port}/`]);
             const result = output.match(/data-result="([^"]*)"/)?.[1];
@@ -168,5 +302,5 @@ if (!fs.existsSync(edge)) {
         }
     } finally { await new Promise(resolve => server.close(resolve)); }
     assert.deepEqual(failures, [], failures.join('\n'));
-    console.log('PASS: main menu, save picker, restart chooser, Pause, run status, level-up, skill choice, campaign setup and tutorial fit landscape screens without scrolling');
+    console.log('PASS: menus and overlays fit landscape screens; short-landscape relics and skill tabs are visible without scrolling');
 }

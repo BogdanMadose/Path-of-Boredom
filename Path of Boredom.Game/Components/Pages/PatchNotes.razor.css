@@ -1,4 +1,4 @@
-.patch-notes { min-height: 100vh; padding: 28px max(20px, calc((100% - 1200px) / 2)); color: #e5dfd3; background: radial-gradient(ellipse at top, #332a20, #121719 55%, #0d1113); font-family: 'Segoe UI', sans-serif; }
+.patch-notes { min-height: 100vh; padding: max(28px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px), calc((100% - 1200px) / 2)) max(28px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px), calc((100% - 1200px) / 2)); color: #e5dfd3; background: radial-gradient(ellipse at top, #332a20, #121719 55%, #0d1113); font-family: 'Segoe UI', sans-serif; }
 a { color: #e9c78b; text-underline-offset: 4px; }
 a:hover { color: #ffe4b6; }
 a:focus-visible, .table-scroll:focus-visible { outline: 2px solid #f4c989; outline-offset: 4px; }
@@ -44,3 +44,53 @@ h4 { font: 20px Georgia, serif; color: #f3dfb9; margin: 0 0 12px; }
 .stat-grid p { font-size: 13px; color: #bfc6bd; line-height: 1.8; margin: 0; }
 footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; padding-top: 28px; color: #99958d; font-size: 11px; }
 @media (max-width: 650px) { .page-heading { padding-top: 28px; } .patch-heading, .patch-section { padding: 24px 18px; } .contents { padding: 18px; } .stat-grid { grid-template-columns: 1fr; } th, td { padding: 12px; } .patch-meta > a { margin-left: 0; } }
+
+.patch-notes:not(.embedded) {
+    box-sizing: border-box;
+    height: 100dvh;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: auto;
+}
+.patch-notes.embedded { height: auto; min-height: 0; padding: 0; background: none; }
+
+/* Phone layouts are landscape. The app locks the outer page, so the notes view owns scrolling. */
+@media (orientation: landscape) and (max-height: 520px) {
+    .patch-notes:not(.embedded) {
+        box-sizing: border-box;
+        height: 100dvh;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+        touch-action: auto;
+        padding: max(8px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+    }
+    .patch-notes.embedded { height: auto; min-height: 0; overflow: visible; padding: 0; touch-action: auto; }
+    .page-header { gap: 10px; padding-bottom: 10px; }
+    .brand { font-size: 15px; letter-spacing: 1px; }
+    .page-header nav { gap: 12px; font-size: 11px; }
+    .page-heading { max-width: none; padding: 12px 0 14px; }
+    .page-heading .eyebrow { margin-bottom: 4px; }
+    h1 { font-size: clamp(25px, 4vw, 34px); margin: 4px 0 6px; }
+    .page-heading > p:last-child { margin: 0; font-size: 12px; line-height: 1.45; }
+    article { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .patch-heading, .contents { grid-column: 1 / -1; }
+    .patch-heading { padding: 14px 16px; }
+    .patch-heading h2 { font-size: clamp(22px, 3vw, 30px); margin: 8px 0; }
+    .patch-heading > p { margin: 6px 0 10px; font-size: 12px; line-height: 1.5; }
+    .tags { gap: 6px; }
+    .tags span { padding: 4px 9px; font-size: 10px; }
+    .contents { flex-wrap: nowrap; gap: 8px 16px; overflow-x: auto; padding: 9px 14px; white-space: nowrap; }
+    .patch-section { min-width: 0; padding: 14px 16px; scroll-margin-top: 12px; }
+    .patch-section .eyebrow { margin-bottom: 6px; }
+    h3 { font-size: 19px; margin-bottom: 8px; }
+    .patch-section > p:not(.eyebrow), li { font-size: 12px; line-height: 1.5; }
+    ul { padding-left: 18px; }
+    li { margin-bottom: 6px; }
+    footer { padding-top: 14px; }
+}

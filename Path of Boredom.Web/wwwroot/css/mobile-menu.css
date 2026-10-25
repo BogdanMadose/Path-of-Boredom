@@ -46,10 +46,10 @@
         display: flex;
         align-self: flex-end;
         width: auto;
-        margin-top: max(var(--menu-shortcuts-top, 56px), env(safe-area-inset-top));
+        margin-top: max(var(--menu-shortcuts-top, 56px), var(--safe-top));
         align-items: stretch;
         gap: 3px;
-        padding: 0 max(8px, env(safe-area-inset-right)) 6px 6px;
+        padding: 0 max(8px, var(--safe-right)) max(6px, var(--safe-bottom)) 6px;
         background: none;
         pointer-events: auto;
     }
@@ -63,7 +63,7 @@
     body.mobile-shell .arpg:not([data-game-status="playing"]) .mm-bar { display: none; }
     body.mobile-shell [data-main-menu-actions],
     body.mobile-shell [data-main-menu-actions] .mm-save-actions { display: contents; }
-    body.mobile-shell .main-menu { padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); overflow: hidden; }
+    body.mobile-shell .main-menu { padding: max(8px, var(--safe-top)) max(12px, var(--safe-right)) max(8px, var(--safe-bottom)) max(12px, var(--safe-left)); overflow: hidden; }
     body.mobile-shell .main-menu-card {
         width: min(860px, 100%);
         max-height: 100%;
@@ -79,6 +79,7 @@
     body.mobile-shell .main-menu-card .mm-save-status:empty { display: none; }
     body.mobile-shell .main-menu-card .mm-save-status { grid-column: 1 / -1; margin: 0; font-size: 11px; }
     body.mobile-shell .main-menu-card button { min-height: 40px; margin: 0; font-size: 13px; }
+    body.mobile-shell .main-menu-card > .main-menu-patch-notes { display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 40px; margin: 0; font-size: 13px; text-align: center; text-decoration: none; }
     body.mobile-shell .main-play-menu {
         grid-column: 1 / -1;
         display: grid;
@@ -122,8 +123,8 @@
     }
     body.mobile-shell .mm-pause-tab {
         position: fixed;
-        top: max(var(--pause-hud-top, 76px), env(safe-area-inset-top));
-        left: max(6px, env(safe-area-inset-left));
+        top: max(var(--pause-hud-top, 76px), var(--safe-top));
+        left: max(6px, var(--safe-left));
         width: 48px;
         height: 44px;
         min-width: 48px;
@@ -184,6 +185,7 @@
        was rendered and lifted over the canvas with position:fixed. Nothing is re-parented — see
        the header comment in js/mobile-menu.js for why that matters. */
     body.mobile-shell .mm-panel {
+        box-sizing: border-box;
         position: fixed;
         inset: 0;
         z-index: 40;
@@ -197,10 +199,10 @@
         overscroll-behavior: contain;
         -webkit-overflow-scrolling: touch;
         padding:
-            0
-            max(12px, env(safe-area-inset-right, 0px))
-            calc(12px + env(safe-area-inset-bottom, 0px))
-            max(12px, env(safe-area-inset-left, 0px));
+            max(8px, var(--safe-top))
+            max(12px, var(--safe-right))
+            max(12px, var(--safe-bottom))
+            max(12px, var(--safe-left));
     }
 
     body.mobile-shell .mm-panel.mm-open {
@@ -239,7 +241,7 @@
         align-items: center;
         gap: 10px;
         margin: 0 -12px;
-        padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+        padding: 8px 12px;
         background: #0e1619f2;
         border-bottom: 1px solid #c7a56b33;
     }
@@ -349,7 +351,7 @@
     /* The original page sections become plain containers once their content lives in a panel. */
     body.mobile-shell .skills-panel,
     body.mobile-shell .forge-panel {
-        padding: 0 12px calc(12px + env(safe-area-inset-bottom));
+        padding: 0 12px 12px;
         border: 0;
         background: #0e1619;
     }
@@ -630,6 +632,7 @@
     }
     body.mobile-shell .mm-pause-screen .mm-head { display: none; }
     body.mobile-shell .mm-pause-card {
+        box-sizing: border-box;
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
@@ -786,9 +789,10 @@
         line-height: 1.4;
     }
     body.mobile-shell .mm-pause-card {
+        box-sizing: border-box;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        width: min(720px, 94vw);
-        max-height: calc(100dvh - 20px);
+        width: min(720px, 100%);
+        max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 20px);
         overflow-y: auto;
     }
     body.mobile-shell .mm-pause-card .mm-pause-option { font-size: 12px; }
@@ -881,8 +885,8 @@
         display: grid;
         grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr);
         align-items: stretch;
-        width: min(900px, 96vw);
-        max-height: calc(100dvh - 16px);
+        width: min(900px, 100%);
+        max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px);
         overflow: hidden;
         gap: 14px;
         padding: 16px 18px;
@@ -907,7 +911,8 @@
     }
     body.mobile-shell .mm-pause-side .mm-pause-footer { margin-top: auto; }
     body.mobile-shell .mm-pause-card .mm-pause-option,
-    body.mobile-shell .main-menu-card button {
+    body.mobile-shell .main-menu-card button,
+    body.mobile-shell .main-menu-card > .main-menu-patch-notes {
         min-height: 42px;
         padding: 6px 10px;
         border: 1px solid #c7a56b40;
@@ -919,7 +924,8 @@
         transition: border-color .15s, background .15s;
     }
     body.mobile-shell .mm-pause-card .mm-pause-option:active,
-    body.mobile-shell .main-menu-card button:active { border-color: #e0b878; background: #22383b; }
+    body.mobile-shell .main-menu-card button:active,
+    body.mobile-shell .main-menu-card > .main-menu-patch-notes:active { border-color: #e0b878; background: #22383b; }
     body.mobile-shell .mm-menu-group { gap: 6px; padding: 8px 10px 10px; background: #0d1b1f99; }
     body.mobile-shell .mm-menu-group h3 { text-align: left; font-size: 10px; }
     body.mobile-shell .mm-progress-group .mm-save-actions {
@@ -947,6 +953,7 @@
         color: #b9c6bf;
     }
     body.mobile-shell .main-menu-card {
+        box-sizing: border-box;
         width: min(720px, 100%);
         max-height: 100%;
         overflow: hidden;
@@ -956,7 +963,8 @@
         padding: 10px 16px;
     }
     body.mobile-shell .main-menu-card > h1 { font-size: 18px; }
-    body.mobile-shell .main-menu-card button { min-height: 34px; font-size: 12px; }
+    body.mobile-shell .main-menu-card button,
+    body.mobile-shell .main-menu-card > .main-menu-patch-notes { min-height: 34px; font-size: 12px; }
     body.mobile-shell .main-menu-card .mm-save-actions > :last-child { grid-column: auto; }
     body.mobile-shell .main-menu-card [data-main-resume] {
         grid-column: 1 / -1;
@@ -969,13 +977,14 @@
     body.mobile-shell .main-menu-card [data-main-status] { color: #9fb7ae; font-size: 11px; text-align: center; }
 
     @media (max-height: 360px) {
-        body.mobile-shell .mm-pause-card { padding: 10px 14px; gap: 10px; max-height: calc(100dvh - 8px); }
+        body.mobile-shell .mm-pause-card { padding: 10px 14px; gap: 10px; max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 8px); }
         body.mobile-shell .mm-pause-side, body.mobile-shell .mm-pause-groups { gap: 6px; }
         body.mobile-shell .mm-pause-side .mm-pause-emblem { display: none; }
         body.mobile-shell .mm-pause-side h2 { font-size: 20px; }
         body.mobile-shell .mm-menu-group { gap: 5px; }
         body.mobile-shell .mm-pause-card .mm-pause-option,
-        body.mobile-shell .main-menu-card button { min-height: 36px; font-size: 12px; }
+        body.mobile-shell .main-menu-card button,
+        body.mobile-shell .main-menu-card > .main-menu-patch-notes { min-height: 36px; font-size: 12px; }
         body.mobile-shell .mm-menu-group { padding: 6px 8px 8px; }
     }
     body.mobile-shell .mm-subtab[hidden],
@@ -1084,8 +1093,8 @@
 
     /* Main menu: balanced landscape composition */
     body.mobile-shell .main-menu-card {
-        width: min(920px, 94vw);
-        max-height: calc(100dvh - 24px);
+        width: min(920px, 100%);
+        max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 24px);
         grid-template-columns: repeat(3, minmax(0, 1fr));
         align-content: center;
         gap: 10px;
@@ -1107,7 +1116,8 @@
     }
 
     /* Main actions get consistent, comfortable targets */
-    body.mobile-shell .main-menu-card button {
+    body.mobile-shell .main-menu-card button,
+    body.mobile-shell .main-menu-card > .main-menu-patch-notes {
         min-width: 0;
         min-height: 46px;
         margin: 0;
@@ -1139,7 +1149,7 @@
     /* Short landscape screens */
     @media (max-height: 480px) {
         body.mobile-shell .main-menu-card {
-            width: min(920px, 96vw);
+            width: min(920px, 100%);
             gap: 7px;
             padding: 10px 18px;
         }
@@ -1151,6 +1161,7 @@
         body.mobile-shell .main-menu-card button {
             min-height: 38px;
         }
+        body.mobile-shell .main-menu-card > .main-menu-patch-notes { min-height: 38px; }
 
         body.mobile-shell .main-menu-card [data-main-resume] {
             min-height: 44px;
@@ -1158,8 +1169,9 @@
     }
         /* Pause menu — landscape-first hierarchy */
     body.mobile-shell .mm-pause-card {
-        width: min(1000px, 94vw);
-        max-height: calc(100dvh - 24px);
+        box-sizing: border-box;
+        width: min(1000px, 100%);
+        max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 24px);
         grid-template-columns: minmax(230px, 0.8fr) minmax(0, 1.4fr);
         gap: 16px;
         padding: 18px;
@@ -1211,7 +1223,7 @@
 
     @media (max-height: 420px) {
         body.mobile-shell .mm-pause-card {
-            max-height: calc(100dvh - 12px);
+            max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 12px);
             padding: 10px 14px;
             gap: 10px;
         }
@@ -1357,10 +1369,10 @@
     body.mobile-shell .main-menu {
         box-sizing: border-box;
         padding:
-            max(8px, env(safe-area-inset-top))
-            max(12px, env(safe-area-inset-right))
-            max(8px, env(safe-area-inset-bottom))
-            max(12px, env(safe-area-inset-left));
+            max(8px, var(--safe-top))
+            max(12px, var(--safe-right))
+            max(8px, var(--safe-bottom))
+            max(12px, var(--safe-left));
         overflow: hidden;
     }
 
@@ -1394,7 +1406,8 @@
         display: none;
     }
 
-    body.mobile-shell .main-menu-card button {
+    body.mobile-shell .main-menu-card button,
+    body.mobile-shell .main-menu-card > .main-menu-patch-notes {
         width: 100%;
         min-width: 0;
         min-height: clamp(34px, 8vh, 42px);
@@ -1430,7 +1443,8 @@
             font-size: 18px;
         }
 
-        body.mobile-shell .main-menu-card button {
+        body.mobile-shell .main-menu-card button,
+        body.mobile-shell .main-menu-card > .main-menu-patch-notes {
             min-height: 30px;
             padding: 4px 8px;
             font-size: 11px;
@@ -1470,9 +1484,9 @@
         flex-direction: column;
         align-items: stretch;
 
-        width: min(340px, calc(100vw - 32px));
-        max-width: calc(100vw - 32px);
-        max-height: calc(100dvh - 32px);
+        width: min(340px, calc(100vw - var(--safe-left) - var(--safe-right) - 32px));
+        max-width: calc(100vw - var(--safe-left) - var(--safe-right) - 32px);
+        max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 32px);
         box-sizing: border-box;
 
         gap: 8px;
@@ -1536,8 +1550,8 @@
 
     @media (max-height: 420px) {
         body.mobile-shell .main-menu-card .main-play-menu {
-            width: min(300px, calc(100vw - 24px));
-            max-height: calc(100dvh - 16px);
+            width: min(300px, calc(100vw - var(--safe-left) - var(--safe-right) - 24px));
+            max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px);
             gap: 4px;
             padding: 12px 10px;
         }

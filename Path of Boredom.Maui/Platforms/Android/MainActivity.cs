@@ -1,5 +1,6 @@
 using Android.App;
 using Android.Content.PM;
+using Android.Views;
 
 namespace Path_of_Boredom.Maui;
 
@@ -22,6 +23,12 @@ public class MainActivity : MauiAppCompatActivity
         base.OnWindowFocusChanged(hasFocus);
         if (!hasFocus || Window is null) return;
         AndroidX.Core.View.WindowCompat.SetDecorFitsSystemWindows(Window, false);
+        if (OperatingSystem.IsAndroidVersionAtLeast(28))
+        {
+            var attributes = Window.Attributes;
+            attributes.LayoutInDisplayCutoutMode = LayoutInDisplayCutoutMode.ShortEdges;
+            Window.Attributes = attributes;
+        }
         var controller = new AndroidX.Core.View.WindowInsetsControllerCompat(Window, Window.DecorView);
         controller.Hide(AndroidX.Core.View.WindowInsetsCompat.Type.SystemBars());
         controller.SystemBarsBehavior = AndroidX.Core.View.WindowInsetsControllerCompat.BehaviorShowTransientBarsBySwipe;

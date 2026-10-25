@@ -23,7 +23,7 @@
     .arpg ::deep button:is(:active, .button-pressed) { scale: 1; }
 }
 .arpg [hidden] { display: none !important; }
-.main-menu { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: radial-gradient(ellipse at top, #34423b, #081218 75%); overflow-y: auto; }
+.main-menu { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; box-sizing: border-box; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); background: radial-gradient(ellipse at top, #34423b, #081218 75%); overflow-y: auto; }
 .main-play-menu {
     display: grid;
     gap: 8px;
@@ -40,13 +40,15 @@
 .main-play-menu button {
     width: 100%;
 }
-.main-menu-card { width: min(480px, 100%); display: grid; gap: 12px; padding: 24px; border: 1px solid #c7a56b66; border-radius: 16px; background: #122025; }
+.main-menu-card { box-sizing: border-box; width: min(480px, 100%); display: grid; gap: 12px; padding: 24px; border: 1px solid #c7a56b66; border-radius: 16px; background: #122025; }
 .main-menu-card h1 { font: 32px Georgia, serif; color: #f3dfb9; }
 .main-menu-card p { font-size: 13px; line-height: 1.6; }
+.main-menu-card > .main-menu-patch-notes { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; min-height: 42px; text-align: center; text-decoration: none; }
 .save-slots-dialog {
-    width: min(620px, calc(100vw - 28px));
+    box-sizing: border-box;
+    width: min(620px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 28px));
     max-width: none;
-    max-height: min(84dvh, 760px);
+    max-height: min(84dvh, 760px, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 28px));
     padding: 0;
     overflow: visible;
     border: 1px solid #c7a56b;
@@ -56,7 +58,7 @@
     box-shadow: 0 24px 80px #000c;
 }
 .save-slots-dialog::backdrop { background: #050b0edb; backdrop-filter: blur(10px); }
-.save-slots-card { display: grid; gap: 12px; max-height: min(84dvh, 760px); overflow-y: auto; padding: 24px; border-radius: 16px; background: radial-gradient(ellipse at top, #263832, #101b20 70%); }
+.save-slots-card { display: grid; gap: 12px; max-height: min(84dvh, 760px, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 28px)); overflow-y: auto; padding: 24px; border-radius: 16px; background: radial-gradient(ellipse at top, #263832, #101b20 70%); }
 .save-slots-card h2 { margin: 0; color: #f3dfb9; font: 28px Georgia, serif; }
 .save-slots-card > p { margin: 0; color: #c3bba9; font-size: 13px; line-height: 1.55; }
 .save-slot-list { display: grid; gap: 8px; margin: 4px 0; }
@@ -67,11 +69,11 @@
 .save-slot-card small { color: #8f9b96; font-size: 11px; }
 .save-slots-card [data-save-slots-cancel] { justify-self: end; min-width: 110px; }
 .arpg dialog[open] { z-index: 90; }
-.main-menu-return { position: fixed; top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); z-index: 45; }
+.main-menu-return { position: fixed; top: max(12px, env(safe-area-inset-top, 0px)); left: max(12px, env(safe-area-inset-left, 0px)); z-index: 45; }
 .arpg[data-main-menu="on"] .main-menu-return { display: none; }
-.campaign-lore-return { position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); left: 130px; z-index: 45; }
-.campaign-lore { position: fixed; inset: 0; z-index: 65; display: grid; place-items: center; padding: 16px; background: #061018ed; }
-.campaign-lore-card { width: min(620px, 100%); max-height: 90dvh; overflow-y: auto; padding: 24px; border: 1px solid #c7a56b; border-radius: 14px; background: #14232b; color: #e5dfd3; }
+.campaign-lore-return { position: fixed; bottom: max(12px, env(safe-area-inset-bottom, 0px)); left: calc(130px + env(safe-area-inset-left, 0px)); z-index: 45; }
+.campaign-lore { position: fixed; inset: 0; z-index: 65; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); background: #061018ed; }
+.campaign-lore-card { box-sizing: border-box; width: min(620px, 100%); max-height: min(90dvh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px)); overflow-y: auto; padding: 24px; border: 1px solid #c7a56b; border-radius: 14px; background: #14232b; color: #e5dfd3; }
 .campaign-lore-card h2 { font: 28px Georgia, serif; color: #f1d49b; }
 .campaign-lore-card p, .campaign-lore-card small { line-height: 1.8; }
 .campaign-lore-card button { margin-top: 16px; }
@@ -80,9 +82,10 @@
 .arpg[data-contrast="true"] ::deep button:focus-visible { outline-width: 3px; }
 .arpg ::deep .game-confirm,
 .arpg ::deep .account-confirm {
+    box-sizing: border-box;
     padding: 24px;
-    max-width: min(540px, 90vw);
-    max-height: 85dvh;
+    max-width: min(540px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 32px));
+    max-height: min(85dvh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px));
     overflow-y: auto;
     border: 1px solid #c7a56b;
     border-radius: 16px;
@@ -91,7 +94,7 @@
     box-shadow: 0 20px 60px #000b;
 }
 .arpg ::deep .game-confirm::backdrop { background: #091318e8; }
-.arpg ::deep .account-confirm { position: fixed; inset: 10% 0 auto; margin: auto; z-index: 100; }
+.arpg ::deep .account-confirm { position: fixed; top: max(10%, calc(env(safe-area-inset-top, 0px) + 16px)); right: env(safe-area-inset-right, 0px); left: env(safe-area-inset-left, 0px); margin: auto; z-index: 100; }
 .arpg ::deep .game-confirm button { min-height: 44px; padding: 10px 24px; margin: 6px; background: #273b36; color: #ecdfc2; border: 1px solid #c7a56b; border-radius: 8px; }
 .run-skill-pool { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .run-skill-pool button { white-space: normal; text-align: left; display: grid; grid-template-columns: 44px minmax(0, 1fr); align-content: start; align-items: center; gap: 8px; padding: 16px; border: 1px solid #c7a56b55; border-radius: 10px; background: linear-gradient(135deg, #29332e, #14212a); }
@@ -301,9 +304,9 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
     place-items: center;
     padding: 0;
     box-sizing: border-box;
-    width: min(440px, calc(100vw - 32px));
-    max-width: calc(100vw - 32px);
-    max-height: calc(100dvh - 32px);
+    width: min(440px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 32px));
+    max-width: calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 32px);
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px);
     margin: 0;
     border: 0;
 
@@ -333,7 +336,7 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 
     box-sizing: border-box;
     width: 100%;
-    max-height: calc(100dvh - 32px);
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 32px);
     overflow-y: auto;
 
     padding: 28px 24px;
@@ -739,7 +742,7 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 }
 .arpg ::deep .ember-camp { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); background: #050b0fdd; }
 .arpg ::deep .ember-camp[hidden] { display: none; }
-.arpg ::deep .ember-camp-card { width: min(560px, 100%); max-height: 100%; overflow-y: auto; display: grid; gap: 10px; padding: 18px; border: 1px solid #c7a56b66; border-radius: 16px; background: #122025; box-shadow: 0 18px 50px #000a; font-size: calc(13px * var(--game-text-scale, 1)); }
+.arpg ::deep .ember-camp-card { box-sizing: border-box; width: min(560px, 100%); max-height: 100%; overflow-y: auto; display: grid; gap: 10px; padding: 18px; border: 1px solid #c7a56b66; border-radius: 16px; background: #122025; box-shadow: 0 18px 50px #000a; font-size: calc(13px * var(--game-text-scale, 1)); }
 .arpg ::deep .ember-camp-card h2 { margin: 0; font: 24px Georgia, serif; color: #f3dfb9; text-align: center; }
 .arpg ::deep .ember-camp-card h3 { margin: 4px 0 0; font: 15px Georgia, serif; color: #f3dfb9; }
 .arpg ::deep .ember-camp-balance { margin: 0; text-align: center; color: #ffb45c; font-weight: 700; }

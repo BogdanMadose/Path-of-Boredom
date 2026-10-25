@@ -1,4 +1,4 @@
-.rankings { min-height: 100vh; padding: 28px max(20px, calc((100% - 1200px) / 2)); color: #e5dfd3; background: radial-gradient(ellipse at top, #332a20, #121719 55%, #0d1113); font-family: 'Segoe UI', sans-serif; }
+.rankings { min-height: 100vh; padding: max(28px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px), calc((100% - 1200px) / 2)) max(28px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px), calc((100% - 1200px) / 2)); color: #e5dfd3; background: radial-gradient(ellipse at top, #332a20, #121719 55%, #0d1113); font-family: 'Segoe UI', sans-serif; }
 header { display: flex; justify-content: space-between; gap: 20px; align-items: center; padding-bottom: 24px; border-bottom: 1px solid #c7a56b40; }
 header a { color: #e4d1ae; text-decoration: none; font: 18px Georgia, serif; letter-spacing: 2px; }
 header span, .eyebrow { color: #c7a56b; font-size: 10px; letter-spacing: 2px; }
@@ -69,4 +69,58 @@ footer { margin-top: 30px; display: flex; justify-content: space-between; flex-w
     .rankings.embedded .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .rankings.embedded .filters button { grid-column: 1 / -1; }
     .class-boards, .rankings.embedded .class-boards { grid-template-columns: minmax(0, 1fr); }
+}
+
+.rankings:not(.embedded) {
+    box-sizing: border-box;
+    height: 100dvh;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: auto;
+}
+
+/* Compact, scrollable ranking boards for the game's landscape phone viewport. */
+@media (orientation: landscape) and (max-height: 520px) {
+    .rankings:not(.embedded) {
+        box-sizing: border-box;
+        height: 100dvh;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+        touch-action: auto;
+        padding: max(8px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+    }
+    .rankings.embedded { height: auto; min-height: 0; overflow: visible; padding: 0; touch-action: auto; }
+    header { gap: 10px; padding-bottom: 10px; }
+    header a { font-size: 14px; letter-spacing: 1px; }
+    header span, .eyebrow { font-size: 9px; letter-spacing: 1.3px; }
+    .heading { max-width: none; padding: 12px 0; }
+    h1 { font-size: clamp(24px, 4vw, 34px); margin: 4px 0 6px; }
+    .heading > p:last-child { margin: 0; font-size: 12px; line-height: 1.45; }
+    .rankings:not(.embedded) .filters { position: sticky; top: 0; z-index: 2; }
+    .filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px; }
+    .filters > * { width: auto; min-width: 0; }
+    label { min-width: 0; gap: 4px; font-size: 10px; }
+    select, button { box-sizing: border-box; width: 100%; min-width: 0; min-height: 40px; padding: 6px 8px; font-size: 12px; }
+    .notice { margin: 10px 0; font-size: 11px; line-height: 1.45; }
+    .class-boards, .rankings.embedded .class-boards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+    .class-board { padding: 10px; }
+    .class-board h2, .rankings.embedded .class-board h2 { font-size: 17px; }
+    .class-heading { margin-bottom: 8px; }
+    .class-heading > span { font-size: 10px; }
+    .ranking-card { padding: 9px; }
+    .record-heading { gap: 6px; margin-bottom: 5px; }
+    .record-date { margin-bottom: 5px; }
+    .rankings.embedded .rank, .rankings.embedded .score { font-size: 16px; }
+    .rankings.embedded .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 8px; }
+    .rankings.embedded .filters > * { width: auto; min-width: 0; }
+    .rankings.embedded .filters button { grid-column: auto; }
+    .rankings.embedded select, .rankings.embedded button { min-height: 40px; padding: 6px 8px; font-size: 11px; }
+    .rankings.embedded .build-details summary { min-height: 40px; }
+    footer { margin-top: 16px; gap: 8px; }
 }

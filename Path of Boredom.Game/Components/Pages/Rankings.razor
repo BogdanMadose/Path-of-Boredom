@@ -166,7 +166,7 @@
     private string? error;
     private IReadOnlyList<RankingRow> rows = [];
 
-    /// <summary>Loads the default (Hard / Campaign / All classes / current patch) leaderboard on first render.</summary>
+    /// <summary>Loads the default (Easy / Campaign / All classes / current patch) leaderboard on first render.</summary>
     protected override Task OnInitializedAsync()
     {
         patch = Mobile ? RankingRules.MobileRelease : RankingRules.CurrentPatch;

@@ -27,7 +27,7 @@ If the combat numbers feel wrong, start here. If the death screen won't scroll, 
 - **`arpg-ui-state.js`** — transient presentation rules: background Endless checkpoints, acknowledgement of newly affordable Forge offers, and boss HUD clearance below mobile controls. None of this adds fields to saves.
 - **`arpg-hazards.js`** — randomized hazard layouts shared by simulation and rendering. Count, position, radius, spawn delay, and activation period vary per wave; circles stay within the arena, avoid one another, and leave the centre clear.
 - **`arpg-modifiers.js`** — elite traits. General enemy/boss scaling and attack behaviour also live in the engine.
-- **`arpg-difficulty.js`** — Hard, Nightmare, and Inferno multipliers.
+- **`arpg-difficulty.js`** — Easy, Medium, and Hard multipliers (the stored keys remain `hard`, `nightmare`, and `inferno`).
 - **`arpg-facing.js`** — cosmetic body/weapon turning. The attack is immediate and accurately aimed; the art catches up without making the attack wait.
 - **`arpg-graphics.js`** — reusable hero art, cached orb/body sprites, floor decoration, atmosphere, and loot icons. Not the entire renderer; look in `arpg.js` for enemies and the frame draw order.
 - **`arpg-hud.js`** — the in-canvas mobile HUD.

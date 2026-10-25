@@ -2714,7 +2714,8 @@ export function createGame(root, saveBridge = null) {
             heading.textContent = slot.exists ? `Slot ${number} · ${classNames[slot.heroClass] || words(slot.heroClass)}` : `Slot ${number} · Empty`;
             const details = document.createElement("span");
             if (slot.exists) {
-                const run = [slot.mode && words(slot.mode), slot.difficulty && words(slot.difficulty)].filter(Boolean).join(" · ");
+                const difficultyName = DIFFICULTIES[slot.difficulty]?.name || words(slot.difficulty);
+                const run = [slot.mode && words(slot.mode), slot.difficulty && difficultyName].filter(Boolean).join(" · ");
                 const checkpoint = [slot.wave == null ? null : `Wave ${slot.wave}`, slot.level == null ? null : `Level ${slot.level}`].filter(Boolean).join(" · ");
                 details.textContent = [run, checkpoint].filter(Boolean).join(" — ") || "Saved run";
             } else details.textContent = savingMode ? "Start a new run in this slot" : "No run saved here";

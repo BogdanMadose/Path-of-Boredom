@@ -25,6 +25,7 @@
 
             <button type="button" class="quiet-button" data-open-camp>Account Progression</button>
             <button type="button" class="quiet-button" data-main-options>Options</button>
+            <a class="quiet-button" href="/patch-notes">Patch Notes · 1.0.1</a>
             <div data-main-menu-actions></div>
             <p data-main-status role="status"></p>
         </div>
@@ -71,10 +72,6 @@
         <div class="signed-in-user" title="@windowsUserName"><small>@(Session is ICloudGameSession ? "PLAYER ACCOUNT" : "WINDOWS SIGN-IN")</small><strong>@windowsUserName</strong></div>
         <div class="game-actions">
             <a class="quiet-button" href="/rankings" target="_blank" rel="noopener">Rankings ↗</a>
-            @if (Session is not ICloudGameSession)
-            {
-                <a class="quiet-button" href="/patch-notes" target="_blank" rel="noopener">Patch notes ↗</a>
-            }
             <button type="button" class="quiet-button" data-action="forge" disabled>Forge</button>
             <button type="button" class="quiet-button" data-action="save" disabled>Save</button>
             <button type="button" class="quiet-button" data-action="load" disabled>Load</button>
@@ -84,8 +81,8 @@
     @if (Session is not ICloudGameSession)
     {
     <aside class="patch-notice" data-patch-notice role="status">
-        <span><strong>Patch 004 is live — Power Under Pressure</strong> · Growing enemy threats, class-specific trees, Ranger ricochets and piercing, faster loot, and automatic Endless checkpoints. Flasks matter: stage rests are now partial.</span>
-        <a href="/patch-notes#patch-004" target="_blank" rel="noopener">Read patch notes ↗</a>
+        <span><strong>Version 1.0.1</strong> · Save slots, the improved main menu, Forge artwork, challenge save fixes, and game polish.</span>
+        <a href="/patch-notes#version-1-0-1" target="_blank" rel="noopener">Read patch notes ↗</a>
         <button type="button" class="quiet-button" data-dismiss-patch aria-label="Dismiss patch announcement">Dismiss</button>
     </aside>
     }
@@ -95,7 +92,7 @@
     <main class="game-shell">
         <section class="chapter-heading" aria-labelledby="chapter-title">
             <div><p class="eyebrow" data-stat="chapter">CHAPTER I / THE LAST EMBER</p><h1 id="chapter-title" data-stat="map">The Ashen Hollow</h1><p data-stat="map-description">The dead are restless. Give them a reason to stay buried.</p></div>
-            <div class="run-record"><span data-stat="difficulty">HARD</span><strong data-stat="score">0</strong><span>RUN SCORE · ENEMIES SLAIN</span></div>
+            <div class="run-record"><span data-stat="difficulty">EASY</span><strong data-stat="score">0</strong><span>RUN SCORE · ENEMIES SLAIN</span></div>
         </section>
 
         <div class="game-grid">
@@ -252,9 +249,9 @@
                             <p data-setup-description></p>
                             <label class="difficulty-picker" data-setup-difficulty>Difficulty
                                 <select data-difficulty aria-describedby="difficulty-description">
-                                    <option value="hard">Hard — easiest / recommended start</option>
-                                    <option value="nightmare">Nightmare — tougher enemies, less healing</option>
-                                    <option value="inferno">Inferno — hardest / least forgiving</option>
+                                    <option value="hard">Easy — recommended starting point</option>
+                                    <option value="nightmare">Medium — tougher enemies, less healing</option>
+                                    <option value="inferno">Hard — most demanding, least healing</option>
                                 </select>
                                 <small id="difficulty-description" data-difficulty-description aria-live="polite"></small>
                             </label>

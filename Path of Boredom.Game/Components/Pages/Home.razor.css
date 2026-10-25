@@ -291,21 +291,23 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .endless-button:hover:not(:disabled) { background: #624372; }
 .restart-mode-overlay {
     position: fixed;
-    inset: 0;
+    inset: auto;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     z-index: 1000;
 
     display: grid;
     place-items: center;
-    padding: 16px;
+    padding: 0;
     box-sizing: border-box;
-    width: 100vw;
-    height: 100dvh;
-    max-width: none;
-    max-height: none;
+    width: min(440px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    max-height: calc(100dvh - 32px);
     margin: 0;
     border: 0;
 
-    overflow-y: auto;
+    overflow: visible;
     background: transparent;
     color: inherit;
 
@@ -330,7 +332,7 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
     z-index: 1;
 
     box-sizing: border-box;
-    width: min(440px, 100%);
+    width: 100%;
     max-height: calc(100dvh - 32px);
     overflow-y: auto;
 

@@ -528,6 +528,7 @@
     body.mobile-shell .challenges-panel.mm-open { grid-template-columns: minmax(0, 1fr); grid-template-rows: 58px minmax(0, 1fr); }
     body.mobile-shell .options-panel.mm-open { grid-template-rows: 58px 52px minmax(0, 1fr); }
     body.mobile-shell .options-panel .run-options [data-options-section] { display: none; }
+    body.mobile-shell .options-panel .run-options [data-options-section][hidden] { display: none !important; }
     body.mobile-shell .options-panel[data-mobile-section="sound"] .run-options [data-options-section="sound"],
     body.mobile-shell .options-panel[data-mobile-section="controls"] .run-options [data-options-section="controls"],
     body.mobile-shell .options-panel[data-mobile-section="codex"] .run-options [data-options-section="codex"] { display: block; }

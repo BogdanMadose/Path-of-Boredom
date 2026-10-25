@@ -1,6 +1,8 @@
 .rankings { min-height: 100vh; padding: max(28px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px), calc((100% - 1200px) / 2)) max(28px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px), calc((100% - 1200px) / 2)); color: #e5dfd3; background: radial-gradient(ellipse at top, #332a20, #121719 55%, #0d1113); font-family: 'Segoe UI', sans-serif; }
 header { display: flex; justify-content: space-between; gap: 20px; align-items: center; padding-bottom: 24px; border-bottom: 1px solid #c7a56b40; }
 header a { color: #e4d1ae; text-decoration: none; font: 18px Georgia, serif; letter-spacing: 2px; }
+.back-link { display: inline-flex; width: 40px; height: 40px; flex: 0 0 40px; align-items: center; justify-content: center; border: 1px solid #c7a56b66; border-radius: 50%; background: #141d20; color: #e9c78b; text-decoration: none; font: 22px/1 system-ui, sans-serif; letter-spacing: 0; }
+.back-link:hover { background: #26302d; color: #ffe4b6; }
 header span, .eyebrow { color: #c7a56b; font-size: 10px; letter-spacing: 2px; }
 .heading { padding: 45px 0 24px; max-width: 760px; }
 h1 { font: clamp(30px, 5vw, 48px) Georgia, serif; color: #f3dfb9; margin: 12px 0 18px; }

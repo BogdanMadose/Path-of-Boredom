@@ -272,14 +272,17 @@
             button.addEventListener("click", function () { selectOptionsSection(source, sections[index]); });
             tabs.appendChild(button);
         });
-        source.dataset.mobileSection = "sound";
         source.appendChild(tabs);
+        selectOptionsSection(source, "sound");
         return panel;
     }
 
     function selectOptionsSection(source, section) {
         var sections = ["sound", "controls", "codex"];
         source.dataset.mobileSection = section;
+        Array.prototype.forEach.call(source.querySelectorAll("[data-options-section]"), function (content) {
+            content.hidden = content.dataset.optionsSection !== section;
+        });
         Array.prototype.forEach.call(source.querySelector(".mm-subtabs").children, function (tab, index) {
             tab.setAttribute("aria-selected", String(sections[index] === section));
         });

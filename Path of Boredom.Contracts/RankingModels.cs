@@ -104,9 +104,9 @@ public static class RankingRules
     /// <summary>Human-readable label for a difficulty key, including the short blurb shown in the setup dialog.</summary>
     public static string DifficultyName(string value) => value switch
     {
-        "hard" => "Hard — easiest / recommended start",
-        "nightmare" => "Nightmare — tougher enemies, less healing",
-        "inferno" => "Inferno — hardest / least forgiving",
+        "hard" => "Easy — recommended starting point",
+        "nightmare" => "Medium — tougher enemies, less healing",
+        "inferno" => "Hard — most demanding, least healing",
         _ => value
     };
 

@@ -595,9 +595,13 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .forge-heading > span { color: #e3c277; font-size: 13px; white-space: nowrap; }
 .forge-hint { font-size: 11px; line-height: 1.7; color: #a8a99d; margin: 12px 0 18px; }
 .forge-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.forge-grid button { display: grid; text-align: left; gap: 7px; padding: 15px 12px; border: 1px solid #b79b6255; border-radius: 4px; background: #141d20; color: #d8c4a3; }
+.forge-grid button { display: grid; grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: auto auto auto; align-items: center; column-gap: 10px; row-gap: 4px; min-width: 0; padding: 12px; border: 1px solid #b79b6255; border-radius: 6px; background: linear-gradient(135deg, #1b2829, #121a1d 78%); color: #d8c4a3; text-align: left; overflow: hidden; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
 .forge-grid button:hover:not(:disabled) { border-color: #efc77a; background: #303327; }
 .forge-grid button:disabled { cursor: not-allowed; opacity: .55; }
+.forge-grid button > .forge-card-art { grid-column: 1; grid-row: 1 / span 3; display: block; width: 48px; height: 48px; border: 1px solid #c7a56b55; border-radius: 12px; background: radial-gradient(circle at 50% 36%, #c7a56b22, #111b20 75%); box-shadow: inset 0 0 12px #0008, 0 2px 8px #0006; object-fit: cover; }
+.forge-grid button > strong, .forge-grid button > span:not([data-upgrade-preview]), .forge-grid button > small { grid-column: 2; min-width: 0; }
+.forge-grid button > [data-upgrade-preview] { grid-column: 1 / -1; }
+.forge-grid button:hover:not(:disabled) > .forge-card-art { border-color: #efc77a99; box-shadow: inset 0 0 12px #0008, 0 0 14px #c7a56b33; }
 .forge-grid strong { font-size: 12px; font-weight: 500; }
 .forge-grid span { font-size: 10px; color: #a4b4b3; }
 .forge-grid small { color: #ddbc75; font-size: 10px; }

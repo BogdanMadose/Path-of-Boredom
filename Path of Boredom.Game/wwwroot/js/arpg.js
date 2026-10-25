@@ -1058,6 +1058,23 @@ export function createGame(root, saveBridge = null) {
     const setupCancel = root.querySelector("[data-setup-cancel]");
     const masteryPanel = root.querySelector("[data-mastery]");
     const masteryButtons = [...root.querySelectorAll("[data-mastery-stat]")];
+    const forgeArtAssets = {
+        weapon: "weapon", armor: "armor", critChance: "critical", critDamage: "ruin",
+        might: "weapon", vitality: "heart", recovery: "recovery", area: "area", warding: "armor"
+    };
+    const forgeArtSource = key => {
+        if (forgeArtAssets[key]) return `/_content/PathOfBoredom.Game/images/forge/${forgeArtAssets[key]}.svg`;
+        const skill = key === "cleave" ? "attack" : key === "flask" ? "potion" : key === "speed" ? "dodge" : key;
+        return skillIcon(state, skill);
+    };
+    const setForgeArt = (button, key) => {
+        const image = button.querySelector("[data-forge-art]");
+        const source = forgeArtSource(key);
+        if (image && image.dataset.source !== source) {
+            image.dataset.source = source;
+            image.src = source;
+        }
+    };
     const forgeNudge = root.querySelector("[data-forge-nudge]");
     const challengeNudge = root.querySelector("[data-challenge-nudge]");
     const challengeNudgeText = root.querySelector("[data-challenge-nudge-text]");
@@ -2163,6 +2180,7 @@ export function createGame(root, saveBridge = null) {
 
         for (const button of masteryButtons) {
             const key = button.dataset.masteryStat;
+            setForgeArt(button, key);
             const cost = masteryCost(state, key);
             const preview = upgradePreview(state, key, true);
             const capped = preview.capped;
@@ -2244,6 +2262,7 @@ export function createGame(root, saveBridge = null) {
         } else shownDraft = "";
         for (const button of upgradeButtons) {
             const key = button.dataset.upgrade;
+            setForgeArt(button, key);
             const selected = forgeSkillSelected(state, key);
             button.hidden = !selected;
             if (["cleave", "nova", "burst", "guard"].includes(key) || NEW_SKILLS[key])

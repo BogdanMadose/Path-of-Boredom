@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Ruinous critical strike</title>
+  <defs><radialGradient id="bg"><stop stop-color="#553248"/><stop offset="1" stop-color="#141e29"/></radialGradient><linearGradient id="edge" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#a983bd"/><stop offset=".52" stop-color="#f4d79b"/><stop offset="1" stop-color="#fff2c8"/></linearGradient></defs>
+  <rect width="64" height="64" rx="13" fill="url(#bg)"/>
+  <path d="m48 7 8 2-3 14-24 28-8-8Z" fill="url(#edge)" stroke="#f6e6c2" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="m51 12-22 27" stroke="#fffbe6" stroke-width="2"/>
+  <path d="m17 18 4 12 12 4-12 4-4 12-4-12-9-4 9-4Z" fill="#c483a4" stroke="#f1b6a2" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="m25 38 7 5-4 5-7-5m17-19 6 3-4 5" fill="#895773" stroke="#e1ab9b" stroke-width="1.2"/>
+  <path d="m10 12 4 3m36 34 4 3" stroke="#ffcf8c" stroke-width="2" stroke-linecap="round"/>
+</svg>

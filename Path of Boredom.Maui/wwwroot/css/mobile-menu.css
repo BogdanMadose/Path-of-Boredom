@@ -1552,4 +1552,36 @@
             font-size: 17px;
         }
     }
+
+    /* Forge art stays legible in the narrow mobile card grids. */
+    body.mobile-shell .mm-panel .forge-grid button {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto auto;
+        justify-items: center;
+        align-content: center;
+        text-align: center;
+    }
+
+    body.mobile-shell .mm-panel .forge-grid button > .forge-card-art {
+        grid-column: 1;
+        grid-row: auto;
+        width: 28px;
+        height: 28px;
+        margin: 0 auto 2px;
+    }
+
+    body.mobile-shell .mm-panel .forge-grid button > strong,
+    body.mobile-shell .mm-panel .forge-grid button > span:not([data-upgrade-preview]),
+    body.mobile-shell .mm-panel .forge-grid button > small,
+    body.mobile-shell .mm-panel .forge-grid button > [data-upgrade-preview] {
+        grid-column: 1;
+        text-align: center;
+    }
+
+    @media (max-height: 480px) {
+        body.mobile-shell .mm-panel .forge-grid button > .forge-card-art {
+            width: 22px;
+            height: 22px;
+        }
+    }
 }

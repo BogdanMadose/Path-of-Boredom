@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Forged sunsteel blade</title>
+  <defs>
+    <radialGradient id="bg"><stop stop-color="#72502b"/><stop offset="1" stop-color="#14232b"/></radialGradient>
+    <linearGradient id="steel" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#8097a1"/><stop offset=".48" stop-color="#f6e6bd"/><stop offset="1" stop-color="#a8c0c5"/></linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="13" fill="url(#bg)"/>
+  <path d="m45 8 11-2-2 12-25 25-9-9Z" fill="url(#steel)" stroke="#fff0c7" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="m48 12-21 23" fill="none" stroke="#fff9df" stroke-width="2"/>
+  <path d="m17 29 18 18-5 5-18-18Z" fill="#d5a85e" stroke="#f3d28f" stroke-width="1.5"/>
+  <path d="m22 44-9 10-5-5 10-9Z" fill="#87553b" stroke="#dcae69" stroke-width="1.5"/>
+  <path d="m34 16 2-5m6 9 5-2M19 15l2 4m-7 6 4 1" stroke="#ffe29a" stroke-width="1.5" opacity=".8"/>
+</svg>

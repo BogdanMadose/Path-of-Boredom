@@ -430,19 +430,19 @@
                         <p data-boss-relics></p>
                     </section>
                     <div class="forge-grid">
-                        <button type="button" data-upgrade="weapon" disabled><strong>Sunsteel edge</strong><span>Weapon damage</span><small data-upgrade-label="weapon">Rank 0 / 50</small></button>
-                        <button type="button" data-upgrade="armor" disabled><strong>Dawnplate</strong><span>Armor + max health</span><small data-upgrade-label="armor">Rank 0 / 12</small></button>
-                        <button type="button" data-upgrade="cleave" disabled><strong>Wide awakening</strong><span data-stat="forge-attack">Cleave power, reach, speed</span><small data-upgrade-label="cleave">Rank 0 / 8</small></button>
-                        <button type="button" data-upgrade="nova" disabled><strong>Solar heart</strong><span data-stat="forge-special">Nova power, radius, recovery</span><small data-upgrade-label="nova">Rank 0 / 8</small></button>
-                        <button type="button" data-upgrade="dodge" disabled><strong>Ghoststep</strong><span>Dodge recovery + immunity</span><small data-upgrade-label="dodge">Rank 0 / 8</small></button>
-                        <button type="button" data-upgrade="flask" disabled><strong>Living ember</strong><span>Healing power + flask refill</span><small data-upgrade-label="flask">Rank 0 / 5</small></button>
-                        <button type="button" data-upgrade="critChance" disabled><strong>Keen ember</strong><span>+2 percentage points critical chance; 75% total cap</span><small data-upgrade-label="critChance">Rank 0 / 8</small></button>
-                        <button type="button" data-upgrade="critDamage" disabled><strong>Ruin's edge</strong><span>+10 percentage points critical damage</span><small data-upgrade-label="critDamage">Rank 0 / 8</small></button>
-                        <button type="button" data-upgrade="burst" disabled><strong>Breaking dawn</strong><span data-stat="forge-burst">Class burst damage, range and recovery</span><small data-upgrade-label="burst">Rank 0 / 8</small></button>
-                        <button type="button" data-upgrade="guard" disabled><strong>Last sanctuary</strong><span data-stat="forge-guard">Class ward damage, radius, duration and recovery</span><small data-upgrade-label="guard">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="weapon" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Sunsteel edge</strong><span>Weapon damage</span><small data-upgrade-label="weapon">Rank 0 / 50</small></button>
+                        <button type="button" data-upgrade="armor" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Dawnplate</strong><span>Armor + max health</span><small data-upgrade-label="armor">Rank 0 / 12</small></button>
+                        <button type="button" data-upgrade="cleave" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Wide awakening</strong><span data-stat="forge-attack">Cleave power, reach, speed</span><small data-upgrade-label="cleave">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="nova" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Solar heart</strong><span data-stat="forge-special">Nova power, radius, recovery</span><small data-upgrade-label="nova">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="dodge" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Ghoststep</strong><span>Dodge recovery + immunity</span><small data-upgrade-label="dodge">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="flask" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Living ember</strong><span>Healing power + flask refill</span><small data-upgrade-label="flask">Rank 0 / 5</small></button>
+                        <button type="button" data-upgrade="critChance" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Keen ember</strong><span>+2 percentage points critical chance; 75% total cap</span><small data-upgrade-label="critChance">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="critDamage" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Ruin's edge</strong><span>+10 percentage points critical damage</span><small data-upgrade-label="critDamage">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="burst" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Breaking dawn</strong><span data-stat="forge-burst">Class burst damage, range and recovery</span><small data-upgrade-label="burst">Rank 0 / 8</small></button>
+                        <button type="button" data-upgrade="guard" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Last sanctuary</strong><span data-stat="forge-guard">Class ward damage, radius, duration and recovery</span><small data-upgrade-label="guard">Rank 0 / 8</small></button>
                         @foreach (var skill in new[] { "chain", "frost", "reap", "meteor", "siphon", "nullwave" })
                         {
-                            <button type="button" data-upgrade="@skill" disabled hidden><strong>@skill upgrades</strong><span>Skill damage, reach and recovery</span><small data-upgrade-label="@skill">Rank 0 / 8</small></button>
+                            <button type="button" data-upgrade="@skill" disabled hidden><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>@skill upgrades</strong><span>Skill damage, reach and recovery</span><small data-upgrade-label="@skill">Rank 0 / 8</small></button>
                         }
                     </div>
                     <p class="forge-feedback" data-forge-feedback role="status" aria-live="polite">Every coin is a choice. Damage, survival, or skills?</p>
@@ -450,14 +450,14 @@
                         <h3 id="mastery-title">Beyond the forge</h3>
                         <p>Unlimited ranks. Each rank costs 100 gold more.</p>
                         <div class="forge-grid">
-                            <button type="button" data-mastery-stat="might" disabled><strong>Ember might</strong><span>+2 base weapon damage</span><small data-mastery-label></small></button>
-                            <button type="button" data-mastery-stat="vitality" disabled><strong>Enduring heart</strong><span>+5 max health; heal 5</span><small data-mastery-label></small></button>
-                            <button type="button" data-mastery-stat="recovery" disabled><strong>Battle rhythm</strong><span>+0.5% cooldown recovery</span><small data-mastery-label></small></button>
-                            <button type="button" data-mastery-stat="area" disabled><strong>Widening ember</strong><span>+1% attack reach and special radius/range</span><small data-mastery-label></small></button>
-                            <button type="button" data-mastery-stat="speed" disabled><strong>Endless stride</strong><span>+1% movement speed; dodge distance unchanged</span><small data-mastery-label></small></button>
-                            <button type="button" data-mastery-stat="critChance" disabled><strong>Unerring spark</strong><span>+0.5 percentage points critical chance; 75% total cap</span><small data-mastery-label></small></button>
-                            <button type="button" data-mastery-stat="critDamage" disabled><strong>Endless ruin</strong><span>+2 percentage points critical damage</span><small data-mastery-label></small></button>
-                            <button type="button" data-mastery-stat="warding" disabled><strong>Warding sigil</strong><span>+0.5 percentage points spell resistance; 60% total cap</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="might" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Ember might</strong><span>+2 base weapon damage</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="vitality" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Enduring heart</strong><span>+5 max health; heal 5</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="recovery" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Battle rhythm</strong><span>+0.5% cooldown recovery</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="area" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Widening ember</strong><span>+1% attack reach and special radius/range</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="speed" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Endless stride</strong><span>+1% movement speed; dodge distance unchanged</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="critChance" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Unerring spark</strong><span>+0.5 percentage points critical chance; 75% total cap</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="critDamage" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Endless ruin</strong><span>+2 percentage points critical damage</span><small data-mastery-label></small></button>
+                            <button type="button" data-mastery-stat="warding" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Warding sigil</strong><span>+0.5 percentage points spell resistance; 60% total cap</span><small data-mastery-label></small></button>
                         </div>
                     </section>
                 </section>

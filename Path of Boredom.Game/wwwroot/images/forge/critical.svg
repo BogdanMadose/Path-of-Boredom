@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Critical spark</title>
+  <defs><radialGradient id="bg"><stop stop-color="#774623"/><stop offset="1" stop-color="#1b2026"/></radialGradient><radialGradient id="core"><stop stop-color="#fff8ce"/><stop offset=".48" stop-color="#ffc45f"/><stop offset="1" stop-color="#de6838"/></radialGradient></defs>
+  <rect width="64" height="64" rx="13" fill="url(#bg)"/>
+  <g fill="none" stroke="#f3bf69" stroke-linecap="round">
+    <path d="M32 7v9M32 48v9M7 32h9m32 0h9M14 14l7 7m22 22 7 7m0-36-7 7m-22 22-7 7" stroke-width="2"/>
+    <path d="m32 15 4 12 12 5-12 4-4 13-4-13-12-4 12-5Z" stroke="#ffe6a5" stroke-width="1.5"/>
+  </g>
+  <path d="m32 20 5 8 8 4-8 4-5 9-5-9-8-4 8-4Z" fill="url(#core)" stroke="#fff0b9" stroke-width="1.5" stroke-linejoin="round"/>
+  <circle cx="32" cy="32" r="3" fill="#fffde7"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Dawn-forged armor sigil</title>
+  <defs><radialGradient id="bg"><stop stop-color="#31574f"/><stop offset="1" stop-color="#14232b"/></radialGradient></defs>
+  <rect width="64" height="64" rx="13" fill="url(#bg)"/>
+  <path d="m32 7 21 8-3 21c-2 10-10 17-18 22-8-5-16-12-18-22l-3-21Z" fill="#203b3a" stroke="#d5bd83" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="m32 13 15 6-2 17c-2 7-7 12-13 16-6-4-11-9-13-16l-2-17Z" fill="#698879" stroke="#91b7a2" stroke-width="1.5"/>
+  <path d="m32 17 6 11-6 17-6-17Z" fill="#e6c880" stroke="#fff0bc" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M16 21h6m20 0h6M22 43l5-3m15 3-5-3" stroke="#f2dca4" stroke-width="1.5" opacity=".8"/>
+</svg>

@@ -39,6 +39,7 @@ if (!fs.existsSync(edge)) {
         const startButton = document.createElement("button"), endlessButton = document.createElement("button"), canvas = document.createElement("canvas");
         const on = (target, event, handler) => target.addEventListener(event, handler);
         const clearInput = () => {}, updateHud = () => {}, scheduleArenaLayout = () => {}, reportScore = async () => {}, showMainMenu = () => {};
+        const clearTemporaryRun = () => {}, saveTemporaryRun = () => {};
         const togglePause = () => {}, enterEndless = () => true, resetToReleaseRankings = () => {};
         const openSaveSlotChooser = async () => "slot-1";
         const { classUnlocked, extraStarters, applyCampBonuses, rerollsPerRun, CLASS_UNLOCK_HINT, CLASS_ORDER, loadProfile, masteryStep, MASTERY_MAX, MASTERY_REWARDS, unlockedTrims, setTrim, creditProgress } = meta;

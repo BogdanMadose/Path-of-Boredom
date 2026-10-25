@@ -20,7 +20,7 @@ for (const heroClass of Object.keys(HERO_CLASSES)) for (const skill of SKILL_KEY
 }
 assert.equal(new Set(Object.keys(HERO_CLASSES).map(heroClass => skillIcon({ heroClass }, 'attack'))).size, 4);
 const menu = read('Path of Boredom.Maui/wwwroot/js/mobile-menu.js');
-const treeArt = vm.runInNewContext(`(${menu.slice(menu.indexOf('function treeArt('), menu.indexOf('    // ---- Panel construction'))})`);
+const treeArt = vm.runInNewContext(`(${menu.slice(menu.indexOf('function treeArt('), menu.indexOf('\n    function returnToMainMenu('))})`);
 for (const heroClass of Object.keys(HERO_CLASSES)) for (const skill of SKILL_KEYS) {
     assert.equal(treeArt({ dataset: { heroClass, treeSkill: skill } }), skillIcon({ heroClass }, skill), 'initial mobile tabs use the same shared URLs');
 }

@@ -1004,7 +1004,7 @@ export function createGame(root, saveBridge = null) {
         // nodes, skill slotting) skip the generic click so two sounds never stack.
         if (event.isTrusted && button && !button.disabled && !button.matches("[data-skill], [data-move], [data-upgrade], [data-mastery-stat], [data-card-id], [data-learn-skill], [data-choose-run-skill], [data-slot-unlocked]")) audio.play("button");
     }, { capture: true });
-    on(window, "pagehide", () => audio.setBackground(true));
+    on(window, "pagehide", () => { audio.setBackground(true); saveTemporaryRun(); });
     const stats = Object.fromEntries([...root.querySelectorAll("[data-stat]")].map(element => [element.dataset.stat, element]));
     const healthMeter = root.querySelector('[data-meter="health"]');
     const xpMeter = root.querySelector('[data-meter="xp"]');
@@ -1035,7 +1035,46 @@ export function createGame(root, saveBridge = null) {
     const keys = new Set();
     const pointers = new Map();
     let aim = null;
+    // Keep a tab-scoped continuation across Blazor route changes such as opening Patch Notes.
+    // This is not a cloud/save-slot write; it only restores the live run in the same browser tab.
+    const liveRunKey = `path-of-boredom.live-run.v1:${releaseRankings ? "release" : "current"}`;
     let state = createState();
+    let restoredSaveSlot = null;
+    let activeSaveSlot = null;
+    function clearTemporaryRun() {
+        try { sessionStorage.removeItem(liveRunKey); } catch { /* Session storage is optional. */ }
+    }
+    function saveTemporaryRun() {
+        if (!["playing", "paused", "camp", "won", "choosing"].includes(state.status)) {
+            clearTemporaryRun();
+            return;
+        }
+        try {
+            const snapshot = captureSnapshot(state);
+            delete snapshot.state.meta;
+            sessionStorage.setItem(liveRunKey, JSON.stringify({
+                snapshot,
+                cloudSignedIn: root.dataset.cloudSignedIn === "on",
+                activeSaveSlot: Number.isInteger(activeSaveSlot) ? activeSaveSlot : null
+            }));
+        }
+        catch { clearTemporaryRun(); }
+    }
+    try {
+        const storedRun = sessionStorage.getItem(liveRunKey);
+        if (storedRun) {
+            const cached = JSON.parse(storedRun);
+            const restoredRun = restoreSnapshot(cached.snapshot || cached);
+            if (["paused", "camp", "won", "choosing"].includes(restoredRun.status)) {
+                state = restoredRun;
+                restoredSaveSlot = cached.cloudSignedIn === (root.dataset.cloudSignedIn === "on")
+                    && Number.isInteger(cached.activeSaveSlot) && cached.activeSaveSlot >= 1 && cached.activeSaveSlot <= 5
+                    ? cached.activeSaveSlot : null;
+            }
+            else clearTemporaryRun();
+        }
+    } catch { clearTemporaryRun(); }
+    activeSaveSlot = restoredSaveSlot;
     if (releaseRankings) resetToReleaseRankings(state);
     let best = 0;
     let frame = 0;
@@ -1050,7 +1089,6 @@ export function createGame(root, saveBridge = null) {
     const retrySave = root.querySelector("[data-retry-save]");
     let checkingUnlock = true;
     let endlessUnlocked = false;
-    let activeSaveSlot = null;
     let saveSlotsCache = [];
     let resumeIfLoadCanceled = false;
     let selectingSaveSlot = false;
@@ -1398,14 +1436,16 @@ export function createGame(root, saveBridge = null) {
     let setupFromMain = false;
     root.dataset.mainMenu = "on";
     function showMainMenu(show) {
-        if (saving || setupAction) return;
+        if (show && setupAction) cancelSetup();
         if (show && state.status === "playing") togglePause(state);
         inMainMenu = show;
         if (show) { loreReader.hidden = true; loreResume = false; }
         mainMenu.hidden = !show;
         root.dataset.mainMenu = show ? "on" : "off";
+        if (show) saveTemporaryRun();
         clearInput();
         updateHud();
+        if (show) (mainMenu.querySelector('[data-main-resume]:not([hidden])') || mainMenu.querySelector("[data-main-play]"))?.focus({ preventScroll: true });
     }
     on(root.querySelector("[data-open-main-menu]"), "click", () => {
         root.dispatchEvent(new CustomEvent("main-menu-open"));
@@ -1459,25 +1499,40 @@ export function createGame(root, saveBridge = null) {
         mainPlay.focus({ preventScroll: true });
     });
     
-    on(root.querySelector("[data-main-resume]"), "click", () => { showMainMenu(false); if (state.status === "paused") begin(); });
+    on(root.querySelector("[data-main-resume]"), "click", () => {
+        if (root.dataset.saveBusy === "on" || root.dataset.gameStatus === "setup") return;
+        showMainMenu(false);
+        if (["paused", "camp"].includes(state.status)) begin();
+        else if (state.status === "won") {
+            setupFromMain = true;
+            openSetup("continue");
+        }
+    });
     on(root.querySelector("[data-main-new]"), "click", async () => {
+        if (root.dataset.saveBusy === "on" || root.dataset.gameStatus === "setup") return;
         if (state.status !== "ready" && !await gameConfirm("Start a new campaign? Unsaved progress in the current run will be replaced.")) return;
+        if (root.dataset.saveBusy === "on" || root.dataset.gameStatus === "setup") return;
         showMainMenu(false);
         setupFromMain = true;
         openSetup("campaign");
     });
     const mainEndless = root.querySelector("[data-main-endless]");
     on(mainEndless, "click", async () => {
-        if (!(endlessUnlocked || state.campaignComplete === 1)) return;
+        if (root.dataset.saveBusy === "on" || root.dataset.gameStatus === "setup" || !(endlessUnlocked || state.campaignComplete === 1)) return;
         if (state.status !== "ready" && state.status !== "dead"
             && !await gameConfirm("Start a new Endless run? The current run ends and its score is submitted. Unsaved progress will be replaced.")) return;
+        if (root.dataset.saveBusy === "on" || root.dataset.gameStatus === "setup") return;
         showMainMenu(false);
         setupFromMain = true;
         openSetup("endless");
     });
-    on(root.querySelector("[data-main-load]"), "click", () => { showMainMenu(false); loadButton.click(); });
+    on(root.querySelector("[data-main-load]"), "click", () => {
+        if (root.dataset.saveBusy === "on" || root.dataset.gameStatus === "setup") return;
+        loadButton.click();
+    });
     on(root, 'open-main-panel', () => { showMainMenu(false); });
     on(root.querySelector("[data-main-options]"), "click", () => {
+        if (root.dataset.saveBusy === "on" || root.dataset.gameStatus === "setup") return;
         showMainMenu(false);
         root.dispatchEvent(new CustomEvent("open-run-options", { detail: { fromMain: true } }));
         if (root.dataset.canvasHud !== "on") root.querySelector("[data-run-options]").scrollIntoView({ block: "start" });
@@ -1688,6 +1743,7 @@ export function createGame(root, saveBridge = null) {
         if (setupAction === "continue") {
             if (!enterEndless(state, difficultySelect.value)) return;
         } else {
+            clearTemporaryRun();
             state = setupAction === "endless" ? startEndlessRun(Math.random, difficultySelect.value, classSelect.value) : startRun(Math.random, difficultySelect.value, classSelect.value);
             state.loadout = loadout;
             applyCampBonuses(state, MAX_FLASKS);
@@ -1702,6 +1758,7 @@ export function createGame(root, saveBridge = null) {
         setupFromMain = false;
         setup.hidden = true;
         checkpointHandled = null;
+        saveTemporaryRun();
         clearInput();
         last = performance.now();
         updateHud();
@@ -1846,9 +1903,11 @@ export function createGame(root, saveBridge = null) {
             hudOne("[data-camp-event-actions]").hidden = !open;
         }
         hudOne("[data-open-lore]").hidden = inMainMenu || state.mode !== "campaign" || state.status === "ready";
-        hudOne("[data-main-resume]").disabled = saving || state.status === "ready";
-        hudOne('[data-main-resume]').hidden = !['playing', 'paused', 'camp', 'won'].includes(state.status);
+        hudOne("[data-main-resume]").disabled = saving || checkingUnlock || state.status === "ready";
+        hudOne('[data-main-resume]').hidden = !['playing', 'paused', 'camp', 'won', 'choosing'].includes(state.status);
         hudOne("[data-main-load]").disabled = saving || checkingUnlock || !saveBridge;
+        hudOne("[data-main-options]").disabled = saving || checkingUnlock;
+        hudOne("[data-main-new]").disabled = saving || checkingUnlock || !!setupAction;
         root.dataset.gameStatus = setupAction ? "setup" : state.status;
         root.dataset.saveBusy = saving || checkingUnlock ? "on" : "off";
         const p = state.player;
@@ -2029,7 +2088,7 @@ export function createGame(root, saveBridge = null) {
         const choosing = state.status === "choosing";
         const draftClosing = (draftVisible || draft.classList.contains("level-draft-exit")) && !choosing;
         const checkpointInBackground = automaticCheckpoint(state, checkpointSaveFailed);
-        overlay.hidden = !!setupAction || (state.status === "playing" || checkpointInBackground) && !draftClosing;
+        overlay.hidden = inMainMenu || !!setupAction || (state.status === "playing" || checkpointInBackground) && !draftClosing;
         const active = ["playing", "paused", "camp", "won", "choosing"].includes(state.status);
         const canForge = !setupAction && ["paused", "camp", "won"].includes(state.status);
         for (const select of hudAll("[data-equipment-style]")) {
@@ -2346,7 +2405,7 @@ export function createGame(root, saveBridge = null) {
             if (state.status === "playing" && shownStatus !== "choosing") scheduleArenaLayout(true);
             if (["paused", "camp", "won", "dead"].includes(state.status)) void reportScore();
             shownStatus = state.status;
-            overlay.hidden = !!setupAction || (state.status === "playing" || checkpointInBackground) && !draftClosing;
+            overlay.hidden = inMainMenu || !!setupAction || (state.status === "playing" || checkpointInBackground) && !draftClosing;
             restartButton.hidden = !["paused", "camp"].includes(state.status) || (state.mode === "endless" && !endlessButton.hidden);
             deathMainMenu.hidden = state.status !== "dead";
             if (state.status !== "playing") {
@@ -2880,6 +2939,7 @@ export function createGame(root, saveBridge = null) {
                 shownStatus = "";
                 shownDraft = "";
                 last = performance.now();
+                saveTemporaryRun();
             }
             advanceEndless = result.success && !loadingSave && state.mode === "endless" && state.status === "camp";
             saveStatus.textContent = automatic
@@ -2955,7 +3015,7 @@ export function createGame(root, saveBridge = null) {
                 if (disposed) return;
                 saveSlotsCache = Array.isArray(slots) ? slots : [];
                 root.dataset.hasSave = saveSlotsCache.some(slot => slot.exists) ? "on" : "off";
-                activeSaveSlot = saveSlotsCache.find(slot => !slot.exists)?.slot ?? null;
+                activeSaveSlot = activeSaveSlot ?? saveSlotsCache.find(slot => !slot.exists)?.slot ?? null;
                 endlessUnlocked = saveSlotsCache.some(slot => slot.endlessUnlocked);
                 if (endlessUnlocked) grandfatherClasses(true);
                 saveStatus.textContent = saveSlotsCache.some(slot => slot.exists)
@@ -3147,6 +3207,7 @@ export function createGame(root, saveBridge = null) {
     // animate() loop's own DOM-disconnection check).
     function dispose() {
         if (disposed) return;
+        saveTemporaryRun();
         disposed = true;
         cancelAnimationFrame(frame);
         cancelAnimationFrame(layoutFrame);
@@ -3188,6 +3249,8 @@ export function createGame(root, saveBridge = null) {
         },
         resetAfterDeletion() {
             accountGeneration++;
+            clearTemporaryRun();
+            activeSaveSlot = null;
             root.dataset.cloudSignedIn = "off";
             pendingScores.clear();
             reportedScores.clear();

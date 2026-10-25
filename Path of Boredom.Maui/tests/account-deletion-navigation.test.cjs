@@ -15,7 +15,7 @@ async function run() {
         rankingStatus: { textContent: '' }, saveStatus: { textContent: '' },
         title: {}, description: {}, startButton: {}, restartButton: {},
         state: { status: 'paused', rankingMode: 'campaign', difficulty: 'hard', kills: 100 },
-        createState: () => ({ status: 'ready' }), resetToReleaseRankings() {}, clearInput() {}, dispose() {},
+        createState: () => ({ status: 'ready' }), resetToReleaseRankings() {}, clearTemporaryRun() {}, clearInput() {}, dispose() {},
         updateHud() { root.dataset.gameStatus = context.state.status; },
         CustomEvent: class { constructor(type) { this.type = type; } },
         saveBridge: { async invokeMethodAsync() { submissions++; return true; } },

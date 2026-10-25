@@ -23,6 +23,7 @@
     .arpg ::deep button:is(:active, .button-pressed) { scale: 1; }
 }
 .arpg [hidden] { display: none !important; }
+.arpg[data-main-menu="on"] [data-overlay] { display: none !important; }
 .main-menu { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; box-sizing: border-box; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); background: radial-gradient(ellipse at top, #34423b, #081218 75%); overflow-y: auto; }
 .main-play-menu {
     display: grid;

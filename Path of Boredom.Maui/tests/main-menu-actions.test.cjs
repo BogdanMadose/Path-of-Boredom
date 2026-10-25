@@ -63,8 +63,9 @@ await elements['[data-main-new]'].fire();
 assert.deepEqual(menuCalls.slice(0, 3), [false, 'campaign', true], 'Campaign closes the menu and opens the new-run setup');
 assert.equal(context.setupFromMain, true);
 
+const menuCallsBeforeLoad = menuCalls.length;
 elements['[data-main-load]'].fire();
-assert.equal(menuCalls.at(-1), false, 'Load closes the main menu');
+assert.equal(menuCalls.length, menuCallsBeforeLoad, 'Load keeps the main menu behind the save chooser');
 assert.equal(loaded, 1, 'Load delegates to the save-slot chooser');
 
 elements['[data-main-options]'].fire();

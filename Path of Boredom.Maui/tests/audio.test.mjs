@@ -199,7 +199,7 @@ assert.equal(new Set(arenaMusic).size, 6, 'all six arenas schedule distinct musi
 assert.match(controller, /event\.isTrusted/);
 assert.match(controller, /audio\.update\(state/);
 assert.match(controller, /audio\.dispose\(\)/);
-assert.match(controller, /"pagehide", \(\) => audio\.setBackground\(true\)/);
+assert.match(controller, /"pagehide", \(\) => \{ audio\.setBackground\(true\); saveTemporaryRun\(\); \}/);
 const home = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/Home.razor', import.meta.url), 'utf8');
 for (const attribute of ['data-audio-mute', 'data-audio-music', 'data-audio-effects', 'data-audio-status']) assert.ok(home.includes(attribute));
 console.log('PASS: procedural audio, class/skill cues, music transitions, settings, gesture gating, spam limits, background suspension, save isolation and disposal');

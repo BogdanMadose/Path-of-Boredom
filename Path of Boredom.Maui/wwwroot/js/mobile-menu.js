@@ -35,7 +35,8 @@
     var resumeAfterMenu = false;
     var fromShortcut = false;
     var returnToMain = false;
-    var accountFromMain = false;
+    var panelBackTarget = null;
+    var loreReturnToPause = false;
     var currentRoot = null;
     var menuController = null;
     var badgeTimer = 0;
@@ -77,7 +78,8 @@
         resumeAfterMenu = false;
         fromShortcut = false;
         returnToMain = false;
-        accountFromMain = false;
+        panelBackTarget = null;
+        loreReturnToPause = false;
     }
 
     function el(tag, className, text) {
@@ -92,6 +94,41 @@
         var skill = tree.dataset.treeSkill;
         return ["dodge", "potion"].includes(skill) ? "/_content/PathOfBoredom.Game/images/skills/" + skill + ".svg"
             : "/_content/PathOfBoredom.Game/images/skills/" + (tree.dataset.heroClass || "knight") + "/" + skill + ".svg";
+    }
+
+    function returnToMainMenu(root) {
+        closePanel(false);
+        var mainMenuButton = root && root.querySelector("[data-open-main-menu]");
+        if (mainMenuButton) mainMenuButton.click();
+        var focusTarget = root && (root.querySelector("[data-main-resume]:not([hidden])") || root.querySelector("[data-main-play]"));
+        if (focusTarget) focusTarget.focus({ preventScroll: true });
+    }
+
+    function backFromPanel(name) {
+        if (panelBackTarget === "main") {
+            returnToMainMenu(currentRoot || document.querySelector(".arpg"));
+            return;
+        }
+        if (fromShortcut) {
+            closePanel();
+            return;
+        }
+        if (panelBackTarget === "pause") {
+            var pausedRoot = currentRoot || document.querySelector(".arpg");
+            if (!pausedRoot || !["playing", "paused", "camp"].includes(pausedRoot.dataset.gameStatus)) {
+                returnToMainMenu(pausedRoot);
+                return;
+            }
+            openPanel("pause");
+            return;
+        }
+
+        var root = currentRoot || document.querySelector(".arpg");
+        if (name !== "pause" && root && ["playing", "paused", "camp"].includes(root.dataset.gameStatus)) {
+            openPanel("pause");
+            return;
+        }
+        closePanel(name === "pause");
     }
 
     // ---- Panel construction ------------------------------------------------------------
@@ -112,19 +149,7 @@
         var information = name !== "pause";
         close.textContent = information ? "\u2190" : "\u2715";
         close.setAttribute("aria-label", information ? "Back to pause menu" : "Close");
-        listen(close, "click", function () {
-            if (name === "account" && accountFromMain) returnToMain = true;
-            if (returnToMain) {
-                accountFromMain = false;
-                closePanel(false);
-                document.querySelector('.arpg [data-open-main-menu]').click();
-                returnToMain = false;
-            }
-            else if (name === "account" && ["ready", "dead", "won"].includes(document.querySelector(".arpg").dataset.gameStatus)) closePanel(false);
-            else if (fromShortcut) closePanel();
-            else if (information) openPanel("pause");
-            else closePanel();
-        });
+        listen(close, "click", function () { backFromPanel(name); });
 
         head.appendChild(heading);
         head.appendChild(meta);
@@ -335,8 +360,7 @@
 
     function closePanel(resume = true) {
         if (!openName) return;
-        var root = document.querySelector(".arpg");
-        if (root.dataset.saveBusy === "on") return;
+        var root = currentRoot || document.querySelector(".arpg");
         panels[openName].root.classList.remove("mm-open");
         if (["rankings", "account"].includes(openName)) panels[openName].root.hidden = true;
         var tab = layer.querySelector('[data-mm-tab="' + openName + '"]');
@@ -346,6 +370,8 @@
         root.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: false, resume: resume && resumeAfterMenu } }));
         resumeAfterMenu = false;
         fromShortcut = false;
+        returnToMain = false;
+        panelBackTarget = null;
         // Returning to combat: the engine's own "resume" control is the authority on unpausing,
         // so we only restore focus and let the player decide.
         var canvas = document.querySelector(".arena-viewport canvas");
@@ -354,13 +380,22 @@
 
     function openPanel(name) {
         if (!panels[name]) return;
-        var root = document.querySelector(".arpg");
-        if (root.dataset.saveBusy === "on") return;
+        var root = currentRoot || document.querySelector(".arpg");
+        if (root.dataset.saveBusy === "on" && !openName) return;
         if (openName === name) { closePanel(); return; }
         var idleAccount = ["account", "options", "rankings"].includes(name) && ["ready", "dead", "won"].includes(root.dataset.gameStatus);
         if (!idleAccount && !["playing", "paused", "camp"].includes(root.dataset.gameStatus)) return;
+        var previousPanel = openName;
+        var returningToMain = previousPanel
+            ? previousPanel !== "pause" && panelBackTarget === "main"
+            : returnToMain || root.dataset.mainMenu === "on";
+        if (previousPanel === "pause") fromShortcut = false;
+        returnToMain = returningToMain;
+        panelBackTarget = name === "pause" ? returningToMain ? "main" : "close"
+            : previousPanel === "pause" ? "pause"
+                : returningToMain ? "main"
+                    : ["playing", "paused", "camp"].includes(root.dataset.gameStatus) ? "pause" : "close";
         var shouldResume = openName ? resumeAfterMenu : root.dataset.gameStatus === "playing";
-        if (!openName && root.dataset.mainMenu === 'on') returnToMain = true;
         if (openName) {
             panels[openName].root.classList.remove("mm-open");
             if (["rankings", "account"].includes(openName)) panels[openName].root.hidden = true;
@@ -368,7 +403,15 @@
             if (previousTab) previousTab.setAttribute("aria-expanded", "false");
         }
         root.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: true, panel: name, information: ["account", "options", "rankings"].includes(name) } }));
-        if (root.dataset.menuOpen !== "on") return;
+        if (root.dataset.menuOpen !== "on") {
+            panelBackTarget = null;
+            returnToMain = false;
+            if (returningToMain) {
+                var mainMenuButton = root.querySelector("[data-open-main-menu]");
+                if (mainMenuButton) mainMenuButton.click();
+            }
+            return;
+        }
         resumeAfterMenu = shouldResume;
 
         openName = name;
@@ -377,7 +420,11 @@
         if (panels[name].syncTabs) panels[name].syncTabs();
         panels[name].root.classList.add("mm-open");
         var back = panels[name].root.querySelector('.mm-close');
-        if (back) back.setAttribute('aria-label', returnToMain ? 'Back to main menu' : name === 'pause' ? 'Close' : 'Back to pause menu');
+        if (back) {
+            back.textContent = returnToMain ? "\u2190" : name === "pause" ? "\u2715" : "\u2190";
+            back.setAttribute('aria-label', returnToMain ? 'Back to main menu' : name === 'pause' ? 'Close' : 'Back to pause menu');
+            back.focus({ preventScroll: true });
+        }
         var tab = layer.querySelector('[data-mm-tab="' + name + '"]');
         if (tab) tab.setAttribute("aria-expanded", "true");
         document.body.classList.add("mm-panel-open");
@@ -475,6 +522,7 @@
         listen(lore, 'click', function () {
             var original = root.querySelector('[data-open-lore]');
             if (!original || original.hidden || original.disabled) return;
+            loreReturnToPause = true;
             closePanel(false);
             original.click();
         });
@@ -502,11 +550,12 @@
         if (root.querySelector("[data-game-account]")) {
             var signIn = el("button", "mm-pause-option", "Account & cloud");
             signIn.type = "button";
+            signIn.dataset.mobileAccountAction = "";
             listen(signIn, "click", function () {
+                if (root.dataset.saveBusy === "on") return;
                 if (root.dataset.mainMenu === 'on') {
-                    accountFromMain = true;
                     root.dispatchEvent(new CustomEvent('open-main-panel', { detail: { panel: 'account' } }));
-                } else accountFromMain = false;
+                }
                 openPanel("account");
             });
             actions.appendChild(signIn);
@@ -556,6 +605,9 @@
             button.textContent = button.dataset.mobileSaveAction === "save"
                 ? root.dataset.cloudSignedIn === "on" ? "Save to cloud" : "Save on device"
                 : root.dataset.cloudSignedIn === "on" ? "Load cloud save" : "Load device save";
+        });
+        Array.prototype.forEach.call(root.querySelectorAll("[data-mobile-account-action]"), function (button) {
+            button.disabled = root.dataset.saveBusy === "on";
         });
         var saveStatus = root.querySelector("[data-save-status]");
         Array.prototype.forEach.call(root.querySelectorAll(".mm-save-status"), function (status) {
@@ -676,13 +728,12 @@
         syncBadges();
         var main = el("button", "mm-pause-option mm-pause-footer", "Main menu");
         main.type = "button";
-        listen(main, "click", function () { closePanel(false); root.querySelector("[data-open-main-menu]").click(); });
+        listen(main, "click", function () { returnToMainMenu(root); });
         panels.pause.root.querySelector(".mm-pause-side").appendChild(main);
-        listen(root, "main-menu-open", function () { closePanel(false); returnToMain = false; accountFromMain = false; });
+        listen(root, "main-menu-open", function () { closePanel(false); returnToMain = false; panelBackTarget = null; loreReturnToPause = false; });
         listen(root, 'open-main-panel', function () { returnToMain = true; });
         listen(root, "open-run-options", function (event) { returnToMain = event.detail?.fromMain === true; openPanel("options"); });
         listen(root, "mobile-save-result", function (event) {
-            if (event.detail?.success && event.detail.loadingSave && openName) closePanel(false);
             syncBadges();
         });
         listen(root, "mobile-account-deleted", function () {
@@ -695,14 +746,17 @@
         });
 
         // Android back closes an open panel first.
+        listen(root.querySelector("[data-close-lore]"), "click", function () {
+            if (!loreReturnToPause) return;
+            loreReturnToPause = false;
+            queueMicrotask(function () { if (!root.querySelector("[data-lore-reader]").hidden) return; openPanel("pause"); });
+        });
         listen(window, "popstate", function () {
-            if (returnToMain && openName) {
-                closePanel(false);
-                root.querySelector('[data-open-main-menu]').click();
-                returnToMain = false;
+            if (openName) backFromPanel(openName);
+            else if (loreReturnToPause) {
+                var closeLore = root.querySelector("[data-close-lore]");
+                if (closeLore) closeLore.click();
             }
-            else if (openName === "rankings") openPanel("pause");
-            else closePanel(false);
         });
         return true;
     }

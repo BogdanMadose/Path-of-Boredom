@@ -38,6 +38,7 @@ if (!fs.existsSync(edge)) {
         <div class="arena-overlay" data-test="death">${runMenu}</div>
         <div class="arena-overlay" data-test="pause"><div class="mm-pause-card"><div class="mm-pause-side"><div class="mm-pause-emblem"></div><h2>The hollow can wait.</h2><p>Combat and game timers are paused.</p><button class="mm-resume">Return to battle</button><p class="mm-save-status mm-run-recap">Run so far: 2m 28s · 2 stages cleared · 185 kills · 0 flasks used · 195 gold spent · 0 challenges completed. Damage dealt: Cleave: 33406 · Cinder relay: 7610 · Blazing cross: 1060.</p><button class="mm-pause-option mm-pause-footer">Main menu</button></div><div class="mm-pause-groups"><section class="mm-menu-group"><h3>Character</h3><button class="mm-pause-option">Skills &amp; loadout</button><button class="mm-pause-option">Forge &amp; equipment</button><button class="mm-pause-option">Stage challenges — bonus gold</button><button class="mm-pause-option">Run options — sound &amp; practice</button></section><section class="mm-menu-group"><h3>Community</h3><button class="mm-pause-option">Rankings</button><button class="mm-pause-option">Chapter lore</button></section><section class="mm-menu-group mm-progress-group"><h3>Progress</h3><div class="mm-save-actions"><button class="mm-pause-option">Save to cloud</button><button class="mm-pause-option">Load cloud save</button><button class="mm-pause-option">Account &amp; cloud</button></div><p class="mm-save-status">Level-up boon selected. Save to keep it, or continue to the next autosaved checkpoint.</p></section></div></div></div>${skillChoice}${setup}</div><script>
         const report = [];
+        const gameRoot = document.querySelector('.arpg');
         const fill = (selector, text) => document.querySelectorAll(selector).forEach(e => e.textContent = text);
         fill('[data-card-category]', 'CRITICAL CHANCE'); fill('[data-card-name]', 'A shattering dawn');
         fill('[data-card-description]', '+2% crit chance per rank (cap 75%).'); fill('[data-card-rank]', 'Rank 1 / 10');
@@ -76,6 +77,7 @@ if (!fs.existsSync(edge)) {
         const overlays = { level: '[data-test="level"]', death: '[data-test="death"]', skill: '[data-skill-choice]', setup: '[data-setup]', tutorial: '[data-setup]', main: '.main-menu', account: '[data-test="account"]', pause: '[data-test="pause"]' };
         window.measure = () => {
             for (const [name, selector] of Object.entries(overlays)) {
+                gameRoot.dataset.mainMenu = name === 'main' ? 'on' : 'off';
                 const overlay = document.querySelector(selector);
                 for (const other of new Set(Object.values(overlays))) document.querySelector(other).style.display = other === selector ? '' : 'none';
                 if (selector === '[data-setup]') {

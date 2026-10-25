@@ -4,9 +4,14 @@ import http from 'node:http';
 import { dumpBrowserDom } from './browser-dom.mjs';
 const source = fs.readFileSync(new URL('../wwwroot/js/mobile-menu.js', import.meta.url), 'utf8');
 const home = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/Home.razor', import.meta.url), 'utf8');
+const patchNotes = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/PatchNotes.razor', import.meta.url), 'utf8');
+const rankings = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/Rankings.razor', import.meta.url), 'utf8');
 const base = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/Home.razor.css', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../wwwroot/css/mobile-menu.css', import.meta.url), 'utf8').replace('@media (pointer: coarse)', '@media all');
 const markup = home.slice(home.indexOf('<section class="main-menu"'), home.indexOf('<section class="campaign-lore"'));
+for (const [name, page] of [['Patch Notes', patchNotes], ['Rankings', rankings]]) {
+    assert.match(page, /class="back-link" href="\/" aria-label="Back to game"/, `${name} page returns to the game route`);
+}
 const actions = source.slice(source.indexOf('    function addSaveActions('), source.indexOf('    function buildAccount('));
 const construction = source.slice(source.indexOf('        var mainCard ='), source.indexOf('        buildBar();'));
 const saveSync = source.slice(source.indexOf('        Array.prototype.forEach.call(root.querySelectorAll("[data-mobile-save-action]")'), source.indexOf('        var saveStatus ='));

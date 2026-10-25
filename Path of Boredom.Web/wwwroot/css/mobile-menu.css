@@ -279,15 +279,14 @@
         line-height: 1;
     }
 
-    /* Sub-tabs, used by Skills to switch between Loadout and each skill tree without scrolling
-       through all six trees stacked vertically. */
+    /* Sub-tabs, used by Skills to switch between Loadout and its selected skill tree. */
     body.mobile-shell .mm-subtabs {
         grid-column: 1 / -1;
         grid-row: 2;
         display: flex;
         min-height: 48px;
         gap: 6px;
-        overflow-x: auto;
+        overflow-x: hidden;
         scrollbar-width: none;
         padding: 8px 0 2px;
     }
@@ -510,6 +509,7 @@
         overflow: visible;
     }
     body.mobile-shell .options-panel[data-mobile-option-count="4"] .mm-subtabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    body.mobile-shell .options-panel[data-mobile-option-count="5"] .mm-subtabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
     body.mobile-shell .forge-panel .mm-subtab,
     body.mobile-shell .options-panel .mm-subtab { min-width: 0; padding-inline: 3px; }
     body.mobile-shell .forge-panel[data-mobile-section="training"] > .forge-grid,
@@ -543,7 +543,8 @@
     body.mobile-shell .options-panel .run-options [data-options-section][hidden] { display: none !important; }
     body.mobile-shell .options-panel[data-mobile-section="sound"] .run-options [data-options-section="sound"],
     body.mobile-shell .options-panel[data-mobile-section="controls"] .run-options [data-options-section="controls"],
-    body.mobile-shell .options-panel[data-mobile-section="codex"] .run-options [data-options-section="codex"],
+    body.mobile-shell .options-panel[data-mobile-section="lore"] .run-options [data-options-section="lore"],
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options [data-options-section="relics"],
     body.mobile-shell .options-panel[data-mobile-section="account"] .run-options [data-options-section="account"] { display: block; }
     body.mobile-shell .options-panel[data-mobile-section="controls"] .run-options [data-options-section="controls"] {
         display: grid;
@@ -1615,5 +1616,246 @@
             width: 22px;
             height: 22px;
         }
+    }
+
+    /* Interactive game screens fit the landscape viewport; no inner pane scrolls to expose controls. */
+    body.mobile-shell .mm-panel .forge-grid,
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid,
+    body.mobile-shell .mm-panel .skill-tree-grid,
+    body.mobile-shell .mm-panel .skill-tree-map,
+    body.mobile-shell .mm-panel .mm-detail,
+    body.mobile-shell .mm-panel .run-options,
+    body.mobile-shell .mm-panel .equipment-options,
+    body.mobile-shell .mm-panel .challenge-options,
+    body.mobile-shell .mm-panel .mastery-panel,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid,
+    body.mobile-shell .mm-pause-card,
+    body.mobile-shell .mm-pause-groups,
+    body.mobile-shell .mm-pause-side .mm-run-recap,
+    body.mobile-shell .mm-account-body,
+    body.mobile-shell .save-slots-card,
+    body.mobile-shell .restart-mode-card {
+        overflow-x: hidden;
+        overflow-y: hidden;
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: auto;
+    }
+
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+        grid-auto-rows: 0;
+        align-content: stretch;
+        gap: 3px;
+        padding: 2px;
+    }
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button {
+        grid-template-columns: 16px minmax(0, 1fr);
+        grid-template-rows: auto auto auto minmax(0, 1fr);
+        justify-items: stretch;
+        text-align: left;
+        min-height: 0;
+        height: 100%;
+        gap: 0;
+        padding: 1px 2px;
+    }
+    body.mobile-shell .mm-panel .forge-grid button > .forge-card-art {
+        grid-column: 1;
+        grid-row: 1 / span 4;
+        align-self: center;
+        width: 14px;
+        height: 14px;
+        margin: 0 auto;
+    }
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > strong,
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > span:not([data-upgrade-preview]),
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > small,
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > [data-upgrade-preview] {
+        grid-column: 2;
+        text-align: left;
+    }
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > strong { grid-row: 1; font-size: 8px; line-height: 1; }
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > span:not([data-upgrade-preview]) { grid-row: 2; font-size: 7px; line-height: 1; }
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > small { grid-row: 3; font-size: 7px; line-height: 1; }
+    body.mobile-shell .mm-panel .forge-grid button > [data-upgrade-preview] {
+        grid-row: 4;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        min-height: 0;
+        overflow: hidden;
+        font-size: 7px;
+        line-height: 1.05;
+        white-space: normal;
+    }
+
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+        grid-auto-rows: 0;
+        align-content: stretch;
+        gap: 4px;
+        padding: 2px;
+    }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button {
+        grid-template-columns: 18px minmax(0, 1fr);
+        grid-template-rows: auto auto auto auto minmax(0, 1fr);
+        justify-items: stretch;
+        text-align: left;
+        min-height: 0;
+        height: 100%;
+        gap: 0;
+        padding: 1px 4px;
+    }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > .forge-card-art { grid-column: 1; grid-row: 1 / span 5; align-self: center; width: 16px; height: 16px; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > strong,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > span:not([data-upgrade-preview]),
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > small,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > [data-upgrade-preview] { grid-column: 2; text-align: left; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > strong { grid-row: 1; font-size: 9px; line-height: 1; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > span:not([data-upgrade-preview]) { grid-row: 2; display: block; font-size: 8px; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > small { grid-row: 3; font-size: 7px; line-height: 1; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > [data-upgrade-preview] { grid-row: 4 / span 2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 8px; line-height: 1.05; }
+
+    body.mobile-shell .mm-panel .skill-tree-map { height: clamp(140px, calc(100dvh - 240px), 210px); }
+    body.mobile-shell .mm-panel .tree-node,
+    body.mobile-shell .mm-panel .tree-node button { width: 48px; }
+    body.mobile-shell .mm-panel .tree-node button { height: 48px; padding: 3px; }
+    body.mobile-shell .mm-panel .tree-node-icon { font-size: 15px; }
+    body.mobile-shell .mm-panel .mm-detail { padding: 8px; font-size: 11px; line-height: 1.3; }
+    body.mobile-shell .mm-panel .mm-detail h3 { margin-bottom: 4px; font-size: 16px; }
+    body.mobile-shell .mm-panel .mm-detail p { margin: 4px 0; }
+
+    body.mobile-shell .options-panel[data-mobile-section="account"] .run-options { display: grid; align-content: center; }
+    body.mobile-shell .mm-account-body {
+        width: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        align-self: stretch;
+        align-content: center;
+        gap: 4px 6px;
+        padding: 4px 6px;
+    }
+    body.mobile-shell .mm-account-body > p { margin: 0; font-size: 10px; line-height: 1.2; }
+    body.mobile-shell .mm-account-body fieldset {
+        flex: 1 1 30%;
+        min-width: 0;
+        max-width: none;
+        gap: 2px;
+        padding: 2px 5px 4px;
+    }
+    body.mobile-shell .mm-account-body legend { padding-inline: 4px; font-size: 11px; }
+    body.mobile-shell .mm-account-body fieldset p,
+    body.mobile-shell .mm-account-body small { margin: 0; font-size: 9px; line-height: 1.15; }
+    body.mobile-shell .mm-account-body button { min-height: 26px; padding: 2px 5px; font-size: 10px; line-height: 1.05; }
+    body.mobile-shell .mm-account-body .mm-display-name { gap: 1px; font-size: 10px; }
+    body.mobile-shell .mm-account-body .mm-display-name input { min-height: 26px; padding: 2px 6px; font-size: 12px; }
+    body.mobile-shell .mm-account-body .account-confirm { padding: 6px; gap: 4px; }
+    body.mobile-shell .options-panel .run-options .mm-account-body fieldset { gap: 2px; }
+    body.mobile-shell .options-panel .run-options .mm-account-body fieldset p,
+    body.mobile-shell .options-panel .run-options .mm-account-body fieldset small { margin: 0; font-size: 9px; line-height: 1.1; }
+    body.mobile-shell .options-panel .run-options .mm-account-body button { min-height: 26px; margin-block: 0; padding: 2px 5px; font-size: 10px; line-height: 1.05; }
+    body.mobile-shell .options-panel .run-options .mm-account-body .mm-display-name { grid-template-columns: minmax(0, 1fr); min-height: 0; margin: 0; }
+    body.mobile-shell .options-panel .run-options .mm-account-body .mm-display-name input { min-height: 26px; }
+
+    body.mobile-shell .options-panel[data-mobile-section="lore"] .run-options {
+        overflow-y: auto;
+        align-content: start;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto minmax(0, 1fr);
+        align-content: stretch;
+        gap: 2px;
+        padding: 4px 8px;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > h3,
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-codex-hint] { margin: 0; }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > h3 { font-size: 14px; line-height: 1.1; }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-codex-hint] { font-size: 10px; line-height: 1.15; }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-relic-codex] {
+        grid-row: 3;
+        min-height: 0;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+        align-content: stretch;
+        gap: 4px;
+        overflow: hidden;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .camp-relic {
+        min-width: 0;
+        min-height: 0;
+        gap: 1px;
+        padding: 3px 6px;
+        overflow: hidden;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .camp-relic b { font-size: 10px; line-height: 1.05; }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .camp-relic small {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+        font-size: 9px;
+        line-height: 1.1;
+    }
+
+    body.mobile-shell .mm-pause-groups { min-height: 0; }
+    body.mobile-shell .mm-pause-side .mm-run-recap { max-height: 5.6em; }
+    body.mobile-shell .challenges-panel .challenge-options {
+        display: grid;
+        align-content: start;
+        gap: 5px;
+        padding: 4px 8px;
+    }
+    body.mobile-shell .challenges-panel .challenge-options > p {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.25;
+    }
+    body.mobile-shell .challenges-panel .training-skill-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, auto));
+        align-content: start;
+        gap: 4px;
+    }
+    body.mobile-shell .challenges-panel .training-skill-grid button {
+        min-height: 34px;
+        margin: 0;
+        padding: 4px 6px;
+        font-size: 10px;
+        line-height: 1.1;
+    }
+
+    @media (max-height: 420px) {
+        body.mobile-shell .mm-panel .skill-tree-map { height: 140px; }
+        body.mobile-shell .mm-panel .tree-node,
+        body.mobile-shell .mm-panel .tree-node button { width: 44px; }
+        body.mobile-shell .mm-panel .tree-node button { height: 44px; }
+        body.mobile-shell .mm-panel .forge-grid button > .forge-card-art { width: 12px; height: 12px; }
+        body.mobile-shell .mm-panel .mastery-panel .forge-grid button > strong { font-size: 8px; }
+        body.mobile-shell .mm-panel .mastery-panel .forge-grid button > span:not([data-upgrade-preview]) { font-size: 7px; }
+        body.mobile-shell .mm-panel .forge-grid button > [data-upgrade-preview] { font-size: 6px; line-height: 1; }
+        body.mobile-shell .mm-account-body fieldset { padding: 2px 4px 4px; }
+        body.mobile-shell .mm-account-body button { min-height: 26px; font-size: 9px; }
+        body.mobile-shell .mm-pause-card {
+            max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 8px);
+            gap: 6px;
+            padding: 6px 10px;
+        }
+        body.mobile-shell .mm-pause-side,
+        body.mobile-shell .mm-pause-groups { gap: 4px; }
+        body.mobile-shell .mm-menu-group { gap: 3px; padding: 4px 6px; }
+        body.mobile-shell .mm-pause-card .mm-pause-option { min-height: 30px; padding: 3px 5px; font-size: 10px; }
+        body.mobile-shell .mm-pause-side .mm-resume { min-height: 36px; }
+        body.mobile-shell .mm-pause-side .mm-run-recap { max-height: 4.6em; -webkit-line-clamp: 3; font-size: 10px; line-height: 1.3; }
+        body.mobile-shell .mm-progress-group .mm-save-actions { gap: 3px; }
+        body.mobile-shell .mm-progress-group .mm-save-status { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: 9px; line-height: 1.1; }
+        body.mobile-shell .challenges-panel .challenge-options > p { -webkit-line-clamp: 1; }
+        body.mobile-shell .challenges-panel .training-skill-grid button { min-height: 30px; padding: 2px 4px; font-size: 9px; }
     }
 }

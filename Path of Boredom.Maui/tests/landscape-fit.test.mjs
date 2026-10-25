@@ -20,6 +20,8 @@ if (!fs.existsSync(edge)) {
     const skillChoice = expand(slice('<div class="arena-overlay skill-choice-overlay"', '<div class="arena-overlay setup-overlay"'));
     const setup = expand(slice('<div class="arena-overlay setup-overlay"', '<div class="arena-caption"'));
     const mainMenu = slice('<section class="main-menu"', '<button type="button" class="quiet-button main-menu-return"');
+    const saveDialogStart = home.indexOf('<dialog class="save-slots-dialog"');
+    const saveDialog = home.slice(saveDialogStart, home.indexOf('</dialog>', saveDialogStart) + '</dialog>'.length);
     const runMenuStart = home.indexOf('<div class="overlay-card" data-run-menu>');
     const runMenu = home.slice(runMenuStart, home.lastIndexOf('</div>', home.indexOf('<div class="arena-overlay skill-choice-overlay"')));
     const css = ['../../Path of Boredom.Game/Components/Pages/Home.razor.css', '../wwwroot/css/mobile-shell.css', '../wwwroot/css/mobile-menu.css']
@@ -30,9 +32,12 @@ if (!fs.existsSync(edge)) {
         <div data-test="main">${mainMenu}</div>
         <div class="arena-overlay" data-test="level">${levelDraft}</div>
         <div class="arena-overlay" data-test="death">${runMenu}</div>
-        <div class="arena-overlay" data-test="pause"><div class="mm-pause-card"><div class="mm-pause-side"><div class="mm-pause-emblem"></div><h2>The hollow can wait.</h2><p>Combat and game timers are paused.</p><button class="mm-resume">Return to battle</button><p class="mm-save-status mm-run-recap">Run so far: 2m 28s · 2 stages cleared · 185 kills · 0 flasks used · 195 gold spent · 0 challenges completed. Damage dealt: Cleave: 33406 · Cinder relay: 7610 · Blazing cross: 1060.</p><button class="mm-pause-option mm-pause-footer">Main menu</button></div><div class="mm-pause-groups"><section class="mm-menu-group"><h3>Character</h3><button class="mm-pause-option">Skills &amp; loadout</button><button class="mm-pause-option">Forge &amp; equipment</button><button class="mm-pause-option">Stage challenges — bonus gold</button><button class="mm-pause-option">Options</button></section><section class="mm-menu-group"><h3>Community</h3><button class="mm-pause-option">Rankings</button><button class="mm-pause-option">Chapter lore</button></section><section class="mm-menu-group mm-progress-group"><h3>Progress</h3><div class="mm-save-actions"><button class="mm-pause-option">Save to cloud</button><button class="mm-pause-option">Load cloud save</button></div><p class="mm-save-status">Level-up boon selected. Save to keep it, or continue to the next autosaved checkpoint.</p></section></div></div></div>${skillChoice}${setup}</div><script>
+        <div class="arena-overlay" data-test="camp" style="display:none">${runMenu}</div>
+        <div class="arena-overlay" data-test="pause"><div class="mm-pause-card"><div class="mm-pause-side"><div class="mm-pause-emblem"></div><h2>The hollow can wait.</h2><p>Combat and game timers are paused.</p><button class="mm-resume">Return to battle</button><p class="mm-save-status mm-run-recap">Run so far: 2m 28s · 2 stages cleared · 185 kills · 0 flasks used · 195 gold spent · 0 challenges completed. Damage dealt: Cleave: 33406 · Cinder relay: 7610 · Blazing cross: 1060.</p><button class="mm-pause-option mm-pause-footer">Main menu</button></div><div class="mm-pause-groups"><section class="mm-menu-group"><h3>Character</h3><button class="mm-pause-option">Skills &amp; loadout</button><button class="mm-pause-option">Forge &amp; equipment</button><button class="mm-pause-option">Stage challenges — bonus gold</button><button class="mm-pause-option">Options</button></section><section class="mm-menu-group"><h3>Community</h3><button class="mm-pause-option">Rankings</button><button class="mm-pause-option">Chapter lore</button></section><section class="mm-menu-group mm-progress-group"><h3>Progress</h3><div class="mm-save-actions"><button class="mm-pause-option">Save to cloud</button><button class="mm-pause-option">Load cloud save</button></div><p class="mm-save-status">Level-up boon selected. Save to keep it, or continue to the next autosaved checkpoint.</p></section></div></div></div>${skillChoice}${setup}${saveDialog}</div><script>
         const report = [];
         const gameRoot = document.querySelector('.arpg');
+        const saveDialog = document.querySelector('.save-slots-dialog');
+        saveDialog.querySelector('[data-save-slot-list]').innerHTML = Array.from({length:5}, (_, i) => '<button class="save-slot-card"><strong>Slot ' + (i + 1) + ' · Ember Knight</strong><span>Campaign · Dawn ' + (i + 1) + ' · Level 12</span><small>Hard · saved a few minutes ago</small></button>').join('');
         const fill = (selector, text) => document.querySelectorAll(selector).forEach(e => e.textContent = text);
         fill('[data-card-category]', 'CRITICAL CHANCE'); fill('[data-card-name]', 'A shattering dawn');
         fill('[data-card-description]', '+2% crit chance per rank (cap 75%).'); fill('[data-card-rank]', 'Rank 1 / 10');
@@ -54,7 +59,8 @@ if (!fs.existsSync(edge)) {
         death.querySelector('[data-damage-history]').innerHTML = Array.from({ length: 12 }, (_, i) => '<li>Ashbound Reaver charge — ' + (20 + i) + ' damage</li>').join('');
         death.querySelector('[data-death-report]').hidden = false;
         death.querySelector('[data-run-summary]').hidden = false;
-        death.querySelector('[data-summary-text]').textContent = 'Run so far: 14 waves, 512 kills, 3 bosses, 9,240 gold earned.';
+        death.querySelector('[data-summary-overview]').innerHTML = '<li>14m 22s</li><li>6 stages</li><li>512 kills</li><li>3 flasks used</li><li>9,240 gold spent</li><li>4 challenges</li>';
+        death.querySelector('[data-summary-damage]').innerHTML = Array.from({ length: 8 }, (_, i) => '<li>Ember nova: ' + (900 - i * 50) + '</li>').join('');
         death.querySelector('[data-action="restart"]').hidden = false;
         death.querySelector('[data-action="start"]').textContent = 'Travel to The Drowned Wilds';
         death.querySelector('[data-action="endless"]').hidden = false;
@@ -64,16 +70,30 @@ if (!fs.existsSync(edge)) {
         for (const label of ['Save on device', 'Load saved run']) {
             const button = document.createElement('button'); button.className = 'mm-pause-option'; button.textContent = label; death.querySelector('[data-run-menu]').appendChild(button);
         }
+        const camp = document.querySelector('[data-test="camp"]');
+        camp.querySelector('[data-death-report]').hidden = true;
+        camp.querySelector('[data-camp-event]').hidden = false;
+        camp.querySelector('[data-camp-event-detail]').textContent = 'The wanderer offers a small blessing in exchange for a few coins.';
+        camp.querySelector('[data-camp-challenge]').hidden = false;
+        camp.querySelector('[data-camp-challenge-status]').textContent = 'Tap one to accept. You can change it until you travel.';
+        camp.querySelector('[data-run-summary]').hidden = false;
+        camp.querySelector('[data-summary-overview]').innerHTML = '<li>14m 22s</li><li>6 stages</li><li>512 kills</li><li>3 flasks used</li><li>9,240 gold spent</li><li>4 challenges</li>';
+        camp.querySelector('[data-summary-damage]').innerHTML = Array.from({ length: 8 }, (_, i) => '<li>Ember nova: ' + (900 - i * 50) + '</li>').join('');
+        camp.querySelector('[data-action="restart"]').hidden = false;
+        camp.querySelector('[data-loading]').hidden = true;
         const actions = document.querySelector('[data-main-menu-actions]');
         for (const label of ['Save on device', 'Options', 'Rankings']) {
             const button = document.createElement('button'); button.className = 'mm-pause-option'; button.textContent = label; actions.appendChild(button);
         }
-        const overlays = { level: '[data-test="level"]', death: '[data-test="death"]', skill: '[data-skill-choice]', setup: '[data-setup]', tutorial: '[data-setup]', main: '.main-menu', pause: '[data-test="pause"]' };
+        const overlays = { level: '[data-test="level"]', death: '[data-test="death"]', camp: '[data-test="camp"]', skill: '[data-skill-choice]', setup: '[data-setup]', tutorial: '[data-setup]', main: '.main-menu', pause: '[data-test="pause"]', save: '.save-slots-dialog' };
         window.measure = () => {
             for (const [name, selector] of Object.entries(overlays)) {
                 gameRoot.dataset.mainMenu = name === 'main' ? 'on' : 'off';
+                gameRoot.dataset.gameStatus = name === 'death' ? 'dead' : name === 'camp' ? 'camp' : 'paused';
                 const overlay = document.querySelector(selector);
                 for (const other of new Set(Object.values(overlays))) document.querySelector(other).style.display = other === selector ? '' : 'none';
+                if (name === 'save') saveDialog.showModal();
+                else if (saveDialog.open) saveDialog.close();
                 if (selector === '[data-setup]') {
                     const touring = name === 'tutorial';
                     overlay.dataset.tutorial = touring ? 'on' : 'off';
@@ -85,10 +105,13 @@ if (!fs.existsSync(edge)) {
                         overlay.querySelector('[data-setup-step]').textContent = 'QUICK GUIDE 2 / 3';
                     }
                 }
-                const card = overlay.querySelector('[data-run-menu], .overlay-card, .level-draft, .main-menu-card, .mm-account-body, .mm-pause-card') ?? overlay;
-                // The death report itself is reading material and may scroll inside its own box.
-                const scrollable = new Set(overlay.querySelectorAll('.death-report'));
-                for (const element of [overlay, card]) if (element.scrollHeight > element.clientHeight + 1) report.push(name + ' ' + innerWidth + 'x' + innerHeight + ' overflow ' + (element.scrollHeight - element.clientHeight) + 'px [' + [...card.children].map(c => c.tagName + ':' + Math.round(c.getBoundingClientRect().height)).join(',') + ']');
+                const card = overlay.querySelector('[data-run-menu], .overlay-card, .level-draft, .main-menu-card, .mm-account-body, .mm-pause-card, .save-slots-card') ?? overlay;
+                const noScroll = new Set([overlay, card, ...overlay.querySelectorAll('.mm-pause-card, .mm-pause-groups, .mm-run-recap, .death-report, .death-report ol, .run-summary, .save-slots-card, .save-slot-list, .save-slot-card, .restart-mode-card')]);
+                for (const element of noScroll) {
+                    const overflow = getComputedStyle(element).overflowY;
+                    if (overflow === 'auto' || overflow === 'scroll') report.push(name + ' has scrollable interactive content: ' + element.className + ' (' + overflow + ')');
+                    if ((element === overlay || element === card) && element.scrollHeight > element.clientHeight + 1) report.push(name + ' ' + innerWidth + 'x' + innerHeight + ' ' + (element.className || element.tagName) + ' overflow ' + (element.scrollHeight - element.clientHeight) + 'px [' + [...card.children].map(c => c.tagName + ':' + Math.round(c.getBoundingClientRect().height)).join(',') + ']');
+                }
                 const bottom = Math.min(innerHeight, overlay.getBoundingClientRect().bottom);
                 for (const button of overlay.querySelectorAll('button')) {
                     if (!button.getBoundingClientRect().height || button.children.length) continue;
@@ -106,9 +129,20 @@ if (!fs.existsSync(edge)) {
                     if (widths.size > 1) report.push('death: secondary buttons have uneven widths ' + secondary.map(b => b.textContent.trim().slice(0, 12) + '=' + Math.round(b.getBoundingClientRect().width)).join('/'));
                 }
                 for (const button of overlay.querySelectorAll('button')) {
-                    if ([...scrollable].some(box => box.contains(button))) continue;
                     const rect = button.getBoundingClientRect();
                     if (rect.height && rect.bottom > bottom + 1) report.push(name + ' button off-screen: ' + button.textContent.trim().slice(0, 30));
+                }
+                if (name === 'death') {
+                    const restartDialog = overlay.querySelector('.restart-mode-overlay');
+                    const restartCard = restartDialog.querySelector('.restart-mode-card');
+                    restartDialog.hidden = false;
+                    restartDialog.setAttribute('open', '');
+                    const restartBounds = restartCard.getBoundingClientRect();
+                    if (getComputedStyle(restartCard).overflowY === 'auto' || getComputedStyle(restartCard).overflowY === 'scroll') report.push('restart chooser must not scroll');
+                    if (restartCard.scrollHeight > restartCard.clientHeight + 1) report.push('restart chooser does not fit without scrolling');
+                    if (restartBounds.top < -1 || restartBounds.bottom > innerHeight + 1 || restartBounds.left < -1 || restartBounds.right > innerWidth + 1) report.push('restart chooser outside viewport');
+                    restartDialog.hidden = true;
+                    restartDialog.removeAttribute('open');
                 }
                 if (name === 'tutorial') {
                     const text = overlay.querySelector('[data-setup-description]');
@@ -132,5 +166,5 @@ if (!fs.existsSync(edge)) {
         }
     } finally { await new Promise(resolve => server.close(resolve)); }
     assert.deepEqual(failures, [], failures.join('\n'));
-    console.log('PASS: main menu, death/run-end card, level-up, level 10/20 skill choice, campaign setup and first-run tutorial fit landscape phones without scrolling');
+    console.log('PASS: main menu, save picker, restart chooser, Pause, run status, level-up, skill choice, campaign setup and tutorial fit landscape screens without scrolling');
 }

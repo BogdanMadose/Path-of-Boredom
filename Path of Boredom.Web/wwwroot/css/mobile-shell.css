@@ -769,7 +769,7 @@
     body.mobile-shell .setup-overlay[data-skill-prompt="on"] .forge-feedback { color: #ffd27a; }
     body.mobile-shell .setup-overlay[data-needs-skill="on"] [data-setup-next] { opacity: .7; }
 
-    /* Death / run-end card: reports on the left (they may scroll), every action on the right. */
+    /* Death / run-end card: keep the report and every action fitted inside the viewport. */
     body.mobile-shell [data-run-menu] {
         display: grid;
         grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
@@ -997,6 +997,163 @@
     body.mobile-shell .skill-bar {
         max-width: 124px;
     }
+}
+
+/* Interactive screens use a fitted layout on landscape phones, never a scrolling card. */
+body.mobile-shell .arena-overlay {
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: auto;
+}
+body.mobile-shell .setup-overlay .overlay-card,
+body.mobile-shell .skill-choice-overlay .overlay-card,
+body.mobile-shell [data-run-menu],
+body.mobile-shell .arpg .ember-camp-card,
+body.mobile-shell .mm-pause-card,
+body.mobile-shell .save-slots-card,
+body.mobile-shell .restart-mode-card,
+body.mobile-shell .game-confirm,
+body.mobile-shell .arpg .game-confirm,
+body.mobile-shell .arpg .account-confirm {
+    overflow-x: hidden;
+    overflow-y: hidden;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: auto;
+    touch-action: manipulation;
+}
+body.mobile-shell .skill-choice-overlay { align-items: center; touch-action: manipulation; }
+body.mobile-shell .skill-choice-overlay .overlay-card {
+    display: grid;
+    gap: 4px;
+    padding: 8px 12px;
+}
+body.mobile-shell .skill-choice-overlay .run-skill-pool {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+}
+body.mobile-shell .skill-choice-overlay .run-skill-pool button {
+    min-height: 0;
+    padding: 4px 6px;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 2px 6px;
+}
+body.mobile-shell .skill-choice-overlay .run-skill-icon { width: 24px; height: 24px; }
+body.mobile-shell .skill-choice-overlay .run-skill-pool strong { font-size: 11px; line-height: 1.1; }
+body.mobile-shell .skill-choice-overlay [data-skill-description] { font-size: 9px; line-height: 1.1; }
+
+body.mobile-shell [data-run-menu] {
+    box-sizing: border-box;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+    align-content: center;
+}
+body.mobile-shell .arpg[data-game-status="dead"] [data-run-menu] { overflow: hidden; touch-action: manipulation; }
+body.mobile-shell [data-run-menu] > .death-report {
+    max-height: 34dvh;
+    overflow: hidden;
+}
+body.mobile-shell [data-run-menu] > .death-report ol {
+    max-height: none;
+    overflow: hidden;
+}
+body.mobile-shell .arpg [data-run-menu] > .run-summary {
+    min-height: 0;
+    max-height: none;
+    overflow: hidden;
+    padding: 6px 8px;
+}
+body.mobile-shell .arpg [data-run-menu] > .run-summary h4 { margin: 0 0 2px; font-size: 10px; }
+body.mobile-shell .arpg [data-run-menu] > .run-summary-overview { padding-bottom: 2px; }
+body.mobile-shell .arpg [data-run-menu] .run-summary-overview ul { gap: 2px 4px; }
+body.mobile-shell .arpg [data-run-menu] .run-summary-overview li { padding: 2px 4px; font-size: 9px; line-height: 1.15; }
+body.mobile-shell .arpg [data-run-menu] .run-summary-damage ul { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px 6px; }
+body.mobile-shell .arpg [data-run-menu] .run-summary-damage li { font-size: 9px; line-height: 1.15; }
+body.mobile-shell .arpg [data-run-menu] .run-summary-damage li:nth-child(n+5) { display: none; }
+body.mobile-shell [data-run-menu] > .run-build-details { max-height: 3.2em; overflow: hidden; }
+body.mobile-shell [data-run-menu] > .run-build-details[open] { max-height: 4.6em; }
+body.mobile-shell [data-run-menu] > .run-build-details p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; margin: 2px 0 0; }
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])),
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-rows: auto auto auto auto auto auto auto;
+    align-content: center;
+    justify-content: stretch;
+    gap: 4px 6px;
+    width: min(820px, 100%);
+    max-width: 820px;
+    max-height: 100%;
+    padding: 6px 8px;
+    overflow: hidden;
+}
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])) > .eyebrow,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) > .eyebrow,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])) > h2,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) > h2 { grid-column: 1 / -1; margin: 0; }
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])) > [data-overlay-description],
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) > [data-overlay-description] { display: none; }
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])) > .camp-event,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) > .camp-event { grid-column: 1 / 4; grid-row: 3; }
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])) > .camp-challenge,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) > .camp-challenge { grid-column: 4 / 7; grid-row: 3; }
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])) > .camp-event,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) > .camp-event,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])) > .camp-challenge,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) > .camp-challenge {
+    min-width: 0;
+    max-height: none;
+    margin: 0;
+    padding: 4px 6px;
+    overflow: hidden;
+}
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])) > button,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) > button { grid-row: 4; grid-column: span 2; min-width: 0; min-height: 34px; }
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])) .mm-save-actions,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) .mm-save-actions { display: none; }
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])) > .run-summary,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) > .run-summary { grid-row: 5; grid-column: 1 / -1; }
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])) .run-summary-damage,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) .run-summary-damage { display: none; }
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])) > .run-build-details,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) > .run-build-details { grid-row: 6; grid-column: 1 / -1; max-height: 2.2em; }
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])) > .checkpoint-note,
+body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) > .checkpoint-note { grid-column: 1 / -1; max-height: 1.3em; overflow: hidden; }
+body.mobile-shell [data-run-menu] > .camp-event,
+body.mobile-shell [data-run-menu] > .camp-challenge {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    max-height: 30dvh;
+    overflow: hidden;
+    margin: 0;
+    padding: 5px 8px;
+}
+body.mobile-shell [data-run-menu] > .camp-event h3,
+body.mobile-shell [data-run-menu] > .camp-challenge h3 { margin: 0 0 2px; font-size: 11px; }
+body.mobile-shell [data-run-menu] > .camp-event p,
+body.mobile-shell [data-run-menu] > .camp-challenge > p { margin: 0 0 3px; font-size: 9px; line-height: 1.15; }
+body.mobile-shell [data-run-menu] .camp-event-actions button { min-height: 30px; font-size: 10px; }
+body.mobile-shell [data-run-menu] .camp-challenge-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; }
+body.mobile-shell [data-run-menu] .camp-challenge-grid button { min-height: 32px; padding: 2px 3px; font-size: 9px; }
+body.mobile-shell [data-run-menu] .camp-challenge-grid button small { font-size: 8px; line-height: 1; }
+body.mobile-shell [data-run-menu] .camp-challenge-status { margin: 2px 0 0; font-size: 9px; line-height: 1.1; }
+
+@media (max-height: 420px) {
+    body.mobile-shell [data-run-menu] { gap: 4px; padding: 6px 8px; }
+    body.mobile-shell [data-run-menu] > .death-report { max-height: 29dvh; padding: 5px 8px; }
+    body.mobile-shell [data-run-menu] > .ember-button { min-height: 38px; }
+    body.mobile-shell [data-run-menu] > button:not(.ember-button),
+    body.mobile-shell [data-run-menu] .mm-save-actions > button { min-height: 34px; }
+    body.mobile-shell [data-run-menu] > .camp-event,
+    body.mobile-shell [data-run-menu] > .camp-challenge { max-height: 27dvh; padding: 3px 6px; }
+    body.mobile-shell .ember-camp-card { overflow: hidden; }
+}
+
+@media (orientation: landscape) and (max-height: 480px) {
+    body.mobile-shell .death-report p[data-killing-blow] + p { display: none; }
+    body.mobile-shell .death-report li:nth-child(n+3) { display: none; }
 }
 
 @keyframes mobile-challenge-in { from { opacity: 0; margin-top: -24px; } }

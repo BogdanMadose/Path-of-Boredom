@@ -347,7 +347,8 @@
         var entries = [
             { name: "Sound", icon: "♪", section: "sound" },
             { name: "Controls", icon: "⌖", section: "controls" },
-            { name: "Codex", icon: "✦", section: "codex" }
+            { name: "Lore", icon: "✦", section: "lore" },
+            { name: "Relics", icon: "◇", section: "relics" }
         ];
         if (source.querySelector('[data-options-section="account"]')) {
             entries.push({ name: "Account", icon: "◉", section: "account" });
@@ -372,13 +373,13 @@
     }
 
     function selectOptionsSection(source, section) {
-        var sections = ["sound", "controls", "codex"];
+        var sections = ["sound", "controls", "lore", "relics"];
         if (source.querySelector('[data-options-section="account"]')) sections.push("account");
         source.dataset.mobileSection = section;
         Array.prototype.forEach.call(source.querySelectorAll("[data-options-section]"), function (content) {
             content.hidden = content.dataset.optionsSection !== section;
         });
-        if (section === "codex") source.dispatchEvent(new CustomEvent("relic-codex-refresh", { bubbles: true }));
+        if (section === "relics") source.dispatchEvent(new CustomEvent("relic-codex-refresh", { bubbles: true }));
         Array.prototype.forEach.call(source.querySelector(".mm-subtabs").children, function (tab, index) {
             tab.setAttribute("aria-selected", String(sections[index] === section));
         });

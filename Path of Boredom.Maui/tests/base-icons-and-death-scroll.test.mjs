@@ -27,9 +27,9 @@ for (const heroClass of Object.keys(HERO_CLASSES)) for (const skill of SKILL_KEY
 const css = read('Path of Boredom.Game/Components/Pages/Home.razor.css');
 const mobileCss = read('Path of Boredom.Maui/wwwroot/css/mobile-shell.css');
 assert.match(css, /\.tree-node-icon\s*\{[^}]*background: var\(--skill-art\)/);
-assert.match(mobileCss, /\[data-run-menu\]\s*\{[^}]*overflow-y: auto;[^}]*touch-action: pan-y;/);
+assert.match(mobileCss, /body\.mobile-shell \[data-run-menu\]\s*\{[^}]*overflow: hidden;/, 'run status must not scroll to expose controls');
 assert.match(css, /data-game-status="dead"[^}]*grid-template-rows: minmax\(0, 1fr\)/);
-console.log('PASS: every skill has a shared SVG, class-specific basic attacks, matching mobile-tab URLs, and death-scroll rules');
+console.log('PASS: every skill has a shared SVG, class-specific basic attacks, matching mobile-tab URLs, and no-scroll run-status rules');
 
 const edge = process.env['ProgramFiles(x86)'] && path.join(process.env['ProgramFiles(x86)'], 'Microsoft/Edge/Application/msedge.exe');
 if (edge && fs.existsSync(edge)) {
@@ -43,17 +43,14 @@ if (edge && fs.existsSync(edge)) {
         const viewport = document.querySelector('.arena-viewport');
         const card = document.querySelector('[data-run-menu]');
         const report = document.querySelector('.death-report');
-        for (const height of [180, 280, 600]) {
+        for (const height of [360, 412, 600]) {
             viewport.style.cssText = 'width:650px;height:' + height + 'px;';
             card.scrollTop = 0;
-            check(getComputedStyle(card).overflowY === 'auto', 'whole card must scroll as a fallback');
-            check(getComputedStyle(card).touchAction === 'pan-y', 'touch scrolling must be allowed');
-            check(getComputedStyle(report.querySelector('ol')).overflowY === 'visible', 'hit list scrolls with its report, not on its own');
+            check(getComputedStyle(card).overflowY === 'hidden', 'run status must not scroll');
+            check(getComputedStyle(report.querySelector('ol')).overflowY === 'hidden', 'damage history must not scroll independently');
             check(card.clientHeight <= viewport.clientHeight, 'card must fit the arena');
-            if (card.scrollHeight > card.clientHeight) {
-                card.scrollTop = card.scrollHeight;
-                check(card.scrollTop > 0, 'card must actually scroll');
-            }
+            card.scrollTop = card.scrollHeight;
+            check(card.scrollTop === 0, 'run status must have no scroll position');
             const action = card.querySelector('[data-action="start"]').getBoundingClientRect();
             const bounds = card.getBoundingClientRect();
             check(action.top >= bounds.top - 1 && action.bottom <= bounds.bottom + 1, 'primary action must be reachable');
@@ -85,7 +82,7 @@ if (edge && fs.existsSync(edge)) {
             child.on('close', code => { clearTimeout(timeout); code === 0 ? resolve(output) : reject(new Error(errors)); });
         });
         assert.match(result, /data-result="PASS"/, result.match(/data-result="[^"]*"/)?.[0] ?? 'Browser checks did not finish');
-        console.log('PASS: browser-verified death-card scrolling and reachable actions at 180/280/600px arena heights; all SVGs load and parse');
+        console.log('PASS: browser-verified no-scroll run status and reachable actions at 360/412/600px arena heights; all SVGs load and parse');
     } finally {
         await new Promise(resolve => server.close(resolve));
     }

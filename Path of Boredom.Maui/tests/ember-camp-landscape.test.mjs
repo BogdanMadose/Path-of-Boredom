@@ -3,8 +3,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import { dumpBrowserDom } from './browser-dom.mjs';
 
-// The Ember Camp must fit landscape phones: card inside the viewport, no horizontal overflow,
-// all content reachable by scrolling inside the card, and the Back button reachable.
+// The Ember Camp must fit landscape phones without scrolling, horizontal overflow, or a hidden Back button.
 const edge = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
 if (!fs.existsSync(edge)) {
     console.log('SKIP: Ember Camp landscape checks require Microsoft Edge');
@@ -44,7 +43,6 @@ if (!fs.existsSync(edge)) {
                 if (el.scrollWidth > el.clientWidth + 1) report.push('text overflows: ' + el.textContent.trim().slice(0, 20));
             }
             const back = q('[data-close-camp]');
-            card.scrollTop = card.scrollHeight;
             const b = back.getBoundingClientRect();
             for (const s of card.querySelectorAll('.camp-node small, .camp-relic small')) {
                 const r = s.getBoundingClientRect(), p = s.parentElement.getBoundingClientRect();
@@ -52,7 +50,7 @@ if (!fs.existsSync(edge)) {
                 if (r.right > b.left && r.left < b.right && r.bottom > b.top && r.top < b.bottom) report.push('Back covers text: ' + s.textContent.trim().slice(0, 20));
             }
             if (b.bottom > innerHeight + 1 || b.height < 22) report.push('Back button unreachable/too small ' + b.bottom + '/' + b.height);
-            report.push('INFO scroll ' + card.scrollHeight + '/' + card.clientHeight);
+            report.push('INFO content ' + card.scrollHeight + '/' + card.clientHeight);
         } catch (e) { report.push('ERR ' + e.message); }
         document.body.dataset.result = report.join(' | ');
         </script></body></html>`;

@@ -140,44 +140,63 @@ assert.equal(mirroredSummary.textContent, summary.textContent);
 const css = fs.readFileSync(new URL('../wwwroot/css/mobile-menu.css', import.meta.url), 'utf8');
 assert.match(css, /forge-panel \.mm-subtabs,[\s\S]*?options-panel \.mm-subtabs[\s\S]*?grid-template-columns: repeat\(3,/);
 assert.match(css, /options-panel\[data-mobile-option-count="4"\] \.mm-subtabs \{ grid-template-columns: repeat\(4,/);
+assert.match(css, /options-panel\[data-mobile-option-count="5"\] \.mm-subtabs \{ grid-template-columns: repeat\(5,/);
 assert.match(css, /forge-panel:not\(\[data-mobile-section="systems"\]\) > \.equipment-options \{ display: none;/);
 assert.match(css, /\.mm-panel \.equipment-options \{[\s\S]*?overflow-y: hidden;/, 'Equipment stays compact without requiring a scroll');
-assert.match(css, /\.mm-panel \.run-options,[^}]*min-height: 0;[^}]*overflow-y: auto;/);
-console.log('PASS: selected-skill Forge/card availability, real combat bonuses, previews, scrolls, mastery gating, v16/v17 migration and synchronized mobile Pause options');
+assert.match(css, /\.mm-panel \.run-options,[\s\S]*?Interactive game screens fit the landscape viewport[\s\S]*?overflow-y: hidden;/, 'Interactive options no longer use a scrolling container');
+console.log('PASS: selected-skill Forge/card availability, real combat bonuses, previews, no-scroll layouts, mastery gating, v16/v17 migration and synchronized mobile Pause options');
 
 const edge = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
 if (fs.existsSync(edge)) {
     const home = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/Home.razor', import.meta.url), 'utf8');
     const optionsMarkup = home.slice(home.indexOf('<section class="options-panel"'), home.indexOf('<section class="challenges-panel"'))
-        .replace('<section class="options-panel"', '<section class="options-panel" data-mobile-option-count="4"')
+        .replace('<section class="options-panel"', '<section class="options-panel" data-mobile-option-count="5"')
         .replace(/@if \(Session is ICloudGameSession\)\s*\{\s*<section class="account-settings"[\s\S]*?<\/section>\s*\}/,
-            '<section class="account-settings" data-options-section="account"><fieldset><legend>Game account</legend><p>Signed in as Player</p><label>Display name<input value="Player" /></label><button>Save player name</button></fieldset><fieldset><legend>Device &amp; cloud saves</legend><p>Cloud save available.</p><button>Refresh</button><button>Upload device save</button></fieldset><fieldset><legend>Delete account</legend><p>Removes cloud and device saves.</p><button>Delete game account</button></fieldset></section>')
+            '<section class="account-settings" data-options-section="account"><div class="mm-account-body"><p>Signed in. Account and cloud saves are ready.</p><fieldset><legend>Game account</legend><p>Signed in as Player</p><label class="mm-display-name">Player display name<input value="Player" /></label><small>Use 3–24 letters, numbers, spaces, or dashes.</small><button>Save player name</button><button>Sign out · keep device save</button></fieldset><fieldset><legend>Device &amp; cloud saves</legend><p>Cloud save available.</p><button>Refresh</button><button>Upload device save</button><button>Use cloud save</button></fieldset><fieldset><legend>Delete account</legend><p>Removes cloud + device saves and rankings. Google account stays.</p><button>Delete game account</button></fieldset></div></section>')
         .replace(/@foreach \(var skill in CombatSkills\)\s*\{([\s\S]*?)\}/g, (_, markup) =>
             ['nova', 'burst', 'guard', ...skills].map(skill => markup.replaceAll('@skill', skill)).join(''));
     const equipmentMarkup = home.slice(home.indexOf('<section class="equipment-options">'), home.indexOf('<div class="forge-grid">'));
     const baseCss = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/Home.razor.css', import.meta.url), 'utf8');
     const shellCss = fs.readFileSync(new URL('../wwwroot/css/mobile-shell.css', import.meta.url), 'utf8');
+    const upgradeCards = Array.from({ length: 14 }, (_, i) => `<button data-upgrade="upgrade-${i}"><img class="forge-card-art" alt=""/><strong>Upgrade ${i + 1}</strong><span>Weapon power</span><small>Rank 1 / 8</small><span data-upgrade-preview>Damage: 12 → 14 · reach: +8</span></button>`).join('');
+    const masteryCards = Array.from({ length: 8 }, (_, i) => `<button data-mastery-stat="mastery-${i}"><img class="forge-card-art" alt=""/><strong>Mastery ${i + 1}</strong><span>+2 base weapon damage</span><small>Rank 1 / 8</small><span data-upgrade-preview>Damage: 12 → 14 · reach: +8</span></button>`).join('');
     const html = `<html><head><style>html,body{margin:0}*{box-sizing:border-box}[hidden]{display:none!important}${baseCss}${shellCss.replace('@media (pointer: coarse)', '@media all')}${css.replace('@media (pointer: coarse)', '@media all')}</style></head>
         <body class="mobile-shell"><div class="arpg">${optionsMarkup}<section class="forge-panel mm-panel" data-mobile-section="systems">
-        ${equipmentMarkup}<div class="forge-grid"><button>Skill forging</button></div><section class="mastery-panel">Mastery</section>
+        ${equipmentMarkup}<div class="forge-grid">${upgradeCards}</div><section class="mastery-panel"><h3>Beyond the forge</h3><p>Unlimited ranks.</p><div class="forge-grid">${masteryCards}</div></section>
         <div class="mm-head">Forge</div><div class="mm-subtabs"><button>Upgrades</button><button>Mastery</button><button>Equipment</button></div>
         </section></div><script>
         try {
-            const panel = document.querySelector('.options-panel'), forgePanel = document.querySelector('.forge-panel'), options = document.querySelector('.run-options'), equipment = document.querySelector('.equipment-options'), forge = document.querySelector('.forge-grid'), mastery = document.querySelector('.mastery-panel');
+            const panel = document.querySelector('.options-panel'), forgePanel = document.querySelector('.forge-panel'), options = document.querySelector('.run-options'), equipment = document.querySelector('.equipment-options'), forge = document.querySelector('.forge-panel > .forge-grid'), mastery = document.querySelector('.mastery-panel'), masteryGrid = mastery.querySelector('.forge-grid');
+            options.querySelector('[data-relic-codex]').innerHTML = Array.from({length: 6}, (_, i) => '<div class="camp-relic"><b>Relic ' + (i + 1) + '</b><small>Run bonus description.</small></div>').join('');
             panel.classList.add('mm-panel', 'mm-open');
             const head = document.createElement('div'); head.className = 'mm-head'; head.textContent = 'Run options'; panel.appendChild(head);
-            const tabs = document.createElement('div'); tabs.className = 'mm-subtabs'; tabs.innerHTML = '<button class="mm-subtab">Sound</button><button class="mm-subtab">Controls</button><button class="mm-subtab">Codex</button><button class="mm-subtab">Account</button>'; panel.appendChild(tabs);
+            const tabs = document.createElement('div'); tabs.className = 'mm-subtabs'; tabs.innerHTML = '<button class="mm-subtab">Sound</button><button class="mm-subtab">Controls</button><button class="mm-subtab">Lore</button><button class="mm-subtab">Relics</button><button class="mm-subtab">Account</button>'; panel.appendChild(tabs);
             const check = (condition, message) => { if (!condition) throw new Error(message); };
         for (const scale of [1, 1.3]) for (const [width, height] of [[320,480],[360,640],[390,740],[430,932],[480,320],[640,360],[740,360],[800,1280],[1024,768],[1280,800]]) {
                 document.documentElement.style.fontSize = (16 * scale) + 'px';
                 panel.style.width = width + 'px'; panel.style.height = height + 'px';
                 panel.classList.add('mm-open'); forgePanel.classList.remove('mm-open');
                 check(!panel.querySelector('[data-equipment-style]') && !panel.querySelector('[data-challenge-choice]'), 'options must be separate from equipment and challenges');
-                check(options.clientHeight > 0 && getComputedStyle(options).overflowY === 'auto', 'Run options must have a usable scrolling container');
-                for (const section of ['sound', 'controls', 'codex', 'account']) {
+                check(options.clientHeight > 0, 'Run options content must fit below the header');
+                for (const section of ['sound', 'controls', 'lore', 'relics', 'account']) {
                     panel.dataset.mobileSection = section;
-                    if (width > height && height >= 360 && section !== 'account') check(options.scrollHeight <= options.clientHeight + 1, 'landscape options tab must fit without scrolling: ' + section + ' ' + width + 'x' + height + ' @' + scale + ' (' + options.scrollHeight + '>' + options.clientHeight + ')');
-                    if (section === 'account') check(getComputedStyle(options).overflowY === 'auto', 'account tab keeps long save/account actions reachable');
+                    if (section === 'lore') check(getComputedStyle(options).overflowY === 'auto', 'text-only campaign lore can scroll independently');
+                    else {
+                        check(getComputedStyle(options).overflowY === 'hidden', section + ' tab must not scroll');
+                        if (width > height && height >= 360) check(options.scrollHeight <= options.clientHeight + 1, 'interactive options tab must fit without scrolling: ' + section + ' ' + width + 'x' + height + ' @' + scale + ' (' + options.scrollHeight + '>' + options.clientHeight + ') ' + (section === 'account' ? [...options.querySelectorAll('.mm-account-body, .mm-account-body > *, .mm-account-body fieldset > *')].map(el => el.tagName + '.' + el.className + ':' + Math.round(el.getBoundingClientRect().height) + '/' + el.scrollHeight).join(',') : ''));
+                        if (section === 'relics') {
+                            const grid = options.querySelector('[data-relic-codex]');
+                            check(getComputedStyle(grid).overflowY === 'hidden', 'Relics grid must not scroll');
+                            if (width > height && height >= 360) {
+                                check(grid.scrollHeight <= grid.clientHeight + 1, 'Relics must fit without scrolling: ' + width + 'x' + height + ' @' + scale);
+                                for (const relic of grid.querySelectorAll('.camp-relic')) {
+                                    const card = relic.getBoundingClientRect(), bounds = grid.getBoundingClientRect(), description = relic.querySelector('small').getBoundingClientRect();
+                                    check(card.width > 0 && card.bottom <= bounds.bottom + 1 && card.right <= bounds.right + 1, 'Relic card must stay inside the visible grid');
+                                    check(description.height >= 8 && description.bottom <= card.bottom + 1, 'Relic description must remain visible');
+                                }
+                            }
+                        }
+                    }
                 }
                 panel.dataset.mobileSection = 'controls';
                 const bounds = options.getBoundingClientRect();
@@ -192,8 +211,26 @@ if (fs.existsSync(edge)) {
                 if (width > height && height >= 360) check(equipment.scrollHeight <= equipment.clientHeight + 1, 'Equipment controls fit without scrolling: ' + width + 'x' + height + ' @' + scale + ' (' + equipment.scrollHeight + '>' + equipment.clientHeight + ')');
                 forgePanel.dataset.mobileSection = 'upgrades';
                 check(getComputedStyle(equipment).display === 'none' && getComputedStyle(forge).display !== 'none' && getComputedStyle(mastery).display === 'none', 'Upgrades tab isolation');
+                check(getComputedStyle(forge).overflowY === 'hidden', 'Upgrade cards must not scroll');
+                if (width > height && height >= 360) {
+                    check(forge.scrollHeight <= forge.clientHeight + 1, 'Upgrade grid must fit without scrolling: ' + width + 'x' + height + ' @' + scale + ' (' + forge.scrollHeight + '>' + forge.clientHeight + ')');
+                    for (const button of forge.querySelectorAll('button')) {
+                        const card = button.getBoundingClientRect(), bounds = forge.getBoundingClientRect(), preview = button.querySelector('[data-upgrade-preview]')?.getBoundingClientRect();
+                        check(card.height > 0 && card.bottom <= bounds.bottom + 1 && card.right <= bounds.right + 1, 'Upgrade card must stay inside the visible grid');
+                        check(preview && preview.height >= 6 && preview.bottom <= card.bottom + 1, 'Upgrade effect preview must stay visible');
+                    }
+                }
                 forgePanel.dataset.mobileSection = 'training';
                 check(getComputedStyle(equipment).display === 'none' && getComputedStyle(forge).display === 'none' && getComputedStyle(mastery).display !== 'none', 'Mastery tab isolation');
+                check(getComputedStyle(mastery).overflowY === 'hidden' && getComputedStyle(masteryGrid).overflowY === 'hidden', 'Mastery cards must not scroll');
+                if (width > height && height >= 360) {
+                    check(mastery.scrollHeight <= mastery.clientHeight + 1 && masteryGrid.scrollHeight <= masteryGrid.clientHeight + 1, 'Mastery grid must fit without scrolling: ' + width + 'x' + height + ' @' + scale + ' (' + masteryGrid.scrollHeight + '>' + masteryGrid.clientHeight + ')');
+                    for (const button of masteryGrid.querySelectorAll('button')) {
+                        const card = button.getBoundingClientRect(), bounds = masteryGrid.getBoundingClientRect(), preview = button.querySelector('[data-upgrade-preview]')?.getBoundingClientRect();
+                        check(card.height > 0 && card.bottom <= bounds.bottom + 1 && card.right <= bounds.right + 1, 'Mastery card must stay inside the visible grid');
+                        check(preview && preview.height >= 6 && preview.bottom <= card.bottom + 1, 'Mastery effect preview must stay visible');
+                    }
+                }
             }
             document.body.dataset.result = 'PASS';
         } catch (error) { document.body.dataset.result = error.message; }

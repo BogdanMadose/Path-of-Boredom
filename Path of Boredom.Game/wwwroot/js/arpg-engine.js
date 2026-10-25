@@ -1070,19 +1070,24 @@ function spawnWave(state) {
     const depth = Math.max(0, state.wave - LAST_WAVE);
     const difficulty = difficultyFor(state);
     const levelPressure = Math.max(0, state.player.level - 8);
-    const scaling = (1 + act * 0.22) * (1 + depth * 0.055 + (depth / 60) ** 1.4)
-        * (1 + levelPressure * 0.055) ** 1.15;
+    // Campaign chapters and player levels should add pressure in measured steps. Endless depth
+    // uses a capped, gradual ramp so no single stat multiplier eventually makes a run unwinnable.
+    const chapterScaling = 1 + act * 0.17;
+    const depthScaling = 1 + Math.min(2, depth * 0.025);
+    const levelScaling = 1 + Math.min(0.55, levelPressure * 0.025);
+    const scaling = chapterScaling * depthScaling * levelScaling;
     const encounter = encounterForWave(state.wave);
     const formation = encounterFormation(state.wave);
-    const baseCount = (bossWave ? 10 + act * 3 : 7 + localWave * 3 + act * 3) + Math.floor(depth / 4) + difficulty.extra;
-    const earlyToughness = state.wave <= 4 ? 1.3 : state.wave <= 8 ? 1.15 : 1;
-    const count = Math.min(40 + Math.min(10, Math.floor(depth / 15)), Math.max(5, Math.round(baseCount * (state.wave >= 6 ? encounter.count : 1))));
-    // Endless pressure gradually counters long-range builds with slightly faster durability, damage,
-    // and movement scaling, while the shared speed and projectile rules still apply to every class.
+    const baseCount = (bossWave ? 10 + act * 3 : 7 + localWave * 3 + act * 3) + Math.min(12, Math.floor(depth / 8)) + difficulty.extra;
+    const earlyToughness = state.wave <= 4 ? 1.4 : state.wave <= 8 ? 1.2 : 1;
+    const earlySpeed = state.wave <= 4 ? 1.06 : state.wave <= 8 ? 1.03 : 1;
+    const countLimit = depth > 0 ? 34 + Math.min(8, Math.floor(depth / 25)) : 40;
+    const count = Math.min(countLimit, Math.max(5, Math.round(baseCount * (state.wave >= 6 ? encounter.count : 1))));
+    // Ranged builds still face some chase pressure in Endless, but it stops at a small, predictable cap.
     const rangedHero = ["ranger", "sorcerer"].includes(state.heroClass);
-    const deepHealth = 1 + (rangedHero ? depth * 0.004 : depth * 0.002);
-    const deepDamage = 1 + depth * 0.006;
-    const deepSpeed = Math.min(rangedHero ? 0.3 : 0.2, depth * 0.002);
+    const deepHealth = 1 + Math.min(rangedHero ? 0.2 : 0.15, depth * (rangedHero ? 0.002 : 0.0015));
+    const deepDamage = 1 + Math.min(0.45, depth * 0.0035);
+    const deepSpeed = Math.min(rangedHero ? 0.18 : 0.12, depth * 0.0012);
     for (let i = 0; i < count; i++) {
         const boss = bossWave && i === 0;
         const kind = boss ? "boss" : encounterKind(state.wave, i);
@@ -1097,9 +1102,9 @@ function spawnWave(state) {
             kind, x, y, health, maxHealth: health, elite, charging: 0, chargeX: 0, chargeY: 0,
             combat: { volleys: [], phase: 1, rest: 0, pattern: 1 },
             radius: boss ? 32 : kind === "brute" || kind === "sentinel" ? 22 : kind === "runner" ? 12 : 15,
-            speed: boss ? 110 + act * 10 : kind === "runner" ? 190 + act * 10 : kind === "sentinel" ? 70 : kind === "brute" ? 84 : ["wisp", "spitter", "summoner", "cantor", "hexer"].includes(kind) ? 95 : 130 + Math.min(state.wave, LAST_WAVE) * 2.2,
+            speed: boss ? 90 + act * 10 : kind === "runner" ? 190 + act * 10 : kind === "sentinel" ? 70 : kind === "brute" ? 84 : ["wisp", "spitter", "summoner", "cantor", "hexer"].includes(kind) ? 95 : 130 + Math.min(state.wave, LAST_WAVE) * 2.2,
             damage: Math.round((boss ? 34 + act * 11 : kind === "sentinel" ? 26 + act * 4 : kind === "brute" ? 22 + act * 5 : 13 + Math.min(state.wave, LAST_WAVE) * 1.5)
-                * (1 + act * 0.045 + depth * 0.009 + levelPressure * 0.008) * (elite ? 1.3 : 1)),
+                * (1 + act * 0.03 + depth * 0.004 + levelPressure * 0.005) * (elite ? 1.3 : 1)),
             cooldown: grouped ? 1.2 + (i % 3) * 0.55 : 1.2, flash: 0, slam: 4, winding: 0, attackWindup: 0, attackX: x, attackY: y, chilled: 0, chillStrength: 0
         });
         const spawned = state.enemies[state.enemies.length - 1];
@@ -1108,10 +1113,10 @@ function spawnWave(state) {
         spawned.modifier = elite && state.wave >= 11 && state.random() < Math.min(0.55, 0.35 + depth * 0.002)
             ? traits[Math.floor(state.random() * traits.length)] : "none";
         spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * difficulty.health
-            * (boss && state.mode === "endless" ? 2.6 + depth * 0.06 : 1));
+            * (boss && state.mode === "endless" ? 1.9 + Math.min(1.1, depth * 0.012) : 1));
         spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * earlyToughness * deepHealth);
         spawned.damage = Math.round(spawned.damage * difficulty.damage * (earlyToughness > 1 ? 1.1 : 1) * deepDamage);
-        spawned.speed = Math.min(210 + Math.min(90, depth), spawned.speed) * difficulty.speed * (1 + Math.max(Math.min(0.15, depth * 0.0015), deepSpeed));
+        spawned.speed = Math.min(210 + Math.min(90, depth), spawned.speed) * difficulty.speed * (boss ? 1 : earlySpeed) * (1 + deepSpeed);
     }
     const opening = Math.max(3, Math.ceil(count * 0.35));
     const waveStart = state.enemies.length - count;

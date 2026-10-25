@@ -29,6 +29,7 @@ if (!fs.existsSync(edge)) {
     const html = `<html><head><style>html,body{margin:0}*{box-sizing:border-box}[hidden]{display:none!important}${css}
         .arena-overlay{position:fixed;inset:0;display:grid;place-items:center}</style></head>
         <body class="mobile-shell"><div class="arpg" data-canvas-hud="on" data-main-menu="on" data-game-status="paused">
+        <div class="skill-bar" data-test="combat-skills"><button>Skill one</button><button>Skill two</button></div>
         <div data-test="main">${mainMenu}</div>
         <div class="arena-overlay" data-test="level">${levelDraft}</div>
         <div class="arena-overlay" data-test="death">${runMenu}</div>
@@ -89,7 +90,8 @@ if (!fs.existsSync(edge)) {
         window.measure = () => {
             for (const [name, selector] of Object.entries(overlays)) {
                 gameRoot.dataset.mainMenu = name === 'main' ? 'on' : 'off';
-                gameRoot.dataset.gameStatus = name === 'death' ? 'dead' : name === 'camp' ? 'camp' : 'paused';
+                gameRoot.dataset.gameStatus = name === 'level' ? 'choosing' : name === 'death' ? 'dead' : name === 'camp' ? 'camp' : 'paused';
+                if (name === 'level' && getComputedStyle(gameRoot.querySelector('[data-test="combat-skills"]')).display !== 'none') report.push('level: combat skill buttons overlap the boon selection card');
                 const overlay = document.querySelector(selector);
                 for (const other of new Set(Object.values(overlays))) document.querySelector(other).style.display = other === selector ? '' : 'none';
                 if (name === 'save') saveDialog.showModal();

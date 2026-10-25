@@ -511,7 +511,6 @@ export function createGameAudio(environment = globalThis) {
             if (current.level > previous.level) play("level");
             if (current.boons > previous.boons || current.selected > previous.selected || current.training > previous.training) play("choice");
             if (current.upgrades > previous.upgrades) play("forge");
-            if (current.weapon > previous.weapon || current.armor > previous.armor) play("loot");
             if (current.damage > previous.damage) play("hit");
             for (const [key, cooldown] of Object.entries(current.cooldowns)) {
                 if (cooldown > (previous.cooldowns[key] ?? 0) + 0.01) play(key === "attack" ? "attack" : key === "dodge" ? "dodge" : key === "potion" ? "heal" : "skill", state.heroClass, key);

@@ -6,7 +6,7 @@
 @inject IServiceProvider Services
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 
-<PageTitle>Path of Boredom - The Ember Campaign</PageTitle>
+<Microsoft.AspNetCore.Components.Web.PageTitle>Path of Boredom - The Ember Campaign</Microsoft.AspNetCore.Components.Web.PageTitle>
 
 <div class="arpg" data-player="@windowsUserName" data-ranking-board="@(Session is ICloudGameSession ? Path_of_Boredom.ServiceDefaults.RankingRules.MobileRelease : Path_of_Boredom.ServiceDefaults.RankingRules.CurrentPatch)" data-cloud-signed-in="@(Session is ICloudGameSession account && account.AccountStatus.SignedIn ? "on" : "off")" @ref="gameRoot">
     <section class="main-menu" data-main-menu aria-labelledby="main-menu-title">
@@ -78,7 +78,7 @@
     @if (Session is not ICloudGameSession)
     {
     <aside class="patch-notice" data-patch-notice role="status">
-        <span><strong>Version 1.0.1</strong> · Save slots, the improved main menu, Forge artwork, challenge save fixes, and a difficulty rebalance.</span>
+        <span><strong>Version 1.0.1</strong> · Save slots, smoother difficulty, Forge and arena artwork, and quieter pickups.</span>
         <a href="/patch-notes#version-1-0-1" target="_blank" rel="noopener">Read patch notes ↗</a>
         <button type="button" class="quiet-button" data-dismiss-patch aria-label="Dismiss patch announcement">Dismiss</button>
     </aside>
@@ -500,7 +500,7 @@
                         @if (Session is ICloudGameSession)
                         {
                             <section class="account-settings" data-options-section="account" aria-label="Account and cloud saves">
-                                <CloudAccountMenu Changed="AccountChanged" Deleted="AccountDeleted" />
+                                <Path_of_Boredom.Game.Components.CloudAccountMenu Changed="AccountChanged" Deleted="AccountDeleted" />
                             </section>
                         }
                     </div>
@@ -545,13 +545,13 @@
         <footer class="game-footer"><span>SIX DAWNS. ONE LAST PROMISE.</span><span>Windows account saves &middot; Checkpoint autosaves &middot; Permanent Endless unlock</span><span class="credit">Developed by MadBone | LIT MES TSR</span></footer>
     </main>
     <section class="game-information" data-game-rankings hidden aria-label="In-game rankings">
-        <Rankings Embedded="true" />
+        <Path_of_Boredom.Game.Components.Pages.Rankings Embedded="true" />
     </section>
     <section class="patch-notes-overlay" data-game-patch-notes hidden aria-label="In-game patch notes">
         <header class="patch-notes-overlay-header">
             <button type="button" class="quiet-button" data-close-patch-notes aria-label="Back to main menu">← Back</button>
         </header>
-        <PatchNotes Embedded="true" />
+        <Path_of_Boredom.Game.Components.Pages.PatchNotes Embedded="true" />
     </section>
 </div>
 

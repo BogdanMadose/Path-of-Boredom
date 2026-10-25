@@ -1,4 +1,4 @@
-﻿@page "/patch-notes"
+@page "/patch-notes"
 @layout GameLayout
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 
@@ -27,9 +27,9 @@
                 <span class="badge latest">LATEST UPDATE</span>
             </div>
             <h2>More room to save your journey</h2>
-            <p>This update brings a redesigned main menu, easier save management, clearer mobile menus, a more compact Forge equipment view, and a more demanding campaign and Endless opening.</p>
+            <p>This update brings a redesigned main menu, easier save management, clearer mobile menus, a more compact Forge equipment view, a steadier difficulty curve, quieter pickups, and softer arena artwork.</p>
             <div class="tags" aria-label="Update highlights">
-                <span>Main menu</span><span>Save slots</span><span>Forge artwork</span><span>Mobile menus</span><span>Challenge saves</span><span>Difficulty rebalance</span><span>Sound polish</span>
+                <span>Main menu</span><span>Save slots</span><span>Forge artwork</span><span>Arena artwork</span><span>Mobile menus</span><span>Challenge saves</span><span>Difficulty rebalance</span><span>Sound polish</span>
             </div>
         </header>
 
@@ -37,6 +37,7 @@
             <a href="#main-menu">Main menu</a>
             <a href="#save-slots">Save slots</a>
             <a href="#forge-artwork">Forge artwork</a>
+            <a href="#arena-artwork">Arena artwork</a>
             <a href="#mobile-menus">Mobile menus</a>
             <a href="#challenge-saves">Challenge saves</a>
             <a href="#difficulty-and-restart">Difficulty and restart</a>
@@ -67,11 +68,18 @@
             <p>Forge upgrades and masteries now have their own artwork, giving each choice more visual character as you shape your build. The Equipment tab has a compact stat preview and shorter style choices, so it fits a landscape phone without making you scroll through long synergy and relic descriptions.</p>
         </section>
 
+        <section class="patch-section" id="arena-artwork">
+            <p class="eyebrow">A WORN, LIVED-IN WORLD</p>
+            <h3>Arena surfaces feel less rigid</h3>
+            <p>Floor details now use scattered worn stone, drifting frost cracks, ember scars, and loose ink marks instead of repeating tiles, hexes, and precise center rings. The combat space stays clear while each chapter feels more natural.</p>
+        </section>
+
         <section class="patch-section" id="mobile-menus">
             <p class="eyebrow">BUILT FOR LANDSCAPE</p>
             <h3>Skills, Forge, and Options are easier to scan</h3>
             <ul>
                 <li>Skills, Forge, and Options tabs now use clearer icons, stronger selected states, and phone-sized touch targets.</li>
+                <li>Combat skill buttons stay out of the way while the level-up boon card is open.</li>
                 <li>Account and cloud controls are grouped under Options. Relic discoveries moved out of Account Progression into Options &gt; Codex; current-run relics and synergies stay with the run summary.</li>
                 <li>Patch Notes opens over the main menu and its Back button sits on the right, so reading the update no longer sends you through a sign-in reset.</li>
             </ul>
@@ -88,6 +96,7 @@
             <h3>Difficulty, combat pressure, and restart options</h3>
             <ul>
                 <li>Difficulty choices are now named Easy, Medium, and Hard, with enemy health, damage, speed, wave size, and healing retuned so upgrades matter sooner.</li>
+                <li>The opening now has a little more chase pressure. Chapter and level scaling rise more gradually, while Endless wave health, damage, and enemy counts no longer accelerate as sharply. Bosses also pursue at a more manageable pace.</li>
                 <li>Enemies pursue faster, and Ash runners now appear in the first wave. Wisps and Spitters lead moving targets and fire faster projectiles, so constant circling is less effective; dodge their shots and use the arena to make space.</li>
                 <li>Fresh Endless runs start with a partial Watchkeeper kit instead of every Forge upgrade at maximum, leaving room to grow through the early echoes.</li>
                 <li>Ranking filters use the current Easy, Medium, and Hard labels. Existing scores and ranking boards are retained.</li>
@@ -97,8 +106,8 @@
 
         <section class="patch-section" id="pickup-audio">
             <p class="eyebrow">A QUIETER ADVENTURE</p>
-            <h3>Coin pickups no longer chime</h3>
-            <p>Routine gold pickups are silent now, so repeated collection sounds do not crowd out combat. Level-ups, upgrades, victories, and improved equipment still have audio cues.</p>
+            <h3>Gear pickups no longer chime</h3>
+            <p>Weapon and armor pickups are silent now, while gold pickups remain quiet too. Repeated collection sounds no longer crowd out combat. Level-ups, deliberate Forge upgrades, victories, and combat actions keep their audio cues.</p>
         </section>
     </article>
 

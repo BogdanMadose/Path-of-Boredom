@@ -588,7 +588,7 @@
     body.mobile-shell [data-class-stats],
     body.mobile-shell [data-class-skills] {
         display: -webkit-box;
-        -webkit-line-clamp: 3;
+        line-clamp: 3; -webkit-line-clamp: 3;
         -webkit-box-orient: vertical;
         overflow: hidden;
         font-size: 11px;
@@ -636,6 +636,17 @@
     body.mobile-shell .arpg:not([data-game-status="playing"]) .skill-bar,
     body.mobile-shell .arpg[data-menu-open="on"] .arena-overlay {
         display: none !important;
+    }
+
+    /* Keep the live skill buttons clear of the level-up card even while its enter/exit
+       transition and the canvas HUD update on adjacent frames. */
+    body.mobile-shell .arpg[data-game-status="choosing"] .skill-bar,
+    body.mobile-shell .arpg:has([data-level-draft]:not([hidden])) .skill-bar {
+        display: none !important;
+    }
+
+    body.mobile-shell .arpg:has([data-level-draft]:not([hidden])) [data-overlay] {
+        background: #0b1519f5;
     }
 
     body.mobile-shell .arena-overlay[hidden],
@@ -701,7 +712,7 @@
     body.mobile-shell .run-skill-pool span {
         grid-column: 2;
         display: -webkit-box;
-        -webkit-line-clamp: 2;
+        line-clamp: 2; -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
         font-size: 11px;
@@ -709,7 +720,7 @@
     }
     body.mobile-shell .skill-choice-overlay .overlay-card { padding: 10px 14px; }
     body.mobile-shell .skill-choice-overlay .run-skill-pool { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    body.mobile-shell .skill-choice-overlay .run-skill-pool span { -webkit-line-clamp: 1; }
+    body.mobile-shell .skill-choice-overlay .run-skill-pool span { line-clamp: 1; -webkit-line-clamp: 1; }
     body.mobile-shell .skill-choice-overlay .run-skill-pool button { min-height: 40px; padding: 4px 8px; margin: 0; }
     body.mobile-shell .setup-overlay .overlay-card { gap: 6px 10px; padding: 10px 14px; }
     body.mobile-shell .setup-overlay .eyebrow { display: none; }
@@ -724,7 +735,7 @@
         font-size: 11px;
         line-height: 1.3;
         display: -webkit-box;
-        -webkit-line-clamp: 1;
+        line-clamp: 1; -webkit-line-clamp: 1;
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
@@ -736,7 +747,7 @@
     body.mobile-shell .setup-overlay .difficulty-picker { gap: 2px; font-size: 11px; }
     body.mobile-shell .setup-overlay .starter-skill-pool button { min-height: 36px; }
     @media (max-height: 420px) {
-        body.mobile-shell .setup-overlay .forge-feedback { -webkit-line-clamp: 2; }
+        body.mobile-shell .setup-overlay .forge-feedback { line-clamp: 2; -webkit-line-clamp: 2; }
         body.mobile-shell .setup-overlay h2 { display: none; }
     }
     body.mobile-shell .setup-overlay[data-tutorial="on"] .eyebrow,
@@ -923,7 +934,7 @@
     }
     body.mobile-shell .level-card .card-description {
         display: -webkit-box;
-        -webkit-line-clamp: 3;
+        line-clamp: 3; -webkit-line-clamp: 3;
         -webkit-box-orient: vertical;
         overflow: hidden;
         font-size: 11px;
@@ -1073,7 +1084,7 @@ body.mobile-shell .arpg [data-run-menu] .run-summary-damage li { font-size: 9px;
 body.mobile-shell .arpg [data-run-menu] .run-summary-damage li:nth-child(n+5) { display: none; }
 body.mobile-shell [data-run-menu] > .run-build-details { max-height: 3.2em; overflow: hidden; }
 body.mobile-shell [data-run-menu] > .run-build-details[open] { max-height: 4.6em; }
-body.mobile-shell [data-run-menu] > .run-build-details p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; margin: 2px 0 0; }
+body.mobile-shell [data-run-menu] > .run-build-details p { display: -webkit-box; -webkit-box-orient: vertical; line-clamp: 1; -webkit-line-clamp: 1; overflow: hidden; margin: 2px 0 0; }
 body.mobile-shell .arpg [data-run-menu]:has(> .camp-event:not([hidden])),
 body.mobile-shell .arpg [data-run-menu]:has(> .camp-challenge:not([hidden])) {
     display: grid;

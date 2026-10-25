@@ -14,7 +14,11 @@ for (const [name, page] of [['Patch Notes', patchNotes], ['Rankings', rankings]]
     assert.match(page, /class="back-link" href="\/" aria-label="Back to game"/, `${name} page returns to the game route`);
 }
 assert.match(home, /<button[^>]*data-open-patch-notes/, 'main-menu Patch Notes opens without a route change');
-assert.match(home, /<section class="patch-notes-overlay"[^>]*data-game-patch-notes hidden[\s\S]*?data-close-patch-notes[\s\S]*?<PatchNotes Embedded="true" \/>/, 'Patch Notes are embedded in the current game page with a Back control');
+assert.match(home, /<Microsoft\.AspNetCore\.Components\.Web\.PageTitle>/, 'document title uses the framework component by its full type name');
+assert.match(home, /<Path_of_Boredom\.Game\.Components\.CloudAccountMenu\b/, 'account menu uses its full component type name');
+assert.match(home, /<Path_of_Boredom\.Game\.Components\.Pages\.Rankings\b/, 'rankings uses its full component type name');
+assert.match(home, /<Path_of_Boredom\.Game\.Components\.Pages\.PatchNotes\b/, 'patch notes uses its full component type name');
+assert.match(home, /<section class="patch-notes-overlay"[^>]*data-game-patch-notes hidden[\s\S]*?data-close-patch-notes[\s\S]*?<([\w.]+\.)?PatchNotes Embedded="true" \/>/, 'Patch Notes are embedded in the current game page with a Back control');
 assert.match(patchNotesCss, /\.page-header \{[^}]*justify-content: flex-end;/, 'standalone Patch Notes Back button is right aligned');
 const actions = source.slice(source.indexOf('    function addSaveActions('), source.indexOf('    function buildInformation('));
 const construction = source.slice(source.indexOf('        var mainCard ='), source.indexOf('        buildBar();'));

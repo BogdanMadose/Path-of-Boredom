@@ -90,62 +90,74 @@ function makeFloor(map) {
             ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 6, y - 20); ctx.moveTo(x, y); ctx.lineTo(x + 5, y - 27); ctx.stroke();
         }
     } else if (map.id === "citadel") {
-        ctx.strokeStyle = "#ed824f30";
-        ctx.lineWidth = 8;
-        ctx.strokeRect(100, 100, WIDTH - 200, HEIGHT - 200);
-        for (const x of [145, WIDTH - 145]) {
-            ctx.fillStyle = "#0d1015";
-            ctx.fillRect(x - 20, 110, 40, 80);
-            ctx.fillRect(x - 20, HEIGHT - 190, 40, 80);
-            ctx.fillStyle = "#987059";
-            ctx.fillRect(x - 24, 106, 48, 10);
-            ctx.fillRect(x - 24, HEIGHT - 194, 48, 10);
+        // Heat scars wander over the old stone instead of tracing a neat rectangle through the arena.
+        ctx.lineCap = "round";
+        for (let i = 0; i < 9; i++) {
+            const x = 115 + random() * (WIDTH - 230), y = 95 + random() * (HEIGHT - 190);
+            ctx.strokeStyle = "#ed824f20"; ctx.lineWidth = 3 + random() * 5;
+            ctx.beginPath(); ctx.moveTo(x, y);
+            ctx.quadraticCurveTo(x + (random() - 0.5) * 70, y + (random() - 0.5) * 65,
+                x + (random() - 0.5) * 125, y + (random() - 0.5) * 110);
+            ctx.stroke();
         }
     }
     if (["glacier", "archive", "rift"].includes(map.id)) {
-        for (let i = 0; i < 18; i++) {
-            const x = 70 + (i % 9) * 120;
-            const y = i < 9 ? 55 : HEIGHT - 55;
-            ctx.fillStyle = map.accent + "55";
-            ctx.strokeStyle = map.accent + "88";
+        ctx.lineCap = "round"; ctx.lineJoin = "round";
+        for (let i = 0; i < 20; i++) {
+            const x = 45 + random() * (WIDTH - 90), y = random() < 0.5 ? 32 + random() * 65 : HEIGHT - 32 - random() * 65;
+            const drift = 12 + random() * 30;
+            ctx.strokeStyle = map.accent + (i % 2 ? "30" : "45");
+            ctx.fillStyle = map.accent + "16"; ctx.lineWidth = 1 + random() * 2;
             ctx.beginPath();
             if (map.id === "glacier") {
-                ctx.moveTo(x - 18, y + 14); ctx.lineTo(x - 6, y - 35); ctx.lineTo(x + 20, y + 10);
+                ctx.moveTo(x - drift, y + 8); ctx.quadraticCurveTo(x - 3, y - 18 - random() * 16, x + drift, y + 9);
+                ctx.quadraticCurveTo(x + 3, y + 4, x - drift, y + 8);
             } else if (map.id === "archive") {
-                ctx.rect(x - 18, y - 15, 36, 30);
-                ctx.moveTo(x, y - 15); ctx.lineTo(x, y + 15);
+                ctx.moveTo(x - drift, y); ctx.quadraticCurveTo(x - 2, y - 8 - random() * 8, x + drift, y - 2);
+                ctx.moveTo(x - drift * 0.45, y + 7); ctx.quadraticCurveTo(x, y + 13, x + drift * 0.5, y + 5);
             } else {
-                ctx.ellipse(x, y, 12, 30, Math.PI / 4, 0, Math.PI * 2);
+                ctx.moveTo(x - drift * 0.7, y + 7); ctx.bezierCurveTo(x - drift, y - 20, x + drift * 0.8, y - 16, x + drift, y + 1);
+                ctx.quadraticCurveTo(x + drift * 0.2, y + 24, x - drift * 0.7, y + 7);
             }
-            ctx.closePath(); ctx.fill(); ctx.stroke();
+            if (map.id !== "archive") { ctx.closePath(); ctx.fill(); }
+            ctx.stroke();
         }
     }
     ctx.save();
     ctx.translate(WIDTH / 2, HEIGHT / 2);
     ctx.scale(1, 0.72);
-    for (const radius of [155, 168, 215]) {
-        ctx.strokeStyle = "#ab987526";
-        ctx.lineWidth = radius === 168 ? 3 : 1;
+    // The central mark is a weathered, asymmetrical scar in the stone, not a set of precise rings
+    // and a hexagonal sigil. The mild variation keeps the playable space easy to read.
+    const wornLoop = (radius, color, lineWidth, offsetX, offsetY) => {
+        const points = [];
+        for (let i = 0; i < 40; i++) {
+            const angle = i / 40 * Math.PI * 2;
+            const wobble = 0.94 + random() * 0.08 + Math.sin(angle * 3 + 0.7) * 0.035;
+            points.push({ x: Math.cos(angle) * radius * wobble + offsetX, y: Math.sin(angle) * radius * wobble + offsetY });
+        }
         ctx.beginPath();
-        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        let active = false;
+        for (let i = 0; i < points.length; i++) {
+            if ((i >= 7 && i <= 10) || (i >= 23 && i <= 26)) { active = false; continue; }
+            const current = points[i], next = points[(i + 1) % points.length];
+            const midX = (current.x + next.x) / 2, midY = (current.y + next.y) / 2;
+            if (!active) { ctx.moveTo(midX, midY); active = true; }
+            ctx.quadraticCurveTo(current.x, current.y, midX, midY);
+        }
+        ctx.strokeStyle = color; ctx.lineWidth = lineWidth; ctx.stroke();
+    };
+    ctx.lineCap = "round";
+    wornLoop(174, "#ab98751b", 15, -5, 3);
+    for (let i = 0; i < 8; i++) {
+        const angle = random() * Math.PI * 2, start = 55 + random() * 66, length = 24 + random() * 46;
+        const x = Math.cos(angle) * start, y = Math.sin(angle) * start;
+        const endX = Math.cos(angle) * (start + length), endY = Math.sin(angle) * (start + length);
+        const bend = (random() - 0.5) * 30;
+        ctx.strokeStyle = i % 3 ? "#bc986120" : "#bc98612b"; ctx.lineWidth = 1 + random();
+        ctx.beginPath(); ctx.moveTo(x, y);
+        ctx.quadraticCurveTo((x + endX) / 2 - Math.sin(angle) * bend, (y + endY) / 2 + Math.cos(angle) * bend, endX, endY);
         ctx.stroke();
     }
-    for (let i = 0; i < 12; i++) {
-        ctx.save();
-        ctx.rotate(i * Math.PI / 6);
-        ctx.fillStyle = "#bdab7425";
-        ctx.fillRect(-2, 179, 4, 18);
-        ctx.restore();
-    }
-    ctx.strokeStyle = "#bc986130";
-    ctx.beginPath();
-    for (let i = 0; i <= 6; i++) {
-        const angle = i * Math.PI * 2 / 3 - Math.PI / 2;
-        const x = Math.cos(angle) * 125;
-        const y = Math.sin(angle) * 125;
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
     ctx.restore();
     for (let i = 0; i < 160; i++) {
         const x = random() * WIDTH;
@@ -158,10 +170,7 @@ function makeFloor(map) {
     ctx.strokeStyle = "#080f16";
     ctx.lineWidth = 24;
     ctx.strokeRect(10, 10, WIDTH - 20, HEIGHT - 20);
-    ctx.strokeStyle = "#7f80632e";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(27, 27, WIDTH - 54, HEIGHT - 54);
-    for (const [x, y] of [[74, 75], [WIDTH - 74, 75], [74, HEIGHT - 75], [WIDTH - 74, HEIGHT - 75]]) {
+    for (const [x, y] of [[74, 75], [WIDTH - 95, 105], [96, HEIGHT - 92], [WIDTH - 77, HEIGHT - 74]]) {
         const glow = ctx.createRadialGradient(x, y, 3, x, y, 140);
         glow.addColorStop(0, map.accent + "38");
         glow.addColorStop(1, map.accent + "00");

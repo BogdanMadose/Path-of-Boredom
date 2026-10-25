@@ -16,3 +16,17 @@ namespace Path_of_Boredom.ServiceDefaults;
 /// <param name="Save">The loaded save payload, present only on a successful load.</param>
 /// <param name="EndlessUnlocked">Whether this account has permanently unlocked Endless mode, echoed back from the API so the client doesn't need a separate call to know.</param>
 public sealed record GameSaveResult(bool Success, string Message, JsonElement? Save = null, bool EndlessUnlocked = false);
+
+/// <summary>Public, compact metadata for one of the player's selectable save slots.</summary>
+public sealed record GameSaveSlotInfo(
+    int Slot,
+    bool Exists,
+    DateTimeOffset? SavedAt = null,
+    string? HeroClass = null,
+    string? Difficulty = null,
+    string? Mode = null,
+    int? Wave = null,
+    int? Level = null,
+    double? Seconds = null,
+    bool EndlessUnlocked = false,
+    long Revision = 0);

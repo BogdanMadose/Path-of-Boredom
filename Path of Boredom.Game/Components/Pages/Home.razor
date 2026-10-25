@@ -42,6 +42,15 @@
             </div>
         </section>
     </section>
+    <dialog class="save-slots-dialog" data-save-slots-dialog aria-labelledby="save-slots-title">
+        <section class="save-slots-card">
+            <p class="eyebrow">THE ARCHIVE</p>
+            <h2 id="save-slots-title" data-save-slots-title>Choose a save</h2>
+            <p data-save-slots-hint>Select a run to continue.</p>
+            <div class="save-slot-list" data-save-slot-list aria-label="Save slots"></div>
+            <button type="button" class="quiet-button" data-save-slots-cancel>Cancel</button>
+        </section>
+    </dialog>
     <button type="button" class="quiet-button main-menu-return" data-open-main-menu>Main menu</button>
     <button type="button" class="quiet-button campaign-lore-return" data-open-lore>Chapter lore</button>
     <section class="campaign-lore" data-lore-reader hidden role="dialog" aria-modal="true" aria-labelledby="lore-title">
@@ -607,14 +616,18 @@
     /// since this project never actually reads individual save fields, it just forwards the blob.
     /// </summary>
     [JSInvokable]
-    public async Task<GameSaveResult> SaveRun(System.Text.Json.JsonElement snapshot) =>
-        await Session.SaveAsync(snapshot);
+    public async Task<GameSaveResult> SaveRun(System.Text.Json.JsonElement snapshot, int slot) =>
+        await Session.SaveAsync(snapshot, slot);
 
     /// <summary>
     /// Called by arpg.js when the player clicks Load (or the game auto-attempts a load at startup).
     /// </summary>
     [JSInvokable]
-    public async Task<GameSaveResult> LoadRun() => await Session.LoadAsync();
+    public async Task<GameSaveResult> LoadRun(int slot) => await Session.LoadAsync(slot);
+
+    [JSInvokable]
+    public async Task<IReadOnlyList<Path_of_Boredom.ServiceDefaults.GameSaveSlotInfo>> GetSaveSlots() =>
+        await Session.GetSaveSlotsAsync();
 
     [JSInvokable]
     public async Task<string?> SaveProfile(string json) => await Session.SaveProfileAsync(json);

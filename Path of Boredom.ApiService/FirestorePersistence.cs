@@ -50,7 +50,8 @@ public sealed class FirestorePersistence(FirestoreDb database)
 }
 
 public sealed class AccountDeletedException : Exception;
-public sealed class SaveConflictException(GameSave? current) : Exception
+public sealed class SaveConflictException(GameSave? current, long currentRevision) : Exception
 {
     public GameSave? Current { get; } = current;
+    public long CurrentRevision { get; } = currentRevision;
 }

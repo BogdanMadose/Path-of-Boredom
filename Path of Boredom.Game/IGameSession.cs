@@ -22,11 +22,17 @@ public interface IGameSession
     /// <summary>Ensures the player has a rankings profile row. Non-fatal if it fails.</summary>
     Task<bool> RegisterPlayerAsync();
 
-    /// <summary>Persists a run snapshot as captured by <c>arpg-save.js</c>.</summary>
-    Task<GameSaveResult> SaveAsync(JsonElement snapshot);
+    /// <summary>Lists the five save slots, including empty slots.</summary>
+    Task<IReadOnlyList<GameSaveSlotInfo>> GetSaveSlotsAsync();
 
-    /// <summary>Fetches the player's stored run, if any.</summary>
-    Task<GameSaveResult> LoadAsync();
+    /// <summary>Persists a run snapshot into one save slot.</summary>
+    Task<GameSaveResult> SaveAsync(JsonElement snapshot, int slot);
+
+    /// <summary>Loads the selected save slot.</summary>
+    Task<GameSaveResult> LoadAsync(int slot);
+
+    Task<GameSaveResult> SaveAsync(JsonElement snapshot) => SaveAsync(snapshot, 1);
+    Task<GameSaveResult> LoadAsync() => LoadAsync(1);
 
     /// <summary>Submits a score/build for the leaderboard.</summary>
     Task<bool> SubmitScoreAsync(ScoreSubmission submission);

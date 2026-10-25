@@ -37,7 +37,7 @@ Mutations read the account marker inside their transaction. That serializes writ
 
 `GameSaveEndpoints.cs` is still the validation wall. `PUT /game/save` reads at most 64 KiB, checks the envelope, then walks the version-specific state shape before anything reaches storage. The current format is **20**; older supported formats remain accepted. Format 17 adds equipment styles, stage challenges, run summaries, and chosen-skill cards; format 18 adds the six newer Forge tracks; format 19 adds the legacy/modern skill schedule; format 20 adds bounded relic, chapter, and checkpoint-event progress. Deploy this validator before expecting format 20 app saves to upload successfully.
 
-`GET /game/save` returns the caller's save and a quoted revision in `ETag`. Google-authenticated writes must send that revision in `If-Match`; revision zero means "create only if there isn't a save yet." A missing revision gets 428, and a stale revision gets 409 with `SaveConflict`. There is no client-clock guessing and no blind last-writer-wins overwrite.
+Each player has five save slots. `GET /game/saves` returns their summaries and the collection revision; `GET /game/save?slot=N` loads one run, and `PUT /game/save?slot=N` writes it. Existing single-save accounts migrate to Slot 1 when read. Google-authenticated writes must send the collection revision in `If-Match`; revision zero means "create only if no save collection exists." A missing revision gets 428, and a stale revision gets 409 with `SaveConflict`. There is no client-clock guessing and no blind last-writer-wins overwrite.
 
 `GameSaveStore.cs` performs the write transactionally, increments the revision, and preserves the permanent Endless unlock if either the existing save or incoming run has completed the campaign.
 

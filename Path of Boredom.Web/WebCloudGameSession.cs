@@ -27,7 +27,7 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
     private bool initialized;
     private long? expectedRevision;
     private long? observedRevision;
-    private JsonElement? observedSave;
+    private IReadOnlyList<GameSaveSlotInfo> observedSlots = Array.Empty<GameSaveSlotInfo>();
     private string player = string.Empty;
     private bool deleted;
     private string message = "Signing in with Google…";
@@ -35,7 +35,7 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
     private HttpClient Http => http ??= httpFactory.CreateClient(ApiClientName);
 
     public CloudAccountStatus AccountStatus => new(true, subject is not null && tokens.Has(subject),
-        subject is not null && initialized && expectedRevision is null, observedSave is not null,
+        subject is not null && initialized && expectedRevision is null, observedSlots.Any(slot => slot.Exists),
         player, message, observedRevision, deleted);
 
     private async Task<string?> GetSubjectAsync()
@@ -103,26 +103,43 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
 
     private async Task ReadCloudMetadataAsync()
     {
-        using var request = await RequestAsync(HttpMethod.Get, "/game/save");
+        using var request = await RequestAsync(HttpMethod.Get, "/game/saves");
         if (request is null) return;
         using var response = await SendAsync(request);
         if (response is null) return;
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             observedRevision = 0;
-            observedSave = null;
+            observedSlots = Enumerable.Range(1, 5).Select(slot => new GameSaveSlotInfo(slot, false)).ToArray();
             message = "No cloud save yet. Save a run to create one.";
             return;
         }
         if (response.StatusCode == HttpStatusCode.Unauthorized) return;
         response.EnsureSuccessStatusCode();
-        var save = await response.Content.ReadFromJsonAsync<JsonElement>();
-        if (!save.TryGetProperty("revision", out var revision) || !revision.TryGetInt64(out var value) || value < 1
-            || !save.TryGetProperty("state", out var state) || state.ValueKind != JsonValueKind.Object)
+        var metadata = await response.Content.ReadFromJsonAsync<JsonElement>();
+        if (!metadata.TryGetProperty("revision", out var revision) || !revision.TryGetInt64(out var value) || value < 0
+            || !metadata.TryGetProperty("slots", out var slots) || slots.ValueKind != JsonValueKind.Array)
             throw new JsonException();
         observedRevision = value;
-        observedSave = save.Clone();
-        message = "Cloud save available. Load to continue it, or Save to replace it with your current run.";
+        observedSlots = JsonSerializer.Deserialize<GameSaveSlotInfo[]>(slots.GetRawText(), new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            ?? throw new JsonException();
+        message = observedSlots.Any(slot => slot.Exists) ? "Cloud save slots available. Choose a slot to load or save."
+            : "No cloud saves yet. Save a run to create one.";
+    }
+
+    public async Task<IReadOnlyList<GameSaveSlotInfo>> GetSaveSlotsAsync()
+    {
+        await gate.WaitAsync();
+        try
+        {
+            await EnsureInitializedAsync();
+            if (!initialized) return Array.Empty<GameSaveSlotInfo>();
+            await ReadCloudMetadataAsync();
+            return observedSlots;
+        }
+        catch (Exception exception) when (IsRecoverable(exception))
+        { message = "Could not read cloud save slots. Retry when connected."; return Array.Empty<GameSaveSlotInfo>(); }
+        finally { gate.Release(); }
     }
 
     public async Task<string> GetPlayerNameAsync()
@@ -171,8 +188,9 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
         finally { gate.Release(); }
     }
 
-    public async Task<GameSaveResult> SaveAsync(JsonElement snapshot)
+    public async Task<GameSaveResult> SaveAsync(JsonElement snapshot, int slot)
     {
+        if (slot is < 1 or > 5) return new(false, "Choose a valid save slot.");
         if (snapshot.ValueKind != JsonValueKind.Object) return new(false, "Invalid save request.");
         var json = snapshot.GetRawText();
         if (Encoding.UTF8.GetByteCount(json) > MaximumSaveBytes) return new(false, "This run is too large to save.");
@@ -183,16 +201,16 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
             if (!initialized) return new(false, message);
             if (expectedRevision is null)
                 return new(false, "Cloud sync is paused because another device changed the save. Open Account & cloud and choose which save to keep. Nothing was overwritten.");
-            return await UploadAsync(snapshot, json, expectedRevision.Value);
+            return await UploadAsync(snapshot, json, expectedRevision.Value, slot);
         }
         catch (Exception exception) when (IsRecoverable(exception))
         { return new(false, "Save API unavailable. Keep this game open and try again when connected."); }
         finally { gate.Release(); }
     }
 
-    private async Task<GameSaveResult> UploadAsync(JsonElement snapshot, string json, long revision)
+    private async Task<GameSaveResult> UploadAsync(JsonElement snapshot, string json, long revision, int slot)
     {
-        using var request = await RequestAsync(HttpMethod.Put, "/game/save");
+        using var request = await RequestAsync(HttpMethod.Put, $"/game/save?slot={slot}");
         if (request is null) return new(false, message);
         request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{revision}\""));
         request.Content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -202,7 +220,7 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
         {
             expectedRevision = null;
             observedRevision = null;
-            observedSave = null;
+            observedSlots = Array.Empty<GameSaveSlotInfo>();
             return new(false, "Cloud conflict: another device changed the save. Open Account & cloud, refresh, then choose which save to keep. Nothing was overwritten.");
         }
         if (response.StatusCode == HttpStatusCode.Unauthorized) return new(false, message);
@@ -219,13 +237,17 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
         var receipt = await response.Content.ReadFromJsonAsync<SaveReceipt>();
         if (receipt is null || receipt.Revision <= revision) throw new JsonException();
         expectedRevision = observedRevision = receipt.Revision;
-        observedSave = JsonSerializer.SerializeToElement(new
+        observedSlots = Enumerable.Range(1, 5).Select(number =>
         {
-            version = snapshot.GetProperty("version"),
-            state = snapshot.GetProperty("state"),
-            endlessUnlocked = receipt.EndlessUnlocked,
-            revision = receipt.Revision
-        });
+            var previous = observedSlots.FirstOrDefault(slotInfo => slotInfo.Slot == number) ?? new GameSaveSlotInfo(number, false);
+            return number == slot ? previous with
+            {
+                Exists = true,
+                SavedAt = receipt.SavedAt ?? DateTimeOffset.UtcNow,
+                EndlessUnlocked = receipt.EndlessUnlocked,
+                Revision = receipt.Revision
+            } : previous;
+        }).ToArray();
         return new(true, "Run saved to your Google account. Continue on any device.", EndlessUnlocked: receipt.EndlessUnlocked);
     }
 
@@ -265,18 +287,25 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
         finally { gate.Release(); }
     }
 
-    public async Task<GameSaveResult> LoadAsync()
+    public async Task<GameSaveResult> LoadAsync(int slot)
     {
+        if (slot is < 1 or > 5) return new(false, "Choose a valid save slot.");
         await gate.WaitAsync();
         try
         {
             await EnsureInitializedAsync();
             if (!initialized) return new(false, message);
             await ReadCloudMetadataAsync();
-            if (observedSave is not { } save) return new(false, "No cloud save found for your Google account yet.");
+            if (!observedSlots.Any(saved => saved.Slot == slot && saved.Exists)) return new(false, $"Slot {slot} has no cloud save.");
+            using var request = await RequestAsync(HttpMethod.Get, $"/game/save?slot={slot}");
+            if (request is null) return new(false, message);
+            using var response = await SendAsync(request);
+            if (response.StatusCode == HttpStatusCode.NotFound) return new(false, $"Slot {slot} has no cloud save.");
+            response.EnsureSuccessStatusCode();
+            var save = (await response.Content.ReadFromJsonAsync<JsonElement>()).Clone();
             expectedRevision = observedRevision;
             var unlocked = save.TryGetProperty("endlessUnlocked", out var flag) && flag.ValueKind == JsonValueKind.True;
-            return new(true, "Cloud save loaded. Resume when ready.", save, unlocked);
+            return new(true, $"Slot {slot} loaded from your Google account. Resume when ready.", save, unlocked);
         }
         catch (Exception exception) when (IsRecoverable(exception))
         { return new(false, "Cloud load unavailable. Your current run is unchanged; retry when connected."); }
@@ -375,7 +404,7 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
             }
             deleted = true;
             expectedRevision = observedRevision = null;
-            observedSave = null;
+            observedSlots = Array.Empty<GameSaveSlotInfo>();
             message = "Game account deleted. Continue with Google to create a new account.";
             if (subject is not null) tokens.Remove(subject);
             return AccountStatus;
@@ -390,6 +419,6 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
 
     private sealed record VerifiedIdentity(string Subject, string Name);
     private sealed record DisplayNameReceipt(string Name);
-    private sealed record SaveReceipt(long Revision, bool EndlessUnlocked);
+    private sealed record SaveReceipt(long Revision, bool EndlessUnlocked, DateTimeOffset? SavedAt = null);
     private sealed record SaveApiError(string? Code);
 }

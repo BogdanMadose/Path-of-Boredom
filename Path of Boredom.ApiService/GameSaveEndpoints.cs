@@ -22,6 +22,25 @@ public static class GameSaveEndpoints
     /// <summary>Registers the GET (load) and PUT (save) endpoints under /game/save.</summary>
     public static void MapGameSaves(this WebApplication app)
     {
+        // Slot metadata is small; run snapshots are fetched only after the player chooses a slot.
+        app.MapGet("/game/saves", async (HttpContext context, GameSaveStore store) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            var ownerId = context.User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            try
+            {
+                var slots = await store.ListAsync(ownerId, context.RequestAborted);
+                var revision = slots.FirstOrDefault()?.Revision ?? 0;
+                context.Response.Headers.ETag = $"\"{revision}\"";
+                return Results.Ok(new { revision, slots });
+            }
+            catch (JsonException exception)
+            {
+                app.Logger.LogError(exception, "Stored save JSON could not be loaded; reference: {Reference}", context.TraceIdentifier);
+                return Results.Json(new { code = "CorruptStoredSave", message = "The stored save JSON is unreadable.", reference = context.TraceIdentifier }, statusCode: StatusCodes.Status500InternalServerError);
+            }
+        }).RequireAuthorization().RequireRateLimiting("PlayerRequests");
+
         // GET /game/save — returns the caller's stored save, or 404 if they've never saved.
         app.MapGet("/game/save", async (HttpContext context, GameSaveStore store) =>
         {
@@ -30,9 +49,10 @@ public static class GameSaveEndpoints
             // NameIdentifier claim is set by SaveServiceAuthenticationHandler to the SID- or name-based
             // owner key; the `!` is safe here because RequireAuthorization() guarantees this claim exists.
             var ownerId = context.User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            if (!TryReadSlot(context.Request.Query["slot"].ToString(), out var slot)) return Results.BadRequest();
             try
             {
-                var save = await store.LoadAsync(ownerId, context.RequestAborted);
+                var save = await store.LoadAsync(ownerId, slot, context.RequestAborted);
                 context.Response.Headers.ETag = $"\"{save?.Revision ?? 0}\"";
                 return save is null ? Results.NotFound() : Results.Ok(save);
             }
@@ -58,6 +78,7 @@ public static class GameSaveEndpoints
         {
             context.Response.Headers.CacheControl = "no-store";
             var ownerId = context.User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+            if (!TryReadSlot(context.Request.Query["slot"].ToString(), out var slot)) return Results.BadRequest();
 
             long? expectedRevision = null;
             if (context.User.HasClaim(claim => claim.Type == "sub"))
@@ -143,13 +164,17 @@ public static class GameSaveEndpoints
 
                 try
                 {
-                    var save = await store.SaveAsync(ownerId, context.User.Identity!.Name!, state, number, context.RequestAborted,
+                    var save = await store.SaveAsync(ownerId, context.User.Identity!.Name!, state, number, slot, context.RequestAborted,
                         expectedRevision, GoogleTokenAuthenticationHandler.IssuedAt(context.User));
                     return Results.Ok(new { save.SavedAt, save.EndlessUnlocked, save.RecoveredFromCorruptSave, save.Revision });
                 }
                 catch (SaveConflictException exception)
                 {
-                    return Results.Conflict(new { code = "SaveConflict", message = "The cloud save changed. Choose which save to keep before retrying.", revision = exception.Current?.Revision ?? 0 });
+                    return Results.Conflict(new { code = "SaveConflict", message = "The cloud save changed. Choose which save to keep before retrying.", revision = exception.CurrentRevision });
+                }
+                catch (SaveSlotsFullException)
+                {
+                    return Results.Conflict(new { code = "SaveSlotsFull", message = "All save slots are full. Choose a slot to replace." });
                 }
                 catch (AccountDeletedException)
                 {
@@ -170,6 +195,12 @@ public static class GameSaveEndpoints
                 }
             }
         }).RequireAuthorization().RequireRateLimiting("PlayerRequests");
+    }
+
+    private static bool TryReadSlot(string? value, out int slot)
+    {
+        if (string.IsNullOrEmpty(value)) { slot = 1; return true; }
+        return int.TryParse(value, out slot) && slot is >= 1 and <= GameSaveStore.SlotCount;
     }
 
     public static bool TryParseRevision(string? value, out long revision)

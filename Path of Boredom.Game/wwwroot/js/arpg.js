@@ -1018,6 +1018,11 @@ export function createGame(root, saveBridge = null) {
     const saveButton = root.querySelector('[data-action="save"]');
     const loadButton = root.querySelector('[data-action="load"]');
     const saveStatus = root.querySelector("[data-save-status]");
+    const saveSlotsDialog = root.querySelector("[data-save-slots-dialog]");
+    const saveSlotsTitle = root.querySelector("[data-save-slots-title]");
+    const saveSlotsHint = root.querySelector("[data-save-slots-hint]");
+    const saveSlotList = root.querySelector("[data-save-slot-list]");
+    const saveSlotsCancel = root.querySelector("[data-save-slots-cancel]");
     const endlessButton = root.querySelector('[data-action="endless"]');
     const forgeButton = root.querySelector('[data-action="forge"]');
     const forgeFeedback = root.querySelector("[data-forge-feedback]");
@@ -1045,6 +1050,11 @@ export function createGame(root, saveBridge = null) {
     const retrySave = root.querySelector("[data-retry-save]");
     let checkingUnlock = true;
     let endlessUnlocked = false;
+    let activeSaveSlot = null;
+    let saveSlotsCache = [];
+    let resumeIfLoadCanceled = false;
+    let selectingSaveSlot = false;
+    let setupPreviousSaveSlot = null;
     let checkpointHandled = null;
     let shownDraft = "";
     let cardPickReadyAt = 0;
@@ -1643,6 +1653,8 @@ export function createGame(root, saveBridge = null) {
     // fresh defaults for a brand-new run), and always starts back at step 0.
     function openSetup(action) {
         if (saving || checkingUnlock || setupAction || state.status === "choosing") return;
+        setupPreviousSaveSlot = activeSaveSlot;
+        if (action !== "continue") activeSaveSlot = saveSlotsCache.find(slot => !slot.exists)?.slot ?? null;
         if (state.status === "playing") togglePause(state);
         clearInput();
         setupAction = action;
@@ -1659,11 +1671,15 @@ export function createGame(root, saveBridge = null) {
     // chosen loadout one last time as a safety net. Reports any pending score from the previous run
     // before replacing `state` so nothing is lost. Resets the frame-timing `last` timestamp so the
     // very next render loop tick doesn't see the (now stale) time since the last frame as elapsed time.
-    function finishSetup() {
+    async function finishSetup() {
         if (!setupAction || saving || setupStep !== tutorial.length + 1) return;
         const loadout = readSetupLoadout();
         if (!validLoadout(setupPreview(), loadout.manual, loadout.auto)) return;
         if (setupAction !== "continue" && (!starterPool().includes(loadout.auto[0]) || !classUnlocked(classSelect.value))) return;
+        if (setupAction !== "continue" && !activeSaveSlot) {
+            activeSaveSlot = await openSaveSlotChooser("save");
+            if (!activeSaveSlot) return;
+        }
         void reportScore();
         if (setupAction === "continue") {
             if (!enterEndless(state, difficultySelect.value)) return;
@@ -1678,6 +1694,7 @@ export function createGame(root, saveBridge = null) {
             if (releaseRankings) resetToReleaseRankings(state);
         }
         setupAction = null;
+        setupPreviousSaveSlot = null;
         setupFromMain = false;
         setup.hidden = true;
         checkpointHandled = null;
@@ -1690,6 +1707,8 @@ export function createGame(root, saveBridge = null) {
     // button would have opened it (Endless launch if the run was already won, otherwise Start).
     function cancelSetup() {
         setupAction = null;
+        activeSaveSlot = setupPreviousSaveSlot;
+        setupPreviousSaveSlot = null;
         setup.hidden = true;
         if (setupFromMain) {
             setupFromMain = false;
@@ -1711,7 +1730,7 @@ export function createGame(root, saveBridge = null) {
         setupSkillButtons[0]?.focus({ preventScroll: true });
         return true;
     }
-    on(setupNext, "click", () => {
+    on(setupNext, "click", async () => {
         if (promptForSkill()) return;
         if (root.dataset.canvasHud === "on") {
             const touringFirstTime = setupAction === "campaign" && !tutorialSeen();
@@ -1723,14 +1742,14 @@ export function createGame(root, saveBridge = null) {
             if (setupStep >= 1 && setupStep < tutorial.length) { setupStep += 1; showSetupStep(); return; }
             if (setupStep === tutorial.length) markTutorialSeen();
             setupStep = tutorial.length + 1;
-            finishSetup();
+            await finishSetup();
             return;
         }
-        if (setupStep === tutorial.length + 1) finishSetup();
+        if (setupStep === tutorial.length + 1) await finishSetup();
         else { setupStep = setupAction === "continue" ? tutorial.length + 1 : setupStep + 1; showSetupStep(); }
     });
-    on(setupSkip, "click", () => {
-        if (root.dataset.canvasHud === "on") { markTutorialSeen(); setupStep = tutorial.length + 1; finishSetup(); return; }
+    on(setupSkip, "click", async () => {
+        if (root.dataset.canvasHud === "on") { markTutorialSeen(); setupStep = tutorial.length + 1; await finishSetup(); return; }
         setupStep = tutorial.length + 1; showSetupStep();
     });
     on(setupCancel, "click", cancelSetup);
@@ -2653,6 +2672,94 @@ export function createGame(root, saveBridge = null) {
 
         showRestartModeChooser();
     });    
+    function noteSavedSlot(slotNumber) {
+        if (saveSlotsCache.some(slot => slot.slot === slotNumber))
+            saveSlotsCache = saveSlotsCache.map(slot => slot.slot === slotNumber ? { ...slot, exists: true } : slot);
+        else saveSlotsCache = [...saveSlotsCache, { slot: slotNumber, exists: true }];
+    }
+
+    async function openSaveSlotChooser(mode) {
+        if (!saveBridge || !saveSlotsDialog || !saveSlotList || saving || checkingUnlock || selectingSaveSlot || saveSlotsDialog.open) return null;
+        selectingSaveSlot = true;
+        const resumeIfCanceled = state.status === "playing";
+        if (resumeIfCanceled) pause();
+        let slots;
+        try {
+            slots = await saveBridge.invokeMethodAsync("GetSaveSlots");
+            if (disposed) { selectingSaveSlot = false; return null; }
+            saveSlotsCache = Array.isArray(slots) ? slots : [];
+        } catch {
+            selectingSaveSlot = false;
+            saveStatus.textContent = "Could not read save slots. Reconnect and try again.";
+            if (resumeIfCanceled && state.status === "paused") { togglePause(state); updateHud(); }
+            return null;
+        }
+        const savingMode = mode === "save";
+        saveSlotsTitle.textContent = savingMode ? "Choose where to save" : "Choose a run to load";
+        saveSlotsHint.textContent = savingMode
+            ? "Saving replaces the selected slot. Empty slots are safe to use."
+            : saveSlotsCache.some(slot => slot.exists)
+                ? "Each run keeps its own character, difficulty, and checkpoint."
+                : "No saved runs yet. Save a journey first.";
+        saveSlotList.replaceChildren();
+        const classNames = { knight: "Ember Knight", ranger: "Dawn Ranger", warden: "Iron Warden", sorcerer: "Astral Sorcerer" };
+        const words = value => value ? value.charAt(0).toUpperCase() + value.slice(1) : "Unknown";
+        for (let number = 1; number <= 5; number++) {
+            const slot = saveSlotsCache.find(item => item.slot === number) || { slot: number, exists: false };
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "save-slot-card";
+            button.disabled = !savingMode && !slot.exists;
+            const heading = document.createElement("strong");
+            heading.textContent = slot.exists ? `Slot ${number} · ${classNames[slot.heroClass] || words(slot.heroClass)}` : `Slot ${number} · Empty`;
+            const details = document.createElement("span");
+            if (slot.exists) {
+                const run = [slot.mode && words(slot.mode), slot.difficulty && words(slot.difficulty)].filter(Boolean).join(" · ");
+                const checkpoint = [slot.wave == null ? null : `Wave ${slot.wave}`, slot.level == null ? null : `Level ${slot.level}`].filter(Boolean).join(" · ");
+                details.textContent = [run, checkpoint].filter(Boolean).join(" — ") || "Saved run";
+            } else details.textContent = savingMode ? "Start a new run in this slot" : "No run saved here";
+            const timestamp = document.createElement("small");
+            if (slot.exists && slot.savedAt) {
+                const date = new Date(slot.savedAt);
+                timestamp.textContent = Number.isNaN(date.getTime()) ? "Saved" : `Last saved ${date.toLocaleString()}`;
+            } else timestamp.textContent = slot.exists ? "Saved run" : "Available";
+            button.append(heading, details, timestamp);
+            saveSlotList.append(button);
+        }
+        const selected = await new Promise(resolve => {
+            let settled = false;
+            const cleanup = () => {
+                saveSlotsCancel.onclick = null;
+                saveSlotsDialog.oncancel = null;
+                saveSlotsDialog.onclose = null;
+            };
+            const finish = slot => {
+                if (settled) return;
+                settled = true;
+                cleanup();
+                if (saveSlotsDialog.open) saveSlotsDialog.close();
+                resolve(slot);
+            };
+            for (const [index, button] of [...saveSlotList.querySelectorAll("button")].entries()) {
+                const number = index + 1;
+                button.onclick = async () => {
+                    const slot = saveSlotsCache.find(item => item.slot === number) || { exists: false };
+                    if (savingMode && slot.exists && !await gameConfirm(`Replace Slot ${number}${slot.heroClass ? ` (${classNames[slot.heroClass] || words(slot.heroClass)})` : ""}? Its saved run will be overwritten.`)) return;
+                    finish(number);
+                };
+            }
+            saveSlotsCancel.onclick = () => finish(null);
+            saveSlotsDialog.oncancel = event => { event.preventDefault(); finish(null); };
+            saveSlotsDialog.onclose = () => { if (!settled) finish(null); };
+            saveSlotsDialog.showModal();
+            (saveSlotList.querySelector("button:not(:disabled)") || saveSlotsCancel).focus({ preventScroll: true });
+        });
+        selectingSaveSlot = false;
+        if (!selected && resumeIfCanceled && state.status === "paused") { togglePause(state); updateHud(); }
+        resumeIfLoadCanceled = !!selected && !savingMode && resumeIfCanceled;
+        return selected;
+    }
+
     // The single save/load entry point, covering both manual Save/Load button clicks and automatic
     // checkpoint autosaves (`automatic = true`, called right after finishCheckpoint() transitions the
     // run to "camp"/"won"). Pauses first so the state being saved can't change mid-save. On load,
@@ -2664,8 +2771,14 @@ export function createGame(root, saveBridge = null) {
     // after every single stage transition; other modes always require an explicit "continue" action.
     // Any failure (network error, invalid save shape) leaves the current in-memory run completely
     // unchanged — nothing here can lose progress, only fail to persist it.
-    async function persist(loadingSave, automatic = false) {
+    async function persist(loadingSave, automatic = false, selectedSlot = activeSaveSlot) {
         if (saving || checkingUnlock || setupAction) return;
+        if (!loadingSave && (!Number.isInteger(selectedSlot) || selectedSlot < 1 || selectedSlot > 5)) {
+            if (automatic && ["camp", "won"].includes(state.status)) checkpointSaveFailed = true;
+            saveStatus.textContent = "All five save slots are in use. Select Save and choose a slot before the next checkpoint.";
+            updateHud();
+            return;
+        }
         if (automatic && !loadingSave && saveBridge && state.mode === "endless" && state.status === "camp") {
             // Endless checkpoints save in the background so the watch never appears frozen.
             const snapshot = captureSnapshot(state);
@@ -2677,9 +2790,12 @@ export function createGame(root, saveBridge = null) {
             checkpointSaveFailed = false;
             saveStatus.textContent = local ? "Saving checkpoint on this device in the background..." : "Autosaving checkpoint to the server in the background...";
             try {
-                const result = await saveBridge.invokeMethodAsync("SaveRun", snapshot);
+                const result = await saveBridge.invokeMethodAsync("SaveRun", snapshot, selectedSlot);
                 if (disposed) return;
-                if (result.success) root.dataset.hasSave = "on";
+                if (result.success) {
+                    root.dataset.hasSave = "on";
+                    noteSavedSlot(selectedSlot);
+                }
                 saveStatus.textContent = result.success
                     ? `Checkpoint ${wave} saved ${local ? "on this device" : "on the server"}. Last successful save: ${new Date().toLocaleTimeString()}.`
                     : `Checkpoint autosave failed. ${result.message} Pause and select Save to retry.`;
@@ -2700,7 +2816,12 @@ export function createGame(root, saveBridge = null) {
         if (loadingSave && ["playing", "paused", "camp", "won", "choosing"].includes(state.status)
             && !await gameConfirm(root.dataset.cloudSignedIn === "on"
                 ? "Load the cloud run and replace this run? Unsaved progress will be lost."
-                : "Load your saved run and replace this run? Unsaved progress will be lost.")) return;
+                : "Load your saved run and replace this run? Unsaved progress will be lost.")) {
+            if (resumeIfLoadCanceled && state.status === "paused") { togglePause(state); updateHud(); }
+            resumeIfLoadCanceled = false;
+            return;
+        }
+        resumeIfLoadCanceled = false;
         if (state.status === "playing") pause();
         clearInput();
         saving = true;
@@ -2713,11 +2834,15 @@ export function createGame(root, saveBridge = null) {
         updateHud();
         try {
             const result = loadingSave
-                ? await saveBridge.invokeMethodAsync("LoadRun")
-                : await saveBridge.invokeMethodAsync("SaveRun", captureSnapshot(state));
+                ? await saveBridge.invokeMethodAsync("LoadRun", selectedSlot)
+                : await saveBridge.invokeMethodAsync("SaveRun", captureSnapshot(state), selectedSlot);
             if (disposed) return;
             operationSucceeded = result.success;
             if (result.success) root.dataset.hasSave = "on";
+            if (result.success) {
+                activeSaveSlot = selectedSlot;
+                if (!loadingSave) noteSavedSlot(selectedSlot);
+            }
             if (result.success) endlessUnlocked = endlessUnlocked || result.endlessUnlocked || result.save?.endlessUnlocked || result.save?.state?.campaignComplete === 1;
             if (endlessUnlocked) grandfatherClasses(true);
             if (!loadingSave && ["camp", "won"].includes(state.status)) checkpointSaveFailed = !result.success;
@@ -2767,9 +2892,19 @@ export function createGame(root, saveBridge = null) {
             }
         }
     }
-    if (saveButton && saveStatus) on(saveButton, "click", () => persist(false));
-    on(retrySave, "click", () => persist(false, true));
-    if (loadButton && saveStatus) on(loadButton, "click", () => persist(true));
+    if (saveButton && saveStatus) on(saveButton, "click", async () => {
+        const slot = await openSaveSlotChooser("save");
+        if (slot) await persist(false, false, slot);
+    });
+    on(retrySave, "click", async () => {
+        if (activeSaveSlot) { await persist(false, true); return; }
+        const slot = await openSaveSlotChooser("save");
+        if (slot) await persist(false, true, slot);
+    });
+    if (loadButton && saveStatus) on(loadButton, "click", async () => {
+        const slot = await openSaveSlotChooser("load");
+        if (slot) await persist(true, false, slot);
+    });
     // One-time startup check (see the `checkingUnlock` flag) that asks the server whether this
     // player's profile has already permanently unlocked Endless Watch, without disturbing the
     // current in-memory run — it only reads endlessUnlocked/campaignComplete off the result, never
@@ -2801,17 +2936,16 @@ export function createGame(root, saveBridge = null) {
         syncProfile();
         try {
             if (saveBridge) {
-                const result = await saveBridge.invokeMethodAsync("LoadRun");
+                const slots = await saveBridge.invokeMethodAsync("GetSaveSlots");
                 if (disposed) return;
-                if (result.success) {
-                    mergeProfile(result.save?.state?.meta);
-                    endlessUnlocked = !!(result.endlessUnlocked || result.save?.endlessUnlocked || result.save?.state?.campaignComplete === 1);
-                    if (endlessUnlocked) grandfatherClasses(true);
-                    root.dataset.hasSave = "on";
-                    if (root.dataset.localSaves === "on") saveStatus.textContent = root.dataset.cloudSignedIn === "on"
-                        ? "Cloud save available. Choose Load to continue it." : "Device save found. Choose Load to restore it.";
-                }
-                else saveStatus.textContent = root.dataset.localSaves === "on" ? result.message : `${result.message} Load can retry the server profile check.`;
+                saveSlotsCache = Array.isArray(slots) ? slots : [];
+                root.dataset.hasSave = saveSlotsCache.some(slot => slot.exists) ? "on" : "off";
+                activeSaveSlot = saveSlotsCache.find(slot => !slot.exists)?.slot ?? null;
+                endlessUnlocked = saveSlotsCache.some(slot => slot.endlessUnlocked);
+                if (endlessUnlocked) grandfatherClasses(true);
+                saveStatus.textContent = saveSlotsCache.some(slot => slot.exists)
+                    ? root.dataset.cloudSignedIn === "on" ? "Cloud save slots available. Choose Load to select a run." : "Device save slots found. Choose Load to select a run."
+                    : "No saved runs yet. Start a journey and choose Save to keep it.";
             }
         } catch {
             if (!disposed) saveStatus.textContent = root.dataset.localSaves === "on"

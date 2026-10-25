@@ -25,8 +25,8 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
     private string? token;
     private bool restoreAttempted;
     private long? expectedRevision;
-    private JsonElement? observedSave;
     private long? observedRevision;
+    private IReadOnlyList<GameSaveSlotInfo> observedSlots = Array.Empty<GameSaveSlotInfo>();
     private string player = "Offline player";
     private bool deleted;
     private string message = GoogleSignInConfiguration.IsConfigured
@@ -34,7 +34,7 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         : "Cloud setup required: configure the Cloud Run HTTPS URL and Web OAuth client ID. Offline saves work.";
 
     public CloudAccountStatus AccountStatus => new(GoogleSignInConfiguration.IsConfigured, token is not null,
-        token is not null && expectedRevision is null, observedSave is not null, player, message, observedRevision, deleted);
+        token is not null && expectedRevision is null, observedSlots.Any(slot => slot.Exists), player, message, observedRevision, deleted);
 
     // Tokens stay in memory; only the user's permission to restore a native session is persisted.
     private void ClearCloudSession()
@@ -43,7 +43,7 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         appleSession = false;
         expectedRevision = null;
         observedRevision = null;
-        observedSave = null;
+        observedSlots = Array.Empty<GameSaveSlotInfo>();
         player = "Offline player";
     }
 
@@ -281,27 +281,34 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
 
     private async Task ReadCloudMetadataAsync()
     {
-        using var request = Request(HttpMethod.Get, "game/save");
+        using var request = Request(HttpMethod.Get, "game/saves");
         using var response = await SendAsync(request);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-        {
-            observedRevision = 0;
-            observedSave = null;
-        }
-        else
-        {
-            response.EnsureSuccessStatusCode();
-            var save = await response.Content.ReadFromJsonAsync<JsonElement>();
-            if (!save.TryGetProperty("revision", out var revision) || !revision.TryGetInt64(out var value) || value < 1
-                || !save.TryGetProperty("state", out var state) || state.ValueKind != JsonValueKind.Object)
-                throw new JsonException();
-            observedRevision = value;
-            observedSave = save.Clone();
-        }
+        response.EnsureSuccessStatusCode();
+        var metadata = await response.Content.ReadFromJsonAsync<JsonElement>();
+        if (!metadata.TryGetProperty("revision", out var revision) || !revision.TryGetInt64(out var value) || value < 0
+            || !metadata.TryGetProperty("slots", out var slots) || slots.ValueKind != JsonValueKind.Array)
+            throw new JsonException();
+        observedRevision = value;
+        observedSlots = JsonSerializer.Deserialize<GameSaveSlotInfo[]>(slots.GetRawText(), new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            ?? throw new JsonException();
         // Refreshing display metadata MUST NOT advance the write baseline. Otherwise a stale
         // device could silently overwrite a remote change without seeing a conflict.
-        message = observedSave is null ? "No cloud save yet. Save a run to create one."
-            : "Cloud save available. Load to continue it, or Save to upload your current run.";
+        message = observedSlots.Any(slot => slot.Exists) ? "Cloud save slots available. Choose a slot to load or save."
+            : "No cloud saves yet. Save a run to create one.";
+    }
+
+    public async Task<IReadOnlyList<GameSaveSlotInfo>> GetSaveSlotsAsync()
+    {
+        await gate.WaitAsync();
+        try
+        {
+            if (token is null) return await local.GetSaveSlotsAsync();
+            await ReadCloudMetadataAsync();
+            return observedSlots;
+        }
+        catch (Exception exception) when (IsRecoverable(exception))
+        { message = "Could not read cloud save slots. Retry when connected."; return Array.Empty<GameSaveSlotInfo>(); }
+        finally { gate.Release(); }
     }
 
     public async Task<GameSaveResult> ResolveCloudSaveAsync(bool useCloud)
@@ -312,20 +319,35 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
             if (token is null || observedRevision is null) return new(false, "Sign in and refresh cloud metadata first.");
             if (useCloud)
             {
-                if (observedSave is not { } save) return new(false, "This account has no cloud save. Upload a device save instead.");
+                var cloudSlots = observedSlots.Where(slot => slot.Exists).ToArray();
+                if (cloudSlots.Length == 0) return new(false, "This account has no cloud saves. Upload a device save instead.");
                 await local.BackupAsync();
-                var result = await local.SaveAsync(save);
-                if (!result.Success) return result;
+                foreach (var cloudSlot in cloudSlots)
+                {
+                    using var request = Request(HttpMethod.Get, $"game/save?slot={cloudSlot.Slot}");
+                    using var response = await SendAsync(request);
+                    if (!response.IsSuccessStatusCode) return new(false, "Could not copy every cloud slot to this device. The previous device saves are backed up.");
+                    var save = (await response.Content.ReadFromJsonAsync<JsonElement>()).Clone();
+                    var stored = await local.SaveAsync(save, cloudSlot.Slot);
+                    if (!stored.Success) return stored;
+                }
                 expectedRevision = observedRevision;
-                message = "Cloud save copied to this device; previous local save backed up. Choose Load saved run to play it.";
-                return result with { Message = message };
+                message = $"Copied {cloudSlots.Length} cloud save{(cloudSlots.Length == 1 ? "" : "s")} to this device; previous device saves backed up.";
+                return new(true, message);
             }
-            var device = await local.LoadAsync();
-            if (!device.Success || device.Save is not { } snapshot) return device;
-            // Use exactly the revision displayed when the player confirmed, not a fresh read.
-            var uploaded = await UploadAsync(snapshot, observedRevision.Value);
-            message = uploaded.Message;
-            return uploaded;
+            var deviceSlots = (await local.GetSaveSlotsAsync()).Where(slot => slot.Exists).ToArray();
+            if (deviceSlots.Length == 0) return new(false, "This device has no saved runs to upload.");
+            var revision = observedRevision.Value;
+            foreach (var deviceSlot in deviceSlots)
+            {
+                var device = await local.LoadAsync(deviceSlot.Slot);
+                if (!device.Success || device.Save is not { } snapshot) return device;
+                var uploaded = await UploadAsync(snapshot, revision, deviceSlot.Slot);
+                if (!uploaded.Success) return uploaded;
+                revision = observedRevision ?? revision;
+            }
+            message = $"Uploaded {deviceSlots.Length} device save{(deviceSlots.Length == 1 ? "" : "s")} to the cloud.";
+            return new(true, message);
         }
         catch (Exception exception) when (IsRecoverable(exception))
         {
@@ -365,18 +387,19 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         finally { gate.Release(); }
     }
 
-    public async Task<GameSaveResult> SaveAsync(JsonElement snapshot)
+    public async Task<GameSaveResult> SaveAsync(JsonElement snapshot, int slot)
     {
+        if (slot is < 1 or > 5) return new(false, "Choose a valid save slot.");
         await gate.WaitAsync();
         try
         {
-            var result = await local.SaveAsync(snapshot);
+            var result = await local.SaveAsync(snapshot, slot);
             if (!result.Success) return result;
             if (token is null) return result with { Message = "Saved on this device. Sign in for cloud sync." };
             if (expectedRevision is null) return result with { Success = false, Message = "Saved on this device, but cloud sync is paused. Open Account & cloud to choose which save to keep before syncing." };
             try
             {
-                var synced = await UploadAsync(snapshot, expectedRevision.Value);
+                var synced = await UploadAsync(snapshot, expectedRevision.Value, slot);
                 return result with { Success = synced.Success, Message = synced.Success ? "Saved on this device and synced to cloud." : "Saved on this device. " + synced.Message };
             }
             catch (Exception exception) when (IsRecoverable(exception))
@@ -387,9 +410,9 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         finally { gate.Release(); }
     }
 
-    private async Task<GameSaveResult> UploadAsync(JsonElement snapshot, long revision)
+    private async Task<GameSaveResult> UploadAsync(JsonElement snapshot, long revision, int slot)
     {
-        using var request = Request(HttpMethod.Put, "game/save");
+        using var request = Request(HttpMethod.Put, $"game/save?slot={slot}");
         request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{revision}\""));
         request.Content = JsonContent.Create(snapshot);
         using var response = await SendAsync(request);
@@ -397,7 +420,7 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         {
             expectedRevision = null;
             observedRevision = null;
-            observedSave = null;
+            observedSlots = Array.Empty<GameSaveSlotInfo>();
             return new(false, "Cloud conflict: another device changed the save. Open Account & cloud, refresh, then explicitly choose a save. Neither cloud save nor device progress was overwritten.");
         }
         if (!response.IsSuccessStatusCode)
@@ -414,30 +437,39 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         var receipt = await response.Content.ReadFromJsonAsync<SaveReceipt>();
         if (receipt is null || receipt.Revision <= revision) throw new JsonException();
         expectedRevision = observedRevision = receipt.Revision;
-        // Refresh the display copy without changing its bounded state.
-        observedSave = JsonSerializer.SerializeToElement(new
+        observedSlots = Enumerable.Range(1, 5).Select(number =>
         {
-            version = snapshot.GetProperty("version"),
-            state = snapshot.GetProperty("state"),
-            endlessUnlocked = receipt.EndlessUnlocked,
-            revision = receipt.Revision
-        });
+            var previous = observedSlots.FirstOrDefault(slotInfo => slotInfo.Slot == number) ?? new GameSaveSlotInfo(number, false);
+            return number == slot ? previous with
+            {
+                Exists = true,
+                SavedAt = receipt.SavedAt ?? DateTimeOffset.UtcNow,
+                EndlessUnlocked = receipt.EndlessUnlocked,
+                Revision = receipt.Revision
+            } : previous;
+        }).ToArray();
         return new(true, "Device save uploaded. Future saves sync until sign-out, expiry or a revision conflict.", EndlessUnlocked: receipt.EndlessUnlocked);
     }
 
-    public async Task<GameSaveResult> LoadAsync()
+    public async Task<GameSaveResult> LoadAsync(int slot)
     {
+        if (slot is < 1 or > 5) return new(false, "Choose a valid save slot.");
         await gate.WaitAsync();
         try
         {
-            if (token is null) return await local.LoadAsync();
+            if (token is null) return await local.LoadAsync(slot);
             await ReadCloudMetadataAsync();
-            if (observedSave is not { } save) return new(false, "No cloud save available. Start a run and Save to create one.");
+            if (!observedSlots.Any(saved => saved.Slot == slot && saved.Exists)) return new(false, $"Slot {slot} has no cloud save.");
+            using var request = Request(HttpMethod.Get, $"game/save?slot={slot}");
+            using var response = await SendAsync(request);
+            if (response.StatusCode == HttpStatusCode.NotFound) return new(false, $"Slot {slot} has no cloud save.");
+            response.EnsureSuccessStatusCode();
+            var save = (await response.Content.ReadFromJsonAsync<JsonElement>()).Clone();
             await local.BackupAsync();
-            var stored = await local.SaveAsync(save);
+            var stored = await local.SaveAsync(save, slot);
             if (!stored.Success) return stored;
             expectedRevision = observedRevision;
-            var loaded = await local.LoadAsync();
+            var loaded = await local.LoadAsync(slot);
             return loaded with { Message = "Loaded from cloud. Previous device save backed up." };
         }
         catch (Exception exception) when (IsRecoverable(exception))
@@ -520,5 +552,5 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
         or TimeoutException or JsonException or IOException or UnauthorizedAccessException or InvalidOperationException or NotSupportedException;
     private sealed record VerifiedIdentity(string Subject, string Name);
     private sealed record DisplayNameReceipt(string Name);
-    private sealed record SaveReceipt(long Revision, bool EndlessUnlocked);
+    private sealed record SaveReceipt(long Revision, bool EndlessUnlocked, DateTimeOffset? SavedAt = null);
 }

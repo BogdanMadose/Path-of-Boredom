@@ -462,7 +462,7 @@ public static class GameSaveEndpoints
             || armor.GetString() is not ("balanced" or "plated" or "light")
             || !systems.TryGetProperty("challenge", out var challenge) || !Numbers(challenge, "stage", "elapsed", "damage", "flasks", "resolved")
             || !challenge.TryGetProperty("key", out var key) || key.ValueKind != JsonValueKind.String
-            || key.GetString() is not ("none" or "unscarred" or "flaskless" or "swift")
+            || key.GetString() is not ("none" or "unscarred" or "flaskless" or "swift" or "blitz" or "steadfast" or "ascetic")
             || !systems.TryGetProperty("summary", out var summary) || !Numbers(summary, "seconds", "flasks", "spent", "stages", "challenges")
             || !summary.TryGetProperty("damage", out var damage)
             || !Numbers(damage, "attack", "nova", "burst", "guard", "dodge", "potion", "chain", "frost", "reap", "meteor", "siphon", "nullwave")) return false;

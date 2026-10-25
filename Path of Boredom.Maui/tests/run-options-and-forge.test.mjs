@@ -103,7 +103,7 @@ assert.equal(acceptChallenge(options, 'flaskless'), true);
 options.wave = 5;
 assert.equal(resolveChallenge(options), 150);
 assert.equal(resolveChallenge(options), 0, 'no duplicate challenge rewards');
-assert.match(runSummary(options, key => skillName(options, key)), /1 challenges completed/);
+assert.ok(runSummary(options, key => skillName(options, key)).overview.some(line => line.includes('1 challenges completed')));
 assert.equal(restoreSnapshot(captureSnapshot(options)).runSystems.equipment.weapon, 'heavy');
 
 const script = fs.readFileSync(new URL('../wwwroot/js/mobile-menu.js', import.meta.url), 'utf8');

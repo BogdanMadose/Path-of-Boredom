@@ -11,10 +11,11 @@ const actions = source.slice(source.indexOf('    function addSaveActions('), sou
 const construction = source.slice(source.indexOf('        var mainCard ='), source.indexOf('        buildBar();'));
 const saveSync = source.slice(source.indexOf('        Array.prototype.forEach.call(root.querySelectorAll("[data-mobile-save-action]")'), source.indexOf('        var saveStatus ='));
 const panelSync = source.slice(source.indexOf("        Array.prototype.forEach.call(root.querySelectorAll('[data-main-panel]')"), source.indexOf('        Array.prototype.forEach.call(layer.querySelectorAll(".mm-tab")'));
-const html = `<html><head><style>html,body{margin:0}*{box-sizing:border-box}[hidden]{display:none!important}${base}${css}</style></head><body class="mobile-shell"><div class="arpg" data-game-status="ready" data-main-menu="on">${markup}<div class="mm-layer"><div class="mm-bar"><button class="mm-tab">Skills</button><button class="mm-tab">Forge</button><button class="mm-tab mm-pause-tab">Pause</button></div></div><button hidden data-action="save"></button><button hidden data-action="load"></button></div><script>
+const html = `<html><head><style>html,body{margin:0}*{box-sizing:border-box}[hidden]{display:none!important}${base}${css}</style></head><body class="mobile-shell"><div class="arpg" data-game-status="ready" data-main-menu="on">${markup}<section data-game-account hidden></section><div class="mm-layer"><div class="mm-bar"><button class="mm-tab" data-mm-tab="skills">Skills</button><button class="mm-tab" data-mm-tab="forge">Forge</button><button class="mm-tab mm-pause-tab" data-mm-tab="pause">Pause</button></div></div><button hidden data-action="save"></button><button hidden data-action="load"></button></div><script>
 const root=document.querySelector('.arpg');
 function el(tag,className,text){const node=document.createElement(tag);node.className=className||'';if(text!=null)node.textContent=text;return node;}
 function openPanel(){}
+function listen(target,event,handler){target.addEventListener(event,handler);}
 let sync;
 try {
 ${actions}
@@ -28,12 +29,13 @@ sync=function(){${saveSync}${panelSync}};
  check(!buttons.some(b=>['skills','forge'].includes(b.dataset.mainPanel)),'no character management before a run');
  check(buttons.some(b=>b.hasAttribute('data-main-play')),'Play available initially');
  check(buttons.some(b=>b.hasAttribute('data-open-camp')),'Account Progression available initially');
+ check(buttons.some(b=>b.textContent==='Account & cloud'),'Account & cloud is available when its panel exists');
  check(buttons.some(b=>b.hasAttribute('data-main-options')),'Options available initially');
  check(!buttons.some(b=>b.dataset.mainPanel==='rankings'),'Rankings not cluttering main menu');
  check(buttons.filter(b=>b.hasAttribute('data-main-load')||b.dataset.mobileSaveAction==='load').length===1,'exactly one Load');
  check(card.querySelector('[data-main-play-menu]').hidden,'Play submenu starts closed'); root.dataset.gameStatus='paused';sync();
  check(!card.querySelector('[data-mobile-save-action="save"]').hidden,'Save available with a run');
- for(const name of ['skills','forge'])check(!card.querySelector('[data-main-panel="'+name+'"]').hidden,'run tools available');
+ for(const name of ['skills','forge'])check(!root.querySelector('.mm-layer [data-mm-tab="'+name+'"]').hidden,'Skills and Forge shortcuts are available');
  check(!card.querySelector('[data-main-panel="challenges"]'),'challenges are chosen in setup, not the main menu');
  for(const status of ['ready','setup','choosing','dead','won','paused']){
   root.dataset.gameStatus=status;root.dataset.mainMenu='off';

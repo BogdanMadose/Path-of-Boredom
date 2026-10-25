@@ -66,6 +66,7 @@ for (const hero of ['knight', 'ranger', 'warden']) {
     });
     const context = vm.createContext({
         el: element, markHelp() {}, requestAnimationFrame: callback => callback(),
+        listen(target, event, handler) { target.addEventListener(event, handler); },
         makePanel(name, title, section) {
             const header = section.appendChild(element('div', 'mm-head'));
             header.appendChild(element('button', 'mm-close'));

@@ -31,6 +31,7 @@ if (!fs.existsSync(edge)) {
     const harness = `
         let state = Object.assign(startRun(Math.random, "hard", "knight"), { status: "ready" });
         let saving = false, checkingUnlock = false, setupAction = null, setupStep = 0, setupFromMain = false, checkpointHandled = null, releaseRankings = false, last = 0;
+        let activeSaveSlot = "slot-1", setupPreviousSaveSlot = null, saveSlotsCache = [{ exists: false, slot: "slot-1" }];
         const setup = root.querySelector("[data-setup]"), setupNext = root.querySelector("[data-setup-next]"), setupSkip = root.querySelector("[data-setup-skip]");
         const setupCancel = root.querySelector("[data-setup-cancel]"), setupLoadoutPanel = root.querySelector("[data-setup-loadout]");
         const classSelect = root.querySelector("[data-hero-class]"), difficultySelect = root.querySelector("[data-difficulty]"), classPreview = root.querySelector("[data-class-preview]");
@@ -39,6 +40,7 @@ if (!fs.existsSync(edge)) {
         const on = (target, event, handler) => target.addEventListener(event, handler);
         const clearInput = () => {}, updateHud = () => {}, scheduleArenaLayout = () => {}, reportScore = async () => {}, showMainMenu = () => {};
         const togglePause = () => {}, enterEndless = () => true, resetToReleaseRankings = () => {};
+        const openSaveSlotChooser = async () => "slot-1";
         const { classUnlocked, extraStarters, applyCampBonuses, rerollsPerRun, CLASS_UNLOCK_HINT, CLASS_ORDER, loadProfile, masteryStep, MASTERY_MAX, MASTERY_REWARDS, unlockedTrims, setTrim, creditProgress } = meta;
         const MAX_FLASKS = 5, RELIC_KEYS = relics.RELIC_KEYS;
         const skillTagline = skills.skillTagline ?? (() => "");
@@ -65,61 +67,68 @@ if (!fs.existsSync(edge)) {
                 "const { STARTER_SKILLS, validLoadout, skillName, skillIcon, combatSkillDefinition } = skills;" + ${JSON.stringify(harness)})
                 (root, skills, meta, relics, HERO_CLASSES, DIFFICULTIES, LAST_WAVE, startRun, startEndlessRun);
             const setup = root.querySelector("[data-setup]"), next = root.querySelector("[data-setup-next]"), skip = root.querySelector("[data-setup-skip]");
+            const setupLoadoutPanel = root.querySelector("[data-setup-loadout]");
             const visible = element => element.getBoundingClientRect().height > 0;
             const description = () => root.querySelector("[data-setup-description]").textContent;
             localStorage.clear();
 
-            // 1. Start without a skill is tappable and points at the skills instead of doing nothing.
+            // 1. A new run opens on class/difficulty before showing starting skills.
             const original = game.state;
             game.openSetup("campaign");
             check(!setup.hidden, "setup opens");
             check(!next.disabled, "Start must be tappable before a skill is chosen");
-            check(setup.dataset.needsSkill === "on", "missing skill is flagged");
-            check(/Tap a skill/.test(root.querySelector("[data-setup-loadout-feedback]").textContent), "hint tells the player to tap a skill");
-            check(visible(root.querySelector("[data-setup-loadout-feedback]")), "hint is visible on mobile");
+            check(setupLoadoutPanel.hidden, "starting skills stay hidden on the class/difficulty step");
+            check(!root.querySelector("[data-class-picker]").hidden, "class picker is the first setup step");
+            check(next.textContent === "Start quick guide", "first-time campaign starts with the quick guide");
             next.click();
-            check(game.state === original && game.step === 0, "Start without a skill must not start the run");
-            check(setup.dataset.skillPrompt === "on", "Start without a skill highlights the skill buttons");
-            check(document.activeElement?.hasAttribute("data-choose-starter-skill"), "focus moves to the skill buttons");
-            steps.push("start-without-skill");
+            check(game.state === original && game.step === 1, "New Run advances to the tutorial without opening skills");
+            steps.push("class-difficulty");
 
-            // 2. Picking a skill clears the prompt.
-            root.querySelector("[data-choose-starter-skill]").click();
-            check(setup.dataset.needsSkill === "off" && setup.dataset.skillPrompt === "off", "choosing a skill clears the prompt");
-
-            // 3. First run: three touch tutorial steps, then the run starts.
-            next.click();
+            // 2. First run: tutorial steps lead to the loadout picker.
             for (let index = 0; index < game.tutorial.length; index++) {
                 check(game.step === index + 1, "tutorial step " + (index + 1));
                 check(setup.dataset.tutorial === "on", "tutorial mode on");
                 check(description() === game.tutorial[index].touch, "touch text shown at step " + (index + 1));
                 check(visible(root.querySelector("[data-setup-description]")), "tutorial text visible");
                 check(visible(skip), "skip visible");
-                check(next.textContent === (index === game.tutorial.length - 1 ? "Got it \u2014 begin" : "Next"), "button label at step " + (index + 1));
+                check(next.textContent === (index === game.tutorial.length - 1 ? "Continue to skills" : "Next"), "button label at step " + (index + 1));
                 check(game.state === original, "run must not start during the tutorial");
                 next.click();
             }
-            check(setup.hidden && game.state !== original, "run starts after the tutorial");
+            check(game.step === game.tutorial.length + 1, "tutorial advances to the loadout step");
+            check(!setupLoadoutPanel.hidden, "starting skill choices appear after the tutorial");
+            next.click();
+            check(game.state === original && setup.dataset.skillPrompt === "on", "missing skill is explained at the loadout step");
+            check(document.activeElement?.hasAttribute("data-choose-starter-skill"), "focus moves to the skill buttons");
+            root.querySelector("[data-choose-starter-skill]").click();
+            check(setup.dataset.needsSkill === "off" && setup.dataset.skillPrompt === "off", "choosing a skill clears the prompt");
+            next.click();
+            check(setup.hidden && game.state !== original, "run starts after the loadout is chosen");
             check(localStorage.getItem("pob-touch-tutorial-seen") === "1", "tutorial remembered");
-            steps.push("tutorial");
+            steps.push("tutorial-loadout");
 
-            // 4. Later campaigns skip straight into the run.
+            // 3. Returning players skip the tutorial but still choose a starting skill.
             let previous = game.state;
             game.openSetup("campaign");
+            check(setupLoadoutPanel.hidden, "returning run still starts on class/difficulty");
+            next.click();
+            check(game.step === game.tutorial.length + 1, "returning players go straight to loadout");
             root.querySelector("[data-choose-starter-skill]").click();
             next.click();
-            check(setup.hidden && game.state !== previous, "returning players start immediately");
+            check(setup.hidden && game.state !== previous, "returning players start after choosing a skill");
             steps.push("returning");
 
-            // 5. Skip on the first tutorial step also starts the run and remembers the choice.
+            // 4. Skipping the tutorial goes to loadout, then starts after a skill is chosen.
             localStorage.clear();
             previous = game.state;
             game.openSetup("campaign");
-            root.querySelector("[data-choose-starter-skill]").click();
             next.click();
             check(game.step === 1, "tutorial shown again after clearing storage");
             skip.click();
-            check(setup.hidden && game.state !== previous, "skip starts the run");
+            check(!setup.hidden && game.step === game.tutorial.length + 1, "skip goes to loadout instead of starting early");
+            root.querySelector("[data-choose-starter-skill]").click();
+            next.click();
+            check(setup.hidden && game.state !== previous, "skip then loadout starts the run");
             check(localStorage.getItem("pob-touch-tutorial-seen") === "1", "skip is remembered");
             steps.push("skip");
             document.body.dataset.result = "PASS";
@@ -147,6 +156,6 @@ if (!fs.existsSync(edge)) {
     try {
         const output = await dumpBrowserDom(edge, ['--virtual-time-budget=10000', '--run-all-compositor-stages-before-draw', '--window-size=664,452', `http://127.0.0.1:${server.address().port}/`]);
         assert.equal(output.match(/data-result="([^"]*)"/)?.[1], 'PASS', 'setup click-through');
-        console.log('PASS: Start without a skill explains itself, first-run tutorial taps through and is remembered, Skip works, returning players start immediately');
+        console.log('PASS: New Run starts at class/difficulty, then tutorial/loadout; skip and returning-player flows work');
     } finally { await new Promise(resolve => server.close(resolve)); }
 }

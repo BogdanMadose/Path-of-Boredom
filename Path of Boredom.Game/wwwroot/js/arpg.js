@@ -1640,8 +1640,12 @@ export function createGame(root, saveBridge = null) {
         difficultySelect.disabled = !choosingDifficulty;
         setupSkip.hidden = choosingDifficulty || choosingLoadout;
         setupSkip.textContent = mobile ? "Skip tutorial" : "Skip tips & choose skills";
-        setupLoadoutPanel.hidden = setupAction === "continue" || (mobile ? !choosingDifficulty : !choosingLoadout);
-        setupNext.textContent = mobile ? (choosingDifficulty ? "Start adventure" : setupStep === tutorial.length ? "Got it — begin" : "Next") : choosingLoadout ? setupAction === "campaign" ? "Confirm slots & begin" : "Confirm slots & enter Endless" : "Next";
+        setupLoadoutPanel.hidden = setupAction === "continue" || !choosingLoadout;
+        setupNext.textContent = mobile
+            ? choosingDifficulty ? setupAction === "continue" ? "Enter Endless"
+                : setupAction === "campaign" && !tutorialSeen() ? "Start quick guide" : "Choose starting skill"
+                : choosingLoadout ? "Start adventure" : setupStep === tutorial.length ? "Continue to skills" : "Next"
+            : choosingLoadout ? setupAction === "campaign" ? "Confirm slots & begin" : "Confirm slots & enter Endless" : "Next";
         setupNext.disabled = saving;
         setup.dataset.skillPrompt = "off";
         if (choosingLoadout || mobile) updateSetupLoadout();
@@ -1719,12 +1723,12 @@ export function createGame(root, saveBridge = null) {
         updateHud();
         (state.status === "won" ? endlessButton : startButton).focus({ preventScroll: true });
     }
-    // Start stays clickable: without a starter skill it points the player at the skill buttons
-    // instead of silently doing nothing (beta feedback: "I can't click start and don't know why").
+    // The start action stays clickable: on the loadout step, a missing starter skill points the
+    // player at the skill buttons instead of silently doing nothing.
     function promptForSkill() {
         const loadout = readSetupLoadout();
         const needsSkill = setupAction !== "continue" && !starterPool().includes(loadout.auto[0]);
-        const atSkillStep = root.dataset.canvasHud === "on" ? setupStep === 0 : setupStep === tutorial.length + 1;
+        const atSkillStep = setupStep === tutorial.length + 1;
         if (!needsSkill || !atSkillStep) return false;
         setup.dataset.skillPrompt = "on";
         setupSkillButtons[0]?.focus({ preventScroll: true });
@@ -1734,13 +1738,23 @@ export function createGame(root, saveBridge = null) {
         if (promptForSkill()) return;
         if (root.dataset.canvasHud === "on") {
             const touringFirstTime = setupAction === "campaign" && !tutorialSeen();
-            if (touringFirstTime && setupStep === 0) {
-                const loadout = readSetupLoadout();
-                if (!STARTER_SKILLS.includes(loadout.auto[0])) return;
-                setupStep = 1; showSetupStep(); return;
+            if (setupStep === 0) {
+                if (setupAction === "continue") {
+                    setupStep = tutorial.length + 1;
+                    await finishSetup();
+                    return;
+                }
+                setupStep = touringFirstTime ? 1 : tutorial.length + 1;
+                showSetupStep();
+                return;
             }
             if (setupStep >= 1 && setupStep < tutorial.length) { setupStep += 1; showSetupStep(); return; }
-            if (setupStep === tutorial.length) markTutorialSeen();
+            if (setupStep === tutorial.length) {
+                markTutorialSeen();
+                setupStep = tutorial.length + 1;
+                showSetupStep();
+                return;
+            }
             setupStep = tutorial.length + 1;
             await finishSetup();
             return;
@@ -1749,7 +1763,7 @@ export function createGame(root, saveBridge = null) {
         else { setupStep = setupAction === "continue" ? tutorial.length + 1 : setupStep + 1; showSetupStep(); }
     });
     on(setupSkip, "click", async () => {
-        if (root.dataset.canvasHud === "on") { markTutorialSeen(); setupStep = tutorial.length + 1; await finishSetup(); return; }
+        if (root.dataset.canvasHud === "on") { markTutorialSeen(); setupStep = tutorial.length + 1; showSetupStep(); return; }
         setupStep = tutorial.length + 1; showSetupStep();
     });
     on(setupCancel, "click", cancelSetup);

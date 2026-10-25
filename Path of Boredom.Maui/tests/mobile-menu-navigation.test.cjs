@@ -34,6 +34,7 @@ class CustomEvent {
 }
 const context = vm.createContext({
     panels, document, CustomEvent,
+    listen(target, type, handler) { target.addEventListener(type, handler); },
     syncBadges() {},
     layer: { querySelector() { return { setAttribute() {} }; } },
     openName: null, resumeAfterMenu: false, returnToMain: false
@@ -100,6 +101,7 @@ const element = () => ({
     children: [], dataset: {}, listeners: {},
     get lastChild() { return this.children[this.children.length - 1]; },
     appendChild(child) { this.children.push(child); },
+    querySelector() { return null; },
     setAttribute() {},
     addEventListener(type, listener) { this.listeners[type] = listener; }
 });

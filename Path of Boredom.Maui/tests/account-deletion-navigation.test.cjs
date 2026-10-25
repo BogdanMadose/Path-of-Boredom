@@ -46,11 +46,12 @@ async function run() {
 
     let deletedHandler;
     root.addEventListener = (type, callback) => { assert.equal(type, 'mobile-account-deleted'); deletedHandler = callback; };
+    context.listen = (target, type, callback) => target.addEventListener(type, callback);
     context.openName = 'account';
     context.syncBadges = () => {};
     context.closePanel = () => { context.openName = null; };
     context.openPanel = name => { context.openName = name; root.dataset.menuOpen = 'on'; };
-    const deletionStart = menus.indexOf('        root.addEventListener("mobile-account-deleted"');
+    const deletionStart = menus.indexOf('        listen(root, "mobile-account-deleted"');
     const deletionEnd = menus.indexOf('        // Android back', deletionStart);
     vm.runInContext(menus.slice(deletionStart, deletionEnd), context);
     deletedHandler();

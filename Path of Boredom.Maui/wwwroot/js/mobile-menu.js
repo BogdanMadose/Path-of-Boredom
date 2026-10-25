@@ -36,6 +36,49 @@
     var fromShortcut = false;
     var returnToMain = false;
     var accountFromMain = false;
+    var currentRoot = null;
+    var menuController = null;
+    var badgeTimer = 0;
+
+    function listen(target, event, handler) {
+        if (target && menuController) target.addEventListener(event, handler, { signal: menuController.signal });
+    }
+
+    function disposeMenu() {
+        var oldRoot = currentRoot;
+        if (oldRoot && oldRoot.dataset.menuOpen === "on") {
+            oldRoot.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: false, resume: false } }));
+        }
+        if (menuController) menuController.abort();
+        menuController = null;
+        if (badgeTimer) window.clearInterval(badgeTimer);
+        badgeTimer = 0;
+        if (layer) layer.remove();
+        if (oldRoot) {
+            oldRoot.querySelectorAll(".mm-panel").forEach(function (panel) {
+                panel.classList.remove("mm-panel", "mm-open", "mm-help-shown");
+                delete panel.dataset.mmPanel;
+                delete panel.dataset.mobileSection;
+            });
+            oldRoot.querySelectorAll(".mm-head, .mm-subtabs, .mm-detail, .mm-loadout-note, .mm-help-view, .mm-help-toggle, .mm-save-actions, .mm-save-status:not([data-mobile-run-summary])").forEach(function (node) { node.remove(); });
+            oldRoot.querySelectorAll(".mm-help-text, .mm-hidden").forEach(function (node) { node.classList.remove("mm-help-text", "mm-hidden"); });
+            oldRoot.querySelectorAll("[data-mobile-section]").forEach(function (node) { delete node.dataset.mobileSection; });
+            oldRoot.querySelectorAll("[data-tree-skill]").forEach(function (node) { node.style.removeProperty("--skill-art"); });
+            oldRoot.querySelectorAll(".skill-bar .skill-icon").forEach(function (node) { node.style.removeProperty("background-image"); });
+            delete oldRoot.dataset.autoAttack;
+            delete oldRoot.dataset.canvasHud;
+            delete oldRoot.dataset.localSaves;
+        }
+        document.body.classList.remove("mm-panel-open");
+        currentRoot = null;
+        layer = null;
+        panels = {};
+        openName = null;
+        resumeAfterMenu = false;
+        fromShortcut = false;
+        returnToMain = false;
+        accountFromMain = false;
+    }
 
     function el(tag, className, text) {
         var node = document.createElement(tag);
@@ -69,7 +112,7 @@
         var information = name !== "pause";
         close.textContent = information ? "\u2190" : "\u2715";
         close.setAttribute("aria-label", information ? "Back to pause menu" : "Close");
-        close.addEventListener("click", function () {
+        listen(close, "click", function () {
             if (name === "account" && accountFromMain) returnToMain = true;
             if (returnToMain) {
                 accountFromMain = false;
@@ -116,7 +159,7 @@
             toggle.title = label;
             toggle.setAttribute("aria-label", label);
             toggle.setAttribute("aria-pressed", "false");
-            toggle.addEventListener("click", function () {
+            listen(toggle, "click", function () {
                 var shown = host.classList.toggle("mm-help-shown");
                 toggle.setAttribute("aria-pressed", String(shown));
                 toggle.textContent = shown ? "\u00d7" : "?";
@@ -169,7 +212,7 @@
             detail.appendChild(el("p", null, "Tap a node to inspect. Tap it again to learn when available."));
         }
 
-        source.addEventListener("click", function (event) {
+        listen(source, "click", function (event) {
             var node = event.target.closest(".tree-node");
             if (node) requestAnimationFrame(function () { describe(node); });
         });
@@ -204,7 +247,7 @@
             tab.type = "button";
             tab.setAttribute("role", "tab");
             tab.setAttribute("aria-selected", String(index === 0));
-            tab.addEventListener("click", function () { select(index); });
+            listen(tab, "click", function () { select(index); });
             subtabs.appendChild(tab);
             tabs.push(tab);
         }
@@ -247,7 +290,7 @@
             var button = el("button", "mm-subtab", name);
             button.type = "button";
             button.setAttribute("aria-selected", String(index === 0));
-            button.addEventListener("click", function () {
+            listen(button, "click", function () {
                 source.dataset.mobileSection = ["upgrades", "training", "systems"][index];
                 Array.prototype.forEach.call(tabs.children, function (tab) {
                     tab.setAttribute("aria-selected", String(tab === button));
@@ -269,7 +312,7 @@
             var button = el("button", "mm-subtab", name);
             button.type = "button";
             button.setAttribute("aria-selected", String(index === 0));
-            button.addEventListener("click", function () { selectOptionsSection(source, sections[index]); });
+            listen(button, "click", function () { selectOptionsSection(source, sections[index]); });
             tabs.appendChild(button);
         });
         source.appendChild(tabs);
@@ -365,7 +408,7 @@
             badge.dataset.mmBadge = entry.name;
             badge.hidden = true;
             tab.appendChild(badge);
-            tab.addEventListener("click", function () { var was = openName; openPanel(entry.name); fromShortcut = !was && openName === entry.name; });
+            listen(tab, "click", function () { var was = openName; openPanel(entry.name); fromShortcut = !was && openName === entry.name; });
             bar.appendChild(tab);
         });
 
@@ -376,7 +419,7 @@
         pause.setAttribute("aria-label", "Pause game");
         pause.appendChild(el("span", "mm-pause-glyph"));
         pause.appendChild(el("span", null, "Pause"));
-        pause.addEventListener("click", function () {
+        listen(pause, "click", function () {
             openPanel("pause");
         });
         bar.appendChild(pause);
@@ -403,7 +446,7 @@
         side.appendChild(explanation);
         var resume = el("button", "mm-resume", "Return to battle");
         resume.type = "button";
-        resume.addEventListener("click", function () {
+        listen(resume, "click", function () {
             resumeAfterMenu = true;
             closePanel(true);
         });
@@ -416,7 +459,7 @@
                 var button = el("button", "mm-pause-option", labels[name]);
                 button.type = "button";
                 if (name === "notes") button.disabled = true;
-                else button.addEventListener("click", function () { openPanel(name); });
+                else listen(button, "click", function () { openPanel(name); });
                 section.appendChild(button);
             });
             groups.appendChild(section);
@@ -429,7 +472,7 @@
         var lore = el('button', 'mm-pause-option', 'Chapter lore');
         lore.type = 'button';
         lore.dataset.mobileLore = '';
-        lore.addEventListener('click', function () {
+        listen(lore, 'click', function () {
             var original = root.querySelector('[data-open-lore]');
             if (!original || original.hidden || original.disabled) return;
             closePanel(false);
@@ -450,22 +493,24 @@
             button.type = "button";
             button.dataset.mobileSaveAction = action;
             button.disabled = true;
-            button.addEventListener("click", function () {
+            listen(button, "click", function () {
                 var original = root.querySelector('[data-action="' + action + '"]');
                 if (original && !original.disabled) original.click();
             });
             actions.appendChild(button);
         });
-        var signIn = el("button", "mm-pause-option", "Account & cloud");
-        signIn.type = "button";
-        signIn.addEventListener("click", function () {
-            if (root.dataset.mainMenu === 'on') {
-                accountFromMain = true;
-                root.dispatchEvent(new CustomEvent('open-main-panel', { detail: { panel: 'account' } }));
-            } else accountFromMain = false;
-            openPanel("account");
-        });
-        actions.appendChild(signIn);
+        if (root.querySelector("[data-game-account]")) {
+            var signIn = el("button", "mm-pause-option", "Account & cloud");
+            signIn.type = "button";
+            listen(signIn, "click", function () {
+                if (root.dataset.mainMenu === 'on') {
+                    accountFromMain = true;
+                    root.dispatchEvent(new CustomEvent('open-main-panel', { detail: { panel: 'account' } }));
+                } else accountFromMain = false;
+                openPanel("account");
+            });
+            actions.appendChild(signIn);
+        }
         host.appendChild(actions);
         var status = el("p", "mm-save-status");
         status.setAttribute("role", "status");
@@ -587,11 +632,16 @@
     // ---- Init --------------------------------------------------------------------------
 
     function init() {
-        var skills = document.querySelector("[data-skills]");
-        var forge = document.querySelector("[data-forge]");
         var root = document.querySelector(".arpg");
-        if (!skills || !forge || !root || layer) return !!layer;
-        if (!root.querySelector("[data-game-rankings]") || !root.querySelector("[data-game-account]")) return false;
+        if (currentRoot && (currentRoot !== root || !currentRoot.isConnected || !layer || !layer.isConnected)) disposeMenu();
+        if (!root) return false;
+        if (currentRoot === root && layer && layer.isConnected) return true;
+        var skills = root.querySelector("[data-skills]");
+        var forge = root.querySelector("[data-forge]");
+        if (!skills || !forge || !root.querySelector("[data-game-rankings]")) return false;
+
+        currentRoot = root;
+        menuController = new AbortController();
 
         // Tells arpg.js to auto-fire the regular attack along the character's facing (no mouse to
         // aim with on a phone) and to draw the HUD into the canvas instead of as DOM over it.
@@ -622,20 +672,20 @@
             tree.style.setProperty("--skill-art", "url('" + treeArt(tree) + "')");
         });
 
-        setInterval(syncBadges, 500);
+        badgeTimer = window.setInterval(syncBadges, 500);
         syncBadges();
         var main = el("button", "mm-pause-option mm-pause-footer", "Main menu");
         main.type = "button";
-        main.addEventListener("click", function () { closePanel(false); root.querySelector("[data-open-main-menu]").click(); });
+        listen(main, "click", function () { closePanel(false); root.querySelector("[data-open-main-menu]").click(); });
         panels.pause.root.querySelector(".mm-pause-side").appendChild(main);
-        root.addEventListener("main-menu-open", function () { closePanel(false); returnToMain = false; accountFromMain = false; });
-        root.addEventListener('open-main-panel', function () { returnToMain = true; });
-        root.addEventListener("open-run-options", function (event) { returnToMain = event.detail?.fromMain === true; openPanel("options"); });
-        root.addEventListener("mobile-save-result", function (event) {
+        listen(root, "main-menu-open", function () { closePanel(false); returnToMain = false; accountFromMain = false; });
+        listen(root, 'open-main-panel', function () { returnToMain = true; });
+        listen(root, "open-run-options", function (event) { returnToMain = event.detail?.fromMain === true; openPanel("options"); });
+        listen(root, "mobile-save-result", function (event) {
             if (event.detail?.success && event.detail.loadingSave && openName) closePanel(false);
             syncBadges();
         });
-        root.addEventListener("mobile-account-deleted", function () {
+        listen(root, "mobile-account-deleted", function () {
             if (openName === "account") root.dataset.menuOpen = "on";
             else {
                 closePanel(false);
@@ -645,7 +695,7 @@
         });
 
         // Android back closes an open panel first.
-        window.addEventListener("popstate", function () {
+        listen(window, "popstate", function () {
             if (returnToMain && openName) {
                 closePanel(false);
                 root.querySelector('[data-open-main-menu]').click();
@@ -657,10 +707,7 @@
         return true;
     }
 
-    if (!init()) {
-        var observer = new MutationObserver(function () {
-            if (init()) observer.disconnect();
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-    }
+    var observer = new MutationObserver(function () { init(); });
+    observer.observe(document.body, { childList: true, subtree: true });
+    init();
 })();

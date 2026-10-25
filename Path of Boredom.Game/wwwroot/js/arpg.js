@@ -1782,10 +1782,13 @@ export function createGame(root, saveBridge = null) {
         }
         void reportScore();
         if (setupAction === "continue") {
-            if (!enterEndless(state, difficultySelect.value)) return;
+            if (!enterEndless(state, difficultySelect.value, root.dataset.quickTravel === "true")) return;
         } else {
             clearTemporaryRun();
-            state = setupAction === "endless" ? startEndlessRun(Math.random, difficultySelect.value, classSelect.value) : startRun(Math.random, difficultySelect.value, classSelect.value);
+            const quickStart = root.dataset.quickTravel === "true";
+            state = setupAction === "endless"
+                ? startEndlessRun(Math.random, difficultySelect.value, classSelect.value, quickStart)
+                : startRun(Math.random, difficultySelect.value, classSelect.value, quickStart);
             state.loadout = loadout;
             applyCampBonuses(state, MAX_FLASKS);
             state.journal += ` Rare relics can drop from any foe. Codex: ${RELIC_KEYS.filter(key => loadProfile().codex[key]).length}/${RELIC_KEYS.length}.`;
@@ -3194,7 +3197,7 @@ export function createGame(root, saveBridge = null) {
         if (typeof updateCanvasResolution === "function" && root.dataset?.batterySaver !== lastSaverMode) updateCanvasResolution();
         if (last && now - last < minFrameMs) { frame = requestAnimationFrame(animate); return; }
         const chapterWave = state.travelPending || state.wave === 0 ? state.wave + 1 : state.wave;
-        if (!inMainMenu && loreReader.hidden && !saving && !setupAction && state.mode === "campaign" && state.status === "playing" && chapterWave % 5 === 1) {
+        if (!inMainMenu && root.dataset.quickTravel !== "true" && loreReader.hidden && !saving && !setupAction && state.mode === "campaign" && state.status === "playing" && chapterWave % 5 === 1) {
             const chapter = mapIndexForWave(chapterWave);
             let seen = loreSeen.get(state);
             if (!seen) { seen = new Set(); loreSeen.set(state, seen); }

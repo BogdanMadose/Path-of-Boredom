@@ -261,7 +261,7 @@ export function continueJourney(state, quick = false) {
 // from the "won" (campaign-complete) state. rankingMode becomes "ascended" (unless it was already
 // "legacy", a compatibility tag that never changes) so the rankings page can distinguish endless
 // runs entered this way from ones started fresh via startEndlessRun().
-export function enterEndless(state, difficulty = state.difficulty) {
+export function enterEndless(state, difficulty = state.difficulty, quick = false) {
     if (state.status !== "won" || state.campaignComplete !== 1 || !Object.hasOwn(DIFFICULTIES, difficulty)) return false;
     state.rankingMode = state.rankingMode === "legacy" ? "legacy" : "ascended";
     state.scoreBaseline = state.kills;
@@ -269,14 +269,16 @@ export function enterEndless(state, difficulty = state.difficulty) {
     state.mode = "endless";
     state.status = "playing";
     state.travelPending = 1;
-    state.resumeDelay = 3;
+    state.resumeDelay = quick ? 2.2 : 3;
+    state.quickTravel = quick ? 1 : 0;
+    state.smoothResume = quick ? 1 : 0;
     state.journal = "You return to the gate by choice. The Endless Watch begins. Your equipment and gold remain yours.";
     return true;
 }
 
 // Creates a fresh campaign run from wave 0 with the chosen class's starting stats — the normal
 // "new game" entry point from the setup dialog in arpg.js.
-export function startRun(random = Math.random, difficulty = "hard", heroClass = "knight") {
+export function startRun(random = Math.random, difficulty = "hard", heroClass = "knight", quickStart = false) {
     if (!Object.hasOwn(DIFFICULTIES, difficulty)) throw new Error("Unknown difficulty.");
     if (!Object.hasOwn(HERO_CLASSES, heroClass)) throw new Error("Unknown class.");
     const state = createState(random);
@@ -285,7 +287,8 @@ export function startRun(random = Math.random, difficulty = "hard", heroClass = 
     Object.assign(state.player, { health: hero.health, maxHealth: hero.health, damage: hero.damage, weapon: hero.weapon });
     state.difficulty = difficulty;
     state.status = "playing";
-    state.resumeDelay = 3;
+    state.resumeDelay = quickStart ? 0 : 3;
+    if (quickStart) state.intermission = 0;
     state.journal = `${hero.name}: ${hero.description}`;
     return state;
 }
@@ -294,8 +297,8 @@ export function startRun(random = Math.random, difficulty = "hard", heroClass = 
 // grinding the campaign — sets rankingMode to "endless" (a separate leaderboard bucket from
 // "ascended") and gives the player a modest Watchkeeper kit. The kit provides a few upgrades and
 // enough gold to specialize, but leaves room for the early Endless waves to pressure their build.
-export function startEndlessRun(random = Math.random, difficulty = "hard", heroClass = "knight") {
-    const state = startRun(random, difficulty, heroClass);
+export function startEndlessRun(random = Math.random, difficulty = "hard", heroClass = "knight", quickStart = false) {
+    const state = startRun(random, difficulty, heroClass, quickStart);
     const hero = classFor(state);
     state.rankingMode = "endless";
     state.mode = "endless";
@@ -1033,8 +1036,9 @@ function hitArrowTarget(state, shot, enemy, damage, piercing) {
 // the `depth` term), player level (levelPressure), and difficulty preset. Every 5th wave
 // (WAVES_PER_MAP) is a boss wave with one guaranteed boss. On returning to wave 1 of a new map,
 // clears leftover projectiles/loot/effects and resets the player to the arena center.
-// Releases queued wave members a few at a time: one every ~0.75s, or immediately when the arena
-// is nearly empty so the player never stands around waiting for the next enemy.
+// Releases queued wave members at a steady pace. The opening group starts together, then each
+// reinforcement waits for the spawn timer even when the arena is nearly empty; this avoids a burst
+// of queued enemies immediately after a boss or a quick clear.
 export function pendingSpawns(state) {
     return state.spawnQueueWave === state.wave ? state.spawnQueue?.length ?? 0 : 0;
 }
@@ -1043,13 +1047,12 @@ function releaseSpawns(state, dt) {
     if (!pendingSpawns(state)) return;
     const queue = state.spawnQueue;
     state.spawnTimer -= dt;
-    const alive = state.enemies.filter(enemy => enemy.health > 0).length;
-    if (state.spawnTimer > 0 && alive >= 3) return;
+    if (state.spawnTimer > 0) return;
     const enemy = queue.shift();
     enemy.appearanceAt = state.time;
     enemy.flash = 0.2;
     state.enemies.push(enemy);
-    state.spawnTimer = 0.6 + state.random() * 0.3;
+    state.spawnTimer = 0.9 + state.random() * 0.2;
 }
 
 function spawnWave(state) {
@@ -1108,7 +1111,7 @@ function spawnWave(state) {
             cooldown: grouped ? 1.2 + (i % 3) * 0.55 : 1.2, flash: 0, slam: 4, winding: 0, attackWindup: 0, attackX: x, attackY: y, chilled: 0, chillStrength: 0
         });
         const spawned = state.enemies[state.enemies.length - 1];
-        spawned.appearanceAt = state.time + Math.min(0.45, i * 0.015);
+        spawned.appearanceAt = state.time;
         const traits = Object.keys(ELITE_MODIFIERS).filter(key => key !== "none");
         spawned.modifier = elite && state.wave >= 11 && state.random() < Math.min(0.55, 0.35 + depth * 0.002)
             ? traits[Math.floor(state.random() * traits.length)] : "none";
@@ -1118,10 +1121,10 @@ function spawnWave(state) {
         spawned.damage = Math.round(spawned.damage * difficulty.damage * (earlyToughness > 1 ? 1.1 : 1) * deepDamage);
         spawned.speed = Math.min(210 + Math.min(90, depth), spawned.speed) * difficulty.speed * (boss ? 1 : earlySpeed) * (1 + deepSpeed);
     }
-    const opening = Math.max(3, Math.ceil(count * 0.35));
+    const opening = Math.min(count, Math.max(3, Math.ceil(count * 0.24)));
     const waveStart = state.enemies.length - count;
     state.spawnQueue = state.enemies.splice(waveStart + opening);
-    state.spawnTimer = 1.2;
+    state.spawnTimer = 0.9;
     state.spawnQueueWave = state.wave;
     if (bossWave) {
         const reveal = effect(state, 'boss-intro', WIDTH / 2, 100, map.accent, `${map.boss} · ${bossProfile(state.wave).title}`);

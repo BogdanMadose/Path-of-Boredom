@@ -164,11 +164,9 @@
                             <button type="button" class="ember-button" data-action="start" disabled>Begin the journey <span>&rarr;</span></button>
                             <button type="button" class="ember-button endless-button" data-action="endless" hidden>Enter the Endless Watch &rarr;</button>
                             <button type="button" class="quiet-button restart-button" data-action="restart" hidden>Abandon run &amp; restart</button>
-                            <section class="arena-overlay restart-mode-overlay"
+                            <dialog class="restart-mode-overlay"
                                     data-restart-mode-chooser
                                     hidden
-                                    role="dialog"
-                                    aria-modal="true"
                                     aria-labelledby="restart-mode-title">
 
                                 <div class="overlay-card restart-mode-card">
@@ -202,7 +200,7 @@
                                         Cancel
                                     </button>
                                 </div>
-                            </section>
+                            </dialog>
                             <button type="button" class="quiet-button restart-button" data-death-main-menu hidden>Main menu</button>
                             <section class="death-report run-summary" data-run-summary hidden>
                                 <div class="run-summary-overview">

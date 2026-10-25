@@ -2563,7 +2563,9 @@ export function createGame(root, saveBridge = null) {
 
         if (!chooser) return;
 
+        if (chooser.open) return;
         chooser.hidden = false;
+        chooser.showModal();
 
         console.log("[Endless] Chooser opened", {
             hidden: chooser.hidden,
@@ -2572,10 +2574,20 @@ export function createGame(root, saveBridge = null) {
 
         const campaignButton = chooser.querySelector('[data-restart-mode="campaign"]');
         const endlessButton = chooser.querySelector('[data-restart-mode="endless"]');
+        const closeChooser = (restoreFocus = true) => {
+            if (chooser.open) chooser.close();
+            chooser.hidden = true;
+            if (restoreFocus) restartButton.focus({ preventScroll: true });
+        };
+
+        chooser.oncancel = event => {
+            event.preventDefault();
+            closeChooser();
+        };
 
         if (campaignButton) {
             campaignButton.onclick = () => {
-                chooser.hidden = true;
+                closeChooser(false);
                 openSetup("campaign");
             };
         }
@@ -2587,7 +2599,7 @@ export function createGame(root, saveBridge = null) {
                     return;
                 }
 
-                chooser.hidden = true;
+                closeChooser(false);
                 openSetup("endless");
             };
         }
@@ -2596,7 +2608,7 @@ export function createGame(root, saveBridge = null) {
 
         if (cancelButton) {
             cancelButton.onclick = () => {
-                chooser.hidden = true;
+                closeChooser();
             };
         }
     }

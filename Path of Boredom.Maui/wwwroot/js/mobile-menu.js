@@ -262,15 +262,19 @@
 
         function addTab(label, index) {
             var tab = el("button", "mm-subtab");
+            tab.type = "button";
+            tab.setAttribute("role", "tab");
             tab.appendChild(el("span", "mm-subtab-label", label));
             if (index > 0) {
                 var image = el("img", "mm-skill-art");
                 image.src = treeArt(trees[index - 1]);
                 image.alt = "";
                 tab.prepend(image);
+            } else {
+                var icon = el("span", "mm-subtab-icon", "▦");
+                icon.setAttribute("aria-hidden", "true");
+                tab.prepend(icon);
             }
-            tab.type = "button";
-            tab.setAttribute("role", "tab");
             tab.setAttribute("aria-selected", String(index === 0));
             listen(tab, "click", function () { select(index); });
             subtabs.appendChild(tab);
@@ -311,35 +315,57 @@
         markHelp(source, [".forge-hint", ".mastery-panel > p"]);
         addHelpToggle(panel.body, "How the forge works");
         var tabs = el("div", "mm-subtabs");
+        var sections = ["upgrades", "training", "systems"];
+        var icons = ["⚒", "✦", "◈"];
         ["Upgrades", "Mastery", "Equipment"].forEach(function (name, index) {
-            var button = el("button", "mm-subtab", name);
+            var button = el("button", "mm-subtab");
             button.type = "button";
+            button.setAttribute("role", "tab");
             button.setAttribute("aria-selected", String(index === 0));
+            var icon = el("span", "mm-subtab-icon", icons[index]);
+            icon.setAttribute("aria-hidden", "true");
+            button.append(icon, el("span", "mm-subtab-label", name));
             listen(button, "click", function () {
-                source.dataset.mobileSection = ["upgrades", "training", "systems"][index];
+                source.dataset.mobileSection = sections[index];
                 Array.prototype.forEach.call(tabs.children, function (tab) {
                     tab.setAttribute("aria-selected", String(tab === button));
                 });
             });
             tabs.appendChild(button);
         });
+        tabs.setAttribute("role", "tablist");
+        tabs.setAttribute("aria-label", "Forge categories");
         source.dataset.mobileSection = "upgrades";
         source.appendChild(tabs);
         return panel;
     }
 
-    // Run options split into tabs so each section fits a landscape phone screen without scrolling.
+    // Options split into small sections so frequent controls are easy to reach on a phone.
     function buildOptions(source) {
-        var panel = makePanel("options", "Run options — sound & controls", source);
+        var panel = makePanel("options", "Options", source);
         var tabs = el("div", "mm-subtabs");
-        var sections = ["sound", "controls", "codex"];
-        ["Sound", "Controls", "Codex"].forEach(function (name, index) {
-            var button = el("button", "mm-subtab", name);
+        var entries = [
+            { name: "Sound", icon: "♪", section: "sound" },
+            { name: "Controls", icon: "⌖", section: "controls" },
+            { name: "Codex", icon: "✦", section: "codex" }
+        ];
+        if (source.querySelector('[data-options-section="account"]')) {
+            entries.push({ name: "Account", icon: "◉", section: "account" });
+        }
+        entries.forEach(function (entry, index) {
+            var button = el("button", "mm-subtab");
             button.type = "button";
+            button.setAttribute("role", "tab");
             button.setAttribute("aria-selected", String(index === 0));
-            listen(button, "click", function () { selectOptionsSection(source, sections[index]); });
+            var icon = el("span", "mm-subtab-icon", entry.icon);
+            icon.setAttribute("aria-hidden", "true");
+            button.append(icon, el("span", "mm-subtab-label", entry.name));
+            listen(button, "click", function () { selectOptionsSection(source, entry.section); });
             tabs.appendChild(button);
         });
+        source.dataset.mobileOptionCount = String(entries.length);
+        tabs.setAttribute("role", "tablist");
+        tabs.setAttribute("aria-label", "Option categories");
         source.appendChild(tabs);
         selectOptionsSection(source, "sound");
         return panel;
@@ -347,10 +373,12 @@
 
     function selectOptionsSection(source, section) {
         var sections = ["sound", "controls", "codex"];
+        if (source.querySelector('[data-options-section="account"]')) sections.push("account");
         source.dataset.mobileSection = section;
         Array.prototype.forEach.call(source.querySelectorAll("[data-options-section]"), function (content) {
             content.hidden = content.dataset.optionsSection !== section;
         });
+        if (section === "codex") source.dispatchEvent(new CustomEvent("relic-codex-refresh", { bubbles: true }));
         Array.prototype.forEach.call(source.querySelector(".mm-subtabs").children, function (tab, index) {
             tab.setAttribute("aria-selected", String(sections[index] === section));
         });
@@ -362,7 +390,7 @@
         if (!openName) return;
         var root = currentRoot || document.querySelector(".arpg");
         panels[openName].root.classList.remove("mm-open");
-        if (["rankings", "account"].includes(openName)) panels[openName].root.hidden = true;
+        if (openName === "rankings") panels[openName].root.hidden = true;
         var tab = layer.querySelector('[data-mm-tab="' + openName + '"]');
         if (tab) tab.setAttribute("aria-expanded", "false");
         openName = null;
@@ -383,8 +411,8 @@
         var root = currentRoot || document.querySelector(".arpg");
         if (root.dataset.saveBusy === "on" && !openName) return;
         if (openName === name) { closePanel(); return; }
-        var idleAccount = ["account", "options", "rankings"].includes(name) && ["ready", "dead", "won"].includes(root.dataset.gameStatus);
-        if (!idleAccount && !["playing", "paused", "camp"].includes(root.dataset.gameStatus)) return;
+        var idleInformation = ["options", "rankings"].includes(name) && ["ready", "dead", "won"].includes(root.dataset.gameStatus);
+        if (!idleInformation && !["playing", "paused", "camp"].includes(root.dataset.gameStatus)) return;
         var previousPanel = openName;
         var returningToMain = previousPanel
             ? previousPanel !== "pause" && panelBackTarget === "main"
@@ -398,11 +426,11 @@
         var shouldResume = openName ? resumeAfterMenu : root.dataset.gameStatus === "playing";
         if (openName) {
             panels[openName].root.classList.remove("mm-open");
-            if (["rankings", "account"].includes(openName)) panels[openName].root.hidden = true;
+            if (openName === "rankings") panels[openName].root.hidden = true;
             var previousTab = layer.querySelector('[data-mm-tab="' + openName + '"]');
             if (previousTab) previousTab.setAttribute("aria-expanded", "false");
         }
-        root.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: true, panel: name, information: ["account", "options", "rankings"].includes(name) } }));
+        root.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: true, panel: name, information: ["options", "rankings"].includes(name) } }));
         if (root.dataset.menuOpen !== "on") {
             panelBackTarget = null;
             returnToMain = false;
@@ -498,15 +526,14 @@
             closePanel(true);
         });
         side.appendChild(resume);
-        var labels = { skills: "Skills & loadout", forge: "Forge & equipment", options: "Run options — sound & controls", challenges: "Stage challenges — bonus gold", rankings: "Rankings", notes: "Patch notes - Coming soon" };
+        var labels = { skills: "Skills & loadout", forge: "Forge & equipment", options: "Options", challenges: "Stage challenges — bonus gold", rankings: "Rankings" };
         [{ title: "Character", names: ["skills", "forge", "challenges", "options"] }, { title: "Community", names: ["rankings"] }].forEach(function (group) {
             var section = el("section", "mm-menu-group");
             section.appendChild(el("h3", null, group.title));
             group.names.forEach(function (name) {
                 var button = el("button", "mm-pause-option", labels[name]);
                 button.type = "button";
-                if (name === "notes") button.disabled = true;
-                else listen(button, "click", function () { openPanel(name); });
+                listen(button, "click", function () { openPanel(name); });
                 section.appendChild(button);
             });
             groups.appendChild(section);
@@ -547,30 +574,11 @@
             });
             actions.appendChild(button);
         });
-        if (root.querySelector("[data-game-account]")) {
-            var signIn = el("button", "mm-pause-option", "Account & cloud");
-            signIn.type = "button";
-            signIn.dataset.mobileAccountAction = "";
-            listen(signIn, "click", function () {
-                if (root.dataset.saveBusy === "on") return;
-                if (root.dataset.mainMenu === 'on') {
-                    root.dispatchEvent(new CustomEvent('open-main-panel', { detail: { panel: 'account' } }));
-                }
-                openPanel("account");
-            });
-            actions.appendChild(signIn);
-        }
         host.appendChild(actions);
         var status = el("p", "mm-save-status");
         status.setAttribute("role", "status");
         status.setAttribute("aria-live", "polite");
         host.appendChild(status);
-    }
-
-    function buildAccount(root) {
-        var section = root.querySelector("[data-game-account]");
-        if (!section) return;
-        makePanel("account", "Account & cloud saves", section);
     }
 
     function buildInformation(root) {
@@ -605,9 +613,6 @@
             button.textContent = button.dataset.mobileSaveAction === "save"
                 ? root.dataset.cloudSignedIn === "on" ? "Save to cloud" : "Save on device"
                 : root.dataset.cloudSignedIn === "on" ? "Load cloud save" : "Load device save";
-        });
-        Array.prototype.forEach.call(root.querySelectorAll("[data-mobile-account-action]"), function (button) {
-            button.disabled = root.dataset.saveBusy === "on";
         });
         var saveStatus = root.querySelector("[data-save-status]");
         Array.prototype.forEach.call(root.querySelectorAll(".mm-save-status"), function (status) {
@@ -710,7 +715,6 @@
         buildOptions(root.querySelector("[data-run-options]"));
         makePanel("challenges", "Stage challenges — bonus gold", root.querySelector("[data-challenges]"));
         buildInformation(root);
-        buildAccount(root);
         buildPause(root);
         addSaveActions(root.querySelector("[data-run-menu]"), root);
         var mainCard = root.querySelector('[data-main-menu-actions]');
@@ -734,13 +738,13 @@
         listen(root, 'open-main-panel', function () { returnToMain = true; });
         listen(root, "open-run-options", function (event) { returnToMain = event.detail?.fromMain === true; openPanel("options"); });
         listen(root, "mobile-save-result", function (event) {
+            if (event.detail?.success && event.detail?.loadingSave && openName) closePanel(false);
             syncBadges();
         });
         listen(root, "mobile-account-deleted", function () {
-            if (openName === "account") root.dataset.menuOpen = "on";
-            else {
-                closePanel(false);
-                openPanel("account");
+            if (openName === "options") {
+                selectOptionsSection(root.querySelector("[data-run-options]"), "account");
+                root.dispatchEvent(new CustomEvent("mobile-menu", { detail: { open: true, panel: "options", information: true } }));
             }
             syncBadges();
         });

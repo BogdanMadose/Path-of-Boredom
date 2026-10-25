@@ -15,7 +15,8 @@ const menu = fs.readFileSync(new URL('../wwwroot/js/mobile-menu.js', import.meta
 assert.ok(menu.includes('challenges: "Stage challenges — bonus gold"'), 'Pause must label the Challenges menu clearly');
 assert.ok(menu.includes('names: ["skills", "forge", "challenges", "options"]'), 'Pause must expose Challenges alongside character menus');
 assert.ok(menu.includes('makePanel("challenges",'), 'Challenges must have its own panel');
-assert.match(menu, /options: "Run options — sound & controls"/);
+assert.match(menu, /options: "Options"/);
+assert.match(menu, /entries\.push\(\{ name: "Account", icon: "◉", section: "account" \}\)/);
 for (const key of ['unscarred', 'flaskless', 'swift']) {
     const state = startRun(() => 0.99);
     state.status = 'paused';

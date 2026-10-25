@@ -45,6 +45,11 @@
 .main-menu-card h1 { font: 32px Georgia, serif; color: #f3dfb9; }
 .main-menu-card p { font-size: 13px; line-height: 1.6; }
 .main-menu-card > .main-menu-patch-notes { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; min-height: 42px; text-align: center; text-decoration: none; }
+.main-menu-card > button.main-menu-patch-notes { color: #e9c78b; }
+.patch-notes-overlay { position: fixed; inset: 0; z-index: 80; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; background: #0d1417; }
+.patch-notes-overlay-header { position: fixed; top: max(10px, env(safe-area-inset-top, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); z-index: 2; }
+.patch-notes-overlay-header button { min-height: 42px; padding: 8px 14px; border: 1px solid #c7a56b99; border-radius: 999px; background: #101a1ef2; color: #f1d49b; }
+.patch-notes-overlay ::deep .patch-notes.embedded { box-sizing: border-box; min-height: 100dvh; padding: max(64px, calc(env(safe-area-inset-top, 0px) + 54px)) max(20px, env(safe-area-inset-right, 0px)) max(24px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px)); }
 .save-slots-dialog {
     box-sizing: border-box;
     width: min(620px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 28px));
@@ -668,6 +673,9 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .options-panel h2, .challenges-panel h2 { font: 24px Georgia, serif; color: #f3dfb9; }
 .equipment-options label { display: grid; gap: 4px; margin-block: 8px; }
 .equipment-options select { min-width: 0; max-width: 100%; }
+.run-build-details { min-width: 0; padding: 7px 10px; border: 1px solid #c7a56b44; border-radius: 8px; background: #101a1e; color: #c9c1af; font-size: 11px; line-height: 1.4; }
+.run-build-details summary { color: #edc581; cursor: pointer; }
+.run-build-details p { margin: 5px 0 0; }
 .challenge-options p { line-height: 1.6; }
 .training-skill-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .training-skill-grid button { min-width: 0; white-space: normal; overflow-wrap: anywhere; padding: 10px; }

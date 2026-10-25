@@ -200,7 +200,7 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
             await EnsureInitializedAsync();
             if (!initialized) return new(false, message);
             if (expectedRevision is null)
-                return new(false, "Cloud sync is paused because another device changed the save. Open Account & cloud and choose which save to keep. Nothing was overwritten.");
+                return new(false, "Cloud sync is paused because another device changed the save. Open Options > Account and choose which save to keep. Nothing was overwritten.");
             return await UploadAsync(snapshot, json, expectedRevision.Value, slot);
         }
         catch (Exception exception) when (IsRecoverable(exception))
@@ -221,7 +221,7 @@ public sealed class WebCloudGameSession(IHttpClientFactory httpFactory, Authenti
             expectedRevision = null;
             observedRevision = null;
             observedSlots = Array.Empty<GameSaveSlotInfo>();
-            return new(false, "Cloud conflict: another device changed the save. Open Account & cloud, refresh, then choose which save to keep. Nothing was overwritten.");
+            return new(false, "Cloud conflict: another device changed the save. Open Options > Account, refresh, then choose which save to keep. Nothing was overwritten.");
         }
         if (response.StatusCode == HttpStatusCode.Unauthorized) return new(false, message);
         if (!response.IsSuccessStatusCode)

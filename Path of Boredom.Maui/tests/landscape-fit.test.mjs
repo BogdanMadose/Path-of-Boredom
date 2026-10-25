@@ -22,21 +22,15 @@ if (!fs.existsSync(edge)) {
     const mainMenu = slice('<section class="main-menu"', '<button type="button" class="quiet-button main-menu-return"');
     const runMenuStart = home.indexOf('<div class="overlay-card" data-run-menu>');
     const runMenu = home.slice(runMenuStart, home.lastIndexOf('</div>', home.indexOf('<div class="arena-overlay skill-choice-overlay"')));
-    const account = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/CloudAccountMenu.razor', import.meta.url), 'utf8');
-    const accountMarkup = account.slice(account.indexOf('<div class="mm-account-body">'), account.indexOf('@if (confirmation'))
-        .replace(/@if \(cloud\.AccountStatus\.SignedIn\)\s*\{([\s\S]*?)\n\s*\}\s*else\s*\{[\s\S]*?\n            \}/, '$1')
-        .replace(/@if \(cloud\.AccountStatus\.SignedIn\)\s*\{/, '').replace(/@if \(lastResult is not null\)\s*\{[\s\S]*?\}/, '')
-        .replace(/@\([^()]*(\([^()]*\)[^()]*)*\)/g, 'Text').replace(/@\w+(\.\w+)*/g, 'Text').replace(/\n\s*\}\s*\n/g, '\n') + '</div>';
     const css = ['../../Path of Boredom.Game/Components/Pages/Home.razor.css', '../wwwroot/css/mobile-shell.css', '../wwwroot/css/mobile-menu.css']
         .map(file => fs.readFileSync(new URL(file, import.meta.url), 'utf8').replaceAll('::deep ', '').replaceAll('@media (pointer: coarse)', '@media all')).join('\n');
     const html = `<html><head><style>html,body{margin:0}*{box-sizing:border-box}[hidden]{display:none!important}${css}
         .arena-overlay{position:fixed;inset:0;display:grid;place-items:center}</style></head>
         <body class="mobile-shell"><div class="arpg" data-canvas-hud="on" data-main-menu="on" data-game-status="paused">
         <div data-test="main">${mainMenu}</div>
-        <section class="game-information mm-info-panel mm-account mm-panel mm-open" data-mm-panel="account" data-test="account"><div class="mm-head" style="order:-1">Account</div>${accountMarkup}</section>
         <div class="arena-overlay" data-test="level">${levelDraft}</div>
         <div class="arena-overlay" data-test="death">${runMenu}</div>
-        <div class="arena-overlay" data-test="pause"><div class="mm-pause-card"><div class="mm-pause-side"><div class="mm-pause-emblem"></div><h2>The hollow can wait.</h2><p>Combat and game timers are paused.</p><button class="mm-resume">Return to battle</button><p class="mm-save-status mm-run-recap">Run so far: 2m 28s · 2 stages cleared · 185 kills · 0 flasks used · 195 gold spent · 0 challenges completed. Damage dealt: Cleave: 33406 · Cinder relay: 7610 · Blazing cross: 1060.</p><button class="mm-pause-option mm-pause-footer">Main menu</button></div><div class="mm-pause-groups"><section class="mm-menu-group"><h3>Character</h3><button class="mm-pause-option">Skills &amp; loadout</button><button class="mm-pause-option">Forge &amp; equipment</button><button class="mm-pause-option">Stage challenges — bonus gold</button><button class="mm-pause-option">Run options — sound &amp; practice</button></section><section class="mm-menu-group"><h3>Community</h3><button class="mm-pause-option">Rankings</button><button class="mm-pause-option">Chapter lore</button></section><section class="mm-menu-group mm-progress-group"><h3>Progress</h3><div class="mm-save-actions"><button class="mm-pause-option">Save to cloud</button><button class="mm-pause-option">Load cloud save</button><button class="mm-pause-option">Account &amp; cloud</button></div><p class="mm-save-status">Level-up boon selected. Save to keep it, or continue to the next autosaved checkpoint.</p></section></div></div></div>${skillChoice}${setup}</div><script>
+        <div class="arena-overlay" data-test="pause"><div class="mm-pause-card"><div class="mm-pause-side"><div class="mm-pause-emblem"></div><h2>The hollow can wait.</h2><p>Combat and game timers are paused.</p><button class="mm-resume">Return to battle</button><p class="mm-save-status mm-run-recap">Run so far: 2m 28s · 2 stages cleared · 185 kills · 0 flasks used · 195 gold spent · 0 challenges completed. Damage dealt: Cleave: 33406 · Cinder relay: 7610 · Blazing cross: 1060.</p><button class="mm-pause-option mm-pause-footer">Main menu</button></div><div class="mm-pause-groups"><section class="mm-menu-group"><h3>Character</h3><button class="mm-pause-option">Skills &amp; loadout</button><button class="mm-pause-option">Forge &amp; equipment</button><button class="mm-pause-option">Stage challenges — bonus gold</button><button class="mm-pause-option">Options</button></section><section class="mm-menu-group"><h3>Community</h3><button class="mm-pause-option">Rankings</button><button class="mm-pause-option">Chapter lore</button></section><section class="mm-menu-group mm-progress-group"><h3>Progress</h3><div class="mm-save-actions"><button class="mm-pause-option">Save to cloud</button><button class="mm-pause-option">Load cloud save</button></div><p class="mm-save-status">Level-up boon selected. Save to keep it, or continue to the next autosaved checkpoint.</p></section></div></div></div>${skillChoice}${setup}</div><script>
         const report = [];
         const gameRoot = document.querySelector('.arpg');
         const fill = (selector, text) => document.querySelectorAll(selector).forEach(e => e.textContent = text);
@@ -67,14 +61,14 @@ if (!fs.existsSync(edge)) {
         death.querySelector('[data-action="endless"]').textContent = 'New Endless Watch run';
         death.querySelector('[data-stat="checkpoint-save"]').textContent = 'Checkpoint saved at wave 13.';
         death.querySelector('[data-loading]').hidden = true;
-        for (const label of ['Save on device', 'Load saved run', 'Account & cloud']) {
+        for (const label of ['Save on device', 'Load saved run']) {
             const button = document.createElement('button'); button.className = 'mm-pause-option'; button.textContent = label; death.querySelector('[data-run-menu]').appendChild(button);
         }
         const actions = document.querySelector('[data-main-menu-actions]');
-        for (const label of ['Save on device', 'Account & cloud', 'Rankings', 'Skills & loadout', 'Forge & equipment']) {
+        for (const label of ['Save on device', 'Options', 'Rankings']) {
             const button = document.createElement('button'); button.className = 'mm-pause-option'; button.textContent = label; actions.appendChild(button);
         }
-        const overlays = { level: '[data-test="level"]', death: '[data-test="death"]', skill: '[data-skill-choice]', setup: '[data-setup]', tutorial: '[data-setup]', main: '.main-menu', account: '[data-test="account"]', pause: '[data-test="pause"]' };
+        const overlays = { level: '[data-test="level"]', death: '[data-test="death"]', skill: '[data-skill-choice]', setup: '[data-setup]', tutorial: '[data-setup]', main: '.main-menu', pause: '[data-test="pause"]' };
         window.measure = () => {
             for (const [name, selector] of Object.entries(overlays)) {
                 gameRoot.dataset.mainMenu = name === 'main' ? 'on' : 'off';
@@ -138,5 +132,5 @@ if (!fs.existsSync(edge)) {
         }
     } finally { await new Promise(resolve => server.close(resolve)); }
     assert.deepEqual(failures, [], failures.join('\n'));
-    console.log('PASS: main menu, account, death/run-end card, level-up, level 10/20 skill choice, campaign setup and first-run tutorial fit landscape phones without scrolling');
+    console.log('PASS: main menu, death/run-end card, level-up, level 10/20 skill choice, campaign setup and first-run tutorial fit landscape phones without scrolling');
 }

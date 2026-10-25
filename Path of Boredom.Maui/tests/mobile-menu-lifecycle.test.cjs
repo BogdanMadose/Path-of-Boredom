@@ -36,10 +36,10 @@ class Node {
     dispatchEvent(event) { (this.events ||= []).push(event); return true; }
 }
 
-function gameRoot(hasAccount) {
+function gameRoot(hasAccountTab) {
     const root = new Node();
     root.querySelector = selector => {
-        if (selector === '[data-game-account]') return hasAccount ? new Node() : null;
+        if (selector === '[data-options-section="account"]') return hasAccountTab ? new Node() : null;
         return new Node();
     };
     return root;
@@ -81,7 +81,7 @@ const context = vm.createContext({
 });
 vm.runInContext(menuFunctions + '\n' + init, context);
 
-assert.equal(context.init(), true, 'menu initializes when the optional cloud panel is absent');
+assert.equal(context.init(), true, 'menu initializes when the optional account tab is absent');
 const firstRoot = activeRoot;
 const firstLayer = context.layer;
 const firstController = controllers[0];
@@ -96,4 +96,4 @@ assert.equal(firstLayer.isConnected, false, 'old menu layer is removed');
 assert.equal(activeRoot.dataset.canvasHud, 'on');
 assert.equal(activeRoot.children.includes(context.layer), true);
 assert.equal(controllers.length, 2);
-console.log('PASS: menu lifecycle reconnects after route navigation, cleans the old root, and initializes without requiring cloud markup');
+console.log('PASS: menu lifecycle reconnects after route navigation, cleans the old root, and initializes with or without an account tab');

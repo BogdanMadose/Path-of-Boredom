@@ -396,7 +396,7 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
             var result = await local.SaveAsync(snapshot, slot);
             if (!result.Success) return result;
             if (token is null) return result with { Message = "Saved on this device. Sign in for cloud sync." };
-            if (expectedRevision is null) return result with { Success = false, Message = "Saved on this device, but cloud sync is paused. Open Account & cloud to choose which save to keep before syncing." };
+            if (expectedRevision is null) return result with { Success = false, Message = "Saved on this device, but cloud sync is paused. Open Options > Account to choose which save to keep before syncing." };
             try
             {
                 var synced = await UploadAsync(snapshot, expectedRevision.Value, slot);
@@ -421,7 +421,7 @@ public sealed class MobileCloudGameSession(OfflineGameSession local) : IGameSess
             expectedRevision = null;
             observedRevision = null;
             observedSlots = Array.Empty<GameSaveSlotInfo>();
-            return new(false, "Cloud conflict: another device changed the save. Open Account & cloud, refresh, then explicitly choose a save. Neither cloud save nor device progress was overwritten.");
+            return new(false, "Cloud conflict: another device changed the save. Open Options > Account, refresh, then explicitly choose a save. Neither cloud save nor device progress was overwritten.");
         }
         if (!response.IsSuccessStatusCode)
         {

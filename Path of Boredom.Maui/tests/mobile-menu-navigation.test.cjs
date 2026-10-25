@@ -8,7 +8,7 @@ const navigation = source.slice(source.indexOf('    function returnToMainMenu(')
 assert.ok(navigation.includes('function openPanel('));
 const classes = () => ({ add() {}, remove() {} });
 const panel = () => ({ root: { classList: classes(), hidden: true, querySelector() { return null; } } });
-const panels = { pause: panel(), skills: panel(), forge: panel(), options: panel(), rankings: panel(), account: panel() };
+const panels = { pause: panel(), skills: panel(), forge: panel(), options: panel(), rankings: panel() };
 const events = [];
 let refreshes = 0;
 let mainMenuReturns = 0;
@@ -60,8 +60,10 @@ assert.equal(context.openName, 'pause', 'Rankings back returns to the open Pause
 assert.equal(panels.rankings.root.hidden, true);
 context.openPanel('notes');
 assert.equal(root.dataset.gameStatus, 'paused');
-assert.equal(context.openName, 'pause', 'patch notes must not be accessible during mobile testing');
-assert.doesNotMatch(source, /data-game-patch-notes/);
+assert.equal(context.openName, 'pause', 'Patch Notes is opened from the main menu without becoming a pause panel');
+const home = fs.readFileSync(path.join(__dirname, '../../Path of Boredom.Game/Components/Pages/Home.razor'), 'utf8');
+assert.match(home, /data-open-patch-notes/, 'main-menu Patch Notes stays inside the game page');
+assert.match(home, /data-close-patch-notes/, 'Patch Notes has an in-place back action');
 assert.ok(events.every(event => !event.resume), 'panel changes must never resume gameplay');
 context.closePanel(true);
 assert.equal(root.dataset.gameStatus, 'playing');
@@ -70,13 +72,12 @@ context.openPanel('rankings');
 context.closePanel(true);
 assert.equal(root.dataset.gameStatus, 'paused', 'a previously paused game must stay paused');
 root.dataset.gameStatus = 'ready';
-context.openPanel('notes');
-assert.equal(context.openName, null, 'no information panel is opened during setup');
-context.openPanel('account');
-assert.equal(context.openName, 'account', 'future sign-in is available from the opening screen');
+context.openPanel('options');
+assert.equal(context.openName, 'options', 'Options and account are available before starting a run');
 assert.equal(root.dataset.gameStatus, 'ready');
+assert.match(home, /data-options-section="account"/, 'account and cloud controls live in Options');
 context.closePanel(false);
-assert.equal(root.dataset.gameStatus, 'ready', 'leaving sign-in must not start a run');
+assert.equal(root.dataset.gameStatus, 'ready', 'leaving Options must not start a run');
 context.openPanel('rankings');
 assert.equal(context.openName, 'rankings', 'rankings are available before starting a run');
 assert.equal(root.dataset.gameStatus, 'ready');
@@ -93,12 +94,12 @@ delete root.dataset.mainMenu;
 root.dataset.gameStatus = 'playing';
 context.openPanel('pause');
 root.dataset.saveBusy = 'on';
-context.openPanel('account');
-context.backFromPanel('account');
-assert.equal(context.openName, 'pause', 'save/load must keep the current menu open');
+context.openPanel('options');
+context.backFromPanel('options');
+assert.equal(context.openName, 'pause', 'Options opened from Pause returns to Pause');
 assert.equal(root.dataset.gameStatus, 'paused', 'save/load must not resume combat');
 root.dataset.saveBusy = 'off';
-context.openPanel('account');
+context.openPanel('options');
 context.openPanel('pause');
 context.closePanel(true);
 assert.equal(root.dataset.gameStatus, 'playing');
@@ -113,7 +114,7 @@ context.buildInformation({ querySelector(selector) {
 } });
 assert.deepEqual(informationPanels, ['rankings'], 'information menus must initialize without a patch-notes section');
 
-const saveActions = source.slice(source.indexOf('    function addSaveActions('), source.indexOf('    function buildAccount('));
+const saveActions = source.slice(source.indexOf('    function addSaveActions('), source.indexOf('    function buildInformation('));
 const element = () => ({
     children: [], dataset: {}, listeners: {},
     get lastChild() { return this.children[this.children.length - 1]; },
@@ -137,22 +138,17 @@ context.addSaveActions(pauseMenu, actionRoot);
 const mainMenu = element();
 mainMenu.matches = selector => selector === '.main-menu-card';
 context.addSaveActions(mainMenu, actionRoot);
-assert.equal(mainMenu.children[0].children.length, 2, 'main menu adds Save and Account only; its existing Load button is retained');
+assert.equal(mainMenu.children[0].children.length, 1, 'main menu adds only Save; its existing Load button is retained');
 assert.equal(mainMenu.children[0].children[0].dataset.mobileSaveAction, 'save');
-assert.equal(mainMenu.children[0].children[1].dataset.mobileSaveAction, undefined);
 for (const host of [openingMenu, pauseMenu]) {
-    const [save, load, signIn] = host.children[0].children;
+    const [save, load] = host.children[0].children;
     assert.equal(save.dataset.mobileSaveAction, 'save');
     assert.equal(load.dataset.mobileSaveAction, 'load');
     save.listeners.click();
     load.listeners.click();
-    root.dataset.gameStatus = 'ready';
-    signIn.listeners.click();
-    assert.equal(context.openName, 'account');
-    context.closePanel(false);
 }
 assert.deepEqual(clicked, ['save', 'load', 'save', 'load']);
-assert.ok(source.includes('addSaveActions(mainCard, root)'), 'actual main menu includes account/save actions');
+assert.ok(source.includes('addSaveActions(mainCard, root)'), 'actual main menu retains its save action');
 assert.ok(source.includes('skillsShortcut.hidden = !badge || badge.hidden'), 'Skills shortcut only appears for notifications');
 assert.ok(source.includes('forgeShortcut.hidden = forgeBadge.hidden'), 'Forge shortcut only appears for notifications');
 originals.save.disabled = true;
@@ -175,10 +171,15 @@ assert.ok(saveResultBody, 'save result handler exists');
 const saveResultHandler = vm.runInContext(`(function(event) {${saveResultBody}})`, context);
 context.openName = 'pause';
 saveResultHandler({ detail: { success: true, loadingSave: true } });
-assert.equal(context.openName, 'pause', 'loading successfully from Pause leaves Pause open');
+assert.equal(context.openName, null, 'a successful load closes the current submenu to reveal the loaded run summary');
+context.openName = 'pause';
+saveResultHandler({ detail: { success: false, loadingSave: true } });
+assert.equal(context.openName, 'pause', 'a failed load keeps the current menu open for retry');
 
 for (const page of ['PatchNotes', 'Rankings']) {
     const markup = fs.readFileSync(path.join(__dirname, `../../Path of Boredom.Game/Components/Pages/${page}.razor`), 'utf8');
     assert.match(markup, /class="back-link" href="\/" aria-label="Back to game"/, `${page} back returns to the game route`);
 }
-console.log('PASS: opening and pause menus expose save/load/sign-in; panel navigation preserves pause and blocks during saves');
+const patchNotesCss = fs.readFileSync(path.join(__dirname, '../../Path of Boredom.Game/Components/Pages/PatchNotes.razor.css'), 'utf8');
+assert.match(patchNotesCss, /\.page-header \{[^}]*justify-content: flex-end;/, 'Patch Notes Back button is aligned to the right');
+console.log('PASS: Options owns account/cloud access; successful loads close their submenu; Patch Notes returns in place and aligns Back right');

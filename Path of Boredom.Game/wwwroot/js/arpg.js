@@ -1035,8 +1035,8 @@ export function createGame(root, saveBridge = null) {
     const keys = new Set();
     const pointers = new Map();
     let aim = null;
-    // Keep a tab-scoped continuation across Blazor route changes such as opening Patch Notes.
-    // This is not a cloud/save-slot write; it only restores the live run in the same browser tab.
+    // Keep the live run available for recovery after a same-tab refresh.
+    // This only restores the live run in this browser tab; it does not write a cloud save or slot.
     const liveRunKey = `path-of-boredom.live-run.v1:${releaseRankings ? "release" : "current"}`;
     let state = createState();
     let restoredSaveSlot = null;
@@ -1354,6 +1354,46 @@ export function createGame(root, saveBridge = null) {
     });
     const mainMenu = root.querySelector("[data-main-menu]");
     const emberCamp = root.querySelector("[data-ember-camp]");
+    const patchNotes = root.querySelector("[data-game-patch-notes]");
+    const openPatchNotes = root.querySelector("[data-open-patch-notes]");
+    const closePatchNotes = root.querySelector("[data-close-patch-notes]");
+    function setPatchNotesOpen(open) {
+        if (!patchNotes || !mainMenu) return;
+        patchNotes.hidden = !open;
+        mainMenu.hidden = open;
+        root.dataset.patchNotesOpen = open ? "on" : "off";
+        if (open && mainPlayMenu) mainPlayMenu.hidden = true;
+        if (open) mainPlay?.setAttribute("aria-expanded", "false");
+        (open ? closePatchNotes : openPatchNotes)?.focus({ preventScroll: true });
+    }
+    on(openPatchNotes, "click", () => setPatchNotesOpen(true));
+    on(closePatchNotes, "click", () => setPatchNotesOpen(false));
+    on(document, "keydown", event => {
+        if (event.key === "Escape" && patchNotes && !patchNotes.hidden) setPatchNotesOpen(false);
+    });
+
+    function renderRelicCodex() {
+        const profile = loadProfile();
+        const codex = root.querySelector("[data-relic-codex]");
+        const hint = root.querySelector("[data-codex-hint]");
+        if (!codex || !hint) return;
+        const signature = RELIC_KEYS.map(key => profile.codex[key] || 0).join(":");
+        if (codex.dataset.entries === signature) return;
+        codex.dataset.entries = signature;
+        const found = RELIC_KEYS.filter(key => profile.codex[key]).length;
+        hint.textContent = `${found}/${RELIC_KEYS.length} discovered. Relic bonuses apply to the current run; discoveries are kept here.`;
+        codex.replaceChildren(...RELIC_KEYS.map(key => {
+            const card = document.createElement("div"), name = document.createElement("b"), detail = document.createElement("small");
+            const known = !!profile.codex[key];
+            card.className = `camp-relic${known ? "" : " is-unknown"}`;
+            card.style.setProperty("--relic", RELICS[key].color);
+            name.textContent = known ? RELICS[key].name : "??? Undiscovered relic";
+            detail.textContent = known ? `${RELICS[key].detail} Found ${profile.codex[key]}×.` : "Keep hunting.";
+            card.append(name, detail);
+            return card;
+        }));
+    }
+
     function renderCamp() {
         const profile = loadProfile();
         emberCamp.querySelector("[data-camp-balance]").textContent = `${profile.embers} Embers · earned every run, even when you fall.`;
@@ -1374,18 +1414,7 @@ export function createGame(root, saveBridge = null) {
             button.addEventListener("click", () => { if (buyCampNode(key)) renderCamp(); });
             return button;
         }));
-        const found = RELIC_KEYS.filter(key => profile.codex[key]).length;
-        emberCamp.querySelector("[data-codex-hint]").textContent = `${found}/${RELIC_KEYS.length} found. Relics are extremely rare finds from any foe (bosses and elites slightly more often).`;
-        emberCamp.querySelector("[data-camp-codex]").replaceChildren(...RELIC_KEYS.map(key => {
-            const card = document.createElement("div"), name = document.createElement("b"), detail = document.createElement("small");
-            const known = !!profile.codex[key];
-            card.className = `camp-relic${known ? "" : " is-unknown"}`;
-            card.style.setProperty("--relic", RELICS[key].color);
-            name.textContent = known ? RELICS[key].name : "??? Undiscovered relic";
-            detail.textContent = known ? `${RELICS[key].detail} Found ${profile.codex[key]}×.` : "Keep hunting.";
-            card.append(name, detail);
-            return card;
-        }));
+        renderRelicCodex();
         const mastery = emberCamp.querySelector("[data-camp-mastery]");
         mastery.replaceChildren(...CLASS_ORDER.map(hero => {
             const row = document.createElement("div"), m = profile.mastery[hero];
@@ -1419,11 +1448,14 @@ export function createGame(root, saveBridge = null) {
             return row;
         }));
     }
+    renderRelicCodex();
+    on(root, "relic-codex-refresh", () => renderRelicCodex());
     on(root.querySelector("[data-open-camp]"), "click", () => { renderCamp(); emberCamp.hidden = false; emberCamp.querySelector("[data-close-camp]").focus({ preventScroll: true }); });
     on(emberCamp.querySelector("[data-close-camp]"), "click", () => { emberCamp.hidden = true; });
     function noteProgress() {
         setRelayForks(relayForks(state.heroClass));
         const discovered = recordRelics(state);
+        if (discovered.length) renderRelicCodex();
         if (discovered.length) saveStatus.textContent = `New codex entry: ${discovered.map(key => RELICS[key].name).join(", ")}!`;
         const earned = creditProgress(state);
         if (!earned) return;
@@ -1863,19 +1895,21 @@ export function createGame(root, saveBridge = null) {
     };
     function updateHud() {
         noteProgress();
-        const gearPreview = [`Equipped now: damage ${weaponDamage(state)}, physical armor ${armorRating(state).toFixed(1)}%, spell resistance ${resistanceRating(state).toFixed(1)}%, movement ${Math.round(movementSpeed(state))}.`];
-        if (state.runRelics?.length) for (const key of state.runRelics) gearPreview.push(`Relic · ${RELICS[key].name}: ${RELICS[key].detail}`);
+        const gearPreview = `Damage ${weaponDamage(state)} · Armor ${armorRating(state).toFixed(1)}% · Resistance ${resistanceRating(state).toFixed(1)}% · Speed ${Math.round(movementSpeed(state))}`;
         const equipmentPreview = hudOne('[data-equipment-preview]');
-        const gearSignature = gearPreview.join('|');
+        const gearSignature = gearPreview;
         if (equipmentPreview.dataset.preview !== gearSignature) {
             equipmentPreview.dataset.preview = gearSignature;
-            equipmentPreview.replaceChildren(...gearPreview.map(text => { const row = document.createElement('p'); row.textContent = text; return row; }));
+            equipmentPreview.textContent = gearPreview;
         }
         hudOne("[data-checkpoint-report]").textContent = ["camp", "won"].includes(state.status)
             ? `${checkpointReport(state)} ${checkpointSaveFailed ? "Checkpoint save failed — retry before leaving." : saving ? "Saving checkpoint…" : "Review your run and save before continuing."}`
             : "At each five-wave checkpoint, review the boss relic, challenge result, and optional encounter here.";
         setText(hudOne("[data-build-synergy]"), buildSynergy(state).detail);
-        setText(hudOne("[data-boss-relics]"), BOSS_RELICS.filter((_, index) => state.adventures.relics[index]).map(relic => `${relic.name}: ${relic.detail}`).join(" · ") || "Defeat each area boss to earn a unique, non-stacking relic.");
+        setText(hudOne("[data-boss-relics]"), BOSS_RELICS.filter((_, index) => state.adventures.relics[index]).map(relic => `${relic.name}: ${relic.detail}`).join(" · ") || "No boss relics earned this run yet.");
+        setText(hudOne("[data-run-relics]"), state.runRelics?.length
+            ? state.runRelics.map(key => `${RELICS[key].name}: ${RELICS[key].detail}`).join(" · ")
+            : "No relics collected this run yet.");
         const codex = hudOne("[data-campaign-codex]");
         const signature = state.adventures.chapters.join("");
         if (codex.dataset.entries !== signature) {
@@ -2922,6 +2956,7 @@ export function createGame(root, saveBridge = null) {
             if (!loadingSave && ["camp", "won"].includes(state.status)) checkpointSaveFailed = !result.success;
             if (result.success && loadingSave) {
                 mergeProfile(result.save?.state?.meta);
+                renderRelicCodex();
                 const restored = restoreSnapshot(result.save);
                 void reportScore();
                 state = restored;
@@ -2940,6 +2975,11 @@ export function createGame(root, saveBridge = null) {
                 shownDraft = "";
                 last = performance.now();
                 saveTemporaryRun();
+                if (inMainMenu) {
+                    if (mainPlayMenu) mainPlayMenu.hidden = true;
+                    mainPlay?.setAttribute("aria-expanded", "false");
+                    showMainMenu(false);
+                }
             }
             advanceEndless = result.success && !loadingSave && state.mode === "endless" && state.status === "camp";
             saveStatus.textContent = automatic

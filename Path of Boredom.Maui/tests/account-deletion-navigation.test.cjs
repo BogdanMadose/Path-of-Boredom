@@ -7,7 +7,10 @@ async function run() {
     const engine = fs.readFileSync(path.join(__dirname, '../../Path of Boredom.Game/wwwroot/js/arpg.js'), 'utf8').replace(/\r\n/g, '\n');
     const menus = fs.readFileSync(path.join(__dirname, '../wwwroot/js/mobile-menu.js'), 'utf8').replace(/\r\n/g, '\n');
     const events = [];
-    const root = { dataset: { cloudSignedIn: 'on', gameStatus: 'paused' }, dispatchEvent(event) { events.push(event.type); } };
+    const root = { dataset: { cloudSignedIn: 'on', gameStatus: 'paused' }, dispatchEvent(event) {
+        events.push(event.type);
+        if (event.type === 'mobile-menu' && event.detail?.open) this.dataset.menuOpen = 'on';
+    } };
     let submissions = 0;
     const context = vm.createContext({
         root, releaseRankings: true, disposed: false, accountGeneration: 0, reporting: false, syncProfile() {},
@@ -17,7 +20,7 @@ async function run() {
         state: { status: 'paused', rankingMode: 'campaign', difficulty: 'hard', kills: 100 },
         createState: () => ({ status: 'ready' }), resetToReleaseRankings() {}, clearTemporaryRun() {}, clearInput() {}, dispose() {},
         updateHud() { root.dataset.gameStatus = context.state.status; },
-        CustomEvent: class { constructor(type) { this.type = type; } },
+        CustomEvent: class { constructor(type, options = {}) { this.type = type; this.detail = options.detail; } },
         saveBridge: { async invokeMethodAsync() { submissions++; return true; } },
         DIFFICULTIES: { hard: {} }, captureRankingBuild: () => ({}), performance: { now: () => 1 }
     });
@@ -47,7 +50,11 @@ async function run() {
     let deletedHandler;
     root.addEventListener = (type, callback) => { assert.equal(type, 'mobile-account-deleted'); deletedHandler = callback; };
     context.listen = (target, type, callback) => target.addEventListener(type, callback);
-    context.openName = 'account';
+    let selectedSection = null;
+    const optionsSource = { querySelector() { return {}; }, querySelectorAll() { return []; }, dataset: {} };
+    root.querySelector = selector => selector === '[data-run-options]' ? optionsSource : null;
+    context.selectOptionsSection = (source, section) => { assert.equal(source, optionsSource); selectedSection = section; };
+    context.openName = 'options';
     context.syncBadges = () => {};
     context.closePanel = () => { context.openName = null; };
     context.openPanel = name => { context.openName = name; root.dataset.menuOpen = 'on'; };
@@ -55,12 +62,13 @@ async function run() {
     const deletionEnd = menus.indexOf('        // Android back', deletionStart);
     vm.runInContext(menus.slice(deletionStart, deletionEnd), context);
     deletedHandler();
-    assert.equal(context.openName, 'account', 'deletion must keep the sign-in screen open');
-    assert.equal(root.dataset.menuOpen, 'on');
+    assert.equal(context.openName, 'options', 'deletion keeps the Options panel open');
+    assert.equal(selectedSection, 'account', 'deletion selects the account tab for sign-in recovery');
+    assert.equal(root.dataset.menuOpen, 'on', 'deletion restores the Options modal after resetting the run');
     context.openName = null;
     deletedHandler();
-    assert.equal(context.openName, 'account', 'deletion must return to sign-in if another panel was active');
-    console.log('PASS: deletion resets account UI and score queues, stops signed-out reporting, and returns to sign-in');
+    assert.equal(context.openName, null, 'account deletion does not open a standalone account panel');
+    console.log('PASS: deletion resets account UI and score queues, stops signed-out reporting, and returns to Options > Account');
 }
 
 run().catch(error => { console.error(error); process.exitCode = 1; });

@@ -2,7 +2,7 @@
 a { color: #e9c78b; text-underline-offset: 4px; }
 a:hover { color: #ffe4b6; }
 a:focus-visible, .table-scroll:focus-visible { outline: 2px solid #f4c989; outline-offset: 4px; }
-.page-header { display: flex; justify-content: flex-start; align-items: center; gap: 12px; padding-bottom: 24px; border-bottom: 1px solid #c7a56b40; }
+.page-header { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding-bottom: 24px; border-bottom: 1px solid #c7a56b40; }
 .back-link { display: inline-flex; width: 40px; height: 40px; flex: 0 0 40px; align-items: center; justify-content: center; border: 1px solid #c7a56b66; border-radius: 50%; background: #141d20; color: #e9c78b; text-decoration: none; font: 22px/1 system-ui, sans-serif; }
 .back-link:hover { background: #26302d; color: #ffe4b6; }
 .page-heading { max-width: 780px; padding: 45px 0 30px; }

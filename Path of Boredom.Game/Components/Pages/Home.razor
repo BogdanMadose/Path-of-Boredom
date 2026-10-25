@@ -25,7 +25,7 @@
 
             <button type="button" class="quiet-button" data-open-camp>Account Progression</button>
             <button type="button" class="quiet-button" data-main-options>Options</button>
-            <a class="quiet-button main-menu-patch-notes" href="/patch-notes">Patch Notes · 1.0.1</a>
+            <button type="button" class="quiet-button main-menu-patch-notes" data-open-patch-notes>Patch Notes · 1.0.1</button>
             <div data-main-menu-actions></div>
             <p data-main-status role="status"></p>
         </div>
@@ -36,9 +36,6 @@
                 <div class="ember-camp-nodes" data-camp-nodes></div>
                 <h3>Class mastery</h3>
                 <div class="ember-camp-mastery" data-camp-mastery></div>
-                <h3>Relic Codex</h3>
-                <p class="ember-camp-hint" data-codex-hint></p>
-                <div class="ember-camp-codex" data-camp-codex></div>
                 <button type="button" class="ember-button" data-close-camp>Back</button>
             </div>
         </section>
@@ -219,6 +216,12 @@
                                     <ul data-summary-damage></ul>
                                 </div>
                             </section>
+                            <details class="run-build-details">
+                                <summary>Run synergies &amp; relics</summary>
+                                <p data-build-synergy></p>
+                                <p data-boss-relics></p>
+                                <p data-run-relics></p>
+                            </details>
                             <small class="unlock-note" data-stat="unlock">Beat the campaign to unlock Endless Watch.</small>
                             <small class="checkpoint-note" data-stat="checkpoint-save"></small>
                             <button type="button" class="ember-button checkpoint-retry" data-retry-save hidden>Retry checkpoint save</button>
@@ -413,27 +416,23 @@
                     <p class="forge-hint">Spend gold on upgrades. Max them all to unlock stat training.</p>
                     <p class="forge-hint">Previews show current → next. CAPPED means no further gain.</p>
                     <section class="equipment-options">
-                        <h3>Equipment trade-offs</h3>
-                        <p>Switching styles is free.</p>
+                        <h3>Equipment</h3>
+                        <p>Switch styles freely; each trades one stat for another.</p>
                         <div data-equipment-preview role="status"></div>
                         <label>Weapon style
                             <select data-equipment-style="weapon">
-                                <option value="balanced">Balanced — normal damage and recovery</option>
-                                <option value="heavy">Heavy — +20% damage, -15% cooldown recovery</option>
-                                <option value="swift">Quick — -15% damage, +20% cooldown recovery</option>
+                                <option value="balanced">Balanced · normal damage and recovery</option>
+                                <option value="heavy">Heavy · +20% damage, −15% recovery</option>
+                                <option value="swift">Quick · −15% damage, +20% recovery</option>
                             </select>
                         </label>
                         <label>Armor style
                             <select data-equipment-style="armor">
-                                <option value="balanced">Balanced — normal armor and speed</option>
-                                <option value="plated">Heavy plates — +8 armor, -12% movement speed</option>
-                                <option value="light">Light weave — -8 armor, +12% movement speed</option>
+                                <option value="balanced">Balanced · normal armor and speed</option>
+                                <option value="plated">Heavy plates · +8 armor, −12% speed</option>
+                                <option value="light">Light weave · −8 armor, +12% speed</option>
                             </select>
                         </label>
-                        <h3>Build synergies</h3>
-                        <p data-build-synergy></p>
-                        <h3>Boss relics</h3>
-                        <p data-boss-relics></p>
                     </section>
                     <div class="forge-grid">
                         <button type="button" data-upgrade="weapon" disabled><img class="forge-card-art" data-forge-art alt="" aria-hidden="true" /><strong>Sunsteel edge</strong><span>Weapon damage</span><small data-upgrade-label="weapon">Rank 0 / 50</small></button>
@@ -468,7 +467,7 @@
                     </section>
                 </section>
                 <section class="options-panel" data-run-options aria-labelledby="run-options-title">
-                    <h2 id="run-options-title">Run options</h2>
+                    <h2 id="run-options-title">Options</h2>
                     <button type="button" class="ember-button" data-resume-combat disabled>Return to battle</button>
                     <div class="run-options">
                         <fieldset class="audio-settings" data-options-section="sound">
@@ -495,6 +494,15 @@
                         </fieldset>
                         <h3 data-options-section="codex">Campaign codex</h3>
                         <div data-campaign-codex data-options-section="codex"></div>
+                        <h3 data-options-section="codex">Relic codex</h3>
+                        <p data-codex-hint data-options-section="codex"></p>
+                        <div class="ember-camp-codex" data-relic-codex data-options-section="codex"></div>
+                        @if (Session is ICloudGameSession)
+                        {
+                            <section class="account-settings" data-options-section="account" aria-label="Account and cloud saves">
+                                <CloudAccountMenu Changed="AccountChanged" Deleted="AccountDeleted" />
+                            </section>
+                        }
                     </div>
                 </section>
                 <section class="challenges-panel" data-challenges aria-labelledby="challenges-title">
@@ -539,18 +547,12 @@
     <section class="game-information" data-game-rankings hidden aria-label="In-game rankings">
         <Rankings Embedded="true" />
     </section>
-    @if (Session is not ICloudGameSession)
-    {
-        <section class="game-information" data-game-patch-notes hidden aria-label="In-game patch notes">
-            <PatchNotes Embedded="true" />
-        </section>
-    }
-    @if (Session is ICloudGameSession)
-    {
-        <section class="game-information mm-info-panel mm-account" data-game-account hidden aria-label="Account and cloud saves">
-            <CloudAccountMenu Changed="AccountChanged" Deleted="AccountDeleted" />
-        </section>
-    }
+    <section class="patch-notes-overlay" data-game-patch-notes hidden aria-label="In-game patch notes">
+        <header class="patch-notes-overlay-header">
+            <button type="button" class="quiet-button" data-close-patch-notes aria-label="Back to main menu">← Back</button>
+        </header>
+        <PatchNotes Embedded="true" />
+    </section>
 </div>
 
 @code {

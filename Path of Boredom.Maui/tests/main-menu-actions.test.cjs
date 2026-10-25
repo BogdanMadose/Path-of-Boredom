@@ -4,9 +4,14 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 
 const source = fs.readFileSync(path.join(__dirname, '../../Path of Boredom.Game/wwwroot/js/arpg.js'), 'utf8');
+const homeMarkup = fs.readFileSync(path.join(__dirname, '../../Path of Boredom.Game/Components/Pages/Home.razor'), 'utf8');
 const start = source.indexOf('    on(root.querySelector("[data-open-main-menu]"), "click"');
 const end = source.indexOf('    for (const select of root.querySelectorAll("[data-equipment-style]"))', start);
 assert.ok(start >= 0 && end > start, 'main menu action handlers exist');
+assert.match(homeMarkup, /<button[^>]*data-open-patch-notes/, 'Patch Notes opens in place instead of navigating away from the signed-in game');
+assert.match(homeMarkup, /data-close-patch-notes/, 'Patch Notes returns with an in-place Back action');
+const loadSuccess = source.slice(source.indexOf('if (result.success && loadingSave)'), source.indexOf('advanceEndless = result.success && !loadingSave'));
+assert.match(loadSuccess, /if \(inMainMenu\)[\s\S]*mainPlayMenu\.hidden = true[\s\S]*showMainMenu\(false\)/, 'loading a save from Main closes Play and reveals the loaded run summary');
 
 class Button {
     constructor() { this.hidden = true; this.disabled = false; this.listeners = {}; this.attributes = {}; }

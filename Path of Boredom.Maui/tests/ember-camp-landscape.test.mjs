@@ -11,6 +11,7 @@ if (!fs.existsSync(edge)) {
 } else {
     const home = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/Home.razor', import.meta.url), 'utf8');
     const camp = home.slice(home.indexOf('<section class="ember-camp"'), home.indexOf('</section>', home.indexOf('<section class="ember-camp"')) + 10);
+    assert.doesNotMatch(camp, /relic codex|data-relic-codex/i, 'run relic records are no longer shown in Account Progression');
     const css = ['../../Path of Boredom.Game/Components/Pages/Home.razor.css', '../wwwroot/css/mobile-shell.css', '../wwwroot/css/mobile-menu.css']
         .map(file => fs.readFileSync(new URL(file, import.meta.url), 'utf8').replaceAll('::deep ', '').replaceAll('@media (pointer: coarse)', '@media all')).join('\n');
     const node = (name, detail, price, cls = '') => `<button class="quiet-button camp-node ${cls}"><b>${name}</b><small>${detail}</small><small>${price}</small></button>`;
@@ -22,8 +23,6 @@ if (!fs.existsSync(edge)) {
     const mastery = row('Ember Knight · Mastery 4/30', 'Next at 6: new starting skill (Blazing cross)', true) + row('Dawn Ranger · Mastery 1/30', 'Next at 3: Gilded trim', false)
         + '<div class="camp-mastery-row"><strong>🔒 Iron Warden</strong><small>Beat the campaign with the Ember Knight or Dawn Ranger to unlock.</small></div>'
         + '<div class="camp-mastery-row"><strong>🔒 Astral Sorcerer</strong><small>Beat the campaign with the Iron Warden to unlock.</small></div>';
-    const relic = (name, detail, known) => `<div class="camp-relic${known ? '' : ' is-unknown'}" style="--relic:#ff8b32"><b>${name}</b><small>${detail}</small></div>`;
-    const codex = relic('Cinder Heart', 'Your nova leaves burning ground for 3s. Found 2×.', true) + Array.from({ length: 5 }, () => relic('??? Undiscovered relic', 'Keep hunting. Bosses drop relics most often.', false)).join('');
     const html = `<html><head><style>html,body{margin:0}*{box-sizing:border-box}[hidden]{display:none!important}${css}</style></head>
         <body class="mobile-shell"><div class="arpg" data-canvas-hud="on" data-main-menu="on">${camp.replace(' hidden', '')}</div><script>
         const report = [];
@@ -32,8 +31,6 @@ if (!fs.existsSync(edge)) {
             q('[data-camp-balance]').textContent = '14 Embers · earned every run, even when you fall.';
             q('[data-camp-nodes]').innerHTML = ${JSON.stringify(nodes)};
             q('[data-camp-mastery]').innerHTML = ${JSON.stringify(mastery)};
-            q('[data-codex-hint]').textContent = '1/6 found. Rare relics can drop from any foe (bosses and elites far more often) and change how a run plays.';
-            q('[data-camp-codex]').innerHTML = ${JSON.stringify(codex)};
             const overlay = q('[data-ember-camp]'), card = q('.ember-camp-card');
             const style = getComputedStyle(overlay);
             if (style.position !== 'fixed') report.push('camp is not an overlay (' + style.position + ')');
@@ -55,8 +52,6 @@ if (!fs.existsSync(edge)) {
                 if (r.right > b.left && r.left < b.right && r.bottom > b.top && r.top < b.bottom) report.push('Back covers text: ' + s.textContent.trim().slice(0, 20));
             }
             if (b.bottom > innerHeight + 1 || b.height < 22) report.push('Back button unreachable/too small ' + b.bottom + '/' + b.height);
-            const codexBox = q('[data-camp-codex]').getBoundingClientRect(), codexTitle = card.querySelector(':scope > h3:last-of-type').getBoundingClientRect();
-            if (codexBox.top - codexTitle.bottom > 60) report.push('empty gap above codex ' + Math.round(codexBox.top - codexTitle.bottom));
             report.push('INFO scroll ' + card.scrollHeight + '/' + card.clientHeight);
         } catch (e) { report.push('ERR ' + e.message); }
         document.body.dataset.result = report.join(' | ');

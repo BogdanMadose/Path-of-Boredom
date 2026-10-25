@@ -138,8 +138,10 @@ context.syncBadges();
 assert.equal(mirroredSummary.textContent, summary.textContent);
 
 const css = fs.readFileSync(new URL('../wwwroot/css/mobile-menu.css', import.meta.url), 'utf8');
-assert.match(css, /forge-panel \.mm-subtabs \{ grid-template-columns: repeat\(3,/);
+assert.match(css, /forge-panel \.mm-subtabs,[\s\S]*?options-panel \.mm-subtabs[\s\S]*?grid-template-columns: repeat\(3,/);
+assert.match(css, /options-panel\[data-mobile-option-count="4"\] \.mm-subtabs \{ grid-template-columns: repeat\(4,/);
 assert.match(css, /forge-panel:not\(\[data-mobile-section="systems"\]\) > \.equipment-options \{ display: none;/);
+assert.match(css, /\.mm-panel \.equipment-options \{[\s\S]*?overflow-y: hidden;/, 'Equipment stays compact without requiring a scroll');
 assert.match(css, /\.mm-panel \.run-options,[^}]*min-height: 0;[^}]*overflow-y: auto;/);
 console.log('PASS: selected-skill Forge/card availability, real combat bonuses, previews, scrolls, mastery gating, v16/v17 migration and synchronized mobile Pause options');
 
@@ -147,6 +149,9 @@ const edge = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
 if (fs.existsSync(edge)) {
     const home = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/Home.razor', import.meta.url), 'utf8');
     const optionsMarkup = home.slice(home.indexOf('<section class="options-panel"'), home.indexOf('<section class="challenges-panel"'))
+        .replace('<section class="options-panel"', '<section class="options-panel" data-mobile-option-count="4"')
+        .replace(/@if \(Session is ICloudGameSession\)\s*\{\s*<section class="account-settings"[\s\S]*?<\/section>\s*\}/,
+            '<section class="account-settings" data-options-section="account"><fieldset><legend>Game account</legend><p>Signed in as Player</p><label>Display name<input value="Player" /></label><button>Save player name</button></fieldset><fieldset><legend>Device &amp; cloud saves</legend><p>Cloud save available.</p><button>Refresh</button><button>Upload device save</button></fieldset><fieldset><legend>Delete account</legend><p>Removes cloud and device saves.</p><button>Delete game account</button></fieldset></section>')
         .replace(/@foreach \(var skill in CombatSkills\)\s*\{([\s\S]*?)\}/g, (_, markup) =>
             ['nova', 'burst', 'guard', ...skills].map(skill => markup.replaceAll('@skill', skill)).join(''));
     const equipmentMarkup = home.slice(home.indexOf('<section class="equipment-options">'), home.indexOf('<div class="forge-grid">'));
@@ -161,16 +166,18 @@ if (fs.existsSync(edge)) {
             const panel = document.querySelector('.options-panel'), forgePanel = document.querySelector('.forge-panel'), options = document.querySelector('.run-options'), equipment = document.querySelector('.equipment-options'), forge = document.querySelector('.forge-grid'), mastery = document.querySelector('.mastery-panel');
             panel.classList.add('mm-panel', 'mm-open');
             const head = document.createElement('div'); head.className = 'mm-head'; head.textContent = 'Run options'; panel.appendChild(head);
+            const tabs = document.createElement('div'); tabs.className = 'mm-subtabs'; tabs.innerHTML = '<button class="mm-subtab">Sound</button><button class="mm-subtab">Controls</button><button class="mm-subtab">Codex</button><button class="mm-subtab">Account</button>'; panel.appendChild(tabs);
             const check = (condition, message) => { if (!condition) throw new Error(message); };
-            for (const scale of [1, 1.3]) for (const [width, height] of [[320,480],[360,640],[390,740],[430,932],[480,320],[640,360],[740,360],[800,1280],[1024,768],[1280,800]]) {
+        for (const scale of [1, 1.3]) for (const [width, height] of [[320,480],[360,640],[390,740],[430,932],[480,320],[640,360],[740,360],[800,1280],[1024,768],[1280,800]]) {
                 document.documentElement.style.fontSize = (16 * scale) + 'px';
                 panel.style.width = width + 'px'; panel.style.height = height + 'px';
                 panel.classList.add('mm-open'); forgePanel.classList.remove('mm-open');
                 check(!panel.querySelector('[data-equipment-style]') && !panel.querySelector('[data-challenge-choice]'), 'options must be separate from equipment and challenges');
                 check(options.clientHeight > 0 && getComputedStyle(options).overflowY === 'auto', 'Run options must have a usable scrolling container');
-                for (const section of ['sound', 'controls', 'codex']) {
+                for (const section of ['sound', 'controls', 'codex', 'account']) {
                     panel.dataset.mobileSection = section;
-                    if (width > height && height >= 360) check(options.scrollHeight <= options.clientHeight + 1, 'landscape options tab must fit without scrolling: ' + section + ' ' + width + 'x' + height + ' @' + scale + ' (' + options.scrollHeight + '>' + options.clientHeight + ')');
+                    if (width > height && height >= 360 && section !== 'account') check(options.scrollHeight <= options.clientHeight + 1, 'landscape options tab must fit without scrolling: ' + section + ' ' + width + 'x' + height + ' @' + scale + ' (' + options.scrollHeight + '>' + options.clientHeight + ')');
+                    if (section === 'account') check(getComputedStyle(options).overflowY === 'auto', 'account tab keeps long save/account actions reachable');
                 }
                 panel.dataset.mobileSection = 'controls';
                 const bounds = options.getBoundingClientRect();
@@ -182,6 +189,7 @@ if (fs.existsSync(edge)) {
                 forgePanel.style.width = width + 'px'; forgePanel.style.height = height + 'px';
                 forgePanel.dataset.mobileSection = 'systems';
                 check(getComputedStyle(equipment).display !== 'none' && getComputedStyle(forge).display === 'none' && getComputedStyle(mastery).display === 'none', 'Equipment tab isolation');
+                if (width > height && height >= 360) check(equipment.scrollHeight <= equipment.clientHeight + 1, 'Equipment controls fit without scrolling: ' + width + 'x' + height + ' @' + scale + ' (' + equipment.scrollHeight + '>' + equipment.clientHeight + ')');
                 forgePanel.dataset.mobileSection = 'upgrades';
                 check(getComputedStyle(equipment).display === 'none' && getComputedStyle(forge).display !== 'none' && getComputedStyle(mastery).display === 'none', 'Upgrades tab isolation');
                 forgePanel.dataset.mobileSection = 'training';

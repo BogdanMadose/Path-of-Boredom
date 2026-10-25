@@ -1255,7 +1255,7 @@ export function createGame(root, saveBridge = null) {
                 if (pendingScores.get(key) === submission) pendingScores.delete(key);
             }
             rankingStatus.textContent = releaseRankings
-                ? "Initial release ranking synced. Scores are separate by class, difficulty and starting mode."
+                ? "Mobile release ranking synced. Scores are separate by class, difficulty and starting mode."
                 : `Class best synced with its upgrades. Board: ${state.rankingPatch === "004" ? "Patch 004" : "archive / inherited run"}. Rankings also separate class, difficulty, and starting mode.`;
         } catch {
             if (!disposed && generation === accountGeneration) rankingStatus.textContent = "Score sync failed. Keep this page open; it will retry automatically.";

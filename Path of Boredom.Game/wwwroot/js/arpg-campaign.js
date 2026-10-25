@@ -118,7 +118,8 @@ export function threatForWave(wave) {
     if (wave >= 11) return "Sentinels resist cleave damage. Ember nova bypasses their shields.";
     if (wave >= 6) return "Spitters fire three-bolt fans. Keep moving and dodge through the gaps.";
     if (wave >= 3) return "Runners are fast but fragile. Turn and cleave before they surround you.";
-    return "Husks swarm, brutes strike hard, and wisps attack at range. Gold fuels the forge.";
+    if (wave < 3) return "Ash runners are fast but fragile. Prioritize them before they close in; Wisps attack from range.";
+    return "Husks swarm, brutes strike hard, and Wisps attack at range. Gold fuels the forge.";
 }
 
 // Deterministically picks which enemy type spawns for a given wave and spawn index within that
@@ -137,6 +138,6 @@ export function enemyKindForWave(wave, index) {
     if (wave >= 16 && index % 5 === 2) return "reaver";
     if (wave >= 11 && index % 5 === 0) return "sentinel";
     if (wave >= 6 && index % 4 === 1) return "spitter";
-    if (wave >= 3 && index % 4 === 0) return "runner";
+    if (wave >= 1 && index % 4 === 0) return "runner";
     return index % 4 === 3 ? "wisp" : index % 3 === 2 ? "brute" : "husk";
 }

@@ -1,8 +1,8 @@
 // arpg-difficulty.js — the three displayed difficulty presets (Easy / Medium / Hard).
 //
 // Each entry is a flat multiplier table applied to enemy stats and player healing; there is no
-// other difficulty-related logic anywhere else, everything reads from DIFFICULTIES via
-// difficultyFor(). If you're tuning difficulty balance, this is almost always the only file you need.
+// other difficulty preset logic anywhere else, everything reads from DIFFICULTIES via
+// difficultyFor(). Enemy base movement, wave composition, and fresh-run kits are tuned in arpg-engine.js.
 //
 // Multiplier meanings:
 //   health  — multiplier applied to every enemy's max health.
@@ -11,9 +11,9 @@
 //   healing — multiplier applied to how much health potions/flasks restore (lower = harsher).
 //   extra   — how many additional enemies spawn per wave on top of the base wave count.
 export const DIFFICULTIES = {
-    hard: { name: "Easy", description: "The easiest of the three difficulties and the recommended starting point. Enemies are less durable, slower, and hit less hard than on the higher tiers. Healing restores 80% of its normal amount.", health: 1.3, damage: 1.2, speed: 1.08, healing: 0.8, extra: 2 },
-    nightmare: { name: "Medium", description: "The middle difficulty, for players comfortable with Easy. More enemies per wave; enemies are tougher, faster, and hit harder. Healing restores only 60% of its normal amount.", health: 1.7, damage: 1.5, speed: 1.16, healing: 0.6, extra: 4 },
-    inferno: { name: "Hard", description: "The hardest difficulty, for experienced players. The most enemies per wave, with the highest health, damage, and speed. Healing restores only 40% of its normal amount, so mistakes are much harder to recover from.", health: 2.2, damage: 1.9, speed: 1.24, healing: 0.4, extra: 6 }
+    hard: { name: "Easy", description: "The gentlest setting. Enemies are still dangerous in groups, so use movement, flasks, and upgrades to survive. Healing restores 75% of its normal amount.", health: 1.45, damage: 1.3, speed: 1.16, healing: 0.75, extra: 3 },
+    nightmare: { name: "Medium", description: "A demanding run for players who know the basics. Enemies are tougher, faster, and more numerous. Healing restores 58% of its normal amount.", health: 1.85, damage: 1.65, speed: 1.25, healing: 0.58, extra: 5 },
+    inferno: { name: "Hard", description: "The harshest setting, for experienced players. Expect dense waves, fast enemies, and little room to recover. Healing restores 40% of its normal amount.", health: 2.35, damage: 2.05, speed: 1.32, healing: 0.4, extra: 7 }
 };
 
 // Looks up the active difficulty preset for a given game state, falling back to Easy if the

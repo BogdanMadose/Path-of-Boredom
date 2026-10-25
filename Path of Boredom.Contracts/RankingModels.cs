@@ -70,7 +70,7 @@ public static class RankingRules
     public static bool IsPatch(string? value) => value is MobileRelease or "005" or "004" or "pre004";
 
     /// <summary>Human-readable label for a patch tag, used as a section heading on the rankings page.</summary>
-    public static string PatchName(string value) => value == MobileRelease ? "Initial release" : value == CurrentPatch ? "Patch 004 — fresh runs" : value == "005" ? "Development archive" : "Pre-004 / inherited runs";
+    public static string PatchName(string value) => value == MobileRelease ? "Mobile release rankings" : value == CurrentPatch ? "Patch 004 — fresh runs" : value == "005" ? "Development archive" : "Pre-004 / inherited runs";
 
     /// <summary>True if <paramref name="value"/> is one of the three supported difficulties.</summary>
     public static bool IsDifficulty(string? value) => value is "hard" or "nightmare" or "inferno";
@@ -101,12 +101,12 @@ public static class RankingRules
         && IsMode(value.Mode) && IsClass(value.HeroClass) && value.Score is >= 0 and <= 9_007_199_254_740_991L
         && (value.Build is null || IsValidBuild(value.Build));
 
-    /// <summary>Human-readable label for a difficulty key, including the short blurb shown in the setup dialog.</summary>
+    /// <summary>Current-build display label for a difficulty key; the stored and submitted keys remain stable for older clients.</summary>
     public static string DifficultyName(string value) => value switch
     {
-        "hard" => "Easy — recommended starting point",
-        "nightmare" => "Medium — tougher enemies, less healing",
-        "inferno" => "Hard — most demanding, least healing",
+        "hard" => "Easy",
+        "nightmare" => "Medium",
+        "inferno" => "Hard",
         _ => value
     };
 

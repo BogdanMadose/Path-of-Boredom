@@ -292,8 +292,8 @@ export function startRun(random = Math.random, difficulty = "hard", heroClass = 
 
 // Alternate "new game" entry point for players who want to skip straight to Endless mode without
 // grinding the campaign — sets rankingMode to "endless" (a separate leaderboard bucket from
-// "ascended") and hands the player a fixed "veteran's kit" of gold, forge ranks, level, and gear so
-// it's immediately playable rather than starting from nothing at wave 30+ difficulty.
+// "ascended") and gives the player a modest Watchkeeper kit. The kit provides a few upgrades and
+// enough gold to specialize, but leaves room for the early Endless waves to pressure their build.
 export function startEndlessRun(random = Math.random, difficulty = "hard", heroClass = "knight") {
     const state = startRun(random, difficulty, heroClass);
     const hero = classFor(state);
@@ -301,14 +301,10 @@ export function startEndlessRun(random = Math.random, difficulty = "hard", heroC
     state.mode = "endless";
     state.campaignComplete = 1;
     state.wave = LAST_WAVE;
-    state.gold = 350;
-    Object.assign(state.upgrades, { weapon: 4, armor: 3, cleave: 2, nova: 2, dodge: 2, flask: 1 });
-    Object.assign(state.player, { level: 20, maxHealth: hero.health + 201, health: hero.health + 201, damage: hero.damage + 44, nextLevel: 1600, weaponBonus: 72, weapon: `Watchkeeper's ${hero.weaponType}`, armorBonus: 20, armor: "Watchkeeper's mail" });
-    // Endless veterans start with the whole forge mastered, so gold goes straight into mastery.
-    for (const [key, upgrade] of Object.entries(UPGRADES)) {
-        if (key === "armor") state.player.maxHealth += 12 * Math.max(0, upgrade.max - state.upgrades.armor);
-        state.upgrades[key] = upgrade.max;
-    }
+    state.gold = 500;
+    Object.assign(state.upgrades, { weapon: 3, armor: 2, cleave: 1, nova: 1, dodge: 1, flask: 1 });
+    const kitHealth = hero.health + 100 + state.upgrades.armor * 12;
+    Object.assign(state.player, { level: 12, maxHealth: kitHealth, health: kitHealth, damage: hero.damage + 30, nextLevel: 700, weaponBonus: 45, weapon: `Watchkeeper's ${hero.weaponType}`, armorBonus: 12, armor: "Watchkeeper's mail" });
     state.player.health = state.player.maxHealth;
     spawnWave(state);
     state.intermission = 3.5;
@@ -1081,7 +1077,8 @@ function spawnWave(state) {
     const baseCount = (bossWave ? 10 + act * 3 : 7 + localWave * 3 + act * 3) + Math.floor(depth / 4) + difficulty.extra;
     const earlyToughness = state.wave <= 4 ? 1.3 : state.wave <= 8 ? 1.15 : 1;
     const count = Math.min(40 + Math.min(10, Math.floor(depth / 15)), Math.max(5, Math.round(baseCount * (state.wave >= 6 ? encounter.count : 1))));
-    // Deep Endless pressure: ranged heroes can kite indefinitely, so enemies get tougher, faster and hit harder.
+    // Endless pressure gradually counters long-range builds with slightly faster durability, damage,
+    // and movement scaling, while the shared speed and projectile rules still apply to every class.
     const rangedHero = ["ranger", "sorcerer"].includes(state.heroClass);
     const deepHealth = 1 + (rangedHero ? depth * 0.004 : depth * 0.002);
     const deepDamage = 1 + depth * 0.006;
@@ -1100,7 +1097,7 @@ function spawnWave(state) {
             kind, x, y, health, maxHealth: health, elite, charging: 0, chargeX: 0, chargeY: 0,
             combat: { volleys: [], phase: 1, rest: 0, pattern: 1 },
             radius: boss ? 32 : kind === "brute" || kind === "sentinel" ? 22 : kind === "runner" ? 12 : 15,
-            speed: boss ? 90 + act * 10 : kind === "runner" ? 160 + act * 10 : kind === "sentinel" ? 55 : kind === "brute" ? 62 : ["wisp", "spitter", "summoner", "cantor", "hexer"].includes(kind) ? 80 : 92 + Math.min(state.wave, LAST_WAVE) * 2.2,
+            speed: boss ? 110 + act * 10 : kind === "runner" ? 190 + act * 10 : kind === "sentinel" ? 70 : kind === "brute" ? 84 : ["wisp", "spitter", "summoner", "cantor", "hexer"].includes(kind) ? 95 : 130 + Math.min(state.wave, LAST_WAVE) * 2.2,
             damage: Math.round((boss ? 34 + act * 11 : kind === "sentinel" ? 26 + act * 4 : kind === "brute" ? 22 + act * 5 : 13 + Math.min(state.wave, LAST_WAVE) * 1.5)
                 * (1 + act * 0.045 + depth * 0.009 + levelPressure * 0.008) * (elite ? 1.3 : 1)),
             cooldown: grouped ? 1.2 + (i % 3) * 0.55 : 1.2, flash: 0, slam: 4, winding: 0, attackWindup: 0, attackX: x, attackY: y, chilled: 0, chillStrength: 0
@@ -1127,7 +1124,7 @@ function spawnWave(state) {
     }
     state.journal = bossWave ? `${map.boss} awakens. Escape the slam${act ? " and its projectile volley" : ""}!`
         : localWave === 1 && act > 0 ? `${map.name}. The next stage begins. ${map.description}`
-        : state.wave === 3 ? "Ash runners join the hunt. Fast but fragile: cleave before they surround you."
+        : state.wave === 1 ? "Ash runners are already on the hunt. Fast but fragile: turn and strike before they surround you."
         : `Wave ${state.wave} · ${encounter.name}. ${count} enemies emerge in ${map.name}.${formation ? ` ${formation.name}: ${formation.detail}` : ''}`;
 }
 
@@ -1472,8 +1469,9 @@ export function step(state, input, elapsed) {
             const meleeReach = enemy.kind === "duelist" ? 85 : enemy.radius + p.radius + 28;
             if (!attackReady) {
                 if (d < (ranged ? enemy.kind === "artillerist" ? 650 : 430 : meleeReach)) {
-                    enemy.attackX = p.x;
-                    enemy.attackY = p.y;
+                    const lead = ["wisp", "spitter"].includes(enemy.kind) ? 0.35 : 0;
+                    enemy.attackX = clamp(p.x + (p.vx || 0) * lead, MARGIN, WIDTH - MARGIN);
+                    enemy.attackY = clamp(p.y + (p.vy || 0) * lead, MARGIN, HEIGHT - MARGIN);
                     enemy.attackWindup = enemy.kind === "artillerist" ? 1.1 : enemy.kind === "brute" ? 0.8 : enemy.kind === "duelist" ? 0.65 : 0.55;
                 }
                 continue;
@@ -1503,7 +1501,7 @@ export function step(state, input, elapsed) {
                 enemy.cooldown = 3.2;
                 enemy.swing = 0.3;
             } else if (ranged && d < 430) {
-                fireVolley(state, enemy, Math.atan2(enemy.attackY - enemy.y, enemy.attackX - enemy.x), enemy.kind === "spitter" ? [-0.25, 0, 0.25] : [0], 190);
+                fireVolley(state, enemy, Math.atan2(enemy.attackY - enemy.y, enemy.attackX - enemy.x), enemy.kind === "spitter" ? [-0.25, 0, 0.25] : [0], enemy.kind === "spitter" ? 235 : 220);
                 enemy.cooldown = enemy.kind === "spitter" ? 2.6 : 2;
                 enemy.swing = 0.3;
             } else if (!ranged) {

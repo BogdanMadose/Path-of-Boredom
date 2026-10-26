@@ -469,30 +469,42 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .tree-respec { width: 100%; margin: 6px 0; font-size: 11px; }
 .elite-guide { margin: 14px 0; padding: 12px; border: 1px solid #c7a56b44; color: #c4d8cc; font-size: 12px; line-height: 1.8; }
 .elite-guide summary { cursor: pointer; color: #edc581; }
-.death-report { margin: 16px 0; padding: 14px; text-align: left; border: 1px solid #b66b5e; border-radius: 6px; background: #21191bea; }
+.death-report { display: flex; flex-direction: column; min-width: 0; min-height: 0; margin: 16px 0; padding: 14px; text-align: left; border: 1px solid #b66b5e; border-radius: 6px; background: #21191bea; }
+.report-panel-heading, .run-summary-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
 .death-report h3 { margin: 0 0 10px; color: #ffd0b8; font-size: 18px; }
-.death-report p, .death-report small { font-size: 12px; line-height: 1.6; color: #d0bbb3; }
-.death-report ol { max-height: 160px; overflow-y: auto; overscroll-behavior: contain; padding-left: 24px; font-size: 12px; line-height: 1.7; }
+.scroll-cue { flex: 0 0 auto; padding: 2px 7px; border: 1px solid #d8b77688; border-radius: 999px; background: #201d16; color: #f2d292; font-size: 9px; font-weight: 700; line-height: 1.2; white-space: nowrap; }
+.report-scroll-region, .run-summary-scroll { min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #d8b776 #182329; }
+.report-scroll-region::-webkit-scrollbar, .run-summary-scroll::-webkit-scrollbar { width: 9px; }
+.report-scroll-region::-webkit-scrollbar-track, .run-summary-scroll::-webkit-scrollbar-track { border-radius: 8px; background: #182329; }
+.report-scroll-region::-webkit-scrollbar-thumb, .run-summary-scroll::-webkit-scrollbar-thumb { border: 2px solid #182329; border-radius: 8px; background: #d8b776; }
+.arpg:not([data-game-status="dead"]) .scroll-cue { display: none; }
+.death-report p, .death-report small { min-width: 0; overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; color: #d0bbb3; }
+.death-report ol { margin: 3px 0; padding-left: 24px; font-size: 12px; line-height: 1.7; }
 .death-report li { margin-bottom: 6px; overflow-wrap: anywhere; }
 .death-report .fatal-hit { color: #ffad97; font-weight: 700; }
 .death-report.run-summary {
-    min-height: 150px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    min-height: 0;
 }
 .run-summary {
     min-width: 0;
 }
-
-.run-summary-overview{
-    padding-bottom: 6px;
+.run-summary-overview, .run-summary-damage {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
 }
-
 .run-summary h4 {
-    margin-bottom: 5px;
-    margin-top: 0;
+    margin: 0;
     color: #edc581;
     font-size: 12px;
     letter-spacing: 0.5px;
 }
+.run-summary-scroll { flex: 1 1 auto; max-height: 180px; margin-top: 3px; }
 
 .run-summary-overview ul,
 .run-summary-damage ul {
@@ -505,6 +517,7 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 }
 
 .run-summary-overview li {
+    min-width: 0;
     padding: 5px 8px;
     border: 1px solid #c7a56b33;
     border-radius: 5px;
@@ -512,6 +525,7 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
     color: #e5dfd3;
     font-size: 11px;
     line-height: 1.5;
+    overflow-wrap: anywhere;
 }
 
 .run-summary-damage li {
@@ -542,7 +556,9 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 }
 .arpg[data-game-status="dead"] [data-overlay] { grid-template-rows: minmax(0, 1fr); touch-action: pan-y; }
 .arpg[data-game-status="dead"] [data-run-menu] { box-sizing: border-box; min-height: 0; max-height: 100%; overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #c7a56b #14212a; }
-.arpg[data-game-status="dead"] .death-report, .arpg[data-game-status="dead"] .death-report ol { max-height: none; overflow: visible; }
+.arpg[data-game-status="dead"] .death-report:not(.run-summary) { max-height: min(26dvh, 220px); overflow: hidden; }
+.arpg[data-game-status="dead"] .report-scroll-region { max-height: min(19dvh, 160px); }
+.arpg[data-game-status="dead"] .run-summary-scroll { max-height: min(16dvh, 120px); }
 .loadout-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .loadout-grid label { min-width: 0; display: grid; gap: 8px; color: #dbc18e; font-size: 12px; }
 .loadout-grid select { min-width: 0; width: 100%; padding: 10px; background: #0e181e; border: 1px solid #bda36b55; border-radius: 4px; color: #e8ddc3; font: inherit; }

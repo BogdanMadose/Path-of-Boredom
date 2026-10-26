@@ -616,7 +616,7 @@
 
     body.mobile-shell .death-report {
         max-height: 34vh;
-        overflow-y: auto;
+        overflow: hidden;
         text-align: left;
     }
 
@@ -946,8 +946,10 @@
     }
     body.mobile-shell .level-draft .eyebrow { margin: 0; }
     body.mobile-shell .death-report ol { margin: 2px 0; padding-left: 18px; font-size: 11px; line-height: 1.3; }
-    body.mobile-shell .death-report li:nth-child(n+6) { display: none; }
-    body.mobile-shell .death-report h3 { margin: 0 0 2px; font-size: 14px; }
+    body.mobile-shell .death-report h3 { margin: 0; font-size: 14px; }
+    body.mobile-shell .report-panel-heading { flex: 0 0 auto; margin-bottom: 3px; }
+    body.mobile-shell .report-scroll-region { flex: 1 1 auto; max-height: none; min-height: 0; }
+    body.mobile-shell .scroll-cue { padding: 1px 5px; font-size: 8px; }
     body.mobile-shell .death-report p { margin: 2px 0; font-size: 11px; }
 
     body.mobile-shell .card-category {
@@ -1073,21 +1075,28 @@ body.mobile-shell [data-run-menu] > .death-report {
 }
 body.mobile-shell [data-run-menu] > .death-report ol {
     max-height: none;
-    overflow: hidden;
+    overflow: visible;
 }
+body.mobile-shell [data-run-menu] > .death-report:not(.run-summary) { display: flex; flex-direction: column; min-height: 0; }
+body.mobile-shell [data-run-menu] > .death-report:not(.run-summary) .report-scroll-region { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #d8b776 #182329; }
 body.mobile-shell .arpg [data-run-menu] > .run-summary {
+    display: grid;
     min-height: 0;
     max-height: none;
     overflow: hidden;
     padding: 6px 8px;
+    grid-template-rows: minmax(0, 1fr);
 }
-body.mobile-shell .arpg [data-run-menu] > .run-summary h4 { margin: 0 0 2px; font-size: 10px; }
+body.mobile-shell .arpg [data-run-menu] > .run-summary .run-summary-heading { flex: 0 0 auto; min-height: 12px; }
+body.mobile-shell .arpg [data-run-menu] > .run-summary h4 { margin: 0; font-size: 10px; }
+body.mobile-shell .arpg [data-run-menu] > .run-summary-overview,
+body.mobile-shell .arpg [data-run-menu] > .run-summary-damage { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+body.mobile-shell .arpg [data-run-menu] > .run-summary .run-summary-scroll { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #d8b776 #182329; }
 body.mobile-shell .arpg [data-run-menu] > .run-summary-overview { padding-bottom: 2px; }
 body.mobile-shell .arpg [data-run-menu] .run-summary-overview ul { gap: 2px 4px; }
 body.mobile-shell .arpg [data-run-menu] .run-summary-overview li { padding: 2px 4px; font-size: 9px; line-height: 1.15; }
 body.mobile-shell .arpg [data-run-menu] .run-summary-damage ul { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px 6px; }
 body.mobile-shell .arpg [data-run-menu] .run-summary-damage li { font-size: 9px; line-height: 1.15; }
-body.mobile-shell .arpg [data-run-menu] .run-summary-damage li:nth-child(n+5) { display: none; }
 body.mobile-shell [data-run-menu] > .run-build-details { max-height: 3.2em; overflow: hidden; }
 body.mobile-shell [data-run-menu] > .run-build-details[open] { max-height: 4.6em; }
 body.mobile-shell [data-run-menu] > .run-build-details p { display: -webkit-box; -webkit-box-orient: vertical; line-clamp: 1; -webkit-line-clamp: 1; overflow: hidden; margin: 2px 0 0; }
@@ -1169,8 +1178,8 @@ body.mobile-shell [data-run-menu] .camp-challenge-status { margin: 2px 0 0; font
 }
 
 @media (orientation: landscape) and (max-height: 480px) {
-    body.mobile-shell .death-report p[data-killing-blow] + p { display: none; }
-    body.mobile-shell .death-report li:nth-child(n+3) { display: none; }
+    body.mobile-shell .arpg[data-game-status="dead"] [data-run-menu] > .death-report:not(.run-summary) .report-scroll-region { overscroll-behavior: contain; }
+    body.mobile-shell .arpg[data-game-status="dead"] [data-run-menu] > .run-summary .scroll-cue { display: inline-flex; }
 }
 
 /* Keep the pause recap and relic details in the short landscape canvas without scrolling. */
@@ -1229,7 +1238,6 @@ body.mobile-shell [data-run-menu] .camp-challenge-status { margin: 2px 0 0; font
     body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-summary-damage li { font-size: 8px; line-height: 1.1; }
     body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-summary-overview li { padding: 1px 3px; }
     body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-summary-damage ul { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 5px; }
-    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-summary-damage li:nth-child(n+5) { display: none; }
     body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > button:not([data-death-main-menu]) {
         grid-row: 4;
         grid-column: span 1;

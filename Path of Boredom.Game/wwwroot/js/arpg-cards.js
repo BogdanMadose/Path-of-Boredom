@@ -12,7 +12,7 @@ import { skillUnlocked, skillSelected, skillIcon, NEW_SKILLS } from "./arpg-skil
 // uncapped/always offerable — matches the "edge"/"vitality"/"fortune" special-cased caps in
 // GameSaveEndpoints.cs's ValidCardProgress). `category` is just the display grouping shown on the card.
 export const LEVEL_CARDS = {
-    edge: { name: "Sunforged oath", category: "OFFENSE", max: Number.MAX_SAFE_INTEGER, description: "+4% damage per rank." },
+    edge: { name: "Sunforged oath", category: "OFFENSE", max: Number.MAX_SAFE_INTEGER, description: "+3.5% damage per rank." },
     vitality: { name: "Heart of the dawn", category: "SURVIVAL", max: Number.MAX_SAFE_INTEGER, description: "+16 max health and heal 16." },
     bulwark: { name: "Unbroken vow", category: "DEFENSE", max: 10, description: "+1.5 armor per rank (cap 60%)." },
     stride: { name: "Wayfarer's instinct", category: "MOBILITY", max: 10, description: "+4% move speed per rank." },

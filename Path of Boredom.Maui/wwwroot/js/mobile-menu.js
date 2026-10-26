@@ -245,7 +245,6 @@
             detail.appendChild(el("h3", null, node.querySelector("[data-tree-name]").textContent));
             detail.appendChild(el("p", null, node.querySelector("[data-tree-detail]").textContent));
             detail.appendChild(el("strong", null, node.querySelector("[data-tree-status]").textContent));
-            detail.appendChild(el("p", null, "Select once to inspect. Select again to spend 1 point when the node is Available."));
         }
 
         listen(source, "click", function (event) {

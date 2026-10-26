@@ -85,7 +85,7 @@ export const POWER_UPS = [
 // GameSaveEndpoints.cs expects for the current save version — adding a new upgrade here means also
 // updating that server-side list and bumping CurrentSaveVersion.
 export const UPGRADES = {
-    weapon: { name: "Sunsteel edge", max: 50, base: 45, detail: "+3 base damage and +2.5% damage per rank, additive with damage cards" },
+    weapon: { name: "Sunsteel edge", max: 50, base: 45, detail: "+2 base damage and +2% damage per rank, additive with damage cards" },
     armor: { name: "Dawnplate", max: 12, base: 40, detail: "+3 armor and +12 max health per rank; total armor reduction caps at 60%" },
     cleave: { name: "Wide awakening", max: 8, base: 55, detail: "Wider, faster cleaves with improved damage" },
     nova: { name: "Solar heart", max: 8, base: 65, detail: "Larger, stronger novas with shorter cooldowns" },

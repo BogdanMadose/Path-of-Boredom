@@ -2161,3 +2161,175 @@ body.mobile-shell .mm-pause-card .mm-stage-recap-row span {
         padding: 4px 5px 8px;
     }
 }
+
+/* Put the selected skill and its explanation on one centered board. The old split-column layout
+   left tiny nodes in a narrow strip and stranded the description in a separate tall card. */
+@media (orientation: landscape) and (max-height: 480px) {
+    body.mobile-shell .skills-panel.mm-open {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: 42px 64px minmax(140px, 1fr) 62px;
+        gap: 4px 0;
+    }
+    body.mobile-shell .skills-panel .skill-tree-grid {
+        grid-column: 1;
+        grid-row: 3;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+        margin: 0;
+        overflow: visible;
+    }
+    body.mobile-shell .skills-panel .skill-tree {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        height: 100%;
+        min-height: 0;
+        overflow: visible;
+    }
+    body.mobile-shell .skills-panel .skill-tree h3 {
+        flex: 0 0 auto;
+        margin: 0;
+        padding-right: 100px;
+        font-size: 15px;
+        line-height: 1.15;
+    }
+    body.mobile-shell .skills-panel .tree-respec {
+        top: -2px;
+        right: 0;
+        min-height: 28px;
+        max-width: 90px;
+        padding: 3px 8px;
+        font-size: 9px;
+    }
+    body.mobile-shell .skills-panel .skill-tree-map {
+        flex: 1 1 auto;
+        width: 100%;
+        height: clamp(110px, calc(100dvh - 260px), 150px);
+        min-height: 110px;
+        margin: 0;
+        overflow: visible;
+        border: 1px solid #d1bd8240;
+        border-radius: 14px;
+        background: radial-gradient(ellipse at center, #263d3b 0%, #142329 72%, #101a20 100%);
+    }
+    body.mobile-shell .skills-panel .tree-connections path {
+        stroke: #9eaaa0;
+        stroke-width: 4;
+        stroke-dasharray: none;
+        stroke-linecap: round;
+        opacity: .7;
+    }
+    body.mobile-shell .skills-panel .tree-connections path.available { stroke: #d4b675; opacity: .9; }
+    body.mobile-shell .skills-panel .tree-connections path.learned { stroke: #ffe4a3; stroke-width: 5; opacity: 1; }
+    body.mobile-shell .skills-panel .tree-node,
+    body.mobile-shell .skills-panel .tree-node button { width: 92px; }
+    body.mobile-shell .skills-panel .tree-node button {
+        height: 56px;
+        grid-template-columns: 18px minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) auto;
+        grid-template-areas: "icon name" "icon rank";
+        justify-items: start;
+        align-content: center;
+        gap: 2px 5px;
+        padding: 5px 6px;
+        border-radius: 12px;
+        border-style: solid;
+        background: linear-gradient(145deg, #263834, #111c22 78%);
+        text-align: left;
+        box-shadow: 0 3px 9px #0008;
+    }
+    body.mobile-shell .skills-panel .tree-node-icon {
+        grid-area: icon;
+        align-self: center;
+        width: 18px;
+        height: 18px;
+        margin: 0;
+    }
+    body.mobile-shell .skills-panel .tree-node button strong {
+        grid-area: name;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        -webkit-line-clamp: 2;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        font-size: 9px;
+        line-height: 1.05;
+    }
+    body.mobile-shell .skills-panel .tree-node button small {
+        grid-area: rank;
+        justify-self: start;
+        font-size: 8px;
+        line-height: 1;
+    }
+    body.mobile-shell .skills-panel .mm-detail {
+        grid-column: 1;
+        grid-row: 4;
+        display: grid;
+        grid-template-columns: minmax(110px, .7fr) minmax(0, 2.3fr) minmax(100px, .8fr);
+        align-items: center;
+        gap: 4px 10px;
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+        max-height: 62px;
+        margin: 0;
+        padding: 5px 10px;
+        overflow: hidden;
+        border: 1px solid #c7a56b66;
+        border-radius: 12px;
+        background: linear-gradient(110deg, #27392f, #17252b 70%);
+        text-align: left;
+    }
+    body.mobile-shell .skills-panel .mm-detail h3 {
+        grid-column: 1;
+        min-width: 0;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.1;
+    }
+    body.mobile-shell .skills-panel .mm-detail p {
+        grid-column: 2;
+        min-width: 0;
+        margin: 0;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+        font-size: 9px;
+        line-height: 1.15;
+    }
+    body.mobile-shell .skills-panel .mm-detail strong {
+        grid-column: 3;
+        min-width: 0;
+        color: #f4d394;
+        font-size: 9px;
+        line-height: 1.15;
+        text-align: right;
+    }
+    body.mobile-shell .skills-panel .mm-help-view { grid-column: 1; grid-row: 3 / span 2; }
+}
+
+@media (orientation: landscape) and (max-width: 600px) and (max-height: 480px) {
+    body.mobile-shell .skills-panel .tree-node,
+    body.mobile-shell .skills-panel .tree-node button { width: 72px; }
+    body.mobile-shell .skills-panel .tree-node button { height: 52px; gap: 2px 4px; padding: 4px; }
+    body.mobile-shell .skills-panel .tree-node button strong { font-size: 8px; }
+    body.mobile-shell .skills-panel .mm-detail { grid-template-columns: minmax(90px, .7fr) minmax(0, 2.3fr) minmax(86px, .8fr); gap: 3px 6px; padding: 4px 6px; }
+    body.mobile-shell .skills-panel .mm-detail h3 { font-size: 11px; }
+    body.mobile-shell .skills-panel .mm-detail p,
+    body.mobile-shell .skills-panel .mm-detail strong { font-size: 8px; }
+}
+
+@media (orientation: landscape) and (max-height: 380px) {
+    body.mobile-shell .skills-panel.mm-open { grid-template-rows: 38px 54px minmax(112px, 1fr) 54px; gap: 3px 0; }
+    body.mobile-shell .skills-panel .mm-subtabs { height: 54px; }
+    body.mobile-shell .skills-panel .skill-tree-map { height: clamp(100px, calc(100dvh - 255px), 122px); min-height: 100px; }
+    body.mobile-shell .skills-panel .mm-detail { max-height: 54px; }
+    body.mobile-shell .skills-panel .tree-respec { min-height: 25px; }
+}

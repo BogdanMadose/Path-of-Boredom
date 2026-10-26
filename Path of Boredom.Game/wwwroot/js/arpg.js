@@ -1824,6 +1824,9 @@ export function createGame(root, saveBridge = null) {
                 ? startEndlessRun(Math.random, difficultySelect.value, classSelect.value, quickStart)
                 : startRun(Math.random, difficultySelect.value, classSelect.value, quickStart);
             state.loadout = loadout;
+            if (setupAction === "endless" && Object.hasOwn(state.upgrades, loadout.auto[0])) {
+                state.upgrades[loadout.auto[0]] = Math.max(state.upgrades[loadout.auto[0]], 2);
+            }
             applyCampBonuses(state, MAX_FLASKS);
             state.journal += ` Rare relics can drop from any foe. Codex: ${RELIC_KEYS.filter(key => loadProfile().codex[key]).length}/${RELIC_KEYS.length}.`;
             creditProgress(state);
@@ -2369,7 +2372,6 @@ export function createGame(root, saveBridge = null) {
         setText(combatPause, state.status === "paused" ? "Resume" : "Pause");
         focusViewButton.disabled = !!setupAction;
         recenterButton.disabled = !!setupAction;
-        startButton.hidden = state.mode === "endless" && state.status === "camp";
         startButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
         restartButton.disabled = saving || choosing || !!setupAction;
         endlessButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
@@ -2557,7 +2559,7 @@ export function createGame(root, saveBridge = null) {
                     : camp || won ? (watch ? `Echo ${state.wave - LAST_WAVE} cleared. All loot collected, partial healing and two flask charges granted. Saving this stage, then continuing automatically. If saving fails, use Save to retry.` : map.ending)
                     : `${state.kills} enemies slain / ${state.gold} gold / Level ${p.level}. ${watch ? "Load your last checkpoint, or begin a fresh watch." : "Forge your equipment, dodge warning zones, and seek fallen upgrade scrolls."}`;
                 startButton.textContent = paused ? "Return to battle" : camp ? (watch ? "Continue the watch" : `Travel to ${mapForWave(state.wave + 1).name}`) : "Begin a new campaign";
-                if (!setupAction && root.dataset.menuOpen !== "on" && !(camp && watch)) (won ? endlessButton : startButton).focus({ preventScroll: true });
+                if (!setupAction && root.dataset.menuOpen !== "on") (won ? endlessButton : startButton).focus({ preventScroll: true });
             }
         }
     }

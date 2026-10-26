@@ -72,51 +72,41 @@ export const SKILL_POINT_INTERVAL = 2;
 // learnable first), two parallel branch nodes (each requires the root), and a capstone (requires
 // at least one of the two branch nodes) — see treePrerequisitesMet below for the actual rule.
 export const TREE_SLOTS = ["root", "left", "right", "capstone"];
-// Each tree uses the same prerequisite rule but a different path silhouette. Coordinates are
-// percentages of the map; connector paths use the matching 300×300 SVG viewBox.
+// Each path keeps the same save-compatible rank rules, but gets its own clear silhouette. Nodes
+// are laid out on a 300×300 board and connectors are drawn as straight, legible tracks between them.
+const treeLayout = (root, left, right, capstone) => {
+    const positions = { root, left, right, capstone };
+    const point = ([x, y]) => `${x * 3} ${y * 3}`;
+    const link = (from, to) => `M${point(positions[from])} L${point(positions[to])}`;
+    return {
+        positions,
+        paths: {
+            "root-left": link("root", "left"), "root-right": link("root", "right"),
+            "left-capstone": link("left", "capstone"), "right-capstone": link("right", "capstone")
+        }
+    };
+};
+
 export const TREE_LAYOUTS = {
-    attack: {
-        positions: { root: [20, 24], left: [54, 42], right: [34, 60], capstone: [80, 76] },
-        paths: {
-            "root-left": "M60 72 Q112 50 162 126", "root-right": "M60 72 Q72 130 102 180",
-            "left-capstone": "M162 126 Q208 175 240 228", "right-capstone": "M102 180 Q176 188 240 228"
-        }
-    },
-    nova: {
-        positions: { root: [20, 60], left: [38, 32], right: [70, 32], capstone: [80, 60] },
-        paths: {
-            "root-left": "M60 180 C55 125 82 82 114 96", "root-right": "M60 180 C112 95 158 64 210 96",
-            "left-capstone": "M114 96 C160 46 222 80 240 180", "right-capstone": "M210 96 C231 120 239 150 240 180"
-        }
-    },
-    burst: {
-        positions: { root: [20, 50], left: [45, 26], right: [45, 74], capstone: [80, 50] },
-        paths: {
-            "root-left": "M60 150 Q103 76 135 78", "root-right": "M60 150 Q103 224 135 222",
-            "left-capstone": "M135 78 Q202 78 240 150", "right-capstone": "M135 222 Q202 222 240 150"
-        }
-    },
-    guard: {
-        positions: { root: [50, 24], left: [24, 44], right: [76, 44], capstone: [50, 76] },
-        paths: {
-            "root-left": "M150 72 Q104 96 72 132", "root-right": "M150 72 Q196 96 228 132",
-            "left-capstone": "M72 132 Q84 198 150 228", "right-capstone": "M228 132 Q216 198 150 228"
-        }
-    },
-    dodge: {
-        positions: { root: [20, 24], left: [80, 42], right: [20, 58], capstone: [80, 76] },
-        paths: {
-            "root-left": "M60 72 Q146 80 240 126", "root-right": "M60 72 Q15 126 60 174",
-            "left-capstone": "M240 126 Q285 176 240 228", "right-capstone": "M60 174 Q145 205 240 228"
-        }
-    },
-    potion: {
-        positions: { root: [50, 24], left: [25, 48], right: [75, 48], capstone: [50, 76] },
-        paths: {
-            "root-left": "M150 72 C104 84 80 112 75 144", "root-right": "M150 72 C196 84 220 112 225 144",
-            "left-capstone": "M75 144 C77 190 111 218 150 228", "right-capstone": "M225 144 C223 190 189 218 150 228"
-        }
-    }
+    // Weapon: a clean fork that rejoins at the finishing strike.
+    attack: treeLayout([12, 50], [42, 28], [42, 72], [88, 50]),
+    // Nova: a rising wave, split into two routes that meet at the far edge.
+    nova: treeLayout([18, 28], [50, 28], [50, 72], [84, 72]),
+    // Burst: alternating high and low lanes, like a lightning bolt.
+    burst: treeLayout([14, 72], [44, 28], [58, 72], [88, 28]),
+    // Guard: an upright bastion with two shoulders and a protected core.
+    guard: treeLayout([50, 28], [22, 50], [78, 50], [50, 72]),
+    // Dodge: a broad switchback with two parallel, easy-to-follow tracks.
+    dodge: treeLayout([14, 28], [46, 28], [46, 72], [88, 72]),
+    // Flask: a forked current that flows from a low start to a high finish.
+    potion: treeLayout([14, 72], [44, 28], [62, 72], [88, 28]),
+    // Class skills get dedicated routes too; none fall back to the old default diamond.
+    chain: treeLayout([14, 50], [42, 28], [42, 72], [86, 72]),
+    frost: treeLayout([50, 28], [22, 50], [78, 50], [86, 72]),
+    reap: treeLayout([86, 50], [58, 28], [58, 72], [14, 50]),
+    meteor: treeLayout([14, 72], [46, 72], [46, 28], [86, 28]),
+    siphon: treeLayout([16, 28], [48, 28], [48, 72], [86, 50]),
+    nullwave: treeLayout([50, 72], [20, 50], [80, 50], [50, 28])
 };
 
 // Shared node definitions contain mechanics that are genuinely common to every class. Class-specific

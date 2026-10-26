@@ -74,6 +74,32 @@ for (const height of [180, 250, 350, 650]) for (const top of [0, 40]) {
 assert.equal(bossHudTop({ top: 0, height: 650 }, null, false), 49);
 
 const source = fs.readFileSync(new URL('../../Path of Boredom.Game/wwwroot/js/arpg.js', import.meta.url), 'utf8');
+const keyboardHandler = source.slice(source.indexOf('    on(window, "keydown", event => {'), source.indexOf('    on(window, "keyup", event =>', source.indexOf('    on(window, "keydown", event => {')));
+const keyboardListeners = {};
+const pageBody = { closest: () => null };
+const keyboardCanvas = {};
+const keyboardRoot = { dataset: { menuOpen: 'off' }, contains: element => element === keyboardCanvas };
+const keyboardSetup = { contains: () => false };
+const pressedKeys = new Set();
+let preventedDefault = 0;
+const keyboard = vm.createContext({
+    on: (target, type, handler) => { keyboardListeners[type] = handler; }, window: {},
+    root: keyboardRoot, setup: keyboardSetup, setupAction: null,
+    document: { activeElement: pageBody, body: pageBody, documentElement: {} }, canvas: keyboardCanvas,
+    state: { status: 'playing' }, keys: pressedKeys,
+    movementKeys: { KeyW: 'up', KeyA: 'left' }, skillKeys: { Space: 'dodge', KeyE: 'potion' }, pause() {}
+});
+vm.runInContext(keyboardHandler, keyboard);
+for (const code of ['KeyW', 'KeyA', 'Space']) {
+    keyboardListeners.keydown({ target: pageBody, code, repeat: false, ctrlKey: false, altKey: false, metaKey: false,
+        preventDefault() { preventedDefault++; } });
+    assert.ok(pressedKeys.has(code), `${code} input is accepted when the browser leaves focus on the page after starting a run`);
+}
+assert.equal(preventedDefault, 3, 'movement and dodge keys prevent browser scrolling');
+keyboardRoot.dataset.menuOpen = 'on';
+keyboardListeners.keydown({ target: pageBody, code: 'KeyW', repeat: false, ctrlKey: false, altKey: false, metaKey: false, preventDefault() {} });
+assert.equal(pressedKeys.size, 3, 'combat controls remain idle while the game menu is open');
+
 const countdown = source.slice(source.indexOf('function drawCountdown('), source.indexOf('// The module\'s single export'));
 const labels = [];
 const brush = new Proxy({}, { get: (object, key) => key in object ? object[key] : key === 'fillText' ? text => labels.push(text) : () => {},
@@ -88,15 +114,15 @@ assert.ok(labels.some(label => label.includes('P to pause')));
 
 const persistCode = source.slice(source.indexOf('    async function persist('), source.indexOf('    if (saveButton && saveStatus)'));
 for (const outcome of ['success', 'failure', 'exception']) {
-    const state = veteran();
+    const state = startEndlessRun(() => 0, 'hard', 'knight');
     state.wave = 35; state.status = 'camp'; state.enemies = []; state.effects = [];
     let complete;
     const pending = new Promise((resolve, reject) => { complete = outcome === 'exception' ? () => reject(new Error('offline')) : () => resolve({ success: outcome === 'success', message: 'Test save' }); });
     const screens = [];
-    const sandbox = { state, saving: false, checkingUnlock: false, setupAction: null, disposed: false,
+    const sandbox = { state, saving: false, checkingUnlock: false, setupAction: null, disposed: false, activeSaveSlot: 1,
         checkpointSaveFailed: false, promptOpen: false, endlessUnlocked: true, releaseRankings: false,
         root: { dataset: { localSaves: 'on' }, dispatchEvent() {} }, saveStatus: {}, saveBridge: { invokeMethodAsync: () => pending },
-        clearInput() {}, reportScore() {}, captureSnapshot, continueJourney, togglePause, automaticCheckpoint,
+        clearInput() {}, reportScore() {}, noteSavedSlot() {}, captureSnapshot, continueJourney, togglePause, automaticCheckpoint,
         document: { hidden: false, hasFocus: () => true }, canvas: { focus() {} }, performance: { now: () => 1 },
         CustomEvent: class {}, updateHud() { screens.push(sandbox.state.status !== 'playing' && !automaticCheckpoint(sandbox.state, sandbox.checkpointSaveFailed)); } };
     vm.createContext(sandbox);

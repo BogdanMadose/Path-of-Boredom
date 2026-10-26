@@ -6,7 +6,7 @@
 // Boons are separate from skill tree points and forge upgrades: they're the passive, permanent-for-the-run
 // bonuses earned purely by leveling up. This mirrors the "boons"/"cardChoices"/"pendingChoices"
 // fields that GameSaveEndpoints.cs's ValidCardProgress validates on the server.
-import { skillUnlocked, skillSelected, NEW_SKILLS } from "./arpg-skills.js";
+import { skillUnlocked, skillSelected, skillIcon, NEW_SKILLS } from "./arpg-skills.js";
 
 // Every possible boon card. `max` is the rank cap (Number.MAX_SAFE_INTEGER effectively means
 // uncapped/always offerable — matches the "edge"/"vitality"/"fortune" special-cased caps in
@@ -31,6 +31,22 @@ export const LEVEL_CARDS = {
         description: "+6% damage per rank for this skill."
     }]))
 };
+
+// Reuse the forge's established icons for the core stats, and use the newer boon set only for
+// boons that have their own artwork. Keeping the source resolver beside the card catalog makes it
+// possible to verify every card asset as the catalog changes.
+const boonArtAssets = {
+    edge: "weapon", vitality: "heart", bulwark: "armor", stride: "stride", focus: "recovery",
+    harvest: "harvest", siphon: "siphon", fortune: "fortune", critChance: "critical", critDamage: "ruin"
+};
+const boonArtFolders = { stride: "boons", harvest: "boons", siphon: "boons", fortune: "boons" };
+const levelCardSkillIcons = { nova: "nova", cleave: "attack", burst: "burst", guard: "guard" };
+export function levelCardArtSource(state, key, card = LEVEL_CARDS[key]) {
+    if (card?.skill) return skillIcon(state, card.skill);
+    if (levelCardSkillIcons[key]) return skillIcon(state, levelCardSkillIcons[key]);
+    const asset = boonArtAssets[key] || "weapon";
+    return `/_content/PathOfBoredom.Game/images/${boonArtFolders[key] || "forge"}/${asset}.svg`;
+}
 
 const CARD_SKILLS = { nova: "nova", burst: "burst", guard: "guard", ...Object.fromEntries(Object.keys(NEW_SKILLS).map(skill => [`${skill}Oath`, skill])) };
 export const levelCardAvailable = (state, key) => Object.hasOwn(LEVEL_CARDS, key)

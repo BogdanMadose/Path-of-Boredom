@@ -29,7 +29,7 @@ export const CLASS_SKILLS = {
         nullwave: { name: "Flamebreaker", cooldown: 14, reach: 240, damage: 1.2, color: "#ffb060", detail: "A forward 120-degree fire cone burns enemies and destroys enemy projectiles inside the cone. Does not clear attacks behind you.", keystone: "Flamebreaker widens to a 180-degree cone." }
     },
     ranger: {
-        chain: { name: "Rebound shot", cooldown: 6, reach: 650, damage: 1.2, color: "#bbdf90", detail: "An instant shot hits the nearest enemy, then rebounds to the farthest other enemy within 220 units of it for 110% damage.", keystone: "Rebound shot makes one additional rebound." },
+        chain: { name: "Rebound shot", cooldown: 6, reach: 650, damage: 1.2, color: "#bbdf90", detail: "An instant shot hits the nearest enemy, then rebounds to the farthest other enemy within 220 units of it for 110% damage.", keystone: "Adds one rebound, raising the base target count from two to three." },
         frost: { name: "Snaring shot", cooldown: 9, reach: 620, damage: 0.9, color: "#8fdcbe", detail: "A shot bursts into vines around the nearest enemy in a 90-unit radius, slowing walking by 55% for 2s. Boss resistance applies; charges are unaffected.", keystone: "Snaring shot slow lasts 3s instead of 2s." },
         reap: { name: "Deadeye", cooldown: 7, reach: 800, damage: 1.6, color: "#e7dc9d", detail: "An instant precision shot hits only the farthest enemy. Deals up to 100% extra damage at the edge of its targeting range.", keystone: "Deadeye deals 25% extra damage to elites and bosses." },
         meteor: { name: "Scattershot", cooldown: 10, reach: 480, damage: 1.3, color: "#c4e795", detail: "Five instant arrow lanes spread across a 70-degree fan. Each lane stops at its first enemy; no enemy can be hit twice.", keystone: "Scattershot fires seven lanes instead of five." },
@@ -37,7 +37,7 @@ export const CLASS_SKILLS = {
         nullwave: { name: "Gale escape", cooldown: 13, reach: 180, damage: 0.65, color: "#b2ebe1", detail: "A close-range wind blast pushes ordinary enemies back 90 units and grants 20% walking speed for 1.2s. Bosses are not displaced.", keystone: "Gale escape pushes enemies back 135 units." }
     },
     warden: {
-        chain: { name: "Gravity well", cooldown: 9, reach: 360, damage: 1.1, color: "#afa3e1", detail: "Crushes a 130-unit area around the nearest enemy and pulls ordinary survivors 65 units toward its centre. Bosses are not displaced.", keystone: "Gravity well radius grows from 130 to 180." },
+        chain: { name: "Gravity well", cooldown: 9, reach: 360, damage: 1.1, color: "#afa3e1", detail: "Crushes a 130-unit area around the nearest enemy and pulls ordinary survivors 65 units toward its centre. Bosses are not displaced.", keystone: "Raises Gravity well's base radius from 130 to 180 units; reach and relay bonuses apply on top." },
         frost: { name: "Glacial rampart", cooldown: 11, reach: 260, damage: 1.2, color: "#95d6ef", detail: "A forward 90-degree ice wedge slows enemy walking by 45% for 2s and clears enemy projectiles in the wedge. Charges and boss attack timing are unaffected.", keystone: "Glacial rampart slow lasts 3s instead of 2s." },
         reap: { name: "Shieldbreaker", cooldown: 6, reach: 200, damage: 2, color: "#ccd4e4", detail: "Crushes one nearby enemy, prioritizing Sentinels and armored enemies. Bypasses Sentinel resistance and deals 50% extra damage to those targets.", keystone: "Shieldbreaker also deals 50% extra damage to elites and bosses." },
         meteor: { name: "Fault pillars", cooldown: 12, reach: 450, damage: 1.9, color: "#c6ac88", detail: "Three stone eruptions rise along your facing direction. Each has a 65-unit radius, leaving gaps between pillars. Each enemy is hit at most once.", keystone: "Fault pillars radius grows from 65 to 90." },
@@ -72,55 +72,99 @@ export const SKILL_POINT_INTERVAL = 2;
 // learnable first), two parallel branch nodes (each requires the root), and a capstone (requires
 // at least one of the two branch nodes) — see treePrerequisitesMet below for the actual rule.
 export const TREE_SLOTS = ["root", "left", "right", "capstone"];
-
-// The generic node shape shared by every class for a given skill: max rank, a fallback icon/visual
-// theme, and a generic detail description. treeNodeDefinition() overlays class-specific names/effects
-// on top of these at lookup time (see below) — these base descriptions are really just the Knight's
-// flavor and get re-colored/re-worded per class via the tint replacement in treeNodeDefinition.
-export const TREE_NODES = {
+// Each tree uses the same prerequisite rule but a different path silhouette. Coordinates are
+// percentages of the map; connector paths use the matching 300×300 SVG viewBox.
+export const TREE_LAYOUTS = {
     attack: {
-        edge: { name: "Honed edge", max: 3, icon: "⚔", visual: "steel", detail: "+8% regular-attack damage per rank. Adds silver impact rays." },
-        sweep: { name: "Long reach", max: 2, icon: "↔", visual: "steel", detail: "+10% regular-attack reach or arrow range per rank. Lengthens swings and adds arrow markings." },
-        execution: { name: "Finisher", max: 1, icon: "◆", visual: "crimson", detail: "Regular attacks deal 25% more damage to enemies at or below 35% health. A crimson mark identifies finishing blows." },
-        rhythm: { name: "Weapon tempo", max: 2, icon: "»", visual: "steel", detail: "+6% regular-attack speed per rank. Adds silver motion streaks; does not affect other skills." }
+        positions: { root: [20, 24], left: [54, 42], right: [34, 60], capstone: [80, 76] },
+        paths: {
+            "root-left": "M60 72 Q112 50 162 126", "root-right": "M60 72 Q72 130 102 180",
+            "left-capstone": "M162 126 Q208 175 240 228", "right-capstone": "M102 180 Q176 188 240 228"
+        }
     },
     nova: {
-        amplitude: { name: "Amplify", max: 3, icon: "✦", visual: "solar", detail: "+10% class-special damage per rank. Adds golden pulse rays." },
-        resonance: { name: "Resonance", max: 2, icon: "◎", visual: "solar", detail: "+10% special radius or volley range per rank. Adds a larger outer ring and arrow markings." },
-        ignition: { name: "Sunfire", max: 1, icon: "♨", visual: "fire", detail: "The class special deals 15% additional fire damage. Ignites its pulse or volley arrows." },
-        chill: { name: "Chilling wake", max: 2, icon: "❄", visual: "frost", detail: "Special hits slow enemy walking by 15% per rank for 1.5s. Charges are unaffected. Chilled targets gain a frost ring." }
+        positions: { root: [20, 60], left: [38, 32], right: [70, 32], capstone: [80, 60] },
+        paths: {
+            "root-left": "M60 180 C55 125 82 82 114 96", "root-right": "M60 180 C112 95 158 64 210 96",
+            "left-capstone": "M114 96 C160 46 222 80 240 180", "right-capstone": "M210 96 C231 120 239 150 240 180"
+        }
     },
     burst: {
-        focus: { name: "Concentrate", max: 3, icon: "✧", visual: "violet", detail: "+12% burst damage per rank. Adds violet impact rays." },
-        aperture: { name: "Shape", max: 2, icon: "⋔", visual: "violet", detail: "Changes the shape of your class burst." },
-        shatter: { name: "Giant slayer", max: 1, icon: "⬟", visual: "crimson", detail: "Burst hits deal 25% more damage to elites and bosses. Adds a crimson impact mark on those targets." },
-        overdrive: { name: "Overdrive", max: 2, icon: "ϟ", visual: "violet", detail: "+10 percentage points critical chance per rank for burst hits only, respecting the 75% cap. Adds violet casting sparks." }
+        positions: { root: [20, 50], left: [45, 26], right: [45, 74], capstone: [80, 50] },
+        paths: {
+            "root-left": "M60 150 Q103 76 135 78", "root-right": "M60 150 Q103 224 135 222",
+            "left-capstone": "M135 78 Q202 78 240 150", "right-capstone": "M135 222 Q202 222 240 150"
+        }
     },
     guard: {
-        barrier: { name: "Bulwark", max: 3, icon: "⬡", visual: "shield", detail: "+5 percentage points ward damage reduction per rank: 40% becomes up to 55%. Thickens the ward shield." },
-        duration: { name: "Enduring ward", max: 2, icon: "◷", visual: "shield", detail: "+0.6s ward duration per rank. Adds a second protective ring." },
-        repulse: { name: "Repulsion", max: 1, icon: "↗", visual: "shield", detail: "The ward's opening pulse pushes living enemies back 60 units; bosses are pushed 30. Shows an outward repulsion wave." },
-        refuge: { name: "Safe haven", max: 2, icon: "+", visual: "healing", detail: "When the ward expires, restore 2% maximum health per rank, subject to difficulty healing penalties. Shows a green healing cross." }
+        positions: { root: [50, 24], left: [24, 44], right: [76, 44], capstone: [50, 76] },
+        paths: {
+            "root-left": "M150 72 Q104 96 72 132", "root-right": "M150 72 Q196 96 228 132",
+            "left-capstone": "M72 132 Q84 198 150 228", "right-capstone": "M228 132 Q216 198 150 228"
+        }
     },
     dodge: {
-        agility: { name: "Ghoststep", max: 3, icon: "◇", visual: "wind", detail: "+0.04s dodge invulnerability per rank. Adds a pale evasion outline." },
-        distance: { name: "Long stride", max: 2, icon: "»", visual: "wind", detail: "+0.025s roll duration per rank, increasing dodge distance. Lengthens the dodge trail." },
-        afterstep: { name: "Windstep", max: 1, icon: "≋", visual: "wind", detail: "Dodging grants +20% walking speed for 1.2s, including the roll time. The roll's speed stays unchanged. Adds cyan foot trails." },
-        recovery: { name: "Quick footing", max: 2, icon: "↻", visual: "wind", detail: "+10% dodge cooldown recovery per rank. Adds cyan recovery streaks; does not affect other skills." }
+        positions: { root: [20, 24], left: [80, 42], right: [20, 58], capstone: [80, 76] },
+        paths: {
+            "root-left": "M60 72 Q146 80 240 126", "root-right": "M60 72 Q15 126 60 174",
+            "left-capstone": "M240 126 Q285 176 240 228", "right-capstone": "M60 174 Q145 205 240 228"
+        }
     },
     potion: {
-        concentration: { name: "Distill", max: 3, icon: "+", visual: "healing", detail: "+10% flask healing per rank. Strengthens the green healing-cross effect." },
-        triage: { name: "Triage", max: 2, icon: "✚", visual: "amber", detail: "+12% flask healing per rank when drinking at or below 35% health. Adds an amber emergency-healing cross." },
-        tonic: { name: "Iron tonic", max: 1, icon: "⬡", visual: "shield", detail: "Drinking a flask grants 25% damage reduction for 2s, stacking multiplicatively with ward and armor. Adds a blue tonic shield." },
-        renewal: { name: "Renewal", max: 2, icon: "❧", visual: "healing", detail: "After drinking, regenerate 4% maximum health per rank over 2s, subject to difficulty penalties. Another flask refreshes rather than stacks regeneration. Adds a green regeneration aura." }
+        positions: { root: [50, 24], left: [25, 48], right: [75, 48], capstone: [50, 76] },
+        paths: {
+            "root-left": "M150 72 C104 84 80 112 75 144", "root-right": "M150 72 C196 84 220 112 225 144",
+            "left-capstone": "M75 144 C77 190 111 218 150 228", "right-capstone": "M225 144 C223 190 189 218 150 228"
+        }
+    }
+};
+
+// Shared node definitions contain mechanics that are genuinely common to every class. Class-specific
+// effects live in CLASS_TREE_EFFECTS so the help text always describes what that class actually gets.
+export const TREE_NODES = {
+    attack: {
+        edge: { name: "Honed edge", max: 3, icon: "⚔", visual: "steel", detail: "Your regular attack deals 8% more damage per rank." },
+        sweep: { name: "Long reach", max: 2, icon: "↔", visual: "steel", detail: "Your regular attack reaches 10% farther per rank. This also extends Ranger arrows." },
+        execution: { name: "Finisher", max: 1, icon: "◆", visual: "crimson", detail: "A class-specific bonus strengthens your regular attack; see the exact trigger for this class." },
+        rhythm: { name: "Weapon tempo", max: 2, icon: "»", visual: "steel", detail: "Regular attacks recover 6% faster per rank. This does not speed up other skills." }
+    },
+    nova: {
+        amplitude: { name: "Amplify", max: 3, icon: "✦", visual: "solar", detail: "Your class special deals 10% more damage per rank." },
+        resonance: { name: "Resonance", max: 2, icon: "◎", visual: "solar", detail: "Your class special reaches 10% farther per rank." },
+        ignition: { name: "Sunfire", max: 1, icon: "♨", visual: "fire", detail: "A class-specific enhancement improves your special; see the exact effect for this class." },
+        chill: { name: "Chilling wake", max: 2, icon: "❄", visual: "frost", detail: "A class-specific control effect improves your special; see the exact effect for this class." }
+    },
+    burst: {
+        focus: { name: "Concentrate", max: 3, icon: "✧", visual: "violet", detail: "Your class burst deals 12% more damage per rank." },
+        aperture: { name: "Shape", max: 2, icon: "⋔", visual: "violet", detail: "Changes the shape or coverage of your class burst; see the exact change for this class." },
+        shatter: { name: "Giant slayer", max: 1, icon: "⬟", visual: "crimson", detail: "A class-specific bonus makes your burst more effective against a key target or through a crowd." },
+        overdrive: { name: "Overdrive", max: 2, icon: "ϟ", visual: "violet", detail: "Burst critical chance rises by 10 percentage points per rank, up to the 75% cap. Warden instead gains bonus damage against chilled enemies." }
+    },
+    guard: {
+        barrier: { name: "Bulwark", max: 3, icon: "⬡", visual: "shield", detail: "While your ward is active, damage reduction rises by 5 percentage points per rank (40% base, up to 55%)." },
+        duration: { name: "Enduring ward", max: 2, icon: "◷", visual: "shield", detail: "Your ward lasts 0.6 seconds longer per rank." },
+        repulse: { name: "Repulsion", max: 1, icon: "↗", visual: "shield", detail: "A class-specific effect adds force or damage to the ward pulse; see the exact effect for this class." },
+        refuge: { name: "Safe haven", max: 2, icon: "+", visual: "healing", detail: "When your ward expires, recover 2% maximum health per rank, scaled by the difficulty's healing modifier." }
+    },
+    dodge: {
+        agility: { name: "Ghoststep", max: 3, icon: "◇", visual: "wind", detail: "Dodge invulnerability lasts 0.04 seconds longer per rank." },
+        distance: { name: "Long stride", max: 2, icon: "»", visual: "wind", detail: "Your dodge lasts 0.025 seconds longer per rank, carrying you farther." },
+        afterstep: { name: "Windstep", max: 1, icon: "≋", visual: "wind", detail: "Dodging increases walking speed by 20% for 1.2 seconds. Roll speed is unchanged." },
+        recovery: { name: "Quick footing", max: 2, icon: "↻", visual: "wind", detail: "Dodge cooldown recovery increases by 10% per rank. Other skill cooldowns are unchanged." }
+    },
+    potion: {
+        concentration: { name: "Distill", max: 3, icon: "+", visual: "healing", detail: "A flask restores 10% more health per rank, after the difficulty healing modifier." },
+        triage: { name: "Triage", max: 2, icon: "✚", visual: "amber", detail: "At 35% health or lower, a flask restores an additional 12% per rank." },
+        tonic: { name: "Iron tonic", max: 1, icon: "⬡", visual: "shield", detail: "Using a flask grants 25% damage reduction for 2 seconds. It combines multiplicatively with armor and ward." },
+        renewal: { name: "Renewal", max: 2, icon: "❧", visual: "healing", detail: "After a flask, regenerate 4% maximum health per rank over 2 seconds, scaled by difficulty. Another flask refreshes the effect." }
     }
 };
 for (const key of Object.keys(NEW_SKILLS)) {
     TREE_NODES[key] = {
-        potency: { name: "Empower", max: 3, icon: "✦", visual: key, detail: "+10% skill damage per rank." },
-        reach: { name: "Expand", max: 2, icon: "◎", visual: key, detail: "+10% targeting range and area per rank." },
-        ember: { name: "Keystone", max: 1, icon: "◆", visual: key, detail: "Unlocks this class ability's unique keystone." },
-        recovery: { name: "Rhythm", max: 2, icon: "↻", visual: key, detail: "+10% skill cooldown recovery per rank." }
+        potency: { name: "Empower", max: 3, icon: "✦", visual: key, detail: "This skill deals 10% more damage per rank." },
+        reach: { name: "Expand", max: 2, icon: "◎", visual: key, detail: "Increases this skill's target range and its listed area or shape by the amounts shown for your class." },
+        ember: { name: "Keystone", max: 1, icon: "◆", visual: key, detail: "Unlocks this skill's class-specific keystone effect." },
+        recovery: { name: "Rhythm", max: 2, icon: "↻", visual: key, detail: "Cooldown recovery increases by 8% per rank; this skill's other rank effect is listed for your class." }
     };
 }
 // Class-specific manual-only skills for the burst and guard slots — unlike attack/nova/dodge/potion
@@ -157,30 +201,41 @@ const CLASS_TREE_NAMES = {
         dodge: ["Iron resolve", "Heavy stride", "Unstoppable", "Sure footing"], potion: ["Mineral draught", "Emergency repair", "Iron tonic", "Reconstruction"]
     }
 };
-// Overrides for specific (skill.node) combinations where a class's re-skinned effect isn't just a
-// renamed version of the generic description but actually behaves differently mechanically (e.g.
-// Knight's nova.chill becomes a knockback instead of a slow). Not every node needs an entry here —
-// nodes without an override just get the generic TREE_NODES detail text with color words swapped
-// (see treeNodeDefinition's tint replacement below).
+// Overrides describe class-specific effects and any node whose mechanics differ from the common
+// fallback. Keep these descriptions aligned with the formulas in arpg-engine.js.
 const CLASS_TREE_EFFECTS = {
-    sorcerer: {},
+    sorcerer: {
+        "attack.execution": { detail: "Regular attacks deal 25% more damage to enemies at or below 35% health." },
+        "nova.ignition": { detail: "Arcane bloom deals 15% more damage with every hit." },
+        "nova.chill": { detail: "Arcane bloom slows surviving enemies by 15% per rank for 1.5 seconds. This does not affect enemy charges." },
+        "burst.aperture": { name: "Wide comet", detail: "Comet lance's beam width and hit area increase by 20% per rank." },
+        "burst.shatter": { detail: "Comet lance deals 25% more damage to elites and bosses." },
+        "guard.repulse": { detail: "Astral veil pushes surviving ordinary enemies 60 units away. Bosses cannot be pushed." }
+    },
     knight: {
-        "nova.chill": { icon: "↗", detail: "Ember nova pushes surviving enemies back 16 units per rank; bosses move half as far. Replaces slowing with a fiery outward shockwave." },
-        "burst.shatter": { icon: "♨", detail: "Flame lance deals 25% more damage to targets at or below 50% health. An ember mark identifies the finishing hit." },
-        "guard.repulse": { icon: "✹", detail: "Double Ember aegis opening-pulse damage. Releases a fiery blast instead of knocking enemies back." }
+        "attack.execution": { detail: "Regular attacks deal 25% more damage to enemies at or below 35% health." },
+        "nova.ignition": { detail: "Ember nova deals 15% more damage with every hit." },
+        "nova.chill": { icon: "↗", detail: "Ember nova pushes surviving ordinary enemies 16 units per rank. Bosses cannot be pushed; this replaces the slow." },
+        "burst.aperture": { name: "Broad lance", detail: "Flame lance's beam width and hit area increase by 20% per rank." },
+        "burst.shatter": { icon: "♨", detail: "Flame lance deals 25% more damage to targets at or below 50% health." },
+        "guard.repulse": { icon: "✹", detail: "Doubles Ember aegis's opening-pulse damage. It does not add knockback." }
     },
     ranger: {
-        "attack.execution": { icon: "\u219d", detail: "Dawn shot ricochets once: the arrow bounces off its target and flies to a different living enemy within 180 units for 60% damage. Cannot bounce back." },
-        "nova.ignition": { icon: "➶", detail: "Each Sunburst volley arrow penetrates one additional target in its remaining flight path for 70% damage. Green tracers show the piercing path; no added fire damage." },
-        "burst.shatter": { icon: "⋙", detail: "Piercing rain penetrates two additional targets instead of one. Each penetration retains 70% of the previous hit's damage; no target is hit twice by the same arrow." },
-        "guard.repulse": { icon: "♧", detail: "Briar ward also pushes ordinary enemies back 60 units and strengthens its walking slow from 25% to 40% for 1.5 seconds. Bosses are not displaced; charges are unaffected." }
+        "attack.execution": { icon: "\u219d", detail: "Dawn shot ricochets once to a different enemy within 180 units, dealing 60% of its original damage. It cannot bounce back." },
+        "nova.ignition": { icon: "➶", detail: "Each Sunburst arrow pierces one additional enemy for 70% of the previous hit's damage." },
+        "nova.chill": { detail: "Sunburst slows surviving enemies by 15% per rank for 1.5 seconds. This does not affect enemy charges." },
+        "burst.aperture": { name: "Arrow storm", detail: "Piercing rain fires 2 more arrows per rank: 7 at base, up to 11. The fan angle stays the same." },
+        "burst.shatter": { icon: "⋙", detail: "Each Piercing rain arrow can pierce two enemies after its first hit, instead of one. Each follow-through deals 70% of the previous hit; targets are hit at most once per arrow." },
+        "guard.repulse": { icon: "♧", detail: "Briar ward pushes surviving ordinary enemies 60 units and raises its slow from 25% to 40% for 1.5 seconds. Bosses cannot be pushed." }
     },
     warden: {
-        "attack.execution": { icon: "⬟", detail: "Hammer sweep bypasses Sentinel resistance and deals 25% extra damage to Sentinels. A steel impact mark identifies shield-breaking hits." },
-        "nova.ignition": { icon: "◆", detail: "Iron quake's inner-half damage bonus rises from 25% to 50%. A steel inner ring marks the seismic core; no added fire damage." },
-        "nova.chill": { icon: "❄", detail: "+15 percentage points Iron quake walking slow per rank, added to its base 15% slow for 1.5s. Charges are unaffected." },
-        "burst.overdrive": { icon: "⬢", detail: "Fault line deals 12% more damage per rank against slowed targets. Combines with Quaking ground; replaces extra critical chance." },
-        "guard.repulse": { icon: "⬡", detail: "Iron bastion pushes living enemies back 100 units, or 50 for bosses. A broad steel shockwave clears breathing room." }
+        "attack.execution": { icon: "⬟", detail: "Hammer sweep deals 25% more damage to Sentinels and bypasses their physical resistance." },
+        "nova.ignition": { icon: "◆", detail: "Iron quake's inner-half damage bonus rises from 25% to 50%." },
+        "nova.chill": { icon: "❄", detail: "Iron quake's base 15% slow gains 15 percentage points per rank (30% or 45% total) for 1.5 seconds. Charges are unaffected." },
+        "burst.aperture": { name: "Rift fan", detail: "Fault line's cone widens by 10° on each side per rank (20° total)." },
+        "burst.shatter": { icon: "⬟", detail: "Fault line deals 25% more damage to elites and bosses." },
+        "burst.overdrive": { icon: "⬢", detail: "Fault line deals 12% more damage per rank to chilled enemies. It does not increase critical chance for Warden." },
+        "guard.repulse": { icon: "⬡", detail: "Iron bastion pushes surviving ordinary enemies 100 units away. Bosses cannot be pushed." }
     }
 };
 // Display name for a skill key, accounting for class-specific naming (attack/nova use the class's
@@ -269,13 +324,8 @@ export function setLoadout(state, manual, auto) {
     return true;
 }
 
-// Builds the full, class-specific display definition for a tree node by overlaying
-// CLASS_TREE_NAMES/CLASS_TREE_EFFECTS on top of the generic TREE_NODES entry, then re-coloring any
-// generic color words in the detail text (silver/golden/violet/crimson) to match the current
-// class's visual theme (ember-colored for Knight, jade for Ranger, steel-blue for Warden). The
-// burst.aperture node gets an extra special case since its actual mechanical effect (beam width vs
-// arrow count vs cone angle) is different enough per class that it needs its own name/detail
-// entirely rather than just a re-themed description.
+// Builds the full class-specific display definition. Class-specific overrides describe mechanics,
+// not just the shared node's visual theme.
 export function treeNodeDefinition(state, skill, node) {
     if (NEW_SKILLS[skill]) {
         const definition = combatSkillDefinition(state, skill);
@@ -285,14 +335,7 @@ export function treeNodeDefinition(state, skill, node) {
     const index = Object.keys(TREE_NODES[skill]).indexOf(node);
     const definition = { ...TREE_NODES[skill][node], name: CLASS_TREE_NAMES[state.heroClass][skill][index],
         visual: state.heroClass, ...CLASS_TREE_EFFECTS[state.heroClass][`${skill}.${node}`] };
-    const tint = state.heroClass === "knight" ? "ember-colored" : state.heroClass === "ranger" ? "jade" : "steel-blue";
-    definition.detail = definition.detail.replace(/silver|golden|violet|crimson/gi, tint);
-    if (skill !== "burst" || node !== "aperture") return definition;
-    const shape = state.heroClass === "sorcerer" ? { name: "Wide comet", detail: "+20% Comet lance beam width per rank." }
-        : state.heroClass === "knight" ? { name: "Broad lance", detail: "+20% Flame lance beam width per rank. Widens the visible beam as well as its hit area." }
-        : state.heroClass === "ranger" ? { name: "Arrow storm", detail: "+2 Piercing rain arrows per rank, from seven to eleven. Adds visible arrows within the same fan." }
-        : { name: "Rift fan", detail: "+10 degrees to each side of Fault line's cone per rank. Widens its visible strike arc." };
-    return { ...definition, ...shape };
+    return definition;
 }
 
 // Builds the human-readable status line shown under a tree node in the UI (why it can/can't be

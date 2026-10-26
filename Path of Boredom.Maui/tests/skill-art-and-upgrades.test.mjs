@@ -7,6 +7,7 @@ import { CLASS_SKILLS, SLOTTABLE_SKILLS, STARTER_SKILLS, skillIcon, skillName, t
 import { drawClassSkillEffect } from '../../Path of Boredom.Game/wwwroot/js/arpg-skill-effects.js';
 import { captureSnapshot, restoreSnapshot } from '../../Path of Boredom.Game/wwwroot/js/arpg-save.js';
 import { skillTagline } from '../../Path of Boredom.Game/wwwroot/js/arpg-skill-taglines.js';
+import { LEVEL_CARDS, levelCardArtSource } from '../../Path of Boredom.Game/wwwroot/js/arpg-cards.js';
 
 const names = [], iconGeometry = [], effects = [];
 for (const hero of Object.keys(CLASS_SKILLS)) {
@@ -39,6 +40,15 @@ assert.equal(new Set(iconGeometry).size, 36, 'icons must differ in shape, not ju
 assert.equal(new Set(effects).size, 36, 'all class combat skills have different rendered geometry');
 assert.equal(names.length, 96);
 assert.equal(new Set(names).size, 96, 'new abilities have uniquely named upgrades');
+
+for (const hero of Object.keys(CLASS_SKILLS)) {
+    const state = { heroClass: hero };
+    for (const key of Object.keys(LEVEL_CARDS)) {
+        const source = levelCardArtSource(state, key, LEVEL_CARDS[key]);
+        const svg = fs.readFileSync(new URL(`../../Path of Boredom.Game/wwwroot/${source.replace('/_content/PathOfBoredom.Game/', '')}`, import.meta.url), 'utf8');
+        assert.match(svg, /<svg[^>]*viewBox="0 0 64 64"/, `${hero} ${key} level-up choice has a real icon asset`);
+    }
+}
 
 function arena(hero, skill, offsets = [[60, 0], [160, 0]]) {
     const state = startEndlessRun(() => 0.99, 'hard', hero);

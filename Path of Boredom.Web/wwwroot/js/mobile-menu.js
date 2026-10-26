@@ -207,17 +207,19 @@
         }
     }
 
+    function addHelpParagraph(help, label, copy) {
+        help.appendChild(el("p", "mm-help-paragraph", label + " " + copy));
+    }
+
     function buildSkills(source) {
         var panel = makePanel("skills", "Paths of power", source);
 
         addHelpToggle(panel.body, "How skills work", function (help) {
             help.appendChild(el("h3", null, "How to use Paths of Power"));
-            [
-                "Combat: slotted skills cast when ready and when their target rules allow. Regular attack, dodge, and flask are always available from their controls.",
-                "Loadout: one auto-skill slot is open from the start. Slots 2 and 3 unlock at the levels shown here. Choose a skill in an open slot to add it to the rotation.",
-                "Trees: select a node once to read its effect and requirements. Select it again when its status says Available. Earlier nodes may be required first.",
-                "Points and reset: earn 1 point every 2 levels. Each node rank costs 1 point. Reset clears only this tree, returns its points, and costs 100 gold plus 50 gold per rank."
-            ].forEach(function (copy) { help.appendChild(el("p", null, copy)); });
+            addHelpParagraph(help, "Combat.", "slotted skills cast when ready if a valid target is in range. Regular attack, dodge and flask stay on their own controls.");
+            addHelpParagraph(help, "Loadout.", "The first automatic slot is open at the start. Later slots unlock at the levels shown here; choices stay for this run.");
+            addHelpParagraph(help, "Points and paths.", "Earn 1 point every 2 levels, up to 32. Each rank costs 1 point; branches require the root, and the capstone requires either branch.");
+            addHelpParagraph(help, "Learning and reset.", "Tap a node to inspect it, then tap again when its status says Available. Reset clears only this tree, returns points, and costs 100 gold plus 50 per rank.");
         });
 
         // Sub-tabs: Loadout first, then one tab per skill tree — the fix for the "scroooollll"
@@ -322,7 +324,13 @@
     function buildForge(source) {
         var panel = makePanel("forge", "The traveling forge", source);
         markHelp(source, [".forge-hint", ".mastery-panel > p"]);
-        addHelpToggle(panel.body, "How the forge works");
+        addHelpToggle(panel.body, "How the forge works", function (help) {
+            help.appendChild(el("h3", null, "How to use the forge"));
+            addHelpParagraph(help, "Upgrades.", "Spend run gold on ranks for your weapon, defenses, skills and flasks. The preview shows the change from your current rank to the next.");
+            addHelpParagraph(help, "Mastery.", "Mastery opens after every available Forge upgrade is maxed. A rank starts at 1,000 gold and costs 100 more for each rank already bought in that stat.");
+            addHelpParagraph(help, "Equipment.", "Better gear equips automatically when its rating improves. Styles trade weapon and armor stats while keeping your rating and Forge ranks.");
+            addHelpParagraph(help, "Buying.", "Forge ranks cost run gold and apply immediately. Style changes are free. CAPPED means an upgrade has reached its limit.");
+        });
         var tabs = el("div", "mm-subtabs");
         var sections = ["upgrades", "training", "systems"];
         var icons = ["⚒", "✦", "◈"];

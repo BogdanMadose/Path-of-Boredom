@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { startRun, startEndlessRun, step, chooseLevelCard, grantExperience } from '../../Path of Boredom.Game/wwwroot/js/arpg-engine.js';
+import { startRun, startEndlessRun, step, chooseLevelCard, grantExperience, pendingSpawns } from '../../Path of Boredom.Game/wwwroot/js/arpg-engine.js';
 import { LEVEL_CARDS, drawLevelCards, levelCardAvailable } from '../../Path of Boredom.Game/wwwroot/js/arpg-cards.js';
 import { SLOTTABLE_SKILLS } from '../../Path of Boredom.Game/wwwroot/js/arpg-skills.js';
 import { difficultyFor } from '../../Path of Boredom.Game/wwwroot/js/arpg-difficulty.js';
@@ -75,19 +75,37 @@ function spawnBoss(wave, difficulty = 'hard') {
     return { state, boss };
 }
 const fixtures = [];
+const campaignPressure = {
+    hard: { health: 1.02, damage: 1.03, speed: 1.02, extra: 1 },
+    nightmare: { health: 1.08, damage: 1.08, speed: 1.05, extra: 2 },
+    inferno: { health: 1.16, damage: 1.12, speed: 1.08, extra: 4 }
+};
 for (const difficulty of ['hard', 'nightmare', 'inferno']) {
     for (const wave of [5, 10, 15, 20, 25, 30]) {
         const { state, boss } = spawnBoss(wave, difficulty);
         const act = mapIndexForWave(wave), rules = difficultyFor(state);
         const chapterHealth = Math.round((680 + act * 380) * 1.7 * (1 + act * 0.1));
         const openingHealth = wave <= 4 ? 1.15 : wave <= 8 ? 1.08 : 1;
-        assert.equal(boss.maxHealth, Math.round(chapterHealth * rules.health * openingHealth), 'boss health follows the new chapter and difficulty curve');
-        assert.equal(boss.speed, (90 + act * 10) * rules.speed);
+        assert.equal(boss.maxHealth, Math.round(chapterHealth * rules.health * campaignPressure[difficulty].health * openingHealth), 'campaign bosses follow the chapter, difficulty, and campaign pressure curve');
+        assert.equal(boss.speed, (90 + act * 10) * rules.speed * campaignPressure[difficulty].speed);
+        assert.equal(boss.damage, Math.round(Math.round((34 + act * 11) * (1 + act * 0.045)) * rules.damage * campaignPressure[difficulty].damage * (wave <= 8 ? 1.05 : 1)));
+        assert.equal(state.enemies.length + pendingSpawns(state), 10 + act * 3 + rules.extra + campaignPressure[difficulty].extra, 'campaign boss-wave counts include the selected campaign pressure');
         state.player.level = 20;
         state.loadout.auto = ['nova', 'burst', 'guard', 'none'];
         fixtures.push(captureSnapshot(state));
     }
 }
+const firstWaveEnemies = ['hard', 'nightmare', 'inferno'].map(difficulty => {
+    const state = startRun(() => 0.5, difficulty, 'knight');
+    state.resumeDelay = 0;
+    state.intermission = 0;
+    step(state, {}, 0.05);
+    return state.enemies[0];
+});
+assert.ok(firstWaveEnemies[0].health < firstWaveEnemies[1].health && firstWaveEnemies[1].health < firstWaveEnemies[2].health, 'campaign opening pressure scales Easy < Medium < Hard');
+assert.ok(firstWaveEnemies[0].damage < firstWaveEnemies[1].damage && firstWaveEnemies[1].damage < firstWaveEnemies[2].damage, 'campaign opening damage scales Easy < Medium < Hard');
+const endlessBalance = startEndlessRun(() => 0.5, 'inferno', 'knight', true);
+assert.equal(endlessBalance.enemies.length + pendingSpawns(endlessBalance), 20, 'the campaign-only pressure step does not change Endless wave counts');
 const tick = state => step(state, {}, 0.05);
 function isolatedBoss() {
     const arena = spawnBoss(5);

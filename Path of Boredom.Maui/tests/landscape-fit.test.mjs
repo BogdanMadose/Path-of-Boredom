@@ -15,6 +15,8 @@ if (!fs.existsSync(edge)) {
     assert.match(menu, /data-stage-bargain/, 'the pause recap includes the chosen bargain');
     assert.match(menu, /data-stage-challenge/, 'the pause recap includes the chosen challenge');
     assert.match(engine, /restartButton\.hidden\s*=\s*[^;]*!endlessButton\.hidden/, 'intermission only shows one restart destination');
+    assert.match(engine, /if \(\["dead", "paused", "camp"\]\.includes\(state\.status\)\) \{\s*showRestartModeChooser\(\);/, 'restart chooser is shared by death, pause, and checkpoints in both modes');
+    assert.match(engine, /root\.dataset\.gameMode\s*=\s*state\.mode/, 'the layout can apply the same camp treatment to campaign and Endless');
     const slice = (start, end) => home.slice(home.indexOf(start), home.indexOf(end));
     const expand = markup => markup
         .replace(/@foreach \(var skill in (CombatSkills|StarterSkills)\)\s*\{([\s\S]*?)\n\s*\}/g, (_, list, inner) =>
@@ -33,13 +35,15 @@ if (!fs.existsSync(edge)) {
     const css = ['../../Path of Boredom.Game/Components/Pages/Home.razor.css', '../wwwroot/css/mobile-shell.css', '../wwwroot/css/mobile-menu.css']
         .map(file => fs.readFileSync(new URL(file, import.meta.url), 'utf8').replaceAll('::deep ', '').replaceAll('@media (pointer: coarse)', '@media all')).join('\n');
     const html = `<html><head><style>html,body{margin:0}*{box-sizing:border-box}[hidden]{display:none!important}${css}
-        .arena-overlay{position:fixed;inset:0;display:grid;place-items:center}</style></head>
-        <body class="mobile-shell"><div class="arpg" data-canvas-hud="on" data-main-menu="on" data-game-status="paused">
+        .arena-overlay{position:fixed;inset:0;display:grid;place-items:center}
+        body.mobile-shell[data-test-safe-area="notched"]{--safe-top:24px!important;--safe-right:44px!important;--safe-bottom:12px!important;--safe-left:44px!important}</style></head>
+        <body class="mobile-shell" data-test-safe-area="none"><div class="arpg" data-canvas-hud="on" data-main-menu="on" data-game-status="paused" data-game-mode="campaign">
         <div class="skill-bar" data-test="combat-skills"><button>Skill one</button><button>Skill two</button></div>
         <div data-test="main">${mainMenu}</div>
         <div class="arena-overlay" data-test="level">${levelDraft}</div>
         <div class="arena-overlay" data-test="death">${runMenu}</div>
         <div class="arena-overlay" data-test="camp" style="display:none">${runMenu}</div>
+        <div class="arena-overlay" data-test="endless-camp" style="display:none">${runMenu}</div>
         <div class="arena-overlay" data-test="run-summary" style="display:none">${runMenu}</div>
         <div class="arena-overlay" data-test="pause"><div class="mm-pause-card"><div class="mm-pause-side"><div class="mm-pause-emblem"></div><h2>The hollow can wait.</h2><p>Combat and game timers are paused.</p><button class="mm-resume">Return to battle</button><p class="mm-save-status mm-run-recap">Run so far: 2m 28s · 2 stages cleared · 185 kills · 0 flasks used · 195 gold spent · 0 challenges completed. Damage dealt: Cleave: 33406 · Cinder relay: 7610 · Blazing cross: 1060.</p><button class="mm-pause-option mm-pause-footer">Main menu</button></div><div class="mm-pause-groups"><section class="mm-menu-group"><h3>Character</h3><button class="mm-pause-option">Skills &amp; loadout</button><button class="mm-pause-option">Forge &amp; equipment</button><button class="mm-pause-option">Stage challenges — bonus gold</button><button class="mm-pause-option">Options</button></section><section class="mm-menu-group"><h3>Community</h3><button class="mm-pause-option">Rankings</button><button class="mm-pause-option">Chapter lore</button></section><section class="mm-menu-group mm-progress-group"><h3>Progress</h3><div class="mm-save-actions"><button class="mm-pause-option">Save to cloud</button><button class="mm-pause-option">Load cloud save</button></div><p class="mm-save-status">Level-up boon selected. Save to keep it, or continue to the next autosaved checkpoint.</p></section></div></div></div>${skillChoice}${setup}${saveDialog}</div><script>
         const report = [];
@@ -120,22 +124,23 @@ if (!fs.existsSync(edge)) {
         for (const label of ['Save on device', 'Load saved run']) {
             const button = document.createElement('button'); button.className = 'mm-pause-option'; button.textContent = label; death.querySelector('[data-run-menu]').appendChild(button);
         }
-        const camp = document.querySelector('[data-test="camp"]');
-        camp.querySelector('[data-death-report]').hidden = true;
-        camp.querySelector('[data-camp-event]').hidden = false;
-        camp.querySelector('[data-camp-event-detail]').textContent = 'The wanderer offers a small blessing in exchange for a few coins.';
-        camp.querySelector('[data-camp-challenge]').hidden = false;
-        camp.querySelector('[data-camp-challenge-status]').textContent = 'Tap one to accept. You can change it until you travel.';
-        camp.querySelector('[data-run-summary]').hidden = false;
-        camp.querySelector('.run-build-details').open = true;
-        camp.querySelector('[data-build-synergy]').textContent = 'No active skill synergies this run.';
-        camp.querySelector('[data-boss-relics]').textContent = 'Warden’s oath +2 armor · Ferryman token +2 resist · Furnace heart +3% damage.';
-        camp.querySelector('[data-run-relics]').replaceChildren(...['Cinder Heart', 'Phantom Quiver', 'Leech Fang', 'Bramble Crown', 'Gilded Tooth', 'Echo Vial'].map(label => { const chip = document.createElement('span'); chip.className = 'run-relic-chip'; chip.textContent = label; return chip; }));
-        camp.querySelector('[data-summary-overview]').innerHTML = '<li>14m 22s</li><li>6 stages</li><li>512 kills</li><li>3 flasks used</li><li>9,240 gold spent</li><li>4 challenges</li>';
-        camp.querySelector('[data-summary-damage]').innerHTML = Array.from({ length: 8 }, (_, i) => '<li>Ember nova: ' + (900 - i * 50) + '</li>').join('');
-        camp.querySelector('[data-action="endless"]').hidden = false;
-        camp.querySelector('[data-action="restart"]').hidden = true;
-        camp.querySelector('[data-loading]').hidden = true;
+        for (const camp of document.querySelectorAll('[data-test="camp"], [data-test="endless-camp"]')) {
+            camp.querySelector('[data-death-report]').hidden = true;
+            camp.querySelector('[data-camp-event]').hidden = false;
+            camp.querySelector('[data-camp-event-detail]').textContent = 'The wanderer offers a small blessing in exchange for a few coins.';
+            camp.querySelector('[data-camp-challenge]').hidden = false;
+            camp.querySelector('[data-camp-challenge-status]').textContent = 'Tap one to accept. You can change it until you travel.';
+            camp.querySelector('[data-run-summary]').hidden = false;
+            camp.querySelector('.run-build-details').open = true;
+            camp.querySelector('[data-build-synergy]').textContent = 'No active skill synergies this run.';
+            camp.querySelector('[data-boss-relics]').textContent = 'Warden’s oath +2 armor · Ferryman token +2 resist · Furnace heart +3% damage.';
+            camp.querySelector('[data-run-relics]').replaceChildren(...['Cinder Heart', 'Phantom Quiver', 'Leech Fang', 'Bramble Crown', 'Gilded Tooth', 'Echo Vial'].map(label => { const chip = document.createElement('span'); chip.className = 'run-relic-chip'; chip.textContent = label; return chip; }));
+            camp.querySelector('[data-summary-overview]').innerHTML = '<li>14m 22s</li><li>6 stages</li><li>512 kills</li><li>3 flasks used</li><li>9,240 gold spent</li><li>4 challenges</li>';
+            camp.querySelector('[data-summary-damage]').innerHTML = Array.from({ length: 8 }, (_, i) => '<li>Ember nova: ' + (900 - i * 50) + '</li>').join('');
+            camp.querySelector('[data-action="endless"]').hidden = false;
+            camp.querySelector('[data-action="restart"]').hidden = true;
+            camp.querySelector('[data-loading]').hidden = true;
+        }
         const pauseSummary = document.querySelector('[data-test="run-summary"]');
         const pauseMenu = pauseSummary.querySelector('[data-run-menu]');
         pauseSummary.querySelector('[data-run-summary]').hidden = false;
@@ -156,11 +161,14 @@ if (!fs.existsSync(edge)) {
         for (const label of ['Save on device', 'Options', 'Rankings']) {
             const button = document.createElement('button'); button.className = 'mm-pause-option'; button.textContent = label; actions.appendChild(button);
         }
-        const overlays = { level: '[data-test="level"]', death: '[data-test="death"]', camp: '[data-test="camp"]', summary: '[data-test="run-summary"]', skill: '[data-skill-choice]', setup: '[data-setup]', tutorial: '[data-setup]', main: '.main-menu', pause: '[data-test="pause"]', save: '.save-slots-dialog' };
+        const overlays = { level: '[data-test="level"]', death: '[data-test="death"]', camp: '[data-test="camp"]', 'endless-camp': '[data-test="endless-camp"]', summary: '[data-test="run-summary"]', skill: '[data-skill-choice]', setup: '[data-setup]', tutorial: '[data-setup]', main: '.main-menu', pause: '[data-test="pause"]', save: '.save-slots-dialog' };
         window.measure = () => {
+            document.body.dataset.testSafeArea = new URLSearchParams(location.search).get('safe') === 'notched' ? 'notched' : 'none';
+            const insets = { top: document.body.dataset.testSafeArea === 'notched' ? 24 : 0, right: document.body.dataset.testSafeArea === 'notched' ? 44 : 0, bottom: document.body.dataset.testSafeArea === 'notched' ? 12 : 0, left: document.body.dataset.testSafeArea === 'notched' ? 44 : 0 };
             for (const [name, selector] of Object.entries(overlays)) {
                 gameRoot.dataset.mainMenu = name === 'main' ? 'on' : 'off';
-                gameRoot.dataset.gameStatus = name === 'level' ? 'choosing' : name === 'death' ? 'dead' : name === 'camp' ? 'camp' : 'paused';
+                gameRoot.dataset.gameStatus = name === 'level' ? 'choosing' : name === 'death' ? 'dead' : name === 'camp' || name === 'endless-camp' ? 'camp' : 'paused';
+                gameRoot.dataset.gameMode = name === 'endless-camp' ? 'endless' : 'campaign';
                 if (name === 'level' && getComputedStyle(gameRoot.querySelector('[data-test="combat-skills"]')).display !== 'none') report.push('level: combat skill buttons overlap the boon selection card');
                 const overlay = document.querySelector(selector);
                 for (const other of new Set(Object.values(overlays))) document.querySelector(other).style.display = other === selector ? '' : 'none';
@@ -178,6 +186,8 @@ if (!fs.existsSync(edge)) {
                     }
                 }
                 const card = overlay.querySelector('[data-run-menu], .overlay-card, .level-draft, .main-menu-card, .mm-account-body, .mm-pause-card, .save-slots-card') ?? overlay;
+                const cardBounds = card.getBoundingClientRect();
+                if (cardBounds.height && (cardBounds.left < insets.left - 1 || cardBounds.right > innerWidth - insets.right + 1 || cardBounds.top < insets.top - 1 || cardBounds.bottom > innerHeight - insets.bottom + 1)) report.push(name + ' interactive card enters the simulated notch/cutout safe area (' + [cardBounds.left, cardBounds.top, cardBounds.right, cardBounds.bottom].map(Math.round).join(',') + ')');
                 const noScroll = new Set([overlay, card, ...overlay.querySelectorAll('.mm-pause-card, .mm-pause-groups, .mm-run-recap, .mm-stage-recap, .death-report, .death-report ol, .run-summary, .run-build-details, .run-relic-list, .save-slots-card, .save-slot-list, .save-slot-card, .restart-mode-card')]);
                 for (const element of noScroll) {
                     const overflow = getComputedStyle(element).overflowY;
@@ -224,7 +234,7 @@ if (!fs.existsSync(edge)) {
                         if (list.children.length !== 6) report.push('pause summary omitted found run relics');
                         for (const relic of list.children) {
                             const box = relic.getBoundingClientRect();
-                            if (!box.height || box.left < detailsBounds.left - 1 || box.right > detailsBounds.right + 1 || box.bottom > detailsBounds.bottom + 1) report.push('found relic hidden in pause summary');
+                            if (!box.height || box.left < detailsBounds.left - 1 || box.right > detailsBounds.right + 1 || box.bottom > detailsBounds.bottom + 1) report.push('found relic hidden in pause summary (' + [box.left, box.top, box.right, box.bottom, detailsBounds.left, detailsBounds.top, detailsBounds.right, detailsBounds.bottom].map(Math.round).join(',') + ')');
                         }
                     }
                 }
@@ -236,7 +246,7 @@ if (!fs.existsSync(edge)) {
                         if (!box.height || box.left < overlay.getBoundingClientRect().left || box.right > overlay.getBoundingClientRect().right || box.bottom > overlay.getBoundingClientRect().bottom) report.push('pause bargain/challenge recap is not visible');
                     }
                 }
-                if (name === 'camp') {
+                if (name === 'camp' || name === 'endless-camp') {
                     const choices = [...overlay.querySelectorAll('[data-action="start"], [data-action="endless"], [data-action="restart"]')].filter(button => !button.hidden);
                     if (choices.length !== 2) report.push('intermission shows duplicate restart actions (' + choices.length + ' actions)');
                     if (innerHeight <= 480) {
@@ -248,7 +258,7 @@ if (!fs.existsSync(edge)) {
                         if (buttons.length !== 7 || columns.size !== 4 || rows.size !== 2) report.push('intermission challenge choices are clipped or not arranged as a readable 4 by 2 grid');
                         const bounds = challenge.getBoundingClientRect();
                         const menuBounds = overlay.querySelector('[data-run-menu]').getBoundingClientRect(), eventBounds = event.getBoundingClientRect();
-                        if (bounds.left < menuBounds.left - 1 || bounds.right > menuBounds.right + 1 || eventBounds.left < menuBounds.left - 1 || eventBounds.right > menuBounds.right + 1 || bounds.top < eventBounds.bottom - 1) report.push('intermission encounter and challenge panels do not use a full-width stacked layout');
+                        if (bounds.left < menuBounds.left - 1 || bounds.right > menuBounds.right + 1 || eventBounds.left < menuBounds.left - 1 || eventBounds.right > menuBounds.right + 1 || bounds.top < eventBounds.bottom - 1 || Math.abs(bounds.left - eventBounds.left) > 2 || Math.abs(bounds.width - eventBounds.width) > 2) report.push(name + ' encounter and challenge panels do not use a full-width stacked layout');
                         for (const button of buttons) {
                             const box = button.getBoundingClientRect();
                             if (!box.height || box.left < bounds.left - 1 || box.right > bounds.right + 1 || box.top < bounds.top - 1 || box.bottom > bounds.bottom + 1) report.push('intermission challenge choice is hidden');
@@ -269,6 +279,7 @@ if (!fs.existsSync(edge)) {
                             const box = paragraph.getBoundingClientRect(), range = document.createRange(); range.selectNodeContents(paragraph);
                             const text = range.getBoundingClientRect();
                             if (paragraph.scrollHeight > paragraph.clientHeight + 1 || text.width && (text.left < box.left - 1 || text.right > box.right + 1 || text.bottom > box.bottom + 1 || box.bottom > bounds.bottom + 1)) report.push('intermission run/relic text is clipped');
+                            if (getComputedStyle(paragraph).textAlign !== 'center' || text.width && Math.abs((text.left + text.right) / 2 - (box.left + box.right) / 2) > 4) report.push(name + ' run/relic text is not centered');
                         }
                     }
                 }
@@ -281,6 +292,7 @@ if (!fs.existsSync(edge)) {
                             const box = paragraph.getBoundingClientRect(), range = document.createRange(); range.selectNodeContents(paragraph);
                             const text = range.getBoundingClientRect();
                             if (paragraph.scrollHeight > paragraph.clientHeight + 1 || text.width && (text.left < box.left - 1 || text.right > box.right + 1 || text.bottom > box.bottom + 1 || box.bottom > bounds.bottom + 1)) report.push('death-screen run/relic text is clipped');
+                            if (getComputedStyle(paragraph).textAlign !== 'center' || text.width && Math.abs((text.left + text.right) / 2 - (box.left + box.right) / 2) > 4) report.push('death-screen run/relic text is not centered');
                         }
                         for (const relic of list.children) {
                             const box = relic.getBoundingClientRect();
@@ -381,11 +393,13 @@ if (!fs.existsSync(edge)) {
     try {
         for (const [width, height] of [[640, 360], [740, 360], [844, 390], [915, 412], [1280, 720], [1366, 768], [1920, 1080]]) {
             // Headless Edge reserves 24px x 92px of window chrome; compensate so the page itself is phone-sized.
-            const output = await dumpBrowserDom(edge, ['--virtual-time-budget=3000', `--window-size=${width + 24},${height + 92}`, `http://127.0.0.1:${server.address().port}/`]);
-            const result = output.match(/data-result="([^"]*)"/)?.[1];
-            if (result !== 'PASS') failures.push(`${width}x${height}: ${result}`);
+            for (const safe of ['none', 'notched']) {
+                const output = await dumpBrowserDom(edge, ['--virtual-time-budget=3000', `--window-size=${width + 24},${height + 92}`, `http://127.0.0.1:${server.address().port}/?safe=${safe}`]);
+                const result = output.match(/data-result="([^"]*)"/)?.[1];
+                if (result !== 'PASS') failures.push(`${width}x${height} (${safe}): ${result}`);
+            }
         }
     } finally { await new Promise(resolve => server.close(resolve)); }
     assert.deepEqual(failures, [], failures.join('\n'));
-    console.log('PASS: menus and overlays fit landscape screens; short-landscape relics and skill tabs are visible without scrolling');
+    console.log('PASS: campaign and Endless intermissions, menus, and overlays fit landscape screens with and without simulated safe-area cutouts');
 }

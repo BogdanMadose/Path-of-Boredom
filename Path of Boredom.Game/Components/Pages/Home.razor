@@ -78,7 +78,7 @@
     @if (Session is not ICloudGameSession)
     {
     <aside class="patch-notice" data-patch-notice role="status">
-        <span><strong>Version 1.0.1</strong> · Save slots, smoother difficulty, Forge and arena artwork, and quieter pickups.</span>
+        <span><strong>Version 1.0.1</strong> · Combat balance, save improvements, clearer menus, and bug fixes.</span>
         <a href="/patch-notes#version-1-0-1" target="_blank" rel="noopener">Read patch notes ↗</a>
         <button type="button" class="quiet-button" data-dismiss-patch aria-label="Dismiss patch announcement">Dismiss</button>
     </aside>
@@ -109,7 +109,7 @@
                 <div class="combat-pressure" data-stat="pressure" aria-label="Current combat pressure">Threat: awaiting a run</div>
                 <div class="arena-viewport">
                     <p class="health-warning" data-health-warning role="status" aria-live="polite"></p>
-                    <canvas width="1100" height="650" tabindex="0" aria-label="Action RPG arena. WASD or arrows move. J or left click attacks. Q uses your manual skill. Space dodges, E drinks a flask, and P pauses. Up to two combat skills can cast automatically." aria-describedby="game-controls"></canvas>
+                    <canvas width="1100" height="650" tabindex="0" aria-label="Action RPG arena. WASD or arrows move. J or left click attacks. Q uses your manual skill. Space dodges, E drinks a flask, and P pauses. Up to three combat skills can cast automatically." aria-describedby="game-controls"></canvas>
                     <div class="arena-overlay" data-overlay>
                         <section class="level-draft" data-level-draft hidden aria-labelledby="level-draft-title">
                             <p class="eyebrow" data-stat="draft-level">LEVEL UP</p>
@@ -540,7 +540,7 @@
                 <section class="journal-card"><p class="eyebrow">FIELD JOURNAL</p><p data-stat="journal" role="status" aria-live="polite">A faint warmth lingers beneath the ashes.</p></section>
                 <section class="controls-card"><p class="eyebrow">PICKUP BLESSINGS</p><dl><dt>Bloodsun / 15s</dt><dd>+50% damage</dd><dt>Windwake / 12s</dt><dd>Speed + recovery</dd><dt>Dawn aegis / 10s</dt><dd>Half damage</dd><dt>Gravetide / 20s</dt><dd>Loot magnet</dd></dl><p>Glowing pickups grant temporary powers. Picking up the same blessing refreshes its timer. Pale scrolls permanently add one upgrade rank to this run.</p></section>
                 <section class="controls-card"><p class="eyebrow">THE ROAD AHEAD</p><dl><dt>1-5</dt><dd>Ashen Hollow</dd><dt>6-10</dt><dd>Drowned Wilds</dd><dt>11-15</dt><dd>Cinder Citadel</dd><dt>16-20</dt><dd>Glass Expanse</dd><dt>21-25</dt><dd>Storm Archive</dd><dt>26-30</dt><dd>Starless Gate</dd><dt>After 30</dt><dd>Endless Watch</dd></dl><p data-stat="threat">Husks swarm, brutes strike hard, and wisps attack at range.</p></section>
-                <section class="controls-card" id="game-controls"><p class="eyebrow">HOW TO SURVIVE</p><dl><dt>WASD / arrows</dt><dd>Move</dd><dt>Mouse</dt><dd>Aim</dd><dt>J / left click</dt><dd>Regular attack</dd><dt>Q</dt><dd>Selected manual skill</dd><dt>Space / E</dt><dd>Dodge / flask (manual)</dd><dt>Two auto slots</dt><dd>Combat skills only; +60% cooldown</dd><dt>P / Escape</dt><dd>Pause</dd><dt>Skills &amp; loadout</dt><dd>Assign skills / upgrade attacks and abilities</dd><dt>Flask pickups</dt><dd>Carry up to 5</dd></dl><p>Earn an upgrade point every five levels, up to 12. Avoid bright pink-white enemy projectiles, marked attack arcs, and mortar circles. Returning from the forge gives you a countdown.</p></section>
+                <section class="controls-card" id="game-controls"><p class="eyebrow">HOW TO SURVIVE</p><dl><dt>WASD / arrows</dt><dd>Move</dd><dt>Mouse</dt><dd>Aim</dd><dt>J / left click</dt><dd>Regular attack</dd><dt>Q</dt><dd>Selected manual skill</dd><dt>Space / E</dt><dd>Dodge / flask (manual)</dd><dt>Auto skills</dt><dd>Up to 3; slots unlock at the levels shown in Loadout</dd><dt>P / Escape</dt><dd>Pause</dd><dt>Skills &amp; loadout</dt><dd>Assign skills / upgrade attacks and abilities</dd><dt>Flask pickups</dt><dd>Carry up to 5</dd></dl><p>Earn one skill point every 2 levels, up to 32. Avoid enemy projectiles, marked attack arcs, and mortar circles. Returning from the forge gives you a countdown.</p></section>
             </aside>
         </div>
         <footer class="game-footer"><span>SIX DAWNS. ONE LAST PROMISE.</span><span>Windows account saves &middot; Checkpoint autosaves &middot; Permanent Endless unlock</span><span class="credit">Developed by MadBone | LIT MES TSR</span></footer>

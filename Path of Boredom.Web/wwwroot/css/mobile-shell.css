@@ -1020,6 +1020,7 @@ body.mobile-shell .arena-overlay {
     overflow: hidden;
     overscroll-behavior: none;
     -webkit-overflow-scrolling: auto;
+    padding: max(10px, var(--safe-top)) max(10px, var(--safe-right)) max(10px, var(--safe-bottom)) max(10px, var(--safe-left));
 }
 body.mobile-shell .setup-overlay .overlay-card,
 body.mobile-shell .skill-choice-overlay .overlay-card,
@@ -1325,7 +1326,7 @@ body.mobile-shell [data-run-menu] .camp-challenge-status { margin: 2px 0 0; font
 @media (orientation: landscape) and (max-height: 480px) {
     body.mobile-shell .arpg[data-game-status="camp"] [data-overlay] {
         overflow: hidden;
-        padding: 5px max(8px, var(--safe-right)) 5px max(8px, var(--safe-left));
+        padding: max(5px, var(--safe-top)) max(8px, var(--safe-right)) max(5px, var(--safe-bottom)) max(8px, var(--safe-left));
     }
     body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu]:has(> .camp-event:not([hidden])),
     body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu]:has(> .camp-challenge:not([hidden])) {
@@ -1513,5 +1514,134 @@ body.mobile-shell .arpg [data-run-menu] > .run-build-details summary { text-alig
 body.mobile-shell .arpg [data-run-menu] > .run-build-details summary::-webkit-details-marker { display: none; }
 body.mobile-shell .arpg [data-run-menu] > .run-build-details summary::before { content: "▸"; margin-right: .4em; }
 body.mobile-shell .arpg [data-run-menu] > .run-build-details[open] summary::before { content: "▾"; }
-body.mobile-shell .arpg [data-run-menu] > .run-build-details p { text-align: center; }
+body.mobile-shell .arpg [data-run-menu] > .run-build-details p {
+    box-sizing: border-box;
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    width: 100%;
+    text-align: center !important;
+}
 body.mobile-shell .arpg [data-run-menu] > .run-build-details > .run-relic-list { justify-content: center; }
+
+/* Campaign and Endless checkpoints share one compact, full-width landscape composition. The
+   earlier wide-screen six-column layout was leaking into Endless camp screens on phones. */
+@media (orientation: landscape) and (max-height: 480px) {
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .run-build-details[open],
+    body.mobile-shell .arpg[data-game-status="dead"] [data-run-menu] > .run-build-details[open] {
+        grid-template-columns: minmax(0, 1fr) !important;
+        max-height: 9.8em;
+        overflow: hidden;
+    }
+    body.mobile-shell .arpg[data-game-status="camp"] [data-run-menu] > .run-build-details[open] > .run-relic-list,
+    body.mobile-shell .arpg[data-game-status="dead"] [data-run-menu] > .run-build-details[open] > .run-relic-list {
+        grid-column: 1 / -1;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+    }
+}
+
+/* Center the restart choice inside the usable rectangle when a landscape cutout consumes one
+   edge of the display. The backdrop still fills the display; only its interactive card moves. */
+body.mobile-shell .arpg .restart-mode-overlay {
+    top: calc(var(--safe-top) + (100dvh - var(--safe-top) - var(--safe-bottom)) / 2);
+    left: calc(var(--safe-left) + (100vw - var(--safe-left) - var(--safe-right)) / 2);
+    width: min(440px, calc(100vw - var(--safe-left) - var(--safe-right) - 32px));
+    max-width: calc(100vw - var(--safe-left) - var(--safe-right) - 32px);
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 32px);
+    transform: translate(-50%, -50%);
+}
+body.mobile-shell .arpg .restart-mode-card {
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 32px);
+    overflow: hidden;
+}
+body.mobile-shell .arpg .save-slots-dialog {
+    width: min(920px, calc(100vw - var(--safe-left) - var(--safe-right) - 20px));
+    max-width: calc(100vw - var(--safe-left) - var(--safe-right) - 20px);
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px);
+}
+body.mobile-shell .arpg .save-slots-dialog .save-slots-card {
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px);
+}
+body.mobile-shell .setup-overlay .overlay-card,
+body.mobile-shell .skill-choice-overlay .overlay-card {
+    box-sizing: border-box;
+    width: min(760px, calc(100vw - var(--safe-left) - var(--safe-right) - 40px));
+    max-width: calc(100vw - var(--safe-left) - var(--safe-right) - 40px);
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 20px);
+}
+@media (orientation: landscape) and (max-height: 480px) {
+    body.mobile-shell .arpg[data-game-status="paused"] [data-overlay] {
+        padding: max(6px, var(--safe-top)) max(8px, var(--safe-right)) max(6px, var(--safe-bottom)) max(8px, var(--safe-left));
+    }
+    body.mobile-shell .arpg[data-game-status="dead"] [data-run-menu] > .run-summary {
+        min-height: 0;
+        max-height: 64px;
+        padding: 2px 6px;
+    }
+    body.mobile-shell .arpg[data-game-status="dead"] [data-run-menu] > .death-report:not(.run-summary) {
+        max-height: 21dvh;
+        padding: 3px 6px;
+    }
+    body.mobile-shell .arpg .restart-mode-card { padding: 14px 18px; }
+    body.mobile-shell .arpg .restart-mode-card .eyebrow { margin: 0; font-size: 8px; }
+    body.mobile-shell .arpg .restart-mode-card h2 { margin: 4px 0 6px; font-size: 22px; line-height: 1.05; }
+    body.mobile-shell .arpg .restart-mode-card > p:not(.eyebrow) { margin: 0; font-size: 10px; line-height: 1.3; }
+    body.mobile-shell .arpg .restart-mode-options { gap: 6px; margin: 10px 0 6px; }
+    body.mobile-shell .arpg .restart-mode-options button,
+    body.mobile-shell .arpg .restart-mode-card > [data-restart-cancel] { min-height: 36px; }
+    body.mobile-shell .arpg .restart-mode-card > [data-restart-cancel] { margin-top: 0; }
+}
+
+/* At the shortest landscape sizes, preserve room for the recap and relics by tightening gaps and
+   report padding before clipping any interactive content. */
+@media (orientation: landscape) and (max-height: 380px) {
+    body.mobile-shell .arpg[data-game-status="dead"] [data-run-menu] { gap: 1px 6px; padding: 4px 6px; }
+    body.mobile-shell .arpg[data-game-status="dead"] [data-run-menu] > .death-report:not(.run-summary) {
+        max-height: 17dvh;
+        padding: 2px 5px;
+    }
+    body.mobile-shell .arpg[data-game-status="dead"] [data-run-menu] > .run-summary {
+        max-height: 58px;
+        padding: 1px 5px;
+    }
+    body.mobile-shell .arpg[data-game-status="dead"] [data-run-menu] > button { min-height: 34px; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] { gap: 2px 6px; padding: 4px 6px; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-summary { max-height: 54px; padding: 2px 5px; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-build-details[open] { max-height: 84px; }
+}
+
+@media (orientation: landscape) and (max-height: 480px) {
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-build-details[open] {
+        grid-template-columns: minmax(0, 1fr) !important;
+        grid-template-rows: auto auto auto auto;
+        align-content: start;
+        gap: 1px;
+        max-height: 84px;
+        padding: 3px 6px;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-build-details[open] summary { grid-row: 1; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-build-details[open] [data-build-synergy] { grid-column: 1 / -1; grid-row: 2; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-build-details[open] [data-boss-relics] { grid-column: 1 / -1; grid-row: 3; }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] > .run-build-details[open] > .run-relic-list {
+        grid-column: 1 / -1;
+        grid-row: 4;
+        display: flex;
+        flex-wrap: nowrap;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        max-height: 1.5em;
+        gap: 2px;
+    }
+    body.mobile-shell .arpg[data-game-status="paused"] [data-run-menu] .run-relic-chip {
+        flex: 0 1 auto;
+        min-width: 0;
+        padding: 1px 3px;
+        overflow: hidden;
+        font-size: 7px;
+        line-height: 1;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+}

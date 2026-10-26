@@ -17,7 +17,7 @@ import { captureSnapshot, restoreSnapshot } from "./arpg-save.js";
 import { captureRankingBuild, resetToReleaseRankings } from "./arpg-ranking.js";
 import { upgradePreview } from "./arpg-upgrade-preview.js";
 import { MAPS, LAST_WAVE, UPGRADES, POWER_UPS, threatForWave, mapForWave, mapIndexForWave } from "./arpg-campaign.js";
-import { LEVEL_CARDS, normalizeCardChoices } from "./arpg-cards.js";
+import { LEVEL_CARDS, normalizeCardChoices, levelCardArtSource } from "./arpg-cards.js";
 import { DIFFICULTIES } from "./arpg-difficulty.js";
 import { MASTERY, MAX_FLASKS, grantExperience, forgeSkillSelected, forgeComplete, masteryCost, buyMastery, chargeLaneEnd } from "./arpg-engine.js";
 import { movementSpeed, criticalChance, criticalDamage, skillReach, cooldownRecovery } from "./arpg-engine.js";
@@ -35,7 +35,7 @@ import { recordRelics } from "./arpg-meta.js";
 import { drawLevelCards } from "./arpg-cards.js";
 import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
 import { treePointsSpent, treeRespecCost, canRespecTree, respecTree } from "./arpg-skills.js";
-import { SKILL_KEYS, SLOTTABLE_SKILLS, STARTER_SKILLS, EXTRA_SKILLS, NEW_SKILLS, combatSkillDefinition, MAX_SKILL_POINTS, skillIcon, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, skillSelected, skillCapacity, selectedSkills, needsSkillChoice, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
+import { SKILL_KEYS, SLOTTABLE_SKILLS, STARTER_SKILLS, EXTRA_SKILLS, NEW_SKILLS, TREE_LAYOUTS, combatSkillDefinition, MAX_SKILL_POINTS, skillIcon, skillName, skillPointsLeft, skillPointsEarned, canLearnSkill, learnSkill, setLoadout, skillUnlocked, skillSelected, skillCapacity, selectedSkills, needsSkillChoice, wardUnlockHint, validLoadout, treeNodeKey, treeNodeDefinition, treeNodeStatus } from "./arpg-skills.js";
 import { drawHero, drawOrb, decorateFloor, drawAtmosphere, drawLootIcon } from "./arpg-graphics.js";
 import { drawClassSkillEffect } from "./arpg-skill-effects.js";
 import { drawHud, drawHudCached } from "./arpg-hud.js";
@@ -1119,17 +1119,6 @@ export function createGame(root, saveBridge = null) {
         weapon: "weapon", armor: "armor", critChance: "critical", critDamage: "ruin",
         might: "weapon", vitality: "heart", recovery: "recovery", area: "area", warding: "armor"
     };
-    const boonArtAssets = {
-        edge: "weapon", vitality: "heart", bulwark: "armor", stride: "stride", focus: "recovery",
-        harvest: "harvest", siphon: "siphon", fortune: "fortune", critChance: "critical", critDamage: "ruin"
-    };
-    const levelCardArtSource = (key, card) => {
-        if (card.skill) return skillIcon(state, card.skill);
-        const ability = { nova: "nova", cleave: "attack", burst: "burst", guard: "guard" }[key];
-        if (ability) return skillIcon(state, ability);
-        const asset = boonArtAssets[key] || "weapon";
-        return `/_content/PathOfBoredom.Game/images/boons/${asset}.svg`;
-    };
     const forgeArtSource = key => {
         if (forgeArtAssets[key]) return `/_content/PathOfBoredom.Game/images/forge/${forgeArtAssets[key]}.svg`;
         const skill = key === "cleave" ? "attack" : key === "flask" ? "potion" : key === "speed" ? "dodge" : key;
@@ -2013,6 +2002,7 @@ export function createGame(root, saveBridge = null) {
         hudOne("[data-main-options]").disabled = saving || checkingUnlock;
         hudOne("[data-main-new]").disabled = saving || checkingUnlock || !!setupAction;
         root.dataset.gameStatus = setupAction ? "setup" : state.status;
+        root.dataset.gameMode = state.mode;
         root.dataset.saveBusy = saving || checkingUnlock ? "on" : "off";
         const p = state.player;
         const map = mapForWave(state.wave);
@@ -2351,12 +2341,25 @@ export function createGame(root, saveBridge = null) {
         for (const tree of hudAll("[data-tree-skill]")) {
             tree.dataset.heroClass = state.heroClass;
             const skill = tree.dataset.treeSkill, nodes = state.skillTree[skill];
+            const layout = TREE_LAYOUTS[skill];
             tree.dataset.skillIcon = skillIcon(state, skill);
             tree.style.setProperty("--skill-art", `url('${tree.dataset.skillIcon}')`);
             tree.hidden = !skillSelected(state, skill);
             tree.classList.toggle("tree-locked", !skillUnlocked(state, skill));
+            for (const node of tree.querySelectorAll(".tree-node")) {
+                const slot = node.querySelector("[data-tree-slot]")?.dataset.treeSlot;
+                const position = layout?.positions[slot];
+                if (position) {
+                    const left = `${position[0]}%`, top = `${position[1]}%`;
+                    if (node.style.left !== left) node.style.left = left;
+                    if (node.style.top !== top) node.style.top = top;
+                }
+            }
             for (const link of tree.querySelectorAll("[data-tree-link]")) {
-                const [from, to] = link.dataset.treeLink.split("-").map(slot => treeNodeKey(skill, slot));
+                const linkName = link.dataset.treeLink;
+                const path = layout?.paths[linkName];
+                if (path && link.getAttribute("d") !== path) link.setAttribute("d", path);
+                const [from, to] = linkName.split("-").map(slot => treeNodeKey(skill, slot));
                 link.classList.toggle("learned", nodes[from] > 0 && nodes[to] > 0);
                 link.classList.toggle("available", skillUnlocked(state, skill) && nodes[from] > 0);
             }
@@ -2465,7 +2468,7 @@ export function createGame(root, saveBridge = null) {
                     const key = state.cardChoices[index];
                     const card = LEVEL_CARDS[key];
                     const art = button.querySelector("[data-card-art]");
-                    const artSource = levelCardArtSource(key, card);
+                    const artSource = levelCardArtSource(state, key, card);
                     if (art && art.dataset.source !== artSource) {
                         art.dataset.source = artSource;
                         art.src = artSource;
@@ -2647,16 +2650,6 @@ export function createGame(root, saveBridge = null) {
     on(startButton, "click", begin);
     on(pauseButton, "click", pause);
     on(endlessButton, "click", () => {
-        console.log("[Endless] CLICKED", {
-            status: state.status,
-            mode: state.mode,
-            saving,
-            checkingUnlock,
-            setupAction,
-            endlessUnlocked,
-            campaignComplete: state.campaignComplete
-        });
-
         if (saving || checkingUnlock || setupAction || state.status === "choosing") return;
 
         if (state.status === "won") {
@@ -2666,8 +2659,7 @@ export function createGame(root, saveBridge = null) {
 
         if (!(endlessUnlocked || state.campaignComplete === 1)) return;
 
-        if (state.mode === "endless" && ["paused", "camp"].includes(state.status)) {
-            console.log("[Endless] Opening restart chooser");
+        if (["dead", "paused", "camp"].includes(state.status)) {
             showRestartModeChooser();
             return;
         }
@@ -2796,24 +2788,13 @@ export function createGame(root, saveBridge = null) {
         if (state.status === "playing") canvas.focus({ preventScroll: true });
     });
     function showRestartModeChooser() {
-        const chooser = document.querySelector("[data-restart-mode-chooser]");
-
-        console.log("[Endless] Chooser lookup", {
-            found: !!chooser,
-            rootConnected: root.isConnected,
-            chooserHidden: chooser?.hidden
-        });
+        const chooser = root.querySelector("[data-restart-mode-chooser]");
 
         if (!chooser) return;
 
         if (chooser.open) return;
         chooser.hidden = false;
         chooser.showModal();
-
-        console.log("[Endless] Chooser opened", {
-            hidden: chooser.hidden,
-            display: getComputedStyle(chooser).display
-        });
 
         const campaignButton = chooser.querySelector('[data-restart-mode="campaign"]');
         const endlessButton = chooser.querySelector('[data-restart-mode="endless"]');
@@ -3174,7 +3155,9 @@ export function createGame(root, saveBridge = null) {
     on(window, "keydown", event => {
         if (setupAction || setup.contains(event.target)) return;
         if (event.target.closest?.("input, select, textarea")) return;
-        if (!root.contains(document.activeElement) || event.ctrlKey || event.altKey || event.metaKey) return;
+        const focus = document.activeElement;
+        const pageHasNoInteractiveFocus = focus === document.body || focus === document.documentElement;
+        if ((!root.contains(focus) && !pageHasNoInteractiveFocus) || root.dataset.menuOpen === "on" || event.ctrlKey || event.altKey || event.metaKey) return;
         if (state.status === "playing" && document.activeElement === canvas && ["PageUp", "PageDown", "Home", "End"].includes(event.code)) {
             event.preventDefault();
             return;

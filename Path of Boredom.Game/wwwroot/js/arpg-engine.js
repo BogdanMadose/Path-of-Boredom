@@ -466,9 +466,11 @@ function hitEnemy(state, enemy, damage, piercing = false, skill = "attack") {
     if (enemy.modifier === "armored" && damageType === "physical") damage = mitigateDamage(damage, 20);
     if (["wisp", "hexer", "cantor"].includes(enemy.kind) && damageType === "magical") damage = mitigateDamage(damage, 20);
     const finishing = skill === "attack" && state.skillTree.attack.execution > 0
-        && (state.heroClass === "knight" ? enemy.health <= enemy.maxHealth * 0.35 : state.heroClass === "warden" && enemy.kind === "sentinel");
+        && (state.heroClass === "knight" || state.heroClass === "sorcerer" ? enemy.health <= enemy.maxHealth * 0.35
+            : state.heroClass === "warden" && enemy.kind === "sentinel");
     const shattering = skill === "burst" && state.skillTree.burst.shatter > 0
-        && (state.heroClass === "knight" ? enemy.health <= enemy.maxHealth * 0.5 : state.heroClass === "warden" && (enemy.elite || enemy.kind === "boss"));
+        && (state.heroClass === "knight" ? enemy.health <= enemy.maxHealth * 0.5
+            : ["sorcerer", "warden"].includes(state.heroClass) && (enemy.elite || enemy.kind === "boss"));
     if (finishing || shattering) {
         damage = Math.round(damage * 1.25);
         effect(state, "execute", enemy.x, enemy.y, classFor(state).color, "", enemy.radius + 12);
@@ -776,7 +778,7 @@ export function useSkill(state, skill, automatic = false) {
     const hero = classFor(state);
     if (p[skill] > 0 || skill === "guard" && p.guarding > 0) return false;
     const nodes = state.skillTree[skill];
-    const power = skill === "attack" ? 1 + nodes.edge * 0.08 : skill === "nova" ? (1 + nodes.amplitude * 0.1) * (1 + (state.heroClass === "knight" ? nodes.ignition * 0.15 : 0))
+    const power = skill === "attack" ? 1 + nodes.edge * 0.08 : skill === "nova" ? (1 + nodes.amplitude * 0.1) * (1 + (["knight", "sorcerer"].includes(state.heroClass) ? nodes.ignition * 0.15 : 0))
         : skill === "burst" ? 1 + nodes.focus * 0.12 : 1;
     const damage = multiplier => Math.round(weaponDamage(state) * multiplier * power);
     const color = skill === "nova" && nodes.ignition && state.heroClass === "knight" ? "#ff8b32" : hero.color;
@@ -868,6 +870,7 @@ export function useSkill(state, skill, automatic = false) {
                 hitEnemy(state, enemy, Math.round(weaponDamage(state) * extra.damage * (1 + state.upgrades.guard * 0.08)
                     * (state.heroClass === "knight" && nodes.repulse ? 2 : 1)), true, skill);
                 if (enemy.health > 0) {
+                    if (state.heroClass === "sorcerer") { if (nodes.repulse) pushEnemy(state, enemy, 60); }
                     if (state.heroClass === "warden") pushEnemy(state, enemy, nodes.repulse ? 100 : 60);
                     if (state.heroClass === "ranger") {
                         if (nodes.repulse) pushEnemy(state, enemy, 60);
@@ -1037,9 +1040,9 @@ function hitArrowTarget(state, shot, enemy, damage, piercing) {
 // the `depth` term), player level (levelPressure), and difficulty preset. Every 5th wave
 // (WAVES_PER_MAP) is a boss wave with one guaranteed boss. On returning to wave 1 of a new map,
 // clears leftover projectiles/loot/effects and resets the player to the arena center.
-// Releases queued wave members at a steady pace. The opening group starts together, then each
-// reinforcement waits for the spawn timer even when the arena is nearly empty; this avoids a burst
-// of queued enemies immediately after a boss or a quick clear.
+// Releases queued wave members at a steady pace while the arena has a fighting group. If the active
+// count drops below three, refill only the missing places immediately; remaining reinforcements keep
+// their normal timer. This avoids both empty arenas and dumping a whole wave onto a player at once.
 export function pendingSpawns(state) {
     return state.spawnQueueWave === state.wave ? state.spawnQueue?.length ?? 0 : 0;
 }
@@ -1047,6 +1050,18 @@ export function pendingSpawns(state) {
 function releaseSpawns(state, dt) {
     if (!pendingSpawns(state)) return;
     const queue = state.spawnQueue;
+    const active = state.enemies.reduce((count, enemy) => count + (enemy.health > 0 ? 1 : 0), 0);
+    if (active < 3) {
+        const needed = Math.min(3 - active, queue.length);
+        for (let i = 0; i < needed; i++) {
+            const enemy = queue.shift();
+            enemy.appearanceAt = state.time;
+            enemy.flash = 0.2;
+            state.enemies.push(enemy);
+        }
+        if (needed) state.spawnTimer = 1.15 + state.random() * 0.2;
+        return;
+    }
     state.spawnTimer -= dt;
     if (state.spawnTimer > 0) return;
     const enemy = queue.shift();
@@ -1080,6 +1095,12 @@ function spawnWave(state) {
     }
     const depth = Math.max(0, state.wave - LAST_WAVE);
     const difficulty = difficultyFor(state);
+    // The authored campaign asks for a stronger challenge than the long-form Endless mode,
+    // which already has its own gradual depth curve. Keep the existing difficulty keys/API stable
+    // and add a small campaign-only pressure step, largest on Hard.
+    const campaignPressure = state.mode === "campaign"
+        ? ({ hard: { health: 1.02, damage: 1.03, speed: 1.02, extra: 1 }, nightmare: { health: 1.08, damage: 1.08, speed: 1.05, extra: 2 }, inferno: { health: 1.16, damage: 1.12, speed: 1.08, extra: 4 } }[state.difficulty] ?? { health: 1, damage: 1, speed: 1, extra: 0 })
+        : { health: 1, damage: 1, speed: 1, extra: 0 };
     // Health rises steadily with wave number and chapter. Player level does not multiply enemy
     // health too: that cancelled out the player's own level-ups and stacked with the wave curve.
     // Endless adds one separate, gradual depth curve after the authored campaign.
@@ -1088,7 +1109,7 @@ function spawnWave(state) {
     const scaling = chapterScaling * depthScaling;
     const encounter = encounterForWave(state.wave);
     const formation = encounterFormation(state.wave);
-    const baseCount = (bossWave ? 10 + countAct * 3 : 7 + localWave * 3 + countAct * 3) + Math.min(12, Math.floor(depth / 8)) + difficulty.extra;
+    const baseCount = (bossWave ? 10 + countAct * 3 : 7 + localWave * 3 + countAct * 3) + Math.min(12, Math.floor(depth / 8)) + difficulty.extra + campaignPressure.extra;
     const earlyToughness = state.wave <= 4 ? 1.15 : state.wave <= 8 ? 1.08 : 1;
     const earlyDamage = state.wave <= 8 ? 1.05 : 1;
     const earlySpeed = state.wave <= 4 ? 1.06 : state.wave <= 8 ? 1.03 : 1;
@@ -1121,10 +1142,10 @@ function spawnWave(state) {
         const traits = Object.keys(ELITE_MODIFIERS).filter(key => key !== "none");
         spawned.modifier = elite && state.wave >= 11 && state.random() < Math.min(0.55, 0.35 + depth * 0.002)
             ? traits[Math.floor(state.random() * traits.length)] : "none";
-        spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * difficulty.health * earlyToughness
+        spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * difficulty.health * campaignPressure.health * earlyToughness
             * (boss && state.mode === "endless" ? 1.35 + Math.min(0.5, depth * 0.006) : 1));
-        spawned.damage = Math.round(spawned.damage * difficulty.damage * earlyDamage * deepDamage);
-        spawned.speed = Math.min(210 + Math.min(90, depth), spawned.speed) * difficulty.speed * (boss ? 1 : earlySpeed) * (1 + deepSpeed);
+        spawned.damage = Math.round(spawned.damage * difficulty.damage * campaignPressure.damage * earlyDamage * deepDamage);
+        spawned.speed = Math.min(210 + Math.min(90, depth), spawned.speed) * difficulty.speed * campaignPressure.speed * (boss ? 1 : earlySpeed) * (1 + deepSpeed);
     }
     const opening = Math.min(count, Math.max(3, Math.ceil(count * 0.2)));
     const waveStart = state.enemies.length - count;

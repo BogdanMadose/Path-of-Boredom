@@ -595,7 +595,7 @@
         z-index: 3;
         display: grid;
         align-content: center;
-        gap: 5px;
+        gap: 6px;
         min-height: 0;
         overflow: hidden;
         padding: 8px 12px;
@@ -603,10 +603,11 @@
         background: #132027;
         color: #bbcbc4;
         font-size: 11px;
-        line-height: 1.25;
+        line-height: 1.32;
     }
     body.mobile-shell .mm-help-view h3 { margin: 0; color: #f0d39a; font: 15px/1.15 Georgia, serif; }
-    body.mobile-shell .mm-help-view p { margin: 0; overflow-wrap: anywhere; }
+    body.mobile-shell .mm-help-view p { margin: 0; padding-top: 5px; border-top: 1px solid #ffffff18; overflow-wrap: anywhere; }
+    body.mobile-shell .mm-help-view p:first-of-type { padding-top: 0; border-top: 0; }
     body.mobile-shell .mm-head .mm-help-toggle {
         width: 36px;
         min-height: 36px;

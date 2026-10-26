@@ -1951,8 +1951,20 @@ export function createGame(root, saveBridge = null) {
         hudOne("[data-checkpoint-report]").textContent = ["camp", "won"].includes(state.status)
             ? `${checkpointReport(state)} ${checkpointSaveFailed ? "Checkpoint save failed — retry before leaving." : saving ? "Saving checkpoint…" : "Review your run and save before continuing."}`
             : "At each five-wave checkpoint, review the boss relic, challenge result, and optional encounter here.";
-        setText(hudOne("[data-build-synergy]"), buildSynergy(state).detail);
-        setText(hudOne("[data-boss-relics]"), BOSS_RELICS.filter((_, index) => state.adventures.relics[index]).map(relic => `${relic.name}: ${relic.detail}`).join(" · ") || "No boss relics earned this run yet.");
+        const synergy = buildSynergy(state);
+        const synergySummary = synergy.detail.startsWith("Optional synergies:")
+            ? "No active skill synergies this run."
+            : synergy.detail.split(" · ").map(entry => entry.split(":")[0]).join(" · ");
+        const synergyElement = hudOne("[data-build-synergy]");
+        setText(synergyElement, synergySummary);
+        synergyElement.title = synergy.detail;
+        const bossRelicSummaries = ["Warden’s oath +2 armor", "Ferryman token +2 resist", "Furnace heart +3% damage", "Glass memory +2% speed", "Unwritten page +3% recovery", "Sixth dawn +3% damage, +2 resist"];
+        const earnedBossRelics = BOSS_RELICS.map((relic, index) => state.adventures.relics[index] ? { ...relic, compact: bossRelicSummaries[index] } : null).filter(Boolean);
+        const bossRelicElement = hudOne("[data-boss-relics]");
+        setText(bossRelicElement, earnedBossRelics.length
+            ? earnedBossRelics.map(relic => relic.compact).join(" · ")
+            : "No boss relics earned this run yet.");
+        if (bossRelicElement) bossRelicElement.title = earnedBossRelics.map(relic => `${relic.name}: ${relic.detail}`).join(" · ");
         renderRunRelicSummary();
         const codex = hudOne("[data-campaign-codex]");
         const signature = state.adventures.chapters.join("");
@@ -1976,8 +1988,11 @@ export function createGame(root, saveBridge = null) {
                 && ["paused", "camp", "won"].includes(state.status);
             campEvent.hidden = !open && !atCheckpoint;
             setText(hudOne("[data-camp-event-name]"), encounter.name);
-            setText(hudOne("[data-camp-event-detail]"), open ? eventDetail(state, encounter)
-                : bargainOutcome?.wave === state.wave ? bargainOutcome.text : "✓ Already resolved at this checkpoint. A new stranger waits at the next one.");
+            const resolvedText = bargainOutcome?.wave === state.wave ? bargainOutcome.text
+                : state.journal.startsWith(`${encounter.name}:`)
+                    ? state.journal.includes("passed by safely") ? `You passed by the ${encounter.name.toLowerCase()}.` : `✓ Bargain with the ${encounter.name.toLowerCase()} completed.`
+                    : `✓ ${encounter.name} choice resolved at this checkpoint.`;
+            setText(hudOne("[data-camp-event-detail]"), open ? eventDetail(state, encounter) : resolvedText);
             hudOne("[data-camp-event-actions]").hidden = !open;
         }
         hudOne("[data-open-lore]").hidden = inMainMenu || state.mode !== "campaign" || state.status === "ready";

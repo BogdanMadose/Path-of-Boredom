@@ -216,8 +216,11 @@ if (fs.existsSync(edge)) {
                     check(forge.scrollHeight <= forge.clientHeight + 1, 'Upgrade grid must fit without scrolling: ' + width + 'x' + height + ' @' + scale + ' (' + forge.scrollHeight + '>' + forge.clientHeight + ')');
                     for (const button of forge.querySelectorAll('button')) {
                         const card = button.getBoundingClientRect(), bounds = forge.getBoundingClientRect(), preview = button.querySelector('[data-upgrade-preview]')?.getBoundingClientRect();
+                        const title = button.querySelector('strong').getBoundingClientRect(), art = button.querySelector('.forge-card-art').getBoundingClientRect(), description = button.querySelector('span:not([data-upgrade-preview])').getBoundingClientRect();
                         check(card.height > 0 && card.bottom <= bounds.bottom + 1 && card.right <= bounds.right + 1, 'Upgrade card must stay inside the visible grid');
                         check(preview && preview.height >= 6 && preview.bottom <= card.bottom + 1, 'Upgrade effect preview must stay visible');
+                        check(art.height >= 16 && art.top >= title.bottom - 1 && art.bottom <= description.top + 1, 'Upgrade artwork must sit below its title and above its description');
+                        check(Number.parseFloat(getComputedStyle(button.querySelector('strong')).fontSize) >= 10 && Number.parseFloat(getComputedStyle(button.querySelector('span:not([data-upgrade-preview])')).fontSize) >= 8, 'Upgrade title and description must remain readable');
                     }
                 }
                 forgePanel.dataset.mobileSection = 'training';
@@ -225,10 +228,16 @@ if (fs.existsSync(edge)) {
                 check(getComputedStyle(mastery).overflowY === 'hidden' && getComputedStyle(masteryGrid).overflowY === 'hidden', 'Mastery cards must not scroll');
                 if (width > height && height >= 360) {
                     check(mastery.scrollHeight <= mastery.clientHeight + 1 && masteryGrid.scrollHeight <= masteryGrid.clientHeight + 1, 'Mastery grid must fit without scrolling: ' + width + 'x' + height + ' @' + scale + ' (' + masteryGrid.scrollHeight + '>' + masteryGrid.clientHeight + ')');
+                    const masteryRows = new Set([...masteryGrid.querySelectorAll('button')].map(button => Math.round(button.getBoundingClientRect().top)));
+                    const masteryColumns = new Set([...masteryGrid.querySelectorAll('button')].map(button => Math.round(button.getBoundingClientRect().left)));
+                    check(masteryRows.size === 2 && masteryColumns.size === 4, 'Mastery cards must use a readable four-by-two grid');
                     for (const button of masteryGrid.querySelectorAll('button')) {
                         const card = button.getBoundingClientRect(), bounds = masteryGrid.getBoundingClientRect(), preview = button.querySelector('[data-upgrade-preview]')?.getBoundingClientRect();
+                        const title = button.querySelector('strong').getBoundingClientRect(), art = button.querySelector('.forge-card-art').getBoundingClientRect(), description = button.querySelector('span:not([data-upgrade-preview])').getBoundingClientRect();
                         check(card.height > 0 && card.bottom <= bounds.bottom + 1 && card.right <= bounds.right + 1, 'Mastery card must stay inside the visible grid');
                         check(preview && preview.height >= 6 && preview.bottom <= card.bottom + 1, 'Mastery effect preview must stay visible');
+                        check(art.height >= 16 && art.top >= title.bottom - 1 && art.bottom <= description.top + 1, 'Mastery artwork must be legible below the title and above its description');
+                        check(Number.parseFloat(getComputedStyle(button.querySelector('strong')).fontSize) >= 10 && Number.parseFloat(getComputedStyle(button.querySelector('span:not([data-upgrade-preview])')).fontSize) >= 8, 'Mastery title and description must remain readable');
                     }
                 }
             }
@@ -238,7 +247,8 @@ if (fs.existsSync(edge)) {
     const server = http.createServer((request, response) => { response.setHeader('Content-Type', 'text/html'); response.end(html); });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     try {
-        const output = await dumpBrowserDom(edge, ['--virtual-time-budget=5000', '--window-size=1400,1400', `http://127.0.0.1:${server.address().port}/`]);
+        // Keep the actual browser viewport in short landscape so its CSS media rules are exercised.
+        const output = await dumpBrowserDom(edge, ['--virtual-time-budget=5000', '--window-size=1400,482', `http://127.0.0.1:${server.address().port}/`]);
         assert.equal(output.match(/data-result="([^"]*)"/)?.[1], 'PASS', 'Run options browser geometry');
         console.log('PASS: Run options and Forge geometry at 10 phone/tablet panel sizes and two root text scales, including 320px phones and short landscape');
     } finally { await new Promise(resolve => server.close(resolve)); }

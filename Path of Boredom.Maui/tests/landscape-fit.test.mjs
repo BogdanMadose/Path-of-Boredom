@@ -52,7 +52,7 @@ if (!fs.existsSync(edge)) {
         const skillPanel = document.createElement('section');
         skillPanel.className = 'skills-panel mm-panel';
         skillPanel.dataset.layoutCheck = 'skills';
-        skillPanel.innerHTML = '<div class="mm-head"><h2>Paths of power</h2><button class="mm-close">×</button></div><div class="mm-subtabs"></div><div class="skill-tree-grid"><section class="skill-tree"><div class="skill-tree-map"></div></section></div><aside class="mm-detail">Selected path detail</aside>';
+        skillPanel.innerHTML = '<div class="mm-head"><h2>Paths of power</h2><button class="mm-close">×</button></div><div class="mm-subtabs"></div><div class="skill-tree-grid"><section class="skill-tree"><h3>Life flask</h3><button class="tree-respec">Reset</button><div class="skill-tree-map"><div class="tree-node tree-node-root"><button><span class="tree-node-icon"></span><strong>Mineral draught</strong><small>0/3</small></button></div><div class="tree-node tree-node-left"><button><span class="tree-node-icon"></span><strong>Emergency repair</strong><small>0/2</small></button></div><div class="tree-node tree-node-right"><button><span class="tree-node-icon"></span><strong>Iron tonic</strong><small>0/1</small></button></div><div class="tree-node tree-node-capstone"><button><span class="tree-node-icon"></span><strong>Reconstruction</strong><small>0/1</small></button></div></div></section></div><aside class="mm-detail">Selected path detail</aside><div class="mm-help-view mm-hidden">Skills help</div>';
         const skillTabs = skillPanel.querySelector('.mm-subtabs');
         for (const label of ['Loadout', 'Knight', 'Ranger', 'Warden', 'Sorcerer', 'Warlock', 'Druid', 'Paladin', 'Assassin', 'Berserker', 'Monk', 'Archer', 'Reaper']) {
             const tab = document.createElement('button'); tab.className = 'mm-subtab';
@@ -107,6 +107,10 @@ if (!fs.existsSync(edge)) {
         death.querySelector('[data-run-summary]').hidden = false;
         death.querySelector('[data-summary-overview]').innerHTML = '<li>14m 22s</li><li>6 stages</li><li>512 kills</li><li>3 flasks used</li><li>9,240 gold spent</li><li>4 challenges</li>';
         death.querySelector('[data-summary-damage]').innerHTML = Array.from({ length: 8 }, (_, i) => '<li>Ember nova: ' + (900 - i * 50) + '</li>').join('');
+        death.querySelector('[data-build-synergy]').textContent = 'No active skill synergies this run.';
+        death.querySelector('[data-boss-relics]').textContent = 'Warden’s oath +2 armor · Ferryman token +2 resist · Furnace heart +3% damage · Glass memory +2% speed · Unwritten page +3% recovery · Sixth dawn +3% damage, +2 resist.';
+        death.querySelector('[data-run-relics]').replaceChildren(...['Cinder Heart', 'Phantom Quiver', 'Leech Fang', 'Bramble Crown', 'Gilded Tooth', 'Echo Vial'].map(label => { const chip = document.createElement('span'); chip.className = 'run-relic-chip'; chip.textContent = label; return chip; }));
+        death.querySelector('.run-build-details').open = true;
         death.querySelector('[data-action="restart"]').hidden = false;
         death.querySelector('[data-action="start"]').textContent = 'Travel to The Drowned Wilds';
         death.querySelector('[data-action="endless"]').hidden = false;
@@ -124,6 +128,9 @@ if (!fs.existsSync(edge)) {
         camp.querySelector('[data-camp-challenge-status]').textContent = 'Tap one to accept. You can change it until you travel.';
         camp.querySelector('[data-run-summary]').hidden = false;
         camp.querySelector('.run-build-details').open = true;
+        camp.querySelector('[data-build-synergy]').textContent = 'No active skill synergies this run.';
+        camp.querySelector('[data-boss-relics]').textContent = 'Warden’s oath +2 armor · Ferryman token +2 resist · Furnace heart +3% damage.';
+        camp.querySelector('[data-run-relics]').replaceChildren(...['Cinder Heart', 'Phantom Quiver', 'Leech Fang', 'Bramble Crown', 'Gilded Tooth', 'Echo Vial'].map(label => { const chip = document.createElement('span'); chip.className = 'run-relic-chip'; chip.textContent = label; return chip; }));
         camp.querySelector('[data-summary-overview]').innerHTML = '<li>14m 22s</li><li>6 stages</li><li>512 kills</li><li>3 flasks used</li><li>9,240 gold spent</li><li>4 challenges</li>';
         camp.querySelector('[data-summary-damage]').innerHTML = Array.from({ length: 8 }, (_, i) => '<li>Ember nova: ' + (900 - i * 50) + '</li>').join('');
         camp.querySelector('[data-action="endless"]').hidden = false;
@@ -221,14 +228,50 @@ if (!fs.existsSync(edge)) {
                     if (choices.length !== 2) report.push('intermission shows duplicate restart actions (' + choices.length + ' actions)');
                     if (innerHeight <= 480) {
                         const challenge = overlay.querySelector('[data-camp-challenge]'), grid = challenge.querySelector('.camp-challenge-grid');
+                        const event = overlay.querySelector('[data-camp-event]');
                         const buttons = [...grid.querySelectorAll('button')];
                         const columns = new Set(buttons.map(button => Math.round(button.getBoundingClientRect().left)));
                         const rows = new Set(buttons.map(button => Math.round(button.getBoundingClientRect().top)));
-                        if (buttons.length !== 7 || columns.size !== 3 || rows.size !== 3) report.push('intermission challenge choices are clipped or not arranged as a readable 3 by 3 grid');
+                        if (buttons.length !== 7 || columns.size !== 4 || rows.size !== 2) report.push('intermission challenge choices are clipped or not arranged as a readable 4 by 2 grid');
                         const bounds = challenge.getBoundingClientRect();
+                        const menuBounds = overlay.querySelector('[data-run-menu]').getBoundingClientRect(), eventBounds = event.getBoundingClientRect();
+                        if (bounds.left < menuBounds.left - 1 || bounds.right > menuBounds.right + 1 || eventBounds.left < menuBounds.left - 1 || eventBounds.right > menuBounds.right + 1 || bounds.top < eventBounds.bottom - 1) report.push('intermission encounter and challenge panels do not use a full-width stacked layout');
                         for (const button of buttons) {
                             const box = button.getBoundingClientRect();
                             if (!box.height || box.left < bounds.left - 1 || box.right > bounds.right + 1 || box.top < bounds.top - 1 || box.bottom > bounds.bottom + 1) report.push('intermission challenge choice is hidden');
+                            const range = document.createRange(); range.selectNodeContents(button);
+                            const text = range.getBoundingClientRect();
+                            if (text.width && (text.left < box.left - 1 || text.right > box.right + 1 || text.top < box.top - 1 || text.bottom > box.bottom + 1)) report.push('intermission challenge label clipped: ' + button.textContent.trim());
+                        }
+                        if (choices.length === 2) {
+                            const first = choices[0].getBoundingClientRect(), second = choices[1].getBoundingClientRect();
+                            if (first.left < menuBounds.left - 1 || second.right > menuBounds.right + 1 || first.right >= second.left || Math.abs(first.width - second.width) > 2) report.push('intermission actions do not use the full two-column row');
+                        }
+                    }
+                    const buildDetails = overlay.querySelector('.run-build-details');
+                    if (innerHeight <= 480 && buildDetails.open && buildDetails.scrollHeight > buildDetails.clientHeight + 1) report.push('expanded intermission run/relic details are clipped ' + buildDetails.scrollHeight + '/' + buildDetails.clientHeight + ' (' + [...buildDetails.children].map(child => child.tagName + ':' + Math.round(child.getBoundingClientRect().height)).join(',') + ')');
+                    if (innerHeight <= 480 && buildDetails.open) {
+                        const bounds = buildDetails.getBoundingClientRect();
+                        for (const paragraph of buildDetails.querySelectorAll('p')) {
+                            const box = paragraph.getBoundingClientRect(), range = document.createRange(); range.selectNodeContents(paragraph);
+                            const text = range.getBoundingClientRect();
+                            if (paragraph.scrollHeight > paragraph.clientHeight + 1 || text.width && (text.left < box.left - 1 || text.right > box.right + 1 || text.bottom > box.bottom + 1 || box.bottom > bounds.bottom + 1)) report.push('intermission run/relic text is clipped');
+                        }
+                    }
+                }
+                if (name === 'death') {
+                    const buildDetails = overlay.querySelector('.run-build-details');
+                    if (innerHeight <= 480 && buildDetails.open && buildDetails.scrollHeight > buildDetails.clientHeight + 1) report.push('expanded death-screen run/relic details are clipped');
+                    if (innerHeight <= 480 && buildDetails.open) {
+                        const list = buildDetails.querySelector('.run-relic-list'), bounds = buildDetails.getBoundingClientRect();
+                        for (const paragraph of buildDetails.querySelectorAll('p')) {
+                            const box = paragraph.getBoundingClientRect(), range = document.createRange(); range.selectNodeContents(paragraph);
+                            const text = range.getBoundingClientRect();
+                            if (paragraph.scrollHeight > paragraph.clientHeight + 1 || text.width && (text.left < box.left - 1 || text.right > box.right + 1 || text.bottom > box.bottom + 1 || box.bottom > bounds.bottom + 1)) report.push('death-screen run/relic text is clipped');
+                        }
+                        for (const relic of list.children) {
+                            const box = relic.getBoundingClientRect();
+                            if (!box.height || box.left < bounds.left - 1 || box.right > bounds.right + 1 || box.bottom > bounds.bottom + 1) report.push('death-screen run relic is clipped');
                         }
                     }
                 }
@@ -263,6 +306,22 @@ if (!fs.existsSync(edge)) {
                     if (!box.height || box.left < skillTabsBounds.left - 1 || box.right > skillTabsBounds.right + 1 || box.bottom > skillTabsBounds.bottom + 1) report.push('skill tab outside its tab area');
                     if (label.width && (label.left < box.left - 1 || label.right > box.right + 1 || label.bottom > box.bottom + 1)) report.push('skill tab label clipped: ' + tab.textContent.trim());
                 }
+                const treeMap = skillPanel.querySelector('.skill-tree-map'), mapBounds = treeMap.getBoundingClientRect();
+                for (const node of treeMap.querySelectorAll('.tree-node')) {
+                    const box = node.getBoundingClientRect(), button = node.querySelector('button'), buttonBounds = button.getBoundingClientRect();
+                    if (!buttonBounds.height || box.left < mapBounds.left - 1 || box.right > mapBounds.right + 1 || box.top < mapBounds.top - 1 || box.bottom > mapBounds.bottom + 1) report.push('skill tree node is clipped by its map: ' + node.className);
+                    const name = button.querySelector('strong').getBoundingClientRect();
+                    if (name.width && (name.left < buttonBounds.left - 1 || name.right > buttonBounds.right + 1 || name.bottom > buttonBounds.bottom + 1)) report.push('skill tree node name is clipped: ' + button.textContent.trim());
+                }
+                skillPanel.classList.add('mm-help-shown');
+                if (getComputedStyle(skillPanel.querySelector('.tree-respec')).display !== 'none') report.push('skill reset button bleeds through the Help view');
+                skillPanel.classList.remove('mm-help-shown');
+                skillTabs.querySelectorAll('.mm-subtab').forEach((tab, index) => { tab.hidden = index >= 5; });
+                for (const tab of skillTabs.querySelectorAll('.mm-subtab:not([hidden])')) {
+                    const box = tab.getBoundingClientRect(), label = tab.querySelector('.mm-subtab-label').getBoundingClientRect();
+                    if (box.height < 29 || label.width && (label.top < box.top - 1 || label.bottom > box.bottom + 1)) report.push('short skill tab row clips a tab label');
+                }
+                skillTabs.querySelectorAll('.mm-subtab').forEach(tab => { tab.hidden = false; });
             }
             skillPanel.classList.remove('mm-open');
             relicPanel.classList.add('mm-open');

@@ -2035,3 +2035,123 @@ body.mobile-shell .mm-pause-card .mm-stage-recap-row span {
         overscroll-behavior: none;
     }
 }
+
+/* Keep skill help, tree nodes, and forge artwork readable on short landscape screens. */
+@media (orientation: landscape) and (max-height: 480px) {
+    body.mobile-shell .skills-panel.mm-open,
+    body.mobile-shell .forge-panel.mm-open {
+        grid-template-rows: 42px 64px minmax(0, 1fr);
+    }
+    body.mobile-shell .skills-panel .mm-subtabs {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(30px, 1fr));
+        grid-auto-flow: row;
+        height: 64px;
+        gap: 2px;
+    }
+    body.mobile-shell .skills-panel .mm-subtab { min-height: 30px; padding: 1px 2px; gap: 1px; font-size: 9px; }
+    body.mobile-shell .skills-panel .mm-subtab .mm-skill-art { width: 12px; height: 12px; }
+    body.mobile-shell .skills-panel .mm-subtab .mm-subtab-icon { height: 12px; font-size: 12px; line-height: 12px; }
+    body.mobile-shell .skills-panel .mm-subtab-label { font-size: 8px; line-height: 1; }
+    body.mobile-shell .skills-panel.mm-help-shown .tree-respec { display: none !important; }
+    body.mobile-shell .skills-panel .mm-help-view { z-index: 4; grid-row: 3; }
+
+    body.mobile-shell .skills-panel .skill-tree-grid { overflow: hidden; }
+    body.mobile-shell .skills-panel .skill-tree { overflow: visible; }
+    body.mobile-shell .skills-panel .skill-tree-map {
+        height: clamp(160px, calc(100dvh - 220px), 210px);
+        margin: 10px 0 0;
+        overflow: visible;
+    }
+    body.mobile-shell .skills-panel .tree-node,
+    body.mobile-shell .skills-panel .tree-node button { width: 64px; }
+    body.mobile-shell .skills-panel .tree-node button { height: 64px; gap: 1px; padding: 2px; overflow: hidden; }
+    body.mobile-shell .skills-panel .tree-node-root { top: 24%; }
+    body.mobile-shell .skills-panel .tree-node-capstone { top: calc(100% - 32px); }
+    body.mobile-shell .skills-panel .tree-node-icon { width: 18px; height: 18px; }
+    body.mobile-shell .skills-panel .tree-node button strong {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        font-size: 9px;
+        line-height: 1.05;
+    }
+    body.mobile-shell .skills-panel .tree-node button small { font-size: 8px; line-height: 1; }
+
+    body.mobile-shell .forge-panel > .forge-grid {
+        grid-template-rows: none;
+        grid-auto-rows: minmax(0, 1fr);
+        gap: 5px;
+        padding: 4px 5px 8px;
+    }
+    body.mobile-shell .forge-panel > .forge-grid button,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto 18px auto auto minmax(0, 1fr);
+        justify-items: center;
+        align-content: stretch;
+        gap: 1px;
+        min-width: 0;
+        min-height: 0;
+        padding: 3px 4px;
+        text-align: center;
+    }
+    body.mobile-shell .forge-panel > .forge-grid button > strong,
+    body.mobile-shell .forge-panel > .forge-grid button > .forge-card-art,
+    body.mobile-shell .forge-panel > .forge-grid button > span:not([data-upgrade-preview]),
+    body.mobile-shell .forge-panel > .forge-grid button > small,
+    body.mobile-shell .forge-panel > .forge-grid button > [data-upgrade-preview],
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > strong,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > .forge-card-art,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > span:not([data-upgrade-preview]),
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > small,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > [data-upgrade-preview] {
+        grid-column: 1;
+        min-width: 0;
+        text-align: center;
+    }
+    body.mobile-shell .forge-panel > .forge-grid button > strong,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > strong { grid-row: 1; font-size: 10px; line-height: 1.05; }
+    body.mobile-shell .forge-panel > .forge-grid button > .forge-card-art,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > .forge-card-art { grid-row: 2; align-self: center; width: 18px; height: 18px; margin: 0; }
+    body.mobile-shell .forge-panel > .forge-grid button > span:not([data-upgrade-preview]),
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > span:not([data-upgrade-preview]) {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        -webkit-line-clamp: 2;
+        grid-row: 3;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        font-size: 8.5px;
+        line-height: 1.05;
+        white-space: normal;
+    }
+    body.mobile-shell .forge-panel > .forge-grid button > small,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > small { grid-row: 4; font-size: 8px; line-height: 1; }
+    body.mobile-shell .forge-panel > .forge-grid button > [data-upgrade-preview],
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > [data-upgrade-preview] {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        -webkit-line-clamp: 2;
+        grid-row: 5;
+        align-self: start;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        font-size: 8px;
+        line-height: 1.05;
+    }
+
+    body.mobile-shell .mm-panel .mastery-panel { grid-template-rows: auto minmax(0, 1fr); }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-rows: none;
+        grid-auto-rows: minmax(0, 1fr);
+        gap: 5px;
+        padding: 4px 5px 8px;
+    }
+}

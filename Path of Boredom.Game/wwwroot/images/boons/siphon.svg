@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Ashdrinker</title>
+  <defs>
+    <radialGradient id="bg"><stop stop-color="#613642"/><stop offset="1" stop-color="#17181f"/></radialGradient>
+    <linearGradient id="ember" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd0aa"/><stop offset="1" stop-color="#d84f64"/></linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="13" fill="url(#bg)"/>
+  <path d="M32 9c-5 10-16 19-16 31a16 16 0 0 0 32 0C48 28 37 19 32 9Z" fill="url(#ember)" stroke="#ffdda9" stroke-width="2"/>
+  <path d="M32 23c-3 6-8 11-8 17a8 8 0 0 0 14 5c-5-1-7-5-4-9 3 3 6 3 8 2-1-6-6-10-10-15Z" fill="#fff1c4" opacity=".9"/>
+  <path d="M8 27c6-7 12-8 18-5m30 15c-5 5-10 6-15 4" fill="none" stroke="#ed9ba5" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 4"/>
+</svg>

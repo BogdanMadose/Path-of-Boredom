@@ -84,7 +84,7 @@ function distanceToSegment(point, start, end) {
 export function createState(random = Math.random) {
     return {
         random, status: "ready", time: 0, wave: 0, intermission: 0.8,
-        mode: "campaign", campaignComplete: 0, difficulty: "hard", rankingMode: "campaign", scoreBaseline: 0,
+        mode: "campaign", campaignComplete: 0, difficulty: "nightmare", rankingMode: "campaign", scoreBaseline: 0,
         rankingPatch: "004", damageHistory: [], volleySequence: 2,
         runSystems: newRunSystems(),
         skillSchedule: "modern",
@@ -101,7 +101,7 @@ export function createState(random = Math.random) {
         journal: "A faint warmth lingers beneath the ashes.",
         player: {
             x: WIDTH / 2, y: HEIGHT / 2, radius: 16, facing: -Math.PI / 2,
-            health: 100, maxHealth: 100, level: 1, xp: 0, nextLevel: 60,
+            health: 100, maxHealth: 100, level: 1, xp: 0, nextLevel: 90,
             damage: 18, weaponBonus: 0, weapon: "Worn iron blade", potions: 3,
             armorBonus: 0, armor: "Traveler's coat",
             attack: 0, nova: 0, burst: 0, guard: 0, guarding: 0, dodge: 0, potion: 0, invulnerable: 0,
@@ -278,7 +278,7 @@ export function enterEndless(state, difficulty = state.difficulty, quick = false
 
 // Creates a fresh campaign run from wave 0 with the chosen class's starting stats — the normal
 // "new game" entry point from the setup dialog in arpg.js.
-export function startRun(random = Math.random, difficulty = "hard", heroClass = "knight", quickStart = false) {
+export function startRun(random = Math.random, difficulty = "nightmare", heroClass = "knight", quickStart = false) {
     if (!Object.hasOwn(DIFFICULTIES, difficulty)) throw new Error("Unknown difficulty.");
     if (!Object.hasOwn(HERO_CLASSES, heroClass)) throw new Error("Unknown class.");
     const state = createState(random);
@@ -297,7 +297,7 @@ export function startRun(random = Math.random, difficulty = "hard", heroClass = 
 // grinding the campaign — sets rankingMode to "endless" (a separate leaderboard bucket from
 // "ascended") and gives the player a modest Watchkeeper kit. The kit provides a few upgrades and
 // enough gold to specialize, but leaves room for the early Endless waves to pressure their build.
-export function startEndlessRun(random = Math.random, difficulty = "hard", heroClass = "knight", quickStart = false) {
+export function startEndlessRun(random = Math.random, difficulty = "nightmare", heroClass = "knight", quickStart = false) {
     const state = startRun(random, difficulty, heroClass, quickStart);
     const hero = classFor(state);
     state.rankingMode = "endless";
@@ -307,7 +307,7 @@ export function startEndlessRun(random = Math.random, difficulty = "hard", heroC
     state.gold = 500;
     Object.assign(state.upgrades, { weapon: 3, armor: 2, cleave: 1, nova: 1, dodge: 1, flask: 1 });
     const kitHealth = hero.health + 100 + state.upgrades.armor * 12;
-    Object.assign(state.player, { level: 12, maxHealth: kitHealth, health: kitHealth, damage: hero.damage + 30, nextLevel: 700, weaponBonus: 45, weapon: `Watchkeeper's ${hero.weaponType}`, armorBonus: 12, armor: "Watchkeeper's mail" });
+    Object.assign(state.player, { level: 12, maxHealth: kitHealth, health: kitHealth, damage: hero.damage + 30, nextLevel: 1600, weaponBonus: 45, weapon: `Watchkeeper's ${hero.weaponType}`, armorBonus: 12, armor: "Watchkeeper's mail" });
     state.player.health = state.player.maxHealth;
     spawnWave(state);
     state.intermission = 3.5;
@@ -375,20 +375,21 @@ function hurtPlayer(state, damage, source = "Unknown attack") {
     }
 }
 
-// Adds XP (scaled up slightly at higher levels so late-game grinding isn't punishing) and resolves
+// Adds XP (with a restrained Endless depth bonus) and resolves
 // any number of level-ups that XP amount triggers. Each level-up grants a flat health/damage bump
 // and queues a boon card choice; if any choices are pending, forces status to "choosing".
 export const grantExperience = (state, amount) => gainExperience(state, amount);
 function gainExperience(state, amount) {
     const player = state.player;
-    const late = Math.min(1.5, Math.max(0, player.level - 15) * 0.03 + Math.max(0, player.level - 25) * 0.05);
-    const depth = Math.min(1, Math.max(0, state.wave - LAST_WAVE) * 0.02);
-    player.xp += Math.round(amount * 1.1 * (1 + late) * (1 + depth));
+    // Kill XP already rises by chapter. Avoid multiplying it again by player level and Endless
+    // depth: stacked bonuses made large kill bursts queue multiple drafts back-to-back.
+    const depthBonus = Math.min(0.5, Math.max(0, state.wave - LAST_WAVE) * 0.01);
+    player.xp += Math.round(amount * 1.1 * (1 + depthBonus));
     while (player.xp >= player.nextLevel) {
         player.xp -= player.nextLevel;
         player.level++;
         state.pendingChoices++;
-        player.nextLevel = Math.min(20000, Math.round(player.nextLevel * (player.level > 25 ? 1.1 : player.level > 15 ? 1.22 : 1.35)));
+        player.nextLevel = Math.min(20000, Math.round(player.nextLevel * (player.level > 25 ? 1.12 : player.level > 15 ? 1.22 : 1.35)));
         player.maxHealth += 8;
         player.damage += 3;
         effect(state, "ring", player.x, player.y, "#f2d390", "", 100);
@@ -1052,13 +1053,20 @@ function releaseSpawns(state, dt) {
     enemy.appearanceAt = state.time;
     enemy.flash = 0.2;
     state.enemies.push(enemy);
-    state.spawnTimer = 0.9 + state.random() * 0.2;
+    state.spawnTimer = 1.15 + state.random() * 0.2;
 }
 
 function spawnWave(state) {
     state.wave++;
     discoverChapter(state);
     const act = mapIndexForWave(state.wave);
+    // Endless still uses each chapter's art and enemy mix, but its stat baseline stays at the
+    // campaign's final act instead of dropping every time the six-map cycle wraps.
+    const finalAct = Math.ceil(LAST_WAVE / WAVES_PER_MAP) - 1;
+    const scalingAct = state.mode === "endless" ? finalAct : act;
+    // Keep Endless enemy counts continuous too: chapter-sized count steps arrive only every two
+    // map cycles, while the separate depth count keeps adding enemies more gradually.
+    const countAct = state.mode === "endless" ? Math.min(finalAct, Math.floor(Math.max(0, state.wave - LAST_WAVE) / (WAVES_PER_MAP * 2))) : act;
     const map = mapForWave(state.wave);
     const localWave = (state.wave - 1) % WAVES_PER_MAP + 1;
     const bossWave = localWave === WAVES_PER_MAP;
@@ -1072,25 +1080,23 @@ function spawnWave(state) {
     }
     const depth = Math.max(0, state.wave - LAST_WAVE);
     const difficulty = difficultyFor(state);
-    const levelPressure = Math.max(0, state.player.level - 8);
-    // Campaign chapters and player levels should add pressure in measured steps. Endless depth
-    // uses a capped, gradual ramp so no single stat multiplier eventually makes a run unwinnable.
-    const chapterScaling = 1 + act * 0.17;
-    const depthScaling = 1 + Math.min(2, depth * 0.025);
-    const levelScaling = 1 + Math.min(0.55, levelPressure * 0.025);
-    const scaling = chapterScaling * depthScaling * levelScaling;
+    // Health rises steadily with wave number and chapter. Player level does not multiply enemy
+    // health too: that cancelled out the player's own level-ups and stacked with the wave curve.
+    // Endless adds one separate, gradual depth curve after the authored campaign.
+    const chapterScaling = 1 + scalingAct * 0.1;
+    const depthScaling = 1 + depth * 0.012;
+    const scaling = chapterScaling * depthScaling;
     const encounter = encounterForWave(state.wave);
     const formation = encounterFormation(state.wave);
-    const baseCount = (bossWave ? 10 + act * 3 : 7 + localWave * 3 + act * 3) + Math.min(12, Math.floor(depth / 8)) + difficulty.extra;
-    const earlyToughness = state.wave <= 4 ? 1.4 : state.wave <= 8 ? 1.2 : 1;
+    const baseCount = (bossWave ? 10 + countAct * 3 : 7 + localWave * 3 + countAct * 3) + Math.min(12, Math.floor(depth / 8)) + difficulty.extra;
+    const earlyToughness = state.wave <= 4 ? 1.15 : state.wave <= 8 ? 1.08 : 1;
+    const earlyDamage = state.wave <= 8 ? 1.05 : 1;
     const earlySpeed = state.wave <= 4 ? 1.06 : state.wave <= 8 ? 1.03 : 1;
     const countLimit = depth > 0 ? 34 + Math.min(8, Math.floor(depth / 25)) : 40;
     const count = Math.min(countLimit, Math.max(5, Math.round(baseCount * (state.wave >= 6 ? encounter.count : 1))));
-    // Ranged builds still face some chase pressure in Endless, but it stops at a small, predictable cap.
-    const rangedHero = ["ranger", "sorcerer"].includes(state.heroClass);
-    const deepHealth = 1 + Math.min(rangedHero ? 0.2 : 0.15, depth * (rangedHero ? 0.002 : 0.0015));
-    const deepDamage = 1 + Math.min(0.45, depth * 0.0035);
-    const deepSpeed = Math.min(rangedHero ? 0.18 : 0.12, depth * 0.0012);
+    // Endless damage grows slowly with depth; pursuit speed receives a small, predictable cap.
+    const deepDamage = 1 + depth * 0.0015;
+    const deepSpeed = Math.min(0.12, depth * 0.001);
     for (let i = 0; i < count; i++) {
         const boss = bossWave && i === 0;
         const kind = boss ? "boss" : encounterKind(state.wave, i);
@@ -1100,14 +1106,14 @@ function spawnWave(state) {
         const x = grouped ? (i < 3 ? MARGIN + (i % 3) * 45 : WIDTH - MARGIN - (i % 3) * 45) : side === 0 ? MARGIN : side === 1 ? WIDTH - MARGIN : WIDTH * t;
         const y = grouped ? HEIGHT / 2 + (i % 3 - 1) * 65 : side === 2 ? MARGIN : side === 3 ? HEIGHT - MARGIN : HEIGHT * t;
         const elite = boss ? 0 : encounterElite(state.wave, i, depth);
-        const health = Math.round((boss ? (680 + act * 380) * 1.7 : (kind === "brute" || kind === "sentinel" ? 75 : kind === "runner" ? 20 : 32) + Math.min(state.wave, LAST_WAVE) * 10) * scaling * (elite ? 1.7 : 1));
+        const health = Math.round((boss ? (680 + scalingAct * 380) * 1.7 : (kind === "brute" || kind === "sentinel" ? 75 : kind === "runner" ? 20 : 32) + Math.min(state.wave, LAST_WAVE) * 8) * scaling * (elite ? 1.7 : 1));
         state.enemies.push({
             kind, x, y, health, maxHealth: health, elite, charging: 0, chargeX: 0, chargeY: 0,
             combat: { volleys: [], phase: 1, rest: 0, pattern: 1 },
             radius: boss ? 32 : kind === "brute" || kind === "sentinel" ? 22 : kind === "runner" ? 12 : 15,
-            speed: boss ? 90 + act * 10 : kind === "runner" ? 190 + act * 10 : kind === "sentinel" ? 70 : kind === "brute" ? 84 : ["wisp", "spitter", "summoner", "cantor", "hexer"].includes(kind) ? 95 : 130 + Math.min(state.wave, LAST_WAVE) * 2.2,
-            damage: Math.round((boss ? 34 + act * 11 : kind === "sentinel" ? 26 + act * 4 : kind === "brute" ? 22 + act * 5 : 13 + Math.min(state.wave, LAST_WAVE) * 1.5)
-                * (1 + act * 0.03 + depth * 0.004 + levelPressure * 0.005) * (elite ? 1.3 : 1)),
+            speed: boss ? 90 + scalingAct * 10 : kind === "runner" ? 190 + scalingAct * 10 : kind === "sentinel" ? 70 : kind === "brute" ? 84 : ["wisp", "spitter", "summoner", "cantor", "hexer"].includes(kind) ? 95 : 130 + Math.min(state.wave, LAST_WAVE) * 2.2,
+            damage: Math.round((boss ? 34 + scalingAct * 11 : kind === "sentinel" ? 26 + scalingAct * 4 : kind === "brute" ? 22 + scalingAct * 5 : 13 + Math.min(state.wave, LAST_WAVE) * 0.9)
+                * (1 + scalingAct * 0.045) * (elite ? 1.3 : 1)),
             cooldown: grouped ? 1.2 + (i % 3) * 0.55 : 1.2, flash: 0, slam: 4, winding: 0, attackWindup: 0, attackX: x, attackY: y, chilled: 0, chillStrength: 0
         });
         const spawned = state.enemies[state.enemies.length - 1];
@@ -1115,16 +1121,15 @@ function spawnWave(state) {
         const traits = Object.keys(ELITE_MODIFIERS).filter(key => key !== "none");
         spawned.modifier = elite && state.wave >= 11 && state.random() < Math.min(0.55, 0.35 + depth * 0.002)
             ? traits[Math.floor(state.random() * traits.length)] : "none";
-        spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * difficulty.health
-            * (boss && state.mode === "endless" ? 1.9 + Math.min(1.1, depth * 0.012) : 1));
-        spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * earlyToughness * deepHealth);
-        spawned.damage = Math.round(spawned.damage * difficulty.damage * (earlyToughness > 1 ? 1.1 : 1) * deepDamage);
+        spawned.health = spawned.maxHealth = Math.round(spawned.maxHealth * difficulty.health * earlyToughness
+            * (boss && state.mode === "endless" ? 1.35 + Math.min(0.5, depth * 0.006) : 1));
+        spawned.damage = Math.round(spawned.damage * difficulty.damage * earlyDamage * deepDamage);
         spawned.speed = Math.min(210 + Math.min(90, depth), spawned.speed) * difficulty.speed * (boss ? 1 : earlySpeed) * (1 + deepSpeed);
     }
-    const opening = Math.min(count, Math.max(3, Math.ceil(count * 0.24)));
+    const opening = Math.min(count, Math.max(3, Math.ceil(count * 0.2)));
     const waveStart = state.enemies.length - count;
     state.spawnQueue = state.enemies.splice(waveStart + opening);
-    state.spawnTimer = 0.9;
+    state.spawnTimer = 1.15;
     state.spawnQueueWave = state.wave;
     if (bossWave) {
         const reveal = effect(state, 'boss-intro', WIDTH / 2, 100, map.accent, `${map.boss} · ${bossProfile(state.wave).title}`);

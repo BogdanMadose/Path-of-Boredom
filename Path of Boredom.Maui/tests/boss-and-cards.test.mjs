@@ -1,11 +1,24 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { startRun, step, chooseLevelCard } from '../../Path of Boredom.Game/wwwroot/js/arpg-engine.js';
+import { startRun, startEndlessRun, step, chooseLevelCard, grantExperience } from '../../Path of Boredom.Game/wwwroot/js/arpg-engine.js';
 import { LEVEL_CARDS, drawLevelCards, levelCardAvailable } from '../../Path of Boredom.Game/wwwroot/js/arpg-cards.js';
 import { SLOTTABLE_SKILLS } from '../../Path of Boredom.Game/wwwroot/js/arpg-skills.js';
 import { difficultyFor } from '../../Path of Boredom.Game/wwwroot/js/arpg-difficulty.js';
 import { mapIndexForWave } from '../../Path of Boredom.Game/wwwroot/js/arpg-campaign.js';
 import { captureSnapshot, restoreSnapshot } from '../../Path of Boredom.Game/wwwroot/js/arpg-save.js';
+
+const freshRun = startRun(() => 0.5);
+assert.equal(freshRun.difficulty, 'nightmare', 'fresh runs recommend Medium');
+assert.equal(freshRun.player.nextLevel, 90, 'a fresh run needs more XP for its first boon');
+grantExperience(freshRun, 150);
+assert.equal(freshRun.player.level, 2, 'a large opening XP award does not skip straight into multiple drafts');
+assert.equal(freshRun.pendingChoices, 1);
+assert.equal(freshRun.player.nextLevel, 122, 'the next boon threshold grows so large kill bursts do not chain choices as often');
+
+const endlessStart = startEndlessRun(() => 0.5);
+assert.equal(endlessStart.player.nextLevel, 1600, 'a fresh Endless run starts with a higher level threshold');
+grantExperience(endlessStart, 1200);
+assert.equal(endlessStart.player.level, 12, 'a single Endless XP burst does not immediately queue another level');
 
 for (const hero of ['knight', 'ranger', 'warden']) {
     for (const chosen of SLOTTABLE_SKILLS) {
@@ -66,8 +79,9 @@ for (const difficulty of ['hard', 'nightmare', 'inferno']) {
     for (const wave of [5, 10, 15, 20, 25, 30]) {
         const { state, boss } = spawnBoss(wave, difficulty);
         const act = mapIndexForWave(wave), rules = difficultyFor(state);
-        const oldHealth = Math.round(Math.round((680 + act * 380) * (1 + act * 0.22)) * rules.health);
-        assert.ok(boss.maxHealth >= oldHealth * 1.49, 'boss durability increases by about 50%');
+        const chapterHealth = Math.round((680 + act * 380) * 1.7 * (1 + act * 0.1));
+        const openingHealth = wave <= 4 ? 1.15 : wave <= 8 ? 1.08 : 1;
+        assert.equal(boss.maxHealth, Math.round(chapterHealth * rules.health * openingHealth), 'boss health follows the new chapter and difficulty curve');
         assert.equal(boss.speed, (90 + act * 10) * rules.speed);
         state.player.level = 20;
         state.loadout.auto = ['nova', 'burst', 'guard', 'none'];
@@ -132,4 +146,4 @@ assert.ok(telegraph.boss.winding > 0 && telegraph.boss.combat.rest === 0, 'phase
 captureSnapshot(telegraph.state);
 
 if (process.argv[2]) fs.writeFileSync(process.argv[2], JSON.stringify(fixtures));
-console.log('PASS: selected-skill drafts, deterministic legacy offer repair, tougher bosses, short recovery, concurrent attack timers, and valid current saves');
+console.log('PASS: selected-skill drafts, XP pacing, rebalance boss curve, short recovery, concurrent attack timers, and valid current saves');

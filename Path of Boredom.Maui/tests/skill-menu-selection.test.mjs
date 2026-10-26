@@ -93,8 +93,10 @@ for (const hero of ['knight', 'ranger', 'warden']) {
     assert.equal(trees[SKILL_KEYS.indexOf('chain')].classList.contains('mm-hidden'), false);
     source.querySelector('.mm-help-toggle').click();
     const helpText = source.querySelector('.mm-help-view').children.map(child => child.textContent);
-    assert.ok(helpText.includes(`Description: ${skillName(state, 'chain')}`));
-    assert.ok(!helpText.includes(`Description: ${skillName(state, 'frost')}`), 'Help excludes unselected tree descriptions');
+    assert.ok(helpText.some(text => text.includes('slotted skills cast when ready')));
+    assert.ok(helpText.some(text => text.includes('status says Available')));
+    assert.ok(helpText.some(text => text.includes('Reset clears only this tree')));
+    assert.ok(!helpText.some(text => text.includes('Description:')), 'Help gives consistent instructions instead of mixing in an unrelated tree description');
 
     state.heroClass = hero === 'knight' ? 'ranger' : 'knight';
     trees.forEach(tree => {
@@ -118,4 +120,4 @@ for (const hero of ['knight', 'ranger', 'warden']) {
 
 const page = fs.readFileSync(new URL('../../Path of Boredom.Game/Components/Pages/Home.razor', import.meta.url), 'utf8');
 assert.match(page, /data-tree-skill="@skill" hidden="@CombatSkills\.Contains\(skill\)"/);
-console.log('PASS: only chosen skill trees and always-available upgrades have tabs; class-specific labels, filtered Help, hidden-tab guards, load transitions, and Blazor DOM stability');
+console.log('PASS: only chosen skill trees and always-available upgrades have tabs; class-specific labels, clear skill help, hidden-tab guards, load transitions, and Blazor DOM stability');

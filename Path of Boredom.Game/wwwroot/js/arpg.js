@@ -1119,6 +1119,17 @@ export function createGame(root, saveBridge = null) {
         weapon: "weapon", armor: "armor", critChance: "critical", critDamage: "ruin",
         might: "weapon", vitality: "heart", recovery: "recovery", area: "area", warding: "armor"
     };
+    const boonArtAssets = {
+        edge: "weapon", vitality: "heart", bulwark: "armor", stride: "stride", focus: "recovery",
+        harvest: "harvest", siphon: "siphon", fortune: "fortune", critChance: "critical", critDamage: "ruin"
+    };
+    const levelCardArtSource = (key, card) => {
+        if (card.skill) return skillIcon(state, card.skill);
+        const ability = { nova: "nova", cleave: "attack", burst: "burst", guard: "guard" }[key];
+        if (ability) return skillIcon(state, ability);
+        const asset = boonArtAssets[key] || "weapon";
+        return `/_content/PathOfBoredom.Game/images/boons/${asset}.svg`;
+    };
     const forgeArtSource = key => {
         if (forgeArtAssets[key]) return `/_content/PathOfBoredom.Game/images/forge/${forgeArtAssets[key]}.svg`;
         const skill = key === "cleave" ? "attack" : key === "flask" ? "potion" : key === "speed" ? "dodge" : key;
@@ -1793,7 +1804,7 @@ export function createGame(root, saveBridge = null) {
         clearInput();
         setupAction = action;
         setupStep = 0;
-        difficultySelect.value = Object.hasOwn(DIFFICULTIES, state.difficulty) ? state.difficulty : "hard";
+        difficultySelect.value = Object.hasOwn(DIFFICULTIES, state.difficulty) ? state.difficulty : "nightmare";
         classSelect.value = classUnlocked(state.heroClass) || action === "continue" ? state.heroClass : "knight";
         setupSlots[0].value = action === "continue" ? state.loadout.auto[0] : "none";
         setup.hidden = false;
@@ -2311,6 +2322,10 @@ export function createGame(root, saveBridge = null) {
         openSkills.classList.toggle("forge-available", active && (skillPointsLeft(state) > 0 || remindWard));
         for (const select of loadoutSelects) {
             const slot = Number(select.dataset.loadoutSlot);
+            const slotLevel = slot === 1 ? 1 : unlockLevels[slot - 2];
+            setText(select.closest("label")?.querySelector("[data-loadout-label]"), slot === 1
+                ? "Auto slot 1 · available from start"
+                : `Auto slot ${slot} · unlocks at level ${slotLevel}`);
             const value = state.loadout.auto[slot - 1];
             if (select.value !== value) select.value = value;
             select.disabled = saving || !canForge || value !== "none" || slot > skillCapacity(state);
@@ -2449,6 +2464,12 @@ export function createGame(root, saveBridge = null) {
                 cardButtons.forEach((button, index) => {
                     const key = state.cardChoices[index];
                     const card = LEVEL_CARDS[key];
+                    const art = button.querySelector("[data-card-art]");
+                    const artSource = levelCardArtSource(key, card);
+                    if (art && art.dataset.source !== artSource) {
+                        art.dataset.source = artSource;
+                        art.src = artSource;
+                    }
                     button.dataset.cardId = key;
                     button.querySelector("[data-card-category]").textContent = ["nova", "burst", "guard"].includes(key)
                         ? skillName(state, key).toUpperCase() : key === "cleave" ? "REGULAR ATTACK" : card.category;
@@ -3046,7 +3067,7 @@ export function createGame(root, saveBridge = null) {
                     challengeNudgeDismissedStage = Math.floor(state.wave / 5) + 1;
                 }
                 stageFade = 0; stageFadeMap = null; suppressTravelFade = true;
-                difficultySelect.value = Object.hasOwn(DIFFICULTIES, state.difficulty) ? state.difficulty : "hard";
+                difficultySelect.value = Object.hasOwn(DIFFICULTIES, state.difficulty) ? state.difficulty : "nightmare";
                 checkpointHandled = ["camp", "won"].includes(state.status) ? `${state.mode}:${state.wave}` : null;
                 shownStatus = "";
                 shownDraft = "";

@@ -52,7 +52,7 @@ if (!fs.existsSync(edge)) {
         const skillPanel = document.createElement('section');
         skillPanel.className = 'skills-panel mm-panel';
         skillPanel.dataset.layoutCheck = 'skills';
-        skillPanel.innerHTML = '<div class="mm-head"><h2>Paths of power</h2><button class="mm-close">×</button></div><div class="mm-subtabs"></div><div class="skill-tree-grid"><section class="skill-tree"><h3>Life flask</h3><button class="tree-respec">Reset</button><div class="skill-tree-map"><div class="tree-node tree-node-root"><button><span class="tree-node-icon"></span><strong>Mineral draught</strong><small>0/3</small></button></div><div class="tree-node tree-node-left"><button><span class="tree-node-icon"></span><strong>Emergency repair</strong><small>0/2</small></button></div><div class="tree-node tree-node-right"><button><span class="tree-node-icon"></span><strong>Iron tonic</strong><small>0/1</small></button></div><div class="tree-node tree-node-capstone"><button><span class="tree-node-icon"></span><strong>Reconstruction</strong><small>0/1</small></button></div></div></section></div><aside class="mm-detail">Selected path detail</aside><div class="mm-help-view mm-hidden">Skills help</div>';
+        skillPanel.innerHTML = '<div class="mm-head"><h2>Paths of power</h2><button class="mm-close">×</button></div><div class="mm-subtabs"></div><div class="skill-tree-grid"><section class="skill-tree"><h3>Life flask</h3><button class="tree-respec">Reset</button><div class="skill-tree-map"><div class="tree-node tree-node-root"><button><span class="tree-node-icon"></span><strong>Mineral draught</strong><small>0/3</small></button></div><div class="tree-node tree-node-left"><button><span class="tree-node-icon"></span><strong>Emergency repair</strong><small>0/2</small></button></div><div class="tree-node tree-node-right"><button><span class="tree-node-icon"></span><strong>Iron tonic</strong><small>0/1</small></button></div><div class="tree-node tree-node-capstone"><button><span class="tree-node-icon"></span><strong>Reconstruction</strong><small>0/1</small></button></div></div></section></div><aside class="mm-detail">Selected path detail</aside><div class="mm-help-view mm-hidden"></div>';
         const skillTabs = skillPanel.querySelector('.mm-subtabs');
         for (const label of ['Loadout', 'Knight', 'Ranger', 'Warden', 'Sorcerer', 'Warlock', 'Druid', 'Paladin', 'Assassin', 'Berserker', 'Monk', 'Archer', 'Reaper']) {
             const tab = document.createElement('button'); tab.className = 'mm-subtab';
@@ -204,6 +204,19 @@ if (!fs.existsSync(edge)) {
                     const rect = button.getBoundingClientRect();
                     if (rect.height && rect.bottom > bottom + 1) report.push(name + ' button off-screen: ' + button.textContent.trim().slice(0, 30));
                 }
+                if (name === 'level') {
+                    for (const card of overlay.querySelectorAll('.level-card')) {
+                        const bounds = card.getBoundingClientRect(), art = card.querySelector('.level-card-art');
+                        if (!art) { report.push('level-up card is missing its artwork slot'); continue; }
+                        const icon = art.getBoundingClientRect();
+                        if (icon.left < bounds.left || icon.right > bounds.right || icon.top < bounds.top || icon.bottom > bounds.bottom) report.push('level-up artwork is outside its card');
+                        for (const text of card.querySelectorAll('.card-category, strong, .card-description, small, .card-pick')) {
+                            const box = text.getBoundingClientRect();
+                            const overlaps = icon.left < box.right && icon.right > box.left && icon.top < box.bottom && icon.bottom > box.top;
+                            if (overlaps) report.push('level-up artwork overlaps card text: ' + text.textContent.trim().slice(0, 24));
+                        }
+                    }
+                }
                 if (name === 'summary') {
                     const details = overlay.querySelector('.run-build-details'), list = overlay.querySelector('.run-relic-list'), detailsBounds = details.getBoundingClientRect();
                     if (innerHeight <= 480) {
@@ -315,6 +328,19 @@ if (!fs.existsSync(edge)) {
                 }
                 skillPanel.classList.add('mm-help-shown');
                 if (getComputedStyle(skillPanel.querySelector('.tree-respec')).display !== 'none') report.push('skill reset button bleeds through the Help view');
+                const help = skillPanel.querySelector('.mm-help-view');
+                help.innerHTML = '<h3>How to use Paths of Power</h3>' + [
+                    'Combat: slotted skills cast when ready and when their target rules allow. Regular attack, dodge, and flask are always available from their controls.',
+                    'Loadout: one auto-skill slot is open from the start. Slots 2 and 3 unlock at the levels shown here. Choose a skill in an open slot to add it to the rotation.',
+                    'Trees: select a node once to read its effect and requirements. Select it again when its status says Available. Earlier nodes may be required first.',
+                    'Points and reset: earn 1 point every 2 levels. Each node rank costs 1 point. Reset clears only this tree, returns its points, and costs 100 gold plus 50 gold per rank.'
+                ].map(copy => '<p>' + copy + '</p>').join('');
+                help.classList.remove('mm-hidden');
+                if (help.scrollHeight > help.clientHeight + 1) report.push('skill help instructions are clipped');
+                for (const paragraph of help.querySelectorAll('p')) {
+                    const box = paragraph.getBoundingClientRect(), bounds = help.getBoundingClientRect();
+                    if (!box.height || box.left < bounds.left - 1 || box.right > bounds.right + 1 || box.bottom > bounds.bottom + 1) report.push('skill help instruction is outside the fitted help card');
+                }
                 skillPanel.classList.remove('mm-help-shown');
                 skillTabs.querySelectorAll('.mm-subtab').forEach((tab, index) => { tab.hidden = index >= 5; });
                 for (const tab of skillTabs.querySelectorAll('.mm-subtab:not([hidden])')) {

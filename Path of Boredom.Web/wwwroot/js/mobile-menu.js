@@ -176,7 +176,7 @@
     // Adds a "Help" toggle that shows/hides everything marked above. Appending our OWN button is
     // safe — Blazor only diffs the nodes it rendered, and additions it never saw are left alone
     // as long as we do not reorder its children. We append at the end for that reason.
-    function addHelpToggle(host, label) {
+    function addHelpToggle(host, label, buildHelp) {
         if (!host.querySelector(".mm-help-toggle")) {
             var toggle = el("button", "mm-help-toggle", "?");
             var help = el("div", "mm-help-view mm-hidden");
@@ -191,7 +191,9 @@
                 toggle.setAttribute("aria-label", shown ? "Back to controls" : label);
                 help.classList.toggle("mm-hidden", !shown);
                 help.replaceChildren();
-                if (shown) {
+                if (shown && typeof buildHelp === "function") {
+                    buildHelp(help);
+                } else if (shown) {
                     Array.prototype.forEach.call(host.querySelectorAll(".mm-help-text"), function (text) {
                         var tree = text.closest("[data-tree-skill]");
                         if (tree && tree.hidden) return;
@@ -208,8 +210,15 @@
     function buildSkills(source) {
         var panel = makePanel("skills", "Paths of power", source);
 
-        markHelp(source, [":scope > p:not([data-skill-feedback]):not(.skill-unlock-status)", ".skill-tree > p"]);
-        addHelpToggle(panel.body, "How skills work");
+        addHelpToggle(panel.body, "How skills work", function (help) {
+            help.appendChild(el("h3", null, "How to use Paths of Power"));
+            [
+                "Combat: slotted skills cast when ready and when their target rules allow. Regular attack, dodge, and flask are always available from their controls.",
+                "Loadout: one auto-skill slot is open from the start. Slots 2 and 3 unlock at the levels shown here. Choose a skill in an open slot to add it to the rotation.",
+                "Trees: select a node once to read its effect and requirements. Select it again when its status says Available. Earlier nodes may be required first.",
+                "Points and reset: earn 1 point every 2 levels. Each node rank costs 1 point. Reset clears only this tree, returns its points, and costs 100 gold plus 50 gold per rank."
+            ].forEach(function (copy) { help.appendChild(el("p", null, copy)); });
+        });
 
         // Sub-tabs: Loadout first, then one tab per skill tree — the fix for the "scroooollll"
         // problem, since six trees were stacked. Appended (never inserted before Blazor's
@@ -234,7 +243,7 @@
             detail.appendChild(el("h3", null, node.querySelector("[data-tree-name]").textContent));
             detail.appendChild(el("p", null, node.querySelector("[data-tree-detail]").textContent));
             detail.appendChild(el("strong", null, node.querySelector("[data-tree-status]").textContent));
-            detail.appendChild(el("p", null, "Tap a node to inspect. Tap it again to learn when available."));
+            detail.appendChild(el("p", null, "Select once to inspect. Select again to spend 1 point when the node is Available."));
         }
 
         listen(source, "click", function (event) {

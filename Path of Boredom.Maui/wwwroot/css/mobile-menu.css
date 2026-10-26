@@ -463,7 +463,7 @@
         padding: 4px 10px;
         font-size: 10px;
     }
-    body.mobile-shell .mm-panel .tree-node-root { top: 24%; }
+    body.mobile-shell .mm-panel .tree-node-root { top: 28%; }
     body.mobile-shell .mm-panel .tree-node-capstone { top: 86%; }
     body.mobile-shell .mm-panel .skill-tree-map { margin-top: 30px; }
     body.mobile-shell .mm-panel .tree-node button strong { font-size: 10px; }
@@ -593,15 +593,20 @@
         grid-row: 3;
         grid-column: 1 / -1;
         z-index: 3;
+        display: grid;
+        align-content: center;
+        gap: 5px;
         min-height: 0;
-        overflow-y: auto;
-        padding: 12px 16px;
+        overflow: hidden;
+        padding: 8px 12px;
         border-radius: 12px;
         background: #132027;
         color: #bbcbc4;
-        font-size: 13px;
-        line-height: 1.5;
+        font-size: 11px;
+        line-height: 1.25;
     }
+    body.mobile-shell .mm-help-view h3 { margin: 0; color: #f0d39a; font: 15px/1.15 Georgia, serif; }
+    body.mobile-shell .mm-help-view p { margin: 0; overflow-wrap: anywhere; }
     body.mobile-shell .mm-head .mm-help-toggle {
         width: 36px;
         min-height: 36px;
@@ -2054,7 +2059,7 @@ body.mobile-shell .mm-pause-card .mm-stage-recap-row span {
     body.mobile-shell .skills-panel .mm-subtab .mm-subtab-icon { height: 12px; font-size: 12px; line-height: 12px; }
     body.mobile-shell .skills-panel .mm-subtab-label { font-size: 8px; line-height: 1; }
     body.mobile-shell .skills-panel.mm-help-shown .tree-respec { display: none !important; }
-    body.mobile-shell .skills-panel .mm-help-view { z-index: 4; grid-row: 3; }
+    body.mobile-shell .skills-panel .mm-help-view { z-index: 7; grid-row: 3; background: #132027; }
 
     body.mobile-shell .skills-panel .skill-tree-grid { overflow: hidden; }
     body.mobile-shell .skills-panel .skill-tree { overflow: visible; }
@@ -2090,9 +2095,9 @@ body.mobile-shell .mm-pause-card .mm-stage-recap-row span {
     body.mobile-shell .forge-panel > .forge-grid button,
     body.mobile-shell .mm-panel .mastery-panel .forge-grid button {
         grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: auto 18px auto auto minmax(0, 1fr);
+        grid-template-rows: auto 18px auto auto auto;
         justify-items: center;
-        align-content: stretch;
+        align-content: center;
         gap: 1px;
         min-width: 0;
         min-height: 0;

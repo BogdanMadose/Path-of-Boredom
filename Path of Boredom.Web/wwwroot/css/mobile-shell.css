@@ -929,9 +929,13 @@
 
     body.mobile-shell .level-card {
         min-height: 44px;
+        grid-template-columns: 32px minmax(0, 1fr);
+        grid-template-rows: auto auto minmax(2em, 1fr) auto auto;
+        align-content: center;
         padding: 8px 10px;
         gap: 4px;
     }
+    body.mobile-shell .level-card-art { width: 28px; height: 28px; border-radius: 8px; }
     body.mobile-shell .level-card .card-description {
         display: -webkit-box;
         line-clamp: 3; -webkit-line-clamp: 3;
@@ -966,6 +970,7 @@
         font-size: 11px;
         margin: 6px 0 0;
     }
+    body.mobile-shell .level-card .card-pick { padding-top: 4px; line-height: 1.1; }
 }
 
 /* Landscape / short screens: HEIGHT becomes the binding constraint, so bind height and release
@@ -1501,3 +1506,12 @@ body.mobile-shell [data-run-menu] .camp-challenge-status { margin: 2px 0 0; font
     body.mobile-shell .arpg[data-game-status="dead"] [data-run-menu] > .run-build-details[open] { order: 6; flex: 0 0 auto; width: 100%; }
     body.mobile-shell .arpg[data-game-status="dead"] [data-run-menu] > .checkpoint-note { order: 7; max-height: 1.2em; margin: 0; overflow: hidden; font-size: 8px; line-height: 1.1; }
 }
+
+/* Keep the run-build recap visually centered in campaign, pause, and death layouts. */
+body.mobile-shell .arpg [data-run-menu] > .run-build-details { text-align: center; }
+body.mobile-shell .arpg [data-run-menu] > .run-build-details summary { text-align: center; list-style: none; }
+body.mobile-shell .arpg [data-run-menu] > .run-build-details summary::-webkit-details-marker { display: none; }
+body.mobile-shell .arpg [data-run-menu] > .run-build-details summary::before { content: "▸"; margin-right: .4em; }
+body.mobile-shell .arpg [data-run-menu] > .run-build-details[open] summary::before { content: "▾"; }
+body.mobile-shell .arpg [data-run-menu] > .run-build-details p { text-align: center; }
+body.mobile-shell .arpg [data-run-menu] > .run-build-details > .run-relic-list { justify-content: center; }

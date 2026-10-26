@@ -11,9 +11,9 @@
 //   healing — multiplier applied to how much health potions/flasks restore (lower = harsher).
 //   extra   — how many additional enemies spawn per wave on top of the base wave count.
 export const DIFFICULTIES = {
-    hard: { name: "Easy", description: "The gentlest setting. Enemies are still dangerous in groups, so use movement, flasks, and upgrades to survive. Healing restores 75% of its normal amount.", health: 1.45, damage: 1.3, speed: 1.16, healing: 0.75, extra: 3 },
-    nightmare: { name: "Medium", description: "A demanding run for players who know the basics. Enemies are tougher, faster, and more numerous. Healing restores 58% of its normal amount.", health: 1.85, damage: 1.65, speed: 1.25, healing: 0.58, extra: 5 },
-    inferno: { name: "Hard", description: "The harshest setting, for experienced players. Expect dense waves, fast enemies, and little room to recover. Healing restores 40% of its normal amount.", health: 2.35, damage: 2.05, speed: 1.32, healing: 0.4, extra: 7 }
+    hard: { name: "Easy", description: "A forgiving run with nearly full flask value. Enemies still arrive in active waves, so keep moving and use your skills.", health: 1.2, damage: 1.08, speed: 1.08, healing: 0.95, extra: 3 },
+    nightmare: { name: "Medium", description: "The recommended challenge. Enemies hit harder and close distance faster, while upgrades give you room to build momentum.", health: 1.45, damage: 1.25, speed: 1.14, healing: 0.85, extra: 5 },
+    inferno: { name: "Hard", description: "A demanding run for experienced players. Expect tougher enemies, denser waves, and less healing.", health: 1.75, damage: 1.5, speed: 1.2, healing: 0.75, extra: 7 }
 };
 
 // Looks up the active difficulty preset for a given game state, falling back to Easy if the

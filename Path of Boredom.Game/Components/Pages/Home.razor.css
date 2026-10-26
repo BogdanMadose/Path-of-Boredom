@@ -650,7 +650,7 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .forge-heading > span { color: #e3c277; font-size: 13px; white-space: nowrap; }
 .forge-hint { font-size: 11px; line-height: 1.7; color: #a8a99d; margin: 12px 0 18px; }
 .forge-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.forge-grid button { display: grid; grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: auto auto auto; align-items: center; column-gap: 10px; row-gap: 4px; min-width: 0; padding: 12px; border: 1px solid #b79b6255; border-radius: 6px; background: linear-gradient(135deg, #1b2829, #121a1d 78%); color: #d8c4a3; text-align: left; overflow: hidden; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
+.forge-grid button { display: grid; grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: auto auto auto; align-items: center; align-content: center; column-gap: 10px; row-gap: 4px; min-width: 0; padding: 12px; border: 1px solid #b79b6255; border-radius: 6px; background: linear-gradient(135deg, #1b2829, #121a1d 78%); color: #d8c4a3; text-align: left; overflow: hidden; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
 .forge-grid button:hover:not(:disabled) { border-color: #efc77a; background: #303327; }
 .forge-grid button:disabled { cursor: not-allowed; opacity: .55; }
 .forge-grid button > .forge-card-art { grid-column: 1; grid-row: 1 / span 3; display: block; width: 48px; height: 48px; border: 1px solid #c7a56b55; border-radius: 12px; background: radial-gradient(circle at 50% 36%, #c7a56b22, #111b20 75%); box-shadow: inset 0 0 12px #0008, 0 2px 8px #0006; object-fit: cover; }
@@ -673,10 +673,13 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .options-panel h2, .challenges-panel h2 { font: 24px Georgia, serif; color: #f3dfb9; }
 .equipment-options label { display: grid; gap: 4px; margin-block: 8px; }
 .equipment-options select { min-width: 0; max-width: 100%; }
-.run-build-details { min-width: 0; padding: 7px 10px; border: 1px solid #c7a56b44; border-radius: 8px; background: #101a1e; color: #c9c1af; font-size: 11px; line-height: 1.4; }
-.run-build-details summary { color: #edc581; cursor: pointer; }
-.run-build-details p { margin: 5px 0 0; }
-.run-relic-list { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 4px; min-width: 0; }
+.run-build-details { min-width: 0; padding: 7px 10px; border: 1px solid #c7a56b44; border-radius: 8px; background: #101a1e; color: #c9c1af; font-size: 11px; line-height: 1.4; text-align: center; }
+.run-build-details summary { color: #edc581; cursor: pointer; list-style: none; }
+.run-build-details summary::-webkit-details-marker { display: none; }
+.run-build-details summary::before { content: "▸"; margin-right: .45em; }
+.run-build-details[open] summary::before { content: "▾"; }
+.run-build-details p { margin: 5px 0 0; text-align: center; }
+.run-relic-list { display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: center; gap: 4px; min-width: 0; }
 .arpg ::deep .run-relic-chip { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; padding: 2px 6px; border: 1px solid #c7a56b77; border-radius: 999px; background: #101a1e; color: var(--relic); font-size: 10px; line-height: 1.2; white-space: nowrap; }
 .challenge-options p { line-height: 1.6; }
 .training-skill-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -700,13 +703,14 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .level-draft h2 { font: 32px Georgia, serif; color: #f3dfb9; margin-bottom: 12px; }
 .draft-description { max-width: 620px; margin: 0 auto 20px; font-size: 12px; color: #babdb5; line-height: 1.7; }
 .level-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.level-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 22px 16px; text-align: left; color: #e4daca; background: linear-gradient(150deg, #373328, #17232a); border: 1px solid #c3a46788; border-radius: 6px; box-shadow: 0 6px 20px #0005; transition: transform .2s cubic-bezier(.2, .85, .3, 1.15), border-color .2s ease-out, background .2s ease-out, box-shadow .2s ease-out; }
+.level-card { display: grid; grid-template-columns: 46px minmax(0, 1fr); grid-template-rows: auto auto minmax(2.2em, 1fr) auto auto; align-content: center; align-items: center; gap: 8px 10px; min-width: 0; padding: 18px 14px; text-align: left; color: #e4daca; background: linear-gradient(150deg, #373328, #17232a); border: 1px solid #c3a46788; border-radius: 6px; box-shadow: 0 6px 20px #0005; transition: transform .2s cubic-bezier(.2, .85, .3, 1.15), border-color .2s ease-out, background .2s ease-out, box-shadow .2s ease-out; }
 .level-card:hover:not(:disabled) { background: linear-gradient(150deg, #51412d, #1c3037); border-color: #f0ce88; transform: translateY(-4px); box-shadow: 0 10px 26px #0007; }
-.card-category { font-size: 9px; letter-spacing: 2px; color: #d4b478; }
-.level-card strong { font: 21px/1.2 Georgia, serif; color: #f3deb8; }
-.card-description { font-size: 12px; line-height: 1.7; color: #bfc6bd; flex: 1; }
-.level-card small { font-size: 10px; color: #9fc5c6; }
-.card-pick { border-top: 1px solid #d1b07533; padding-top: 12px; color: #e3c385; font-size: 11px; }
+.level-card-art { grid-column: 1; grid-row: 1 / span 4; justify-self: center; align-self: center; width: 42px; height: 42px; border: 1px solid #c7a56b77; border-radius: 11px; background: radial-gradient(circle at 50% 36%, #c7a56b22, #111b20 75%); box-shadow: inset 0 1px 8px #0008, 0 2px 8px #0006; object-fit: contain; }
+.card-category { grid-column: 2; grid-row: 1; min-width: 0; font-size: 9px; letter-spacing: 2px; color: #d4b478; }
+.level-card strong { grid-column: 2; grid-row: 2; min-width: 0; font: 21px/1.2 Georgia, serif; color: #f3deb8; }
+.card-description { grid-column: 2; grid-row: 3; min-width: 0; font-size: 12px; line-height: 1.45; color: #bfc6bd; }
+.level-card small { grid-column: 2; grid-row: 4; min-width: 0; font-size: 10px; color: #9fc5c6; }
+.card-pick { grid-column: 1 / -1; grid-row: 5; border-top: 1px solid #d1b07533; padding-top: 8px; color: #e3c385; font-size: 11px; }
 .draft-footer { color: #e9ca8c; font-size: 12px; margin: 16px 0 8px; }
 .level-draft > small { color: #a2b1b3; font-size: 10px; }
 .boons-card > p:not(.eyebrow) { color: #c4d2c5; font-size: 12px; line-height: 1.9; overflow-wrap: anywhere; }

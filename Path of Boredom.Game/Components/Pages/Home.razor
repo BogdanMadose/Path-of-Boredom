@@ -119,6 +119,7 @@
                                 @for (var index = 0; index < 3; index++)
                                 {
                                     <button type="button" class="level-card" data-level-card="@index" disabled>
+                                        <img class="level-card-art" data-card-art alt="" aria-hidden="true" />
                                         <span class="card-category" data-card-category></span>
                                         <strong data-card-name></strong>
                                         <span class="card-description" data-card-description></span>
@@ -252,8 +253,8 @@
                             <p data-setup-description></p>
                             <label class="difficulty-picker" data-setup-difficulty>Difficulty
                                 <select data-difficulty aria-describedby="difficulty-description">
-                                    <option value="hard">Easy — recommended starting point</option>
-                                    <option value="nightmare">Medium — tougher enemies, less healing</option>
+                                    <option value="hard">Easy — gentler enemy damage and fuller healing</option>
+                                    <option value="nightmare" selected>Medium — recommended challenge</option>
                                     <option value="inferno">Hard — most demanding, least healing</option>
                                 </select>
                                 <small id="difficulty-description" data-difficulty-description aria-live="polite"></small>
@@ -352,7 +353,7 @@
                     <div class="loadout-grid">
                         @for (var slot = 1; slot <= 3; slot++)
                         {
-                            <label>@($"Auto slot {slot} · level {new[] { 1, 5, 10 }[slot - 1]}")
+                            <label><span data-loadout-label="@slot">@($"Auto slot {slot}")</span>
                                 <select data-loadout-slot="@slot" disabled>
                                     <option value="none">Choose when unlocked</option>
                                     @foreach (var skill in CombatSkills)
@@ -378,7 +379,7 @@
                             <section class="skill-tree" data-tree-skill="@skill" hidden="@CombatSkills.Contains(skill)">
                                 <h3 data-skill-name="@skill">@skill</h3>
                                 <p data-skill-description="@skill"></p>
-                                <p class="tree-path">Tap a node to preview it, then tap again to learn. Each rank costs 1 point.</p>
+                                <p class="tree-path">Select once to inspect. Select again while Available to learn; each rank costs 1 point.</p>
                                 <button type="button" class="quiet-button tree-respec" data-respec-tree="@skill" disabled>Reset tree</button>
                                 <div class="skill-tree-map" role="group" aria-label="Upgrade branches">
                                     <svg class="tree-connections" viewBox="0 0 300 300" preserveAspectRatio="none" aria-hidden="true">

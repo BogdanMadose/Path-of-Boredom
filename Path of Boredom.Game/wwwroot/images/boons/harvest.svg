@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Call of the fallen</title>
+  <defs>
+    <radialGradient id="bg"><stop stop-color="#5a4b2b"/><stop offset="1" stop-color="#111a20"/></radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0ae"/><stop offset="1" stop-color="#d79d4f"/></linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="13" fill="url(#bg)"/>
+  <path d="M18 13v15a14 14 0 0 0 28 0V13" fill="none" stroke="url(#gold)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M18 13h10m18 0h-10" stroke="#fff0bd" stroke-width="4" stroke-linecap="round"/>
+  <path d="M14 43c5-4 9-4 14 0m8 4c4-3 8-3 12 0m-28 7c3-2 6-2 9 0" fill="none" stroke="#8fe0c0" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="32" cy="28" r="4" fill="#fff2c0"/>
+</svg>

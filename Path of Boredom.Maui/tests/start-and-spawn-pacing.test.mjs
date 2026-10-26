@@ -46,6 +46,6 @@ bossWave.spawnTimer = 0.01;
 step(bossWave, {}, 0.05);
 assert.equal(pendingSpawns(bossWave), queuedBefore - 1, 'one queued enemy releases when its timer expires');
 assert.equal(bossWave.enemies.length, 1, 'the queue releases only one enemy per timer');
-assert.ok(bossWave.spawnTimer >= 0.9 && bossWave.spawnTimer <= 1.1, 'reinforcements arrive at a measured, bounded interval');
+assert.ok(bossWave.spawnTimer >= 1.15 && bossWave.spawnTimer <= 1.35, 'reinforcements arrive at a measured, bounded interval');
 
 console.log('PASS: quick starts and paced reinforcements');

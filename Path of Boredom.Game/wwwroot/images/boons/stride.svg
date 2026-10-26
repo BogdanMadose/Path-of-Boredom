@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Wayfarer's instinct</title>
+  <defs>
+    <radialGradient id="bg"><stop stop-color="#36574d"/><stop offset="1" stop-color="#111d22"/></radialGradient>
+    <linearGradient id="wind" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e4f4c3"/><stop offset="1" stop-color="#78c5a7"/></linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="13" fill="url(#bg)"/>
+  <path d="M9 20h19q7 0 7 5t-7 5H16m-7 8h29q7 0 7 5t-7 5H15" fill="none" stroke="url(#wind)" stroke-width="4" stroke-linecap="round"/>
+  <path d="m44 13 4 8 8 4-8 4-4 8-4-8-8-4 8-4z" fill="#f2d58d" stroke="#fff0bd" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>

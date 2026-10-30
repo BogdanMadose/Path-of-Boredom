@@ -1,12 +1,13 @@
-﻿<Router AppAssembly="@typeof(App).Assembly">
+<Router AppAssembly="@typeof(App).Assembly" AdditionalAssemblies="@(new[] { typeof(IGameSession).Assembly })">
     <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(Path_of_Boredom.Game.Components.Layout.GameLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
     </Found>
     <NotFound>
         <PageTitle>Not found</PageTitle>
-        <LayoutView Layout="@typeof(MainLayout)">
-            <p role="alert">Sorry, there's nothing at this address.</p>
-        </LayoutView>
+        <main>
+            <h1>Page not found</h1>
+            <p>The requested page could not be found.</p>
+        </main>
     </NotFound>
 </Router>

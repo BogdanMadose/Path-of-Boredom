@@ -663,7 +663,7 @@
 
         try
         {
-            var importedModule = await JS.InvokeAsync<IJSObjectReference>("import", "_content/PathOfBoredom.Game/js/arpg.js");
+            var importedModule = await JS.InvokeAsync<IJSObjectReference>("import", "/_content/PathOfBoredom.Game/js/arpg.js");
 
             // If the component got disposed while the import was in flight (e.g. fast navigation
             // away), don't leave an orphaned module reference around — clean it up immediately

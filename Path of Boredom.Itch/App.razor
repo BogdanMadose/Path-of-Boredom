@@ -4,10 +4,9 @@
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
     </Found>
     <NotFound>
-        <PageTitle>Not found</PageTitle>
-        <main>
-            <h1>Page not found</h1>
-            <p>The requested page could not be found.</p>
-        </main>
+        @* itch.io loads the build as ".../index.html", which matches no route: show the game. *@
+        <LayoutView Layout="@typeof(Path_of_Boredom.Game.Components.Layout.GameLayout)">
+            <Path_of_Boredom.Game.Components.Pages.Home />
+        </LayoutView>
     </NotFound>
 </Router>

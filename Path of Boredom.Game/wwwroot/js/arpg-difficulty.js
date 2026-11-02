@@ -12,8 +12,8 @@
 //   extra   — how many additional enemies spawn per wave on top of the base wave count.
 export const DIFFICULTIES = {
     hard: { name: "Easy", description: "A forgiving run with nearly full flask value. Enemies still arrive in active waves, so keep moving and use your skills.", health: 1.2, damage: 1.08, speed: 1.08, healing: 0.95, extra: 3 },
-    nightmare: { name: "Medium", description: "The recommended challenge. Enemies hit harder and close distance faster, while upgrades give you room to build momentum.", health: 1.45, damage: 1.25, speed: 1.14, healing: 0.85, extra: 5 },
-    inferno: { name: "Hard", description: "A demanding run for experienced players. Expect tougher enemies, denser waves, and less healing.", health: 1.75, damage: 1.5, speed: 1.2, healing: 0.75, extra: 7 }
+    nightmare: { name: "Medium", description: "The recommended challenge. Enemies hit harder and close distance faster, while upgrades give you room to build momentum.", health: 1.45, damage: 1.25, speed: 1.14, healing: 0.8, extra: 5 },
+    inferno: { name: "Hard", description: "A demanding run for experienced players. Expect tougher enemies, denser waves, and less healing.", health: 1.75, damage: 1.5, speed: 1.2, healing: 0.7, extra: 7 }
 };
 
 // Looks up the active difficulty preset for a given game state, falling back to Easy if the

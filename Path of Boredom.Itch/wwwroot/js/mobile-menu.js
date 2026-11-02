@@ -92,8 +92,9 @@
     function treeArt(tree) {
         if (tree.dataset.skillIcon) return tree.dataset.skillIcon;
         var skill = tree.dataset.treeSkill;
-        return ["dodge", "potion"].includes(skill) ? "/_content/PathOfBoredom.Game/images/skills/" + skill + ".svg"
-            : "/_content/PathOfBoredom.Game/images/skills/" + (tree.dataset.heroClass || "knight") + "/" + skill + ".svg";
+        var base = (globalThis.pobAssetBase || "") + "/_content/PathOfBoredom.Game/images/skills/";
+        return ["dodge", "potion"].includes(skill) ? base + skill + ".svg"
+            : base + (tree.dataset.heroClass || "knight") + "/" + skill + ".svg";
     }
 
     function returnToMainMenu(root) {
@@ -628,9 +629,11 @@
         var pause = layer.querySelector('[data-mm-tab="pause"]');
         if (canvas && bar) {
             var bounds = canvas.getBoundingClientRect();
-            bar.style.setProperty('--menu-shortcuts-top', (bounds.top + 52) + 'px');
+            var hudBottom = window.pobDesktopShell ? 80 * Math.min(1.4, Math.max(1.1, bounds.width / 1100)) : 50;
+            bar.style.setProperty('--menu-shortcuts-top', (bounds.top + hudBottom + 2) + 'px');
+            bar.style.setProperty('--menu-shortcuts-right', Math.max(0, window.innerWidth - bounds.right) + 'px');
             if (pause) {
-                pause.style.setProperty('--pause-hud-top', (bounds.top + 50) + 'px');
+                pause.style.setProperty('--pause-hud-top', (bounds.top + hudBottom) + 'px');
                 pause.style.setProperty('--pause-hud-left', (bounds.left + 14) + 'px');
             }
         }
@@ -737,9 +740,7 @@
         currentRoot = root;
         menuController = new AbortController();
 
-        // Tells arpg.js to auto-fire the regular attack along the character's facing (no mouse to
-        // aim with on a phone) and to draw the HUD into the canvas instead of as DOM over it.
-        // Both are read by arpg.js; desktop leaves them unset and is unaffected.
+        // Menus and the canvas HUD are shared; desktop keeps mouse/keyboard attacks.
         root.dataset.autoAttack = "on";
         root.dataset.canvasHud = "on";
         root.dataset.localSaves = "on";
@@ -773,7 +774,11 @@
         panels.pause.root.querySelector(".mm-pause-side").appendChild(main);
         listen(root, "main-menu-open", function () { closePanel(false); returnToMain = false; panelBackTarget = null; loreReturnToPause = false; });
         listen(root, 'open-main-panel', function () { returnToMain = true; });
-        listen(root, "open-run-options", function (event) { returnToMain = event.detail?.fromMain === true; openPanel("options"); });
+        listen(root, "open-run-options", function (event) {
+            returnToMain = event.detail?.fromMain === true;
+            openPanel("options");
+            if (openName === "options" && event.detail?.section === "account") selectOptionsSection(panels.options.root, "account");
+        });
         listen(root, "mobile-save-result", function (event) {
             if (event.detail?.success && event.detail?.loadingSave && openName) closePanel(false);
             syncBadges();

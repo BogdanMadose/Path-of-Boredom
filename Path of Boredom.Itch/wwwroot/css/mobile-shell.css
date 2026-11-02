@@ -1075,7 +1075,7 @@ body.mobile-shell [data-run-menu] > .death-report {
 }
 body.mobile-shell [data-run-menu] > .death-report ol {
     max-height: none;
-    overflow: visible;
+    overflow: hidden;
 }
 body.mobile-shell [data-run-menu] > .death-report:not(.run-summary) { display: flex; flex-direction: column; min-height: 0; }
 body.mobile-shell [data-run-menu] > .death-report:not(.run-summary) .report-scroll-region { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #d8b776 #182329; }

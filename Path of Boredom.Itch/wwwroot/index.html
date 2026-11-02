@@ -4,33 +4,109 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>Path of Boredom.Itch</title>
+    <title>Path of Boredom</title>
+    <!-- Relative base: itch.io serves the build from a nested CDN path, so nothing may assume "/". -->
     <base href="./" />
-    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
+    <script>
+        // Prefix for the game's asset URLs (arpg*.js / mobile-menu.js); "" on hosts served from "/".
+        window.pobAssetBase = new URL(".", document.baseURI).pathname.replace(/\/$/, "");
+    </script>
+    <link rel="stylesheet" href="PathOfBoredom.Itch.styles.css" />
     <link rel="stylesheet" href="css/app.css" />
-    <link rel="stylesheet" href="Path of Boredom.Itch.styles.css" />
-    <link rel="stylesheet" href="css/mobile-shell.css" />
-    <link rel="stylesheet" href="css/mobile-menu.css" />
+    <!-- Menus are shared; only the arena layout and touch input differ on desktop. -->
+    <link rel="stylesheet" href="css/mobile-shell.css" id="mobile-shell-css" />
+    <link rel="stylesheet" href="css/mobile-menu.css" id="mobile-menu-css" />
+    <link rel="stylesheet" href="_content/PathOfBoredom.Game/css/desktop-shell.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
+    <script>
+        window.pobDesktopShell = !(navigator.maxTouchPoints > 0);
+        if (window.pobDesktopShell) {
+            document.getElementById("mobile-shell-css").disabled = true;
+        }
+    </script>
+    <style>
+        html, body { margin: 0; background: #0b1114; }
+
+        .boot {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            background: radial-gradient(circle at 50% 42%, #1c2a2b 0%, #0b1114 62%);
+            color: #f0d9ad;
+            font-family: Georgia, serif;
+            text-align: center;
+            padding: 24px;
+            z-index: 100000;
+            transition: opacity .6s ease;
+        }
+
+        .boot h1 { margin: 0; font-size: 26px; font-weight: 400; letter-spacing: 1px; color: #f1e5cc; }
+        .boot p { margin: 0; font-family: system-ui, sans-serif; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #9fb0ad; }
+
+        .boot-ember {
+            position: relative;
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ffcf87 0%, #e08a2e 38%, #7a3d12 62%, transparent 70%);
+            animation: boot-pulse 1.9s ease-in-out infinite;
+        }
+
+        .boot-ember::after {
+            content: "";
+            position: absolute;
+            inset: -14px;
+            border-radius: 50%;
+            border: 1px solid #c7a56b44;
+            border-top-color: #f0c98d;
+            animation: boot-spin 1.5s linear infinite;
+        }
+
+        @keyframes boot-pulse { 0%, 100% { transform: scale(.88); opacity: .78; } 50% { transform: scale(1.06); opacity: 1; } }
+        @keyframes boot-spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .boot-ember, .boot-ember::after { animation: none; } }
+    </style>
 </head>
 
 <body class="mobile-shell">
-    <div id="app">
-        <svg class="loading-progress">
-            <circle r="40%" cx="50%" cy="50%" />
-            <circle r="40%" cx="50%" cy="50%" />
-        </svg>
-        <div class="loading-progress-text"></div>
+    <script>if (window.pobDesktopShell) document.body.classList.add("desktop-shell");</script>
+    <div id="app"></div>
+    <div class="boot" id="boot-splash">
+        <div class="boot-ember" aria-hidden="true"></div>
+        <h1>Path of Boredom</h1>
+        <p>Kindling the last ember…</p>
     </div>
+    <script>
+        (function () {
+            var splash = document.getElementById("boot-splash"), app = document.getElementById("app");
+            function check() {
+                if (app.childElementCount > 0) {
+                    splash.style.opacity = "0";
+                    setTimeout(function () { splash.remove(); }, 650);
+                } else setTimeout(check, 150);
+            }
+            setTimeout(check, 300);
+        })();
+    </script>
 
     <div id="blazor-error-ui">
         An unhandled error has occurred.
         <a href="." class="reload">Reload</a>
-        <span class="dismiss">🗙</span>
+        <span class="dismiss">&times;</span>
     </div>
+    <script src="js/itch-auth.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>
-    <script src="js/mobile-shell.js"></script>
-    <script src="js/mobile-menu.js"></script>
+    <script>
+        for (const src of window.pobDesktopShell ? ["js/mobile-menu.js"] : ["js/mobile-shell.js", "js/mobile-menu.js"]) {
+            const script = document.createElement("script");
+            script.src = src; script.async = false;
+            document.body.appendChild(script);
+        }
+    </script>
 </body>
 
 </html>

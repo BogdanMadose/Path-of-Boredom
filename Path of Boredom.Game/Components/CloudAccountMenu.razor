@@ -3,7 +3,7 @@
 
 @if (Session is ICloudGameSession cloud)
 {
-    <div class="mm-account-body">
+    <div class="mm-account-body" data-signed-in="@(cloud.AccountStatus.SignedIn ? "true" : "false")" aria-busy="@(busy ? "true" : "false")">
         @if (busyLabel is not null)
         {
             <div class="account-busy" role="status" aria-live="assertive">
@@ -17,6 +17,14 @@
         @if (lastResult is not null)
         {
             <p role="status" aria-live="polite">@lastResult</p>
+        }
+        @if (!cloud.AccountStatus.SignedIn)
+        {
+            <section class="account-intro">
+                <h3>Keep your ember with you</h3>
+                <p>Sign in to back up your runs to the cloud and join the rankings.</p>
+                <p>Prefer to play offline? Your device saves still work without an account.</p>
+            </section>
         }
         <fieldset disabled="@busy">
             <legend>Game account</legend>
@@ -105,7 +113,12 @@
         if (busy) return;
         busy = true;
         lastResult = null;
-        try { await action(); }
+        StateHasChanged();
+        try
+        {
+            await Task.Yield();
+            await action();
+        }
         catch
         {
             lastResult = "This operation could not be completed. Device progress is safe; retry when connected.";
@@ -120,6 +133,7 @@
 
     private async Task RunWithLabel(string label, string hint, Func<Task> action)
     {
+        if (busy) return;
         busyLabel = label; busyHint = hint;
         StateHasChanged();
         try { await Run(action); }
@@ -130,14 +144,12 @@
     {
         renameResult = null;
         status = await Cloud.SignInAsync();
-        busyLabel = "Loading your account…"; busyHint = "Checking cloud saves and rankings."; StateHasChanged();
         displayName = status.Player;
     });
     private Task SignInApple() => RunWithLabel("Signing in with Apple…", "Finish in the Apple window, then come back here.", async () =>
     {
         renameResult = null;
         status = await Cloud.SignInWithAppleAsync();
-        busyLabel = "Loading your account…"; busyHint = "Checking cloud saves and rankings."; StateHasChanged();
         displayName = status.Player;
     });
     private Task SignOut() => RunWithLabel("Signing out…", "Your device save stays here.", async () =>

@@ -11,7 +11,7 @@ const patchNotesCss = fs.readFileSync(new URL('../../Path of Boredom.Game/Compon
 const css = fs.readFileSync(new URL('../wwwroot/css/mobile-menu.css', import.meta.url), 'utf8').replace('@media (pointer: coarse)', '@media all');
 const markup = home.slice(home.indexOf('<section class="main-menu"'), home.indexOf('<section class="campaign-lore"'));
 for (const [name, page] of [['Patch Notes', patchNotes], ['Rankings', rankings]]) {
-    assert.match(page, /class="back-link" href="\/" aria-label="Back to game"/, `${name} page returns to the game route`);
+    assert.match(page, /class="back-link" href="\.\/" aria-label="Back to game"/, `${name} page returns to the game route`);
 }
 assert.match(home, /<button[^>]*data-open-patch-notes/, 'main-menu Patch Notes opens without a route change');
 assert.match(home, /<Microsoft\.AspNetCore\.Components\.Web\.PageTitle>/, 'document title uses the framework component by its full type name');

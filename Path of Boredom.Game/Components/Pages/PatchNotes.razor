@@ -11,7 +11,7 @@
     @if (!Embedded)
     {
         <header class="page-header">
-            <a class="back-link" href="/" aria-label="Back to game" title="Back to game"><span aria-hidden="true">←</span></a>
+            <a class="back-link" href="./" aria-label="Back to game" title="Back to game"><span aria-hidden="true">←</span></a>
         </header>
         <section class="page-heading">
             <p class="eyebrow">LATEST UPDATE</p>
@@ -38,8 +38,13 @@
             <h3>A steadier challenge</h3>
             <ul>
                 <li>Campaign level and Forge damage growth is more measured; the first wave starts with fewer enemies.</li>
-                <li>Campaign bosses have less health but attack more often, with faster, more dangerous projectiles.</li>
+                <li>Wave 1 keeps its existing opening difficulty. From wave 2, enemy health and damage now grow more aggressively throughout the campaign, with no fading early-wave bonuses.</li>
+                <li>Later campaign waves maintain larger fighting groups and release reinforcements more frequently, so upgraded builds still face pressure.</li>
+                <li>Bosses now enter after their reinforcements, when at most two other enemies remain. Their entrance warning and boss music start when they actually arrive.</li>
+                <li>Bosses have 90% more health and 20% more damage on top of the stronger wave curve. Enemy stats follow the wave and chosen difficulty, not the upgrades you buy.</li>
+                <li>Boss specials repeat a fixed cycle, lock their aim when the warning appears, and keep the full 1.1-second telegraph in every phase. Each of the six bosses gains an extra clearly marked final-phase hazard, with matching visuals and hit detection.</li>
                 <li>Endless starts with more Forge upgrades, with tuned opening echoes to keep the veteran start challenging.</li>
+                <li>The first 30 Endless echoes use the campaign's rising pressure curve on a veteran baseline. Reinforcements accelerate as you progress, and difficulty continues growing beyond echo 30 without resetting on a new map cycle.</li>
                 <li>Early level-ups arrive at a steadier pace. Difficulty choices are now Easy, Medium, and Hard; existing rankings are preserved.</li>
             </ul>
         </section>
@@ -50,6 +55,7 @@
             <ul>
                 <li>Keep up to five runs and choose a save by its character and run details.</li>
                 <li>Fixed saving after choosing a stage challenge, and improved the load, continue, and restart flow.</li>
+                <li>Pending reinforcements and bosses are now preserved when saving and loading mid-wave. Existing saves remain supported.</li>
                 <li>Fixed movement and dodge controls failing at the start of a run, along with several skill upgrades that did not apply correctly.</li>
             </ul>
         </section>
@@ -59,6 +65,9 @@
             <h3>Clearer choices across the game</h3>
             <ul>
                 <li>The main menu and account options are easier to navigate. Back and restart actions return to the right screen without signing you out.</li>
+                <li>Sign in directly from the main menu for cloud saves and rankings, or keep playing offline. Account operations show progress while waiting; browser sign-in sheets can be cancelled.</li>
+                <li>Browser and desktop builds use larger menus, clearer Forge cards and a desktop-sized canvas HUD. The Forge notification replaces the extra upgrade banner.</li>
+                <li>Browser audio now also unlocks on touch release and click, fixing silent touch sessions. Sound options explain when a gesture is needed to enable audio.</li>
                 <li>Skill, Forge, and level-up choices are clearer, with refreshed upgrade cards and arena artwork.</li>
                 <li>Run summaries keep their details inside the cards and show when more can be scrolled. Landscape menus fit phone screens better, and gear pickup sounds are quieter.</li>
             </ul>
@@ -69,7 +78,7 @@
     {
         <footer>
             <span>Version 1.0.1 · Path of Boredom</span>
-            <a href="/">Return to the game</a>
+            <a href="./">Return to the game</a>
         </footer>
     }
 </main>

@@ -178,7 +178,12 @@ assert.equal(context.openName, 'pause', 'a failed load keeps the current menu op
 
 for (const page of ['PatchNotes', 'Rankings']) {
     const markup = fs.readFileSync(path.join(__dirname, `../../Path of Boredom.Game/Components/Pages/${page}.razor`), 'utf8');
-    assert.match(markup, /class="back-link" href="\/" aria-label="Back to game"/, `${page} back returns to the game route`);
+    const back = markup.match(/class="back-link" href="([^"]+)" aria-label="Back to game"/);
+    assert.ok(back, `${page} has a Back to game link`);
+    assert.equal(back[1], './', `${page} back is relative to the application base`);
+    for (const base of ['https://example.test/', 'https://example.test/itch/game/']) {
+        assert.equal(new URL(back[1], base).href, base, `${page} back preserves the hosting path`);
+    }
 }
 const patchNotesCss = fs.readFileSync(path.join(__dirname, '../../Path of Boredom.Game/Components/Pages/PatchNotes.razor.css'), 'utf8');
 assert.match(patchNotesCss, /\.page-header \{[^}]*justify-content: flex-end;/, 'Patch Notes Back button is aligned to the right');

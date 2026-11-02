@@ -12,8 +12,11 @@ assert.ok(options.includes('data-audio-mute') && !options.includes('data-trainin
 assert.ok(!options.includes('data-equipment-style') && !options.includes('data-challenge-choice'));
 for (const key of ['none', 'unscarred', 'flaskless', 'swift']) assert.ok(challenges.includes(`data-challenge-choice="${key}"`));
 const menu = fs.readFileSync(new URL('../wwwroot/js/mobile-menu.js', import.meta.url), 'utf8');
-assert.ok(menu.includes('challenges: "Stage challenges — bonus gold"'), 'Pause must label the Challenges menu clearly');
-assert.ok(menu.includes('names: ["skills", "forge", "challenges", "options"]'), 'Pause must expose Challenges alongside character menus');
+assert.ok(menu.includes('names: ["skills", "forge", "options"]'), 'Pause character menus must not duplicate the stage challenge picker');
+assert.ok(home.includes('data-open-challenges>View challenges</button>'), 'Stage notifications must expose the Challenges panel');
+assert.ok(home.includes('data-camp-challenge hidden'), 'Camp must offer stage challenge selection');
+assert.ok(menu.includes('stageRecap.setAttribute("aria-label", "Current stage choices")'), 'Pause must expose the current stage recap');
+assert.ok(menu.includes('["Challenge", "stageChallenge"]'), 'Pause recap must include the selected challenge');
 assert.ok(menu.includes('makePanel("challenges",'), 'Challenges must have its own panel');
 assert.match(menu, /options: "Options"/);
 assert.match(menu, /entries\.push\(\{ name: "Account", icon: "◉", section: "account" \}\)/);

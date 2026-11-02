@@ -45,7 +45,7 @@ export function levelCardArtSource(state, key, card = LEVEL_CARDS[key]) {
     if (card?.skill) return skillIcon(state, card.skill);
     if (levelCardSkillIcons[key]) return skillIcon(state, levelCardSkillIcons[key]);
     const asset = boonArtAssets[key] || "weapon";
-    return `/_content/PathOfBoredom.Game/images/${boonArtFolders[key] || "forge"}/${asset}.svg`;
+    return `${globalThis.pobAssetBase || ""}/_content/PathOfBoredom.Game/images/${boonArtFolders[key] || "forge"}/${asset}.svg`;
 }
 
 const CARD_SKILLS = { nova: "nova", burst: "burst", guard: "guard", ...Object.fromEntries(Object.keys(NEW_SKILLS).map(skill => [`${skill}Oath`, skill])) };

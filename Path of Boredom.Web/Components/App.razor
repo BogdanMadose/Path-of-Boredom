@@ -9,8 +9,16 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["Path of Boredom.Web.styles.css"]" />
-    <link rel="stylesheet" href="@Assets["css/mobile-shell.css"]" />
-    <link rel="stylesheet" href="@Assets["css/mobile-menu.css"]" />
+    <link rel="stylesheet" href="@Assets["css/mobile-shell.css"]" id="mobile-shell-css" />
+    <link rel="stylesheet" href="@Assets["css/mobile-menu.css"]" id="mobile-menu-css" />
+    <link rel="stylesheet" href="@Assets["_content/PathOfBoredom.Game/css/desktop-shell.css"]" />
+    <!-- Menus are shared; only the arena layout and touch input differ on desktop. -->
+    <script>
+        window.pobDesktopShell = !(navigator.maxTouchPoints > 0);
+        if (window.pobDesktopShell) {
+            document.getElementById("mobile-shell-css").disabled = true;
+        }
+    </script>
     <ImportMap />
     <HeadOutlet />
     <style>
@@ -31,6 +39,7 @@
 </head>
 
 <body class="mobile-shell" style="background: #0b1114;">
+    <script>if (window.pobDesktopShell) document.body.classList.add("desktop-shell");</script>
     <div class="boot" id="boot-splash">
         <div class="boot-ember" aria-hidden="true"></div>
         <h1>Path of Boredom</h1>
@@ -59,8 +68,13 @@
     </script>
     <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)" />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
-    <script src="@Assets["js/mobile-shell.js"]" defer></script>
-    <script src="@Assets["js/mobile-menu.js"]" defer></script>
+    <script>
+        for (const src of window.pobDesktopShell ? ["@Assets["js/mobile-menu.js"]"] : ["@Assets["js/mobile-shell.js"]", "@Assets["js/mobile-menu.js"]"]) {
+            const script = document.createElement("script");
+            script.src = src; script.async = false;
+            document.body.appendChild(script);
+        }
+    </script>
 </body>
 
 </html>

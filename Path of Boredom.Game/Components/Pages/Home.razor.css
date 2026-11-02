@@ -46,6 +46,7 @@
 .main-menu-card p { font-size: 13px; line-height: 1.6; }
 .main-menu-card > .main-menu-patch-notes { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 100%; min-height: 42px; text-align: center; text-decoration: none; }
 .main-menu-card > button.main-menu-patch-notes { color: #e9c78b; }
+.main-menu-card > .main-account-action { border-color: #e9c78b; background: #394334; color: #ffe6b7; }
 .patch-notes-overlay { position: fixed; inset: 0; z-index: 80; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; background: #0d1417; }
 .patch-notes-overlay-header { position: fixed; top: max(10px, env(safe-area-inset-top, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); z-index: 2; }
 .patch-notes-overlay-header button { min-height: 42px; padding: 8px 14px; border: 1px solid #c7a56b99; border-radius: 999px; background: #101a1ef2; color: #f1d49b; }
@@ -596,13 +597,16 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .tree-node:focus-within { z-index: 3; }
 .tree-node:not(.tooltip-dismissed):hover, .tree-node.tooltip-inspected:not(.tooltip-dismissed) { z-index: 5; }
 .tree-node.tooltip-dismissed { z-index: auto; }
-.tree-node button { display: grid; place-content: center; gap: 2px; width: 72px; height: 72px; padding: 6px; border: 2px solid #607b7a; border-radius: 50%; background: #0d1a20; color: #dfcba6; text-align: center; box-shadow: 0 4px 12px #0007; }
-.tree-node button strong { font-size: 11px; line-height: 1.2; overflow-wrap: anywhere; }
-.tree-node button small { font-size: 10px; color: #edcc91; }
+.tree-node button { display: grid; place-content: center; justify-items: center; gap: 2px; width: 72px; height: 72px; padding: 6px; overflow: hidden; border: 2px solid #607b7a; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #1b2d33 0%, #0d1a20 72%); color: #dfcba6; text-align: center; box-shadow: 0 4px 12px #0007, inset 0 1px 0 #ffffff12; }
+.tree-node button strong { display: -webkit-box; -webkit-box-orient: vertical; line-clamp: 2; -webkit-line-clamp: 2; max-width: 100%; overflow: hidden; font-size: 10px; line-height: 1.1; overflow-wrap: anywhere; }
+.tree-node button small { padding: 0 5px; border-radius: 999px; background: #00000059; font-size: 9px; line-height: 1.4; color: #edcc91; font-variant-numeric: tabular-nums; }
+.tree-node button small:empty { display: none; }
 .tree-node-icon { display: block; width: 24px; height: 24px; margin-inline: auto; border-radius: 5px; background: var(--skill-art) center / contain no-repeat; font-size: 0; line-height: 1; color: #b8d1d0; }
 .tree-node button[aria-disabled="true"] { cursor: help; border-style: dashed; color: #a8b6b2; }
-.tree-node button.available { border-color: #edc581; box-shadow: 0 0 15px #d9ad4433; }
-.tree-node button.learned { border-color: #d5ac62; border-style: solid; background: #303029; }
+.tree-node button[aria-disabled="true"] .tree-node-icon { filter: grayscale(.7) brightness(.75); }
+.tree-node button.available { border-color: #edc581; box-shadow: 0 0 15px #d9ad4433, inset 0 0 10px #e8b45918; }
+.tree-node button.learned { border-color: #d5ac62; border-style: solid; background: radial-gradient(circle at 50% 30%, #4a4532 0%, #2a2a24 75%); box-shadow: 0 0 12px #d5ac6244, inset 0 1px 0 #ffe4a333; }
+.tree-node button.learned .tree-node-icon { filter: drop-shadow(0 0 4px #ffd27a88); }
 .tree-locked .tree-node button { background: #182025; border-color: #556265; }
 .skill-tree button[data-node-visual="fire"].learned { border-color: #ff9849; box-shadow: inset 0 0 15px #fa842a22; }
 .skill-tree button[data-node-visual="frost"].learned, .skill-tree button[data-node-visual="wind"].learned { border-color: #8cddff; }
@@ -669,7 +673,7 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .forge-grid button { display: grid; grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: auto auto auto; align-items: center; align-content: center; column-gap: 10px; row-gap: 4px; min-width: 0; padding: 12px; border: 1px solid #b79b6255; border-radius: 6px; background: linear-gradient(135deg, #1b2829, #121a1d 78%); color: #d8c4a3; text-align: left; overflow: hidden; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
 .forge-grid button:hover:not(:disabled) { border-color: #efc77a; background: #303327; }
 .forge-grid button:disabled { cursor: not-allowed; opacity: .55; }
-.forge-grid button > .forge-card-art { grid-column: 1; grid-row: 1 / span 3; display: block; width: 48px; height: 48px; border: 1px solid #c7a56b55; border-radius: 12px; background: radial-gradient(circle at 50% 36%, #c7a56b22, #111b20 75%); box-shadow: inset 0 0 12px #0008, 0 2px 8px #0006; object-fit: cover; }
+.forge-grid button > .forge-card-art { grid-column: 1; grid-row: 1 / span 3; display: block; width: 48px; height: 48px; min-width: 0; min-height: 0; max-width: 100%; max-height: 100%; flex-shrink: 0; border: 1px solid #c7a56b55; border-radius: 12px; background: radial-gradient(circle at 50% 36%, #c7a56b22, #111b20 75%); box-shadow: inset 0 0 12px #0008, 0 2px 8px #0006; object-fit: cover; }
 .forge-grid button > strong, .forge-grid button > span:not([data-upgrade-preview]), .forge-grid button > small { grid-column: 2; min-width: 0; }
 .forge-grid button > [data-upgrade-preview] { grid-column: 1 / -1; }
 .forge-grid button:hover:not(:disabled) > .forge-card-art { border-color: #efc77a99; box-shadow: inset 0 0 12px #0008, 0 0 14px #c7a56b33; }

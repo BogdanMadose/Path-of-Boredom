@@ -537,6 +537,7 @@ export function createGameAudio(environment = globalThis) {
     }
     return {
         unlock, play, update, setBackground,
+        get ready() { return context?.state === "running" && !failed && !disposed; },
         get settings() { return { ...settings }; },
         setSettings(value) {
             settings = audioSettings({ ...settings, ...value });

@@ -29,7 +29,7 @@ assert.ok(ascension.enemies.length > 0);
 
 // A quick clear must not release the entire remainder of the wave at once. This also exercises a
 // boss wave, whose support queue is where the old low-enemy bypass caused the largest burst.
-const bossWave = startRun(() => 0.5);
+const bossWave = startRun(() => 0.5, 'hard');
 bossWave.status = 'playing';
 bossWave.wave = 4;
 bossWave.intermission = 0;
@@ -54,6 +54,7 @@ bossWave.spawnTimer = 0.01;
 step(bossWave, {}, 0.05);
 assert.equal(pendingSpawns(bossWave), queuedAtPressureFloor - 1, 'one queued enemy releases when its timer expires');
 assert.equal(bossWave.enemies.length, 4, 'the normal timer releases only one enemy above the pressure floor');
-assert.ok(bossWave.spawnTimer >= 1.15 && bossWave.spawnTimer <= 1.35, 'reinforcements arrive at a measured, bounded interval');
+const interval = 1.15 / (1 + 4 * 0.03);
+assert.ok(bossWave.spawnTimer >= interval && bossWave.spawnTimer <= interval + 0.12, 'reinforcements follow the wave-scaled, bounded interval');
 
 console.log('PASS: quick starts and paced reinforcements');

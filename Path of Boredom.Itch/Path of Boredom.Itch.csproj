@@ -2,6 +2,10 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
+    <!-- Space-free, like the Game and MAUI projects: static web asset endpoint keys break on spaces,
+         and index.html references the PathOfBoredom.Itch.styles.css bundle by this name. -->
+    <AssemblyName>PathOfBoredom.Itch</AssemblyName>
+    <RootNamespace>Path_of_Boredom.Itch</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
@@ -18,5 +22,15 @@
   <ItemGroup>
     <Folder Include="Pages\" />
   </ItemGroup>
+
+  <Target Name="PackageItchUpload" AfterTargets="Publish">
+    <PropertyGroup>
+      <ItchPackageDirectory>$(MSBuildProjectDirectory)\bin\$(Configuration)\itch</ItchPackageDirectory>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(PublishDir)wwwroot/index.html')" Text="Itch publish output is missing wwwroot/index.html." />
+    <MakeDir Directories="$(ItchPackageDirectory)" />
+    <ZipDirectory SourceDirectory="$(PublishDir)wwwroot" DestinationFile="$(ItchPackageDirectory)\PathOfBoredom-Itch.zip" Overwrite="true" />
+    <Message Importance="high" Text="Upload $(ItchPackageDirectory)\PathOfBoredom-Itch.zip to itch.io as an HTML game." />
+  </Target>
 
 </Project>

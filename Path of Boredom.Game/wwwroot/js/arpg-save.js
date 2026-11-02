@@ -279,6 +279,17 @@ export function restoreSnapshot(snapshot, random = Math.random) {
         enemy.kind = item.kind;
         return enemy;
     });
+    // Queue metadata is optional for older saves. All enemies remain in the validated entity
+    // array on disk, so older readers still retain the entire encounter rather than losing it.
+    if (saved.queuedEnemies !== undefined) {
+        integer(saved.queuedEnemies, 0, state.enemies.length);
+        const timer = numbers(saved, ["spawnTimer"]).spawnTimer;
+        require(timer >= 0 && timer <= 10);
+        require(!saved.queuedEnemies || state.wave > 0);
+        state.spawnQueue = saved.queuedEnemies ? state.enemies.splice(-saved.queuedEnemies) : [];
+        state.spawnQueueWave = state.wave;
+        state.spawnTimer = timer;
+    }
     state.projectiles = array(saved.projectiles, item => {
         const projectile = numbers(item, projectileNumbers);
         require(projectile.life > 0 && projectile.life <= 3 && projectile.damage >= 0);
@@ -345,16 +356,19 @@ export function restoreSnapshot(snapshot, random = Math.random) {
 // oversized save is caught client-side with time to react rather than failing after a network round trip.
 export function captureSnapshot(state) {
     require(["playing", "paused", "camp", "won", "choosing"].includes(state.status));
+    const queued = state.spawnQueueWave === state.wave ? (state.spawnQueue ?? []).filter(enemy => enemy.health > 0) : [];
     const restored = restoreSnapshot({ version: 20, state: {
         skillSchedule: state.skillSchedule,
         ...state,
         playerShots: state.playerShots.filter(shot => shot.life > 0),
-        enemies: state.enemies.filter(enemy => enemy.health > 0),
+        enemies: [...state.enemies.filter(enemy => enemy.health > 0), ...queued],
+        queuedEnemies: queued.length,
+        spawnTimer: queued.length ? state.spawnTimer : 0,
         projectiles: state.projectiles.filter(projectile => projectile.life > 0).map(({ boss, ...projectile }) => projectile),
         loot: state.loot.filter(drop => drop.life > 0)
     } });
-    const { random, effects, damageHistory, burns, relicBanner, quickTravel, smoothResume, choiceReturn, ...saved } = restored;
-    const snapshot = { version: 20, state: { ...saved, meta: exportProfile() } };
+    const { random, effects, damageHistory, burns, relicBanner, quickTravel, smoothResume, choiceReturn, spawnQueue, spawnQueueWave, spawnTimer, ...saved } = restored;
+    const snapshot = { version: 20, state: { ...saved, enemies: [...saved.enemies, ...(spawnQueue ?? [])], queuedEnemies: spawnQueue?.length ?? 0, spawnTimer: spawnTimer ?? 0, meta: exportProfile() } };
     require(new TextEncoder().encode(JSON.stringify(snapshot)).length <= 64 * 1024);
     return snapshot;
 }

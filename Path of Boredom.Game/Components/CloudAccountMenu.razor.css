@@ -28,3 +28,42 @@
     color: #f1d49b;
     overflow-wrap: anywhere;
 }
+
+.account-intro { min-width: 0; padding: 12px; text-align: left; }
+.mm-account-body[data-signed-in="false"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (orientation: portrait) and (max-width: 600px) {
+    .mm-account-body[data-signed-in="false"] { grid-template-columns: minmax(0, 1fr); }
+}
+.account-intro h3 { margin: 0 0 12px; color: #f1d49b; font: 24px Georgia, serif; }
+.account-intro p { line-height: 1.5; }
+.account-busy {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px;
+    background: #071116ed;
+    color: #f1dfbf;
+    text-align: center;
+    font: 18px system-ui, sans-serif;
+    cursor: progress;
+}
+.account-busy small { max-width: 38em; font-size: 14px; line-height: 1.5; }
+.account-busy-ember {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #c7a56b44;
+    border-top-color: #f1d49b;
+    border-radius: 50%;
+    animation: account-spin 1s linear infinite;
+}
+@keyframes account-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .account-busy-ember { animation: none; } }
+@media (max-height: 480px) {
+    .account-intro { padding: 6px; }
+    .account-intro h3 { font-size: 18px; margin-bottom: 6px; }
+}

@@ -19,7 +19,7 @@ for (const [index, profile] of BOSS_PROFILES.entries()) {
         state.resumeDelay = 0;
         state.intermission = 0;
         state.player.invulnerable = 10;
-        state.loadout.auto = ['nova', 'burst', 'guard', 'none'];
+        state.loadout.auto = ['nova', 'burst', 'none', 'none'];
         state.player.nova = state.player.burst = state.player.guard = 30;
         const boss = state.enemies[0];
         Object.assign(boss, { kind: 'boss', health: 1000, maxHealth: 1000, winding: 0.01, x: 100, y: 100, attackX: 500, attackY: 300, attackWindup: 0 });

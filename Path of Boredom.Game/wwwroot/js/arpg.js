@@ -62,8 +62,8 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 const BEST_KEY = "path-of-boredom.best.v1";
 // Maps physical keyboard keys to logical movement directions (WASD or arrow keys, either works).
 const movementKeys = { KeyW: "up", ArrowUp: "up", KeyS: "down", ArrowDown: "down", KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right" };
-// Maps physical keys to logical skill/action inputs (J = attack, Q = manual skill, Space = dodge, E = flask).
-const skillKeys = { KeyJ: "attack", KeyQ: "manual", Space: "dodge", KeyE: "potion" };
+// Maps physical keys to logical actions (J = attack, Space = dodge, E = flask). Skills cast automatically.
+const skillKeys = { KeyJ: "attack", Space: "dodge", KeyE: "potion" };
 
 // Pre-renders a map's background floor tile to an offscreen canvas once per map, rather than
 // redrawing the (static) floor tint/decoration every single frame — a basic but effective perf win
@@ -582,8 +582,8 @@ function render(ctx, floor, state, bossTop = 49, preferences = {}, canvasHud = f
             ctx.fillStyle = color; ctx.textAlign = "center"; ctx.font = "bold 11px 'Segoe UI', sans-serif";
             const warningPosition = bossWarningPosition(enemy, bossTop);
             ctx.strokeStyle = '#081218'; ctx.lineWidth = 4;
-            ctx.strokeText(bossWarning(identity, pattern), warningPosition.x, warningPosition.y, 400);
-            ctx.fillText(bossWarning(identity, pattern), warningPosition.x, warningPosition.y, 400);
+            ctx.strokeText(bossWarning(identity, pattern, enemy.combat?.phase), warningPosition.x, warningPosition.y, 400);
+            ctx.fillText(bossWarning(identity, pattern, enemy.combat?.phase), warningPosition.x, warningPosition.y, 400);
             ctx.restore();
             continue;
         }
@@ -991,6 +991,7 @@ export function createGame(root, saveBridge = null) {
         if (audioStatus) audioStatus.textContent = !(window.AudioContext || window.webkitAudioContext)
             ? "Audio is unavailable in this browser. Visual warnings remain active."
             : settings.muted ? "Audio muted. Visual warnings remain active."
+            : !audio.ready ? "Click, tap, or press a key to enable sound. Check that this browser tab is not muted."
             : `Music ${Math.round(settings.music * 100)}% · Effects ${Math.round(settings.effects * 100)}%.`;
     }
     updateAudioControls();
@@ -1003,9 +1004,12 @@ export function createGame(root, saveBridge = null) {
     const unlockAudio = event => {
         if (!event.isTrusted || document.hidden) return;
         audio.setBackground(false);
-        void audio.unlock();
+        void audio.unlock().then(updateAudioControls);
     };
     on(window, "pointerdown", unlockAudio, { capture: true });
+    // Touch activation is granted on release, not pointer-down. Click also covers accessible controls.
+    on(window, "pointerup", unlockAudio, { capture: true });
+    on(window, "click", unlockAudio, { capture: true });
     on(window, "keydown", unlockAudio, { capture: true });
     on(root, "click", event => {
         const button = event.target.closest("button");
@@ -1120,7 +1124,7 @@ export function createGame(root, saveBridge = null) {
         might: "weapon", vitality: "heart", recovery: "recovery", area: "area", warding: "armor"
     };
     const forgeArtSource = key => {
-        if (forgeArtAssets[key]) return `/_content/PathOfBoredom.Game/images/forge/${forgeArtAssets[key]}.svg`;
+        if (forgeArtAssets[key]) return `${globalThis.pobAssetBase || ""}/_content/PathOfBoredom.Game/images/forge/${forgeArtAssets[key]}.svg`;
         const skill = key === "cleave" ? "attack" : key === "flask" ? "potion" : key === "speed" ? "dodge" : key;
         return skillIcon(state, skill);
     };
@@ -1606,6 +1610,12 @@ export function createGame(root, saveBridge = null) {
         loadButton.click();
     });
     on(root, 'open-main-panel', () => { showMainMenu(false); });
+    const mainAccount = root.querySelector("[data-main-account]");
+    if (mainAccount) on(mainAccount, "click", () => {
+        if (root.dataset.saveBusy === "on" || root.dataset.gameStatus === "setup") return;
+        showMainMenu(false);
+        root.dispatchEvent(new CustomEvent("open-run-options", { detail: { fromMain: true, section: "account" } }));
+    });
     on(root.querySelector("[data-main-options]"), "click", () => {
         if (root.dataset.saveBusy === "on" || root.dataset.gameStatus === "setup") return;
         showMainMenu(false);
@@ -2003,6 +2013,8 @@ export function createGame(root, saveBridge = null) {
         hudOne('[data-main-resume]').hidden = !['playing', 'paused', 'camp', 'won', 'choosing'].includes(state.status);
         hudOne("[data-main-load]").disabled = saving || checkingUnlock || !saveBridge;
         hudOne("[data-main-options]").disabled = saving || checkingUnlock;
+        if (mainAccount) mainAccount.disabled = saving || checkingUnlock;
+        setText(hudOne("[data-main-status]"), checkingUnlock ? "Checking saves and account… Please wait." : saving ? "Saving your progress…" : "");
         hudOne("[data-main-new]").disabled = saving || checkingUnlock || !!setupAction;
         root.dataset.gameStatus = setupAction ? "setup" : state.status;
         root.dataset.gameMode = state.mode;
@@ -2093,7 +2105,7 @@ export function createGame(root, saveBridge = null) {
             const cannotHeal = skill === "potion" && (p.potions === 0 || p.health >= p.maxHealth);
             button.disabled = unavailable || cannotHeal || !manual;
             button.classList.toggle("skill-auto", automatic);
-            const slotLabel = locked ? "STAGE 3" : skill === "attack" ? "J / CLICK" : skill === "dodge" ? "SPACE" : skill === "potion" ? "E" : manual ? "Q" : automatic ? "AUTO ×1.6" : "UNSLOTTED";
+            const slotLabel = locked ? "STAGE 3" : skill === "attack" ? root.dataset.autoAttack === "on" ? "AUTO" : "J / CLICK" : skill === "dodge" ? "SPACE" : skill === "potion" ? "E" : automatic ? "AUTO ×1.6" : "UNSLOTTED";
             if (button.querySelector("[data-slot-label]").textContent !== slotLabel) button.querySelector("[data-slot-label]").textContent = slotLabel;
             button.classList.toggle("skill-cooling", p[skill] > 0);
             if (root.dataset.canvasHud === "on") {
@@ -2394,7 +2406,7 @@ export function createGame(root, saveBridge = null) {
         const cheapestOffer = completedForge ? cheapestTraining
             : Math.min(...Object.keys(UPGRADES).filter(key => forgeSkillSelected(state, key) && state.upgrades[key] < UPGRADES[key].max).map(key => upgradeCost(state, key)));
         const notifyForge = forgeNotification(state, offers, root.dataset.menuPanel === "forge", cheapestOffer);
-        forgeNudge.hidden = state.status !== "playing" || state.resumeDelay > 0 || draftClosing || !!setupAction || !notifyForge || !skillUnlockNotice.hidden;
+        forgeNudge.hidden = true;
         forgeButton.classList.toggle("forge-available", active && !choosing && !setupAction && notifyForge);
         root.dataset.forgeAvailable = active && !choosing && !setupAction && notifyForge ? "on" : "off";
         hudOne("[data-open-forge]").disabled = forgeButton.disabled;
@@ -2714,11 +2726,12 @@ export function createGame(root, saveBridge = null) {
             node.classList.remove("tooltip-inspected");
         });
         on(button, "click", event => {
-            if ((event.pointerType === "touch" || event.sourceCapabilities?.firesTouchEvents) && inspectedTreeNode !== button) {
+            const isTouch = event.pointerType === "touch" || event.sourceCapabilities?.firesTouchEvents;
+            if (inspectedTreeNode !== button) {
                 for (const other of root.querySelectorAll(".tree-node.tooltip-inspected")) other.classList.remove("tooltip-inspected");
                 button.focus({ preventScroll: true });
                 inspectedTreeNode = button;
-                node.dataset.treeCta = button.getAttribute("aria-disabled") === "true" ? "Not available yet" : "Tap again to learn";
+                node.dataset.treeCta = button.getAttribute("aria-disabled") === "true" ? "Not available yet" : isTouch ? "Tap again to learn" : "Click again to learn";
                 node.classList.add("tooltip-inspected");
                 showTooltip();
                 return;
@@ -3241,8 +3254,7 @@ export function createGame(root, saveBridge = null) {
             aim: root.dataset.autoAttack === "on" ? null : aim,
             attack: held.has("attack"), manual: held.has("manual") || held.has(state.loadout.manual),
             dodge: held.has("dodge"), potion: held.has("potion"),
-            // Opt-in, set by hosts that have no mouse (the MAUI mobile shell sets
-            // data-auto-attack on the game root). Desktop leaves it undefined and is unaffected.
+            // Hosts opt into automatic targeting independently of touch/desktop presentation.
             autoAttack: root.dataset.autoAttack === "on",
             // Continuous facing from an on-screen thumbstick, in radians. Hosts publish it as
             // data-face-angle on the game root; absent on desktop, where the mouse sets aim.
@@ -3312,7 +3324,8 @@ export function createGame(root, saveBridge = null) {
             if (canvasHud) {
                 const boss = state.enemies.find(enemy => enemy.kind === "boss" && enemy.health > 0);
                 const map = mapForWave(state.wave);
-                drawHudCached(ctx, state, { maxFlasks: MAX_FLASKS, cssWidth: canvasCssWidth, cssHeight: canvasCssHeight,
+                drawHudCached(ctx, state, { maxFlasks: MAX_FLASKS, cssWidth: canvasCssWidth, cssHeight: canvasCssHeight, desktop: !!window.pobDesktopShell,
+                    autoAttack: root.dataset.autoAttack === "on",
                     boss: boss ? { ...boss, name: map.boss, accent: map.accent } : null,
                     stage: !state.wave ? "" : state.mode === "endless"
                         ? `Endless \u00b7 Wave ${Math.max(1, state.wave - LAST_WAVE)}`

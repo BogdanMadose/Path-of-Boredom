@@ -51,8 +51,8 @@ export const SKILL_KEYS = ["attack", "nova", "burst", "guard", "dodge", "potion"
 // Nine combat slots per class; attack/dodge/potion never occupy a chosen skill slot.
 export const SLOTTABLE_SKILLS = ["nova", "burst", "guard", ...Object.keys(NEW_SKILLS)];
 export const skillIcon = (state, skill) => SLOTTABLE_SKILLS.includes(skill) || skill === "attack"
-    ? `/_content/PathOfBoredom.Game/images/skills/${state.heroClass}/${skill}.svg`
-    : `/_content/PathOfBoredom.Game/images/skills/${skill}.svg`;
+    ? `${globalThis.pobAssetBase || ""}/_content/PathOfBoredom.Game/images/skills/${state.heroClass}/${skill}.svg`
+    : `${globalThis.pobAssetBase || ""}/_content/PathOfBoredom.Game/images/skills/${skill}.svg`;
 export const STARTER_SKILLS = ["nova", "chain", "reap"];
 // Guard/ward unlocks later in Endless mode (wave 41) than in campaign (wave 11), since Endless
 // effectively starts players over at a higher baseline difficulty.

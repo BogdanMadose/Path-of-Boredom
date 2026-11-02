@@ -24,6 +24,12 @@
             </div>
 
             <button type="button" class="quiet-button" data-open-camp>Account Progression</button>
+            @if (Session is ICloudGameSession cloudSession)
+            {
+                <button type="button" class="quiet-button main-account-action" data-main-account>
+                    @(cloudSession.AccountStatus.SignedIn ? "Account & cloud saves" : "Sign in · cloud saves & rankings")
+                </button>
+            }
             <button type="button" class="quiet-button" data-main-options>Options</button>
             <button type="button" class="quiet-button main-menu-patch-notes" data-open-patch-notes>Patch Notes · 1.0.1</button>
             <div data-main-menu-actions></div>
@@ -64,11 +70,11 @@
         </article>
     </section>
     <header class="game-header">
-        <a class="brand" href="/" aria-label="Path of Boredom home"><span class="brand-mark">&#9671;</span> PATH <small>OF</small> BOREDOM</a>
+        <a class="brand" href="./" aria-label="Path of Boredom home"><span class="brand-mark">&#9671;</span> PATH <small>OF</small> BOREDOM</a>
         <span class="edition"><span data-stat="mode">THE EMBER CAMPAIGN</span> <span>&middot;</span> <span data-stat="campaign">MAP 1 / 6</span></span>
         <div class="signed-in-user" title="@windowsUserName"><small>@(Session is ICloudGameSession ? "PLAYER ACCOUNT" : "WINDOWS SIGN-IN")</small><strong>@windowsUserName</strong></div>
         <div class="game-actions">
-            <a class="quiet-button" href="/rankings" target="_blank" rel="noopener">Rankings ↗</a>
+            <a class="quiet-button" href="rankings" target="_blank" rel="noopener">Rankings ↗</a>
             <button type="button" class="quiet-button" data-action="forge" disabled>Forge</button>
             <button type="button" class="quiet-button" data-action="save" disabled>Save</button>
             <button type="button" class="quiet-button" data-action="load" disabled>Load</button>
@@ -79,7 +85,7 @@
     {
     <aside class="patch-notice" data-patch-notice role="status">
         <span><strong>Version 1.0.1</strong> · Combat balance, save improvements, clearer menus, and bug fixes.</span>
-        <a href="/patch-notes#version-1-0-1" target="_blank" rel="noopener">Read patch notes ↗</a>
+        <a href="patch-notes#version-1-0-1" target="_blank" rel="noopener">Read patch notes ↗</a>
         <button type="button" class="quiet-button" data-dismiss-patch aria-label="Dismiss patch announcement">Dismiss</button>
     </aside>
     }
@@ -594,8 +600,15 @@
 
     private async Task AccountChanged()
     {
-        windowsUserName = await Session.GetPlayerNameAsync();
-        if (game is not null) await game.InvokeVoidAsync("accountChanged", Session is not ICloudGameSession cloud || cloud.AccountStatus.SignedIn);
+        try
+        {
+            windowsUserName = await Session.GetPlayerNameAsync();
+            if (game is not null) await game.InvokeVoidAsync("accountChanged", Session is not ICloudGameSession cloud || cloud.AccountStatus.SignedIn);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Console.Error.WriteLine($"Account refresh failed: {exception.Message}");
+        }
     }
 
     private async Task AccountDeleted()
@@ -663,7 +676,7 @@
 
         try
         {
-            var importedModule = await JS.InvokeAsync<IJSObjectReference>("import", "/_content/PathOfBoredom.Game/js/arpg.js");
+            var importedModule = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/PathOfBoredom.Game/js/arpg.js");
 
             // If the component got disposed while the import was in flight (e.g. fast navigation
             // away), don't leave an orphaned module reference around — clean it up immediately

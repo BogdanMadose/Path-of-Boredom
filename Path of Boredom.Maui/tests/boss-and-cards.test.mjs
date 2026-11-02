@@ -70,25 +70,26 @@ function spawnBoss(wave, difficulty = 'hard') {
     state.intermission = 0;
     step(state, {}, 0.05);
     assert.equal(state.wave, wave);
-    const boss = state.enemies.find(enemy => enemy.kind === 'boss');
+    const boss = state.spawnQueue.find(enemy => enemy.kind === 'boss');
     assert.ok(boss);
     return { state, boss };
 }
 const fixtures = [];
 const campaignPressure = {
-    hard: { health: 1.02, damage: 1.03, speed: 1.02, extra: 1 },
-    nightmare: { health: 1.08, damage: 1.08, speed: 1.05, extra: 2 },
-    inferno: { health: 1.16, damage: 1.12, speed: 1.08, extra: 4 }
+    hard: { health: 1.22, damage: 1.2, speed: 1.05, extra: 2 },
+    nightmare: { health: 1.42, damage: 1.36, speed: 1.09, extra: 4 },
+    inferno: { health: 1.62, damage: 1.58, speed: 1.12, extra: 6 }
 };
 for (const difficulty of ['hard', 'nightmare', 'inferno']) {
     for (const wave of [5, 10, 15, 20, 25, 30]) {
         const { state, boss } = spawnBoss(wave, difficulty);
         const act = mapIndexForWave(wave), rules = difficultyFor(state);
-        const chapterHealth = Math.round((680 + act * 380) * 1.7 * (1 + act * 0.1));
-        const openingHealth = wave <= 4 ? 1.15 : wave <= 8 ? 1.08 : 1;
-        assert.equal(boss.maxHealth, Math.round(chapterHealth * rules.health * campaignPressure[difficulty].health * openingHealth), 'campaign bosses follow the chapter, difficulty, and campaign pressure curve');
+        const chapterHealth = Math.round((680 + act * 380) * 1.7 * (1 + act * 0.18));
+        const progress = wave - 1;
+        const openingHealth = 1.24 + progress * 0.05 + progress * progress * 0.003;
+        assert.equal(boss.maxHealth, Math.round(chapterHealth * rules.health * campaignPressure[difficulty].health * openingHealth * 1.9), 'campaign bosses follow the sustained curve and increased boss durability');
         assert.equal(boss.speed, (90 + act * 10) * rules.speed * campaignPressure[difficulty].speed);
-        assert.equal(boss.damage, Math.round(Math.round((34 + act * 11) * (1 + act * 0.045)) * rules.damage * campaignPressure[difficulty].damage * (wave <= 8 ? 1.05 : 1)));
+        assert.equal(boss.damage, Math.round(Math.round((34 + act * 11) * (1 + act * 0.06)) * rules.damage * campaignPressure[difficulty].damage * (1.12 + progress * 0.016) * 1.2));
         assert.equal(state.enemies.length + pendingSpawns(state), 10 + act * 3 + rules.extra + campaignPressure[difficulty].extra, 'campaign boss-wave counts include the selected campaign pressure');
         state.player.level = 20;
         state.loadout.auto = ['nova', 'burst', 'guard', 'none'];
@@ -105,11 +106,12 @@ const firstWaveEnemies = ['hard', 'nightmare', 'inferno'].map(difficulty => {
 assert.ok(firstWaveEnemies[0].health < firstWaveEnemies[1].health && firstWaveEnemies[1].health < firstWaveEnemies[2].health, 'campaign opening pressure scales Easy < Medium < Hard');
 assert.ok(firstWaveEnemies[0].damage < firstWaveEnemies[1].damage && firstWaveEnemies[1].damage < firstWaveEnemies[2].damage, 'campaign opening damage scales Easy < Medium < Hard');
 const endlessBalance = startEndlessRun(() => 0.5, 'inferno', 'knight', true);
-assert.equal(endlessBalance.enemies.length + pendingSpawns(endlessBalance), 20, 'the campaign-only pressure step does not change Endless wave counts');
+assert.equal(endlessBalance.enemies.length + pendingSpawns(endlessBalance), 30, 'Endless includes the chosen difficulty pressure');
 const tick = state => step(state, {}, 0.05);
 function isolatedBoss() {
     const arena = spawnBoss(5);
     arena.state.enemies = [arena.boss];
+    arena.state.spawnQueue = [];
     arena.state.player.invulnerable = 10;
     arena.state.player.nova = 30;
     arena.boss.attackX = arena.state.player.x;
@@ -124,7 +126,7 @@ for (const pattern of [1, 2, 3]) {
     boss.winding = 0.05;
     tick(state);
     assert.equal(boss.combat.rest, 0.75);
-    const interval = 3.2 * (pattern >= 3 ? 0.72 : pattern === 2 ? 0.86 : 1);
+    const interval = 3.2 * (pattern >= 3 ? 0.56 : pattern === 2 ? 0.72 : 0.88);
     assert.ok(Math.abs(boss.slam - interval) < 1e-9, 'later phases attack faster');
     const duringRecovery = captureSnapshot(state);
     assert.equal(restoreSnapshot(duringRecovery).enemies[0].combat.rest, boss.combat.rest);

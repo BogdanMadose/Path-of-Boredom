@@ -18,13 +18,12 @@
     <link rel="stylesheet" href="css/mobile-shell.css" id="mobile-shell-css" />
     <!-- Owns the canvas-style menu layer (tab bar + full-screen panels) built by js/mobile-menu.js. -->
     <link rel="stylesheet" href="css/mobile-menu.css" id="mobile-menu-css" />
-    <!-- Mac (no touch screen): use the desktop layout with keyboard + mouse, like the web version.
-         iPads report a Mac user agent too, but they have touch points, so they keep the mobile shell. -->
+    <link rel="stylesheet" href="_content/PathOfBoredom.Game/css/desktop-shell.css" />
+    <!-- Keep shared menus on desktop, but not the touch layout or joystick. -->
     <script>
-        window.pobDesktopShell = /Macintosh/.test(navigator.userAgent) && !(navigator.maxTouchPoints > 0);
+        window.pobDesktopShell = !(navigator.maxTouchPoints > 0);
         if (window.pobDesktopShell) {
             document.getElementById("mobile-shell-css").disabled = true;
-            document.getElementById("mobile-menu-css").disabled = true;
         }
     </script>
     <!-- Inlined, not in mobile-shell.css: this must paint on the very first frame, while the
@@ -118,7 +117,7 @@
      are Blazor scoped CSS (`.x[b-hash]`, specificity 0,2,0); a bare `.x` override would lose
      regardless of load order, so the shell rules qualify themselves with this class to match it. -->
 <body class="mobile-shell">
-    <script>if (window.pobDesktopShell) document.body.classList.remove("mobile-shell");</script>
+    <script>if (window.pobDesktopShell) document.body.classList.add("desktop-shell");</script>
     <!-- Splash shown until Blazor renders. Styles are inline so it paints immediately, before any
          stylesheet has loaded — otherwise the first frame is unstyled "Loading..." text. Blazor
          replaces the whole of #app once the root component renders, so no teardown is needed. -->
@@ -153,9 +152,9 @@
     </div>
 
     <script src="_framework/blazor.webview.js" autostart="false"></script>
-    <!-- Floating joystick + in-game menu layer. Touch devices only (skipped on Mac). -->
+    <!-- The in-game menu is shared; only touch devices need the joystick. -->
     <script>
-        if (!window.pobDesktopShell) for (const src of ["js/mobile-shell.js", "js/mobile-menu.js"]) {
+        for (const src of window.pobDesktopShell ? ["js/mobile-menu.js"] : ["js/mobile-shell.js", "js/mobile-menu.js"]) {
             const script = document.createElement("script");
             script.src = src; script.async = false;
             document.body.appendChild(script);

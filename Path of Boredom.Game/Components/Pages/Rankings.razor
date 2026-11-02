@@ -1,4 +1,4 @@
-@page "/rankings"
+﻿@page "/rankings"
 @layout GameLayout
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using Path_of_Boredom.ServiceDefaults
@@ -11,7 +11,7 @@
 
 <main class="rankings @(Embedded ? "embedded" : null)">
     <header>
-        <a class="back-link" href="/" aria-label="Back to game" title="Back to game"><span aria-hidden="true">←</span></a>
+        <a class="back-link" href="./" aria-label="Back to game" title="Back to game"><span aria-hidden="true">←</span></a>
         <span>THE WATCH REMEMBERS</span>
     </header>
     <section class="heading">

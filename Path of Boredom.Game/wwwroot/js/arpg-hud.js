@@ -105,12 +105,13 @@ export function drawHud(ctx, state, options = {}) {
     if (!p) return;
 
     ctx.save();
-    const width = options.cssWidth || WIDTH, height = options.cssHeight || HEIGHT;
+    const scale = options.desktop ? Math.min(1.4, Math.max(1.1, (options.cssWidth || WIDTH) / 1100)) : 1;
+    const width = (options.cssWidth || WIDTH) / scale, height = (options.cssHeight || HEIGHT) / scale;
     if (options.cssWidth && options.cssHeight) ctx.setTransform(ctx.canvas.width / width, 0, 0, ctx.canvas.height / height, 0, 0);
     const barWidth = Math.min(BAR_W, width * 0.3);
     ctx.textBaseline = "alphabetic";
 
-    const compact = !!options.cssWidth;
+    const compact = !!options.cssWidth && !options.desktop;
     const scrimHeight = compact ? 50 : 76, barHeight = compact ? 14 : BAR_H;
     // Top scrim keeps the bars legible over bright floors without hiding the playfield.
     const scrim = ctx.createLinearGradient(0, 0, 0, scrimHeight);
@@ -186,6 +187,15 @@ export function drawHud(ctx, state, options = {}) {
         ctx.font = "600 13px system-ui, sans-serif";
         ctx.fillStyle = "#ead5a8";
         ctx.fillText(options.checkpoint, width / 2, height - 24, width - 28);
+    } else if (options.desktop) {
+        ctx.fillStyle = "#071116cc";
+        roundRect(ctx, width * 0.1, height - 34, width * 0.8, 28, 8);
+        ctx.fill();
+        ctx.textAlign = "center";
+        ctx.font = "12px system-ui, sans-serif";
+        ctx.fillStyle = "#dfd0b4";
+        const combatHint = options.autoAttack ? "Attacks & skills · Auto" : "Mouse · Aim / Attack    Skills · Auto";
+        ctx.fillText(`WASD · Move    ${combatHint}    Space · Dodge    E · Flask    Esc · Pause`, width / 2, height - 16, width * 0.76);
     }
 
     ctx.restore();
@@ -201,7 +211,7 @@ export function drawHudCached(ctx, state, options = {}) {
     const canvas = ctx.canvas;
     if (typeof document === "undefined" || !canvas?.width) { drawHud(ctx, state, options); return; }
     const boss = options.boss;
-    const key = [canvas.width, canvas.height, options.cssWidth, options.cssHeight, Math.ceil(p.health), Math.ceil(p.maxHealth),
+    const key = [canvas.width, canvas.height, options.cssWidth, options.cssHeight, options.desktop, options.autoAttack, Math.ceil(p.health), Math.ceil(p.maxHealth),
         Math.floor(p.xp || 0), p.nextLevel, p.level, p.potions, options.maxFlasks, boss ? boss.name + ":" + Math.ceil(boss.health) + ":" + boss.maxHealth : "",
         options.buffs || "", options.checkpoint || "", options.stage || ""].join("|");
     if (!hudLayer || hudLayer.width !== canvas.width || hudLayer.height !== canvas.height) {

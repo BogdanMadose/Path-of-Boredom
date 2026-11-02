@@ -7,6 +7,15 @@ export const BOSS_MOVES = {
     rift: ['VOID RING — INSIDE OR OUTSIDE', 'UNMAKING — LEAVE YOUR OLD POSITION', 'LAST HORIZON — CLOSE THE DISTANCE']
 };
 
+const FINAL_PHASE_WARNINGS = {
+    hollow: 'TWIN BELLS - BETWEEN THE RINGS',
+    marsh: 'DROWNED SHORES - LEAVE THE POOLS',
+    citadel: 'TRIPLE FURNACE - BETWEEN THE LANES',
+    glacier: 'SHATTER CORE - CLEAR THE CROSS AND CORE',
+    archive: 'SEALED INDEX - LEAVE THE CIRCLE AND MARKS',
+    rift: 'VOID COLLAPSE - LEAVE THE RING AND MARK'
+};
+
 export function bossShapes(profile, enemy, pattern = enemy.combat?.pattern ?? 1) {
     const angle = Math.atan2(enemy.attackY - enemy.y, enemy.attackX - enemy.x);
     const circle = (x, y, radius, inner = 0) => ({ kind: 'circle', x, y, radius, inner });
@@ -14,9 +23,19 @@ export function bossShapes(profile, enemy, pattern = enemy.combat?.pattern ?? 1)
     const cross = rotation => [lane(enemy.x - Math.cos(rotation) * 300, enemy.y - Math.sin(rotation) * 300, 600, 48, rotation),
         lane(enemy.x + Math.sin(rotation) * 300, enemy.y - Math.cos(rotation) * 300, 600, 48, rotation + Math.PI / 2)];
     if (pattern === 1) {
-        if (profile.id === 'citadel') return [lane(enemy.x, enemy.y, 450, 80)];
-        if (profile.id === 'glacier') return cross(angle);
-        return [circle(enemy.x, enemy.y, profile.radius, profile.id === 'rift' ? 70 : 0)];
+        const shapes = profile.id === 'citadel' ? [lane(enemy.x, enemy.y, 450, 80)]
+            : profile.id === 'glacier' ? cross(angle)
+                : [circle(enemy.x, enemy.y, profile.radius, profile.id === 'rift' ? 70 : 0)];
+        if (enemy.combat?.phase >= 3) {
+            if (profile.id === 'hollow') shapes.push(circle(enemy.x, enemy.y, 285, 205));
+            else if (profile.id === 'citadel') shapes.push(...[-180, 180].map(offset =>
+                lane(enemy.x - Math.sin(angle) * offset, enemy.y + Math.cos(angle) * offset, 450, 50)));
+            else if (profile.id === 'glacier') shapes.push(circle(enemy.x, enemy.y, 85));
+            else if (profile.id === 'rift') shapes.push(circle(enemy.attackX, enemy.attackY, 65));
+            else shapes.push(...[-1, 1].map(side => circle(enemy.attackX + Math.cos(angle + Math.PI / 2) * side * 200,
+                enemy.attackY + Math.sin(angle + Math.PI / 2) * side * 200, 55)));
+        }
+        return shapes;
     }
     if (pattern === 2) {
         if (['hollow', 'archive'].includes(profile.id)) return [lane(enemy.x, enemy.y, 550, profile.id === 'hollow' ? 90 : 60)];
@@ -57,7 +76,8 @@ export function drawBossDanger(ctx, profile, enemy) {
         ctx.restore();
     }
 }
-export const bossWarning = (profile, pattern = 1) => BOSS_MOVES[profile.id][pattern - 1];
+export const bossWarning = (profile, pattern = 1, phase = 1) => pattern === 1 && phase >= 3
+    ? FINAL_PHASE_WARNINGS[profile.id] : BOSS_MOVES[profile.id][pattern - 1];
 
 // Landed boss skills: each realm gets its own attack look on the exact shapes it hits.
 const STRIKE_THEMES = {

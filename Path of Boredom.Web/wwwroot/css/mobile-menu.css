@@ -445,6 +445,7 @@
     }
     body.mobile-shell .mm-panel .skill-tree h3 {
         margin: 0 0 4px;
+        padding-right: 86px;
         font-size: 17px;
         color: #edd5a2;
     }
@@ -453,7 +454,7 @@
         z-index: 6;
         top: 0;
         right: 0;
-        max-width: 60%;
+        max-width: 80px;
         margin: 0;
         white-space: nowrap;
         overflow: hidden;
@@ -1016,36 +1017,31 @@
     body.mobile-shell .mm-panel [data-tree-skill][hidden],
     body.mobile-shell .mm-panel [data-upgrade][hidden] { display: none !important; }
 
-    /* Account & cloud: a centred, evenly sized card row instead of a ragged auto-fit grid. */
+    /* Account & cloud: fill the full options panel like Sound/Controls, instead of a centred floating card. */
     body.mobile-shell .mm-account-body {
-        align-self: center;
-        justify-self: center;
-        width: fit-content;
-        max-width: min(100%, 860px);
-        max-height: 100%;
-        margin-inline: auto;
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        align-items: stretch;
-        align-content: center;
-        gap: 6px 10px;
-        padding: 6px 10px;
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+        align-items: start;
+        align-content: start;
+        gap: 10px 14px;
+        padding: 4px 0;
     }
-    body.mobile-shell .mm-account-body > p { flex: 1 1 100%; text-align: center; }
+    body.mobile-shell .mm-account-body > p { grid-column: 1 / -1; text-align: left; }
     body.mobile-shell .mm-account-body fieldset {
-        flex: 1 1 0;
-        max-width: 260px;
-        min-width: min(150px, 100%);
+        width: 100%;
+        max-width: none;
+        min-width: 0;
         align-content: start;
         grid-auto-rows: min-content;
-        text-align: center;
+        text-align: left;
     }
-    body.mobile-shell .mm-account-body legend { margin-inline: auto; }
+    body.mobile-shell .mm-account-body legend { margin-inline: 0; }
     body.mobile-shell .mm-account-body .mm-apple { background: #000; border-color: #666; color: #fff; }
     body.mobile-shell .mm-account-body .mm-display-name { text-align: left; }
     body.mobile-shell .mm-account-body .account-confirm {
-        flex: 1 1 100%;
         grid-column: 1 / -1;
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1732,7 +1728,36 @@
     body.mobile-shell .mm-panel .mm-detail h3 { margin-bottom: 4px; font-size: 16px; }
     body.mobile-shell .mm-panel .mm-detail p { margin: 4px 0; }
 
-    body.mobile-shell .options-panel[data-mobile-section="account"] .run-options { display: grid; align-content: center; }
+    body.mobile-shell .options-panel[data-mobile-section="account"] .run-options {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-row: 3;
+        grid-template-columns: minmax(0, 1fr);
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        min-height: 0;
+        align-self: stretch;
+        align-content: stretch;
+        grid-template-rows: minmax(0, 1fr);
+        padding: 0;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="account"] .account-settings {
+        min-width: 0;
+        min-height: 0;
+        height: 100%;
+        overflow-y: auto;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="account"] .mm-account-body {
+        min-height: 100%;
+        max-height: none;
+        align-content: start;
+        border: 0;
+        border-radius: 0;
+        background: none;
+        padding: 8px;
+        overflow: visible;
+    }
     body.mobile-shell .mm-account-body {
         width: 100%;
         max-width: 100%;
@@ -1905,6 +1930,7 @@ body.mobile-shell .mm-pause-card .mm-stage-recap-row span {
         gap: 4px 8px;
         padding: max(4px, var(--safe-top)) max(8px, var(--safe-right)) max(4px, var(--safe-bottom)) max(8px, var(--safe-left));
     }
+    body.mobile-shell .mm-info-panel.mm-open { grid-template-rows: 42px minmax(0, 1fr); }
     body.mobile-shell .mm-head { min-height: 0; padding-block: 2px; }
     body.mobile-shell .mm-head h2 { font-size: 15px; }
     body.mobile-shell .mm-close { width: 36px; height: 36px; }
@@ -2189,6 +2215,7 @@ body.mobile-shell .mm-pause-card .mm-stage-recap-row span {
     }
     body.mobile-shell .skills-panel .skill-tree h3 {
         flex: 0 0 auto;
+        min-height: 30px;
         margin: 0;
         padding-right: 100px;
         font-size: 15px;
@@ -2198,7 +2225,7 @@ body.mobile-shell .mm-pause-card .mm-stage-recap-row span {
         top: -2px;
         right: 0;
         min-height: 28px;
-        max-width: 90px;
+        max-width: 150px;
         padding: 3px 8px;
         font-size: 9px;
     }

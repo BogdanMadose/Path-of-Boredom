@@ -27,7 +27,9 @@ if (!fs.existsSync(edge)) {
     const levelDraft = expand(slice('<section class="level-draft"', '<div class="overlay-card" data-run-menu>'));
     const skillChoice = expand(slice('<div class="arena-overlay skill-choice-overlay"', '<div class="arena-overlay setup-overlay"'));
     const setup = expand(slice('<div class="arena-overlay setup-overlay"', '<div class="arena-caption"'));
-    const mainMenu = slice('<section class="main-menu"', '<button type="button" class="quiet-button main-menu-return"');
+    const mainMenu = slice('<section class="main-menu"', '<button type="button" class="quiet-button main-menu-return"')
+        .replace(/@if \(Session is ICloudGameSession cloudSession\)\s*\{([\s\S]*?)\n\s*\}/, '$1')
+        .replace(/@\(cloudSession\.AccountStatus\.SignedIn \? "[^"]*" : "([^"]*)"\)/, '$1');
     const saveDialogStart = home.indexOf('<dialog class="save-slots-dialog"');
     const saveDialog = home.slice(saveDialogStart, home.indexOf('</dialog>', saveDialogStart) + '</dialog>'.length);
     const runMenuStart = home.indexOf('<div class="overlay-card" data-run-menu>');

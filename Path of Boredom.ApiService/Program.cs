@@ -38,6 +38,12 @@ builder.Services.AddOptions<GoogleIdentityOptions>()
     .ValidateOnStart();
 builder.Services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
 builder.Services.AddOptions<AppleIdentityOptions>().BindConfiguration("AppleIdentity");
+builder.Services.AddOptions<WebSignInOptions>().BindConfiguration("WebSignIn");
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
+    .WithOrigins(builder.Configuration.GetSection("WebSignIn:AllowedOrigins").Get<string[]>() ?? [])
+    .WithHeaders("Authorization", "Content-Type", "If-Match")
+    .WithMethods("GET", "POST", "PUT", "DELETE")
+    .SetPreflightMaxAge(TimeSpan.FromHours(1))));
 builder.Services.AddSingleton<AppleIdentityService>();
 var authentication = builder.Services.AddAuthentication(GoogleTokenAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, GoogleTokenAuthenticationHandler>(GoogleTokenAuthenticationHandler.SchemeName, _ => { });
@@ -55,6 +61,7 @@ builder.Services.AddRateLimiter(options =>
 var app = builder.Build();
 
 app.UseExceptionHandler();
+app.UseCors();
 app.UseAuthentication();
 app.Use(async (context, next) =>
 {
@@ -86,6 +93,7 @@ app.MapPlayerProfile();
 app.MapRankings();
 app.MapPlayerAccount();
 app.MapAppleSignIn();
+app.MapWebSignIn();
 // /health and /alive (development-only, see ServiceDefaults.Extensions).
 app.MapDefaultEndpoints();
 

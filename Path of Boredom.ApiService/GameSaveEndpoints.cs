@@ -399,7 +399,7 @@ public static class GameSaveEndpoints
         // Every entity list (enemies/projectiles/loot) is validated per-item via ValidArray, which
         // also enforces the array's own size cap (128 entries) so a save can't smuggle in an
         // unbounded number of entities.
-        return ValidArray(state, "enemies", item =>
+        return ValidSpawnQueue(state, wave) && ValidArray(state, "enemies", item =>
                 Numbers(item, "x", "y", "health", "maxHealth", "radius", "speed", "damage", "cooldown", "flash", "slam", "winding")
                 && (version < 13 || ValidEliteModifier(item, wave))
                 && (version < 14 || ValidEnemyCombat(item, volleySequence))
@@ -657,6 +657,15 @@ public static class GameSaveEndpoints
         && modifier.GetString() is ("none" or "armored" or "swift" or "mending")
         && Numbers(item, "elite") && item.GetProperty("elite").TryGetInt32(out var elite) && elite is 0 or 1
         && (modifier.GetString() == "none" || elite == 1 && wave >= 11 && !Kind(item, "boss"));
+
+    private static bool ValidSpawnQueue(JsonElement state, double wave)
+    {
+        if (!state.TryGetProperty("queuedEnemies", out var queued)) return true;
+        return queued.ValueKind == JsonValueKind.Number && queued.TryGetInt32(out var count) && count >= 0
+            && state.TryGetProperty("enemies", out var enemies) && enemies.ValueKind == JsonValueKind.Array
+            && count <= enemies.GetArrayLength() && (count == 0 || wave > 0)
+            && Numbers(state, "spawnTimer") && state.GetProperty("spawnTimer").GetDouble() is >= 0 and <= 10;
+    }
 
     /// <summary>
     /// Checks that every named property on <paramref name="item"/> exists, is a JSON number, and is

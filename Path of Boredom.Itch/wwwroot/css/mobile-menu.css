@@ -1,0 +1,2335 @@
+ /* Mobile game shell, shared by the MAUI and Web heads (desktop is the same game with mouse + WASD).
+ *
+ * Loaded by Path of Boredom.Maui/wwwroot/index.html and Path of Boredom.Web/Components/App.razor,
+ * after the scoped-CSS bundle.
+ *
+/*
+ * Replaces the desktop page-section menus (Skills, Forge, and the vitals/toolbar HUD) with a
+ * game-style UI layer that sits over the canvas: a bottom tab bar, full-bleed panels sized to the
+ * viewport, and NO page scrolling to reach a control.
+ *
+ * Relationship to mobile-shell.css: that file collapses the desktop page chrome. This file owns
+ * the menu layer built by js/mobile-menu.js. They are loaded together and both scoped to
+ * `body.mobile-shell` for the specificity reasons documented in mobile-shell.css.
+ */
+
+@media all {
+
+    body.mobile-shell button:not(:disabled):not([aria-disabled="true"]):is(:active, .button-pressed) {
+        filter: brightness(1.3);
+        outline: 2px solid #f4c989;
+        outline-offset: -2px;
+        box-shadow: inset 0 0 0 2px #ffe3ac55, inset 0 3px 8px #0008;
+        scale: .97;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        body.mobile-shell button:is(:active, .button-pressed) { scale: 1; }
+    }
+
+    /* ---- Menu layer ------------------------------------------------------ */
+
+    /* Covers the whole app. Transparent and click-through by default so combat is unaffected;
+       only the bar and an open panel take input. */
+    body.mobile-shell .mm-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        pointer-events: none;
+    }
+
+    /* ---- Bottom tab bar -------------------------------------------------- */
+
+    body.mobile-shell .mm-bar {
+        display: flex;
+        align-self: flex-end;
+        width: auto;
+        margin-top: max(var(--menu-shortcuts-top, 56px), var(--safe-top));
+        align-items: stretch;
+        gap: 3px;
+        padding: 0 max(8px, var(--safe-right)) max(6px, var(--safe-bottom)) 6px;
+        background: none;
+        pointer-events: auto;
+    }
+    body.mobile-shell .mm-tab[hidden] { display: none; }
+    body.mobile-shell .mm-tab { min-width: 48px; }
+    body.mobile-shell .campaign-lore-return { display: none; }
+    body.mobile-shell .main-menu-return { display: none !important; }
+    body.mobile-shell .arpg[data-main-menu="on"] .mm-bar,
+    body.mobile-shell .arpg[data-menu-open="on"] .mm-bar,
+    body.mobile-shell.mm-panel-open .mm-bar,
+    body.mobile-shell .arpg:not([data-game-status="playing"]) .mm-bar { display: none; }
+    body.mobile-shell [data-main-menu-actions],
+    body.mobile-shell [data-main-menu-actions] .mm-save-actions { display: contents; }
+    body.mobile-shell .main-menu { padding: max(8px, var(--safe-top)) max(12px, var(--safe-right)) max(8px, var(--safe-bottom)) max(12px, var(--safe-left)); overflow: hidden; }
+    body.mobile-shell .main-menu-card {
+        width: min(860px, 100%);
+        max-height: 100%;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 8px;
+        padding: 12px 16px;
+    }
+    body.mobile-shell .main-menu-card > h1,
+    body.mobile-shell .main-menu-card > p,
+    body.mobile-shell .main-menu-card > h1 { font-size: 22px; text-align: center; }
+    body.mobile-shell .main-menu-card > p:not([data-main-status]) { display: none; }
+    body.mobile-shell .main-menu-card > p:empty,
+    body.mobile-shell .main-menu-card .mm-save-status:empty { display: none; }
+    body.mobile-shell .main-menu-card .mm-save-status { grid-column: 1 / -1; margin: 0; font-size: 11px; }
+    body.mobile-shell .main-menu-card button { min-height: 40px; margin: 0; font-size: 13px; }
+    body.mobile-shell .main-menu-card > .main-menu-patch-notes { display: flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 40px; margin: 0; font-size: 13px; text-align: center; text-decoration: none; }
+    body.mobile-shell .main-play-menu {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 6px;
+        padding: 8px;
+        border: 1px solid #c7a56b44;
+        border-radius: 10px;
+        background: #0b1519;
+    }
+
+    body.mobile-shell .main-play-menu[hidden] {
+        display: none !important;
+    }
+
+    body.mobile-shell .main-play-menu button {
+        width: 100%;
+    }
+    body.mobile-shell .mm-tab {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        min-height: 44px;
+        padding: 4px 2px;
+        border: 1px solid #c7a56b33;
+        border-radius: 10px;
+        background: #141d20d9;
+        color: #d8c9a8;
+        font: 500 9px/1 system-ui, sans-serif;
+        letter-spacing: .3px;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body.mobile-shell .mm-tab .mm-glyph {
+        font-size: 17px;
+        line-height: 1;
+        color: #e0bd84;
+    }
+    body.mobile-shell .mm-pause-tab {
+        position: fixed;
+        top: max(var(--pause-hud-top, 76px), var(--safe-top));
+        left: max(6px, var(--safe-left));
+        width: 48px;
+        height: 44px;
+        min-width: 48px;
+        min-height: 44px;
+        background: #141d2066;
+        border-color: #c7a56b55;
+        color: #f6e7c6;
+    }
+    body.mobile-shell .main-menu-return {
+        width: 48px;
+        min-height: 44px;
+        padding: 4px;
+        font: 500 10px/1.2 system-ui, sans-serif;
+        background: #141d2066;
+    }
+    body.mobile-shell .arpg:is([data-game-status="playing"], [data-game-status="paused"], [data-game-status="camp"]) .main-menu-return {
+        display: none;
+    }
+
+    body.mobile-shell .mm-tab[aria-expanded="true"] {
+        border-color: #f0c98d;
+        background: #27332fe8;
+        color: #f6e7c6;
+    }
+
+    body.mobile-shell .mm-tab:disabled {
+        opacity: .4;
+    }
+
+    /* A count badge (unspent skill points / affordable forge ranks) so the player knows there is
+       something to do without opening the panel. */
+    body.mobile-shell .mm-tab .mm-badge {
+        position: absolute;
+        top: 3px;
+        right: 8px;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        border-radius: 8px;
+        background: #b4452f;
+        color: #fff;
+        font-size: 9px;
+        line-height: 16px;
+        text-align: center;
+    }
+
+    body.mobile-shell .mm-tab:not(.mm-pause-tab) {
+        position: relative;
+    }
+
+    body.mobile-shell .mm-badge[hidden] {
+        display: none;
+    }
+
+    /* ---- Panels ---------------------------------------------------------- */
+
+    /* A panel IS the original Blazor section (.skills-panel / .forge-panel), left exactly where it
+       was rendered and lifted over the canvas with position:fixed. Nothing is re-parented — see
+       the header comment in js/mobile-menu.js for why that matters. */
+    body.mobile-shell .mm-panel {
+        box-sizing: border-box;
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: none;
+        flex-direction: column;
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+        background: #0e1619;
+        overflow: hidden;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        padding:
+            max(8px, var(--safe-top))
+            max(12px, var(--safe-right))
+            max(12px, var(--safe-bottom))
+            max(12px, var(--safe-left));
+    }
+
+    body.mobile-shell .mm-panel.mm-open {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr);
+        grid-template-rows: 58px 52px minmax(0, 1fr) auto;
+        gap: 8px 16px;
+        animation: none;
+    }
+
+    body.mobile-shell.mm-panel-open .mm-bar {
+        display: none !important;
+    }
+
+    @keyframes mm-rise {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        body.mobile-shell .mm-panel.mm-open { animation: none; }
+    }
+
+    /* The header and sub-tabs are appended last (appending avoids reordering Blazor's children),
+       so flex `order` is what actually puts them at the top. Everything Blazor rendered keeps the
+       default order of 0 and therefore follows them. */
+    body.mobile-shell .mm-head {
+        grid-column: 1 / -1;
+        grid-row: 1;
+        min-height: 0;
+        order: -2;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 -12px;
+        padding: 8px 12px;
+        background: #0e1619f2;
+        border-bottom: 1px solid #c7a56b33;
+    }
+
+    body.mobile-shell .mm-subtabs {
+        order: -1;
+    }
+
+    /* The section's own desktop heading duplicates our panel header. */
+    body.mobile-shell .mm-panel > .forge-heading {
+        display: none;
+    }
+
+    body.mobile-shell .mm-head h2 {
+        flex: 1;
+        margin: 0;
+        font: 400 17px Georgia, serif;
+        color: #f1e5cc;
+    }
+
+    body.mobile-shell .mm-head .mm-meta {
+        font-size: 12px;
+        color: #e3c277;
+        white-space: nowrap;
+    }
+
+    body.mobile-shell .mm-close {
+        width: 44px;
+        height: 44px;
+        border: 1px solid #c7a56b44;
+        border-radius: 50%;
+        background: #161f22;
+        color: #e8d7ae;
+        font-size: 17px;
+        line-height: 1;
+    }
+
+    /* Sub-tabs, used by Skills to switch between Loadout and its selected skill tree. */
+    body.mobile-shell .mm-subtabs {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        display: flex;
+        min-height: 48px;
+        gap: 6px;
+        overflow-x: hidden;
+        scrollbar-width: none;
+        padding: 8px 0 2px;
+    }
+
+    body.mobile-shell .mm-subtabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    body.mobile-shell .mm-subtab {
+        flex: 0 0 auto;
+        min-height: 46px;
+        padding: 4px 9px;
+        border: 1px solid #c7a56b33;
+        border-radius: 12px;
+        background: linear-gradient(180deg, #1a282b, #121b1f);
+        color: #c8c1b1;
+        font-size: 12px;
+        white-space: nowrap;
+        transition: border-color .16s ease, background .16s ease, color .16s ease, box-shadow .16s ease;
+    }
+
+    body.mobile-shell .mm-subtab[aria-selected="true"] {
+        border-color: #f0c98d;
+        background: linear-gradient(180deg, #35453d, #202f2c);
+        color: #fff0d0;
+        box-shadow: inset 0 1px 0 #ffe3ac30, 0 0 12px #c7a56b20;
+    }
+    body.mobile-shell .mm-subtab:hover { border-color: #d9b77799; color: #f4e4c4; }
+    body.mobile-shell .mm-subtab:focus-visible { outline: 2px solid #f4c989; outline-offset: 2px; }
+
+    /* Sub-tab visibility. Applied to nodes Blazor rendered, so it must be a class toggle — the
+       nodes are never re-parented (see js/mobile-menu.js). */
+    body.mobile-shell .mm-hidden {
+        display: none !important;
+    }
+
+    /* Long-form explanation stays exactly where Blazor put it and is collapsed by default,
+       revealed by the injected .mm-help-toggle button. */
+    body.mobile-shell .mm-help-text {
+        display: none;
+    }
+
+    body.mobile-shell .mm-help-shown .mm-help-text {
+        display: block;
+        color: #9fb0ad;
+        font-size: 11px;
+        line-height: 1.6;
+    }
+
+    body.mobile-shell .mm-help-toggle {
+        grid-column: 1 / -1;
+        grid-row: 4;
+        width: 100%;
+        margin-top: 0;
+        min-height: 38px;
+        border: 1px solid #c7a56b33;
+        border-radius: 8px;
+        background: #141d20;
+        color: #d9c69c;
+        font-size: 12px;
+    }
+
+    /* ---- Moved content --------------------------------------------------- */
+
+    /* The original page sections become plain containers once their content lives in a panel. */
+    body.mobile-shell .skills-panel,
+    body.mobile-shell .forge-panel {
+        padding: 0 12px 12px;
+        border: 0;
+        background: #0e1619;
+    }
+
+    /* One tree fills the panel, so it can be large and legible rather than shrunk to fit six. */
+    body.mobile-shell .mm-panel .skill-tree-map {
+        position: relative;
+        height: clamp(160px, calc(100dvh - 260px), 240px);
+        margin: 0;
+        border-radius: 18px;
+        background: radial-gradient(ellipse, #34524966, #0b1519 75%);
+    }
+
+    body.mobile-shell .mm-panel .skill-tree {
+        position: relative;
+        padding: 0;
+        border: 0;
+        background: none;
+    }
+
+    body.mobile-shell .mm-panel .tree-node,
+    body.mobile-shell .mm-panel .tree-node button {
+        width: 64px;
+    }
+
+    body.mobile-shell .mm-panel .tree-node button {
+        height: 64px;
+        border-radius: 16px;
+        padding: 4px;
+        background: linear-gradient(145deg, #223730, #101c22);
+    }
+
+    /* Tooltips are hover-oriented on desktop; on touch they must not be clipped by the panel. */
+    body.mobile-shell .mm-panel .tree-tooltip {
+        display: none !important;
+    }
+
+    body.mobile-shell .mm-panel .loadout-grid {
+        grid-row: 3;
+        grid-column: 1 / -1;
+        align-self: start;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    body.mobile-shell .mm-panel .loadout-grid label {
+        display: grid;
+        gap: 5px;
+        font-size: 12px;
+        color: #c9bb9c;
+    }
+
+    body.mobile-shell .mm-panel select {
+        width: 100%;
+        min-height: 46px;
+        font-size: 14px;
+    }
+
+    body.mobile-shell .mm-panel .forge-grid {
+        grid-row: 3;
+        grid-column: 1 / -1;
+        align-self: stretch;
+        min-height: 0;
+        overflow-y: auto;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    body.mobile-shell .mm-panel .forge-grid button {
+        min-height: 62px;
+        padding: 10px 9px;
+        gap: 3px;
+    }
+    body.mobile-shell .mm-panel > [data-resume-combat],
+    body.mobile-shell .mm-panel > .elite-guide,
+    body.mobile-shell .mm-panel > p,
+    body.mobile-shell .mm-panel .skill-tree > p {
+        display: none !important;
+    }
+    body.mobile-shell .mm-panel .skill-tree-grid {
+        grid-column: 1;
+        grid-row: 3;
+        display: block;
+        min-height: 0;
+        overflow-y: auto;
+        margin: 0;
+    }
+    body.mobile-shell .mm-panel .skill-tree h3 {
+        margin: 0 0 4px;
+        font-size: 17px;
+        color: #edd5a2;
+    }
+    body.mobile-shell .mm-panel .tree-respec {
+        position: absolute;
+        z-index: 6;
+        top: 0;
+        right: 0;
+        max-width: 60%;
+        margin: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        width: auto;
+        min-height: 32px;
+        padding: 4px 10px;
+        font-size: 10px;
+    }
+    body.mobile-shell .mm-panel .tree-node-root { top: 28%; }
+    body.mobile-shell .mm-panel .tree-node-capstone { top: 86%; }
+    body.mobile-shell .mm-panel .skill-tree-map { margin-top: 30px; }
+    body.mobile-shell .mm-panel .tree-node button strong { font-size: 10px; }
+    body.mobile-shell .mm-panel .tree-node-icon { font-size: 18px; }
+    body.mobile-shell .mm-panel .tree-node button.available {
+        box-shadow: 0 0 18px #e8b45955, inset 0 0 12px #e8b45915;
+    }
+    body.mobile-shell .mm-detail {
+        grid-column: 2;
+        grid-row: 3;
+        min-height: 0;
+        padding: 16px;
+        overflow-y: auto;
+        border: 1px solid #c7a56b44;
+        border-radius: 14px;
+        background: linear-gradient(145deg, #263530, #111e24);
+        font-size: 13px;
+        line-height: 1.5;
+        color: #c4d2cd;
+    }
+    body.mobile-shell .mm-detail h3 { margin: 0 0 10px; color: #f1d59e; font: 20px Georgia, serif; }
+    body.mobile-shell .mm-detail p { margin: 8px 0; }
+    body.mobile-shell .mm-detail strong { color: #edc581; }
+    body.mobile-shell .mm-loadout-note {
+        grid-row: 3;
+        grid-column: 1 / -1;
+        align-self: end;
+        padding: 10px 14px;
+        border: 1px solid #c7a56b33;
+        border-radius: 10px;
+        background: #192b2a;
+        color: #bed5cc;
+        font-size: 12px;
+        line-height: 1.4;
+        max-height: 40%;
+        overflow-y: auto;
+    }
+    body.mobile-shell .mm-hidden { display: none !important; }
+    body.mobile-shell .forge-panel .mm-subtabs,
+    body.mobile-shell .options-panel .mm-subtabs {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        overflow: visible;
+    }
+    body.mobile-shell .options-panel[data-mobile-option-count="4"] .mm-subtabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    body.mobile-shell .options-panel[data-mobile-option-count="5"] .mm-subtabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    body.mobile-shell .forge-panel .mm-subtab,
+    body.mobile-shell .options-panel .mm-subtab { min-width: 0; padding-inline: 3px; }
+    body.mobile-shell .forge-panel[data-mobile-section="training"] > .forge-grid,
+    body.mobile-shell .forge-panel[data-mobile-section="systems"] > .forge-grid,
+    body.mobile-shell .forge-panel:not([data-mobile-section="training"]) > .mastery-panel,
+    body.mobile-shell .forge-panel:not([data-mobile-section="systems"]) > .equipment-options { display: none; }
+    body.mobile-shell .mm-panel .run-options,
+    body.mobile-shell .mm-panel .equipment-options,
+    body.mobile-shell .mm-panel .challenge-options {
+        grid-row: 3;
+        grid-column: 1 / -1;
+        min-height: 0;
+        min-width: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        margin: 0;
+        padding: 12px 16px;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+    body.mobile-shell .mm-panel .run-options label,
+    body.mobile-shell .mm-panel .equipment-options label { display: grid; gap: 6px; margin-block: 12px; }
+    body.mobile-shell .mm-panel .equipment-options select { min-width: 0; max-width: 100%; }
+    body.mobile-shell .mm-panel .run-options button,
+    body.mobile-shell .mm-panel .challenge-options button { min-height: 44px; margin-block: 8px; }
+    body.mobile-shell .options-panel.mm-open,
+    body.mobile-shell .challenges-panel.mm-open { grid-template-columns: minmax(0, 1fr); grid-template-rows: 58px minmax(0, 1fr); }
+    body.mobile-shell .options-panel.mm-open { grid-template-rows: 58px 52px minmax(0, 1fr); }
+    body.mobile-shell .options-panel .run-options [data-options-section] { display: none; }
+    body.mobile-shell .options-panel .run-options [data-options-section][hidden] { display: none !important; }
+    body.mobile-shell .options-panel[data-mobile-section="sound"] .run-options [data-options-section="sound"],
+    body.mobile-shell .options-panel[data-mobile-section="controls"] .run-options [data-options-section="controls"],
+    body.mobile-shell .options-panel[data-mobile-section="lore"] .run-options [data-options-section="lore"],
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options [data-options-section="relics"],
+    body.mobile-shell .options-panel[data-mobile-section="account"] .run-options [data-options-section="account"] { display: block; }
+    body.mobile-shell .options-panel[data-mobile-section="controls"] .run-options [data-options-section="controls"] {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px 16px;
+        margin: 0;
+    }
+    body.mobile-shell .options-panel .run-options [data-options-section="controls"] legend,
+    body.mobile-shell .options-panel .run-options [data-options-section="controls"] small { grid-column: 1 / -1; }
+    body.mobile-shell .options-panel .run-options [data-options-section="controls"] label { margin-block: 4px; }
+    body.mobile-shell .options-panel.mm-open .run-options { padding: 4px 14px; line-height: 1.3; }
+    body.mobile-shell .options-panel .run-options fieldset { margin: 0; padding: 4px 10px 6px; }
+    body.mobile-shell .options-panel .run-options fieldset label {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+        align-items: center;
+        gap: 8px;
+        margin-block: 2px;
+        min-height: 32px;
+    }
+    body.mobile-shell .options-panel .run-options fieldset label:has(input[type="checkbox"]) { display: flex; }
+    body.mobile-shell .options-panel .run-options fieldset input[type="range"],
+    body.mobile-shell .options-panel .run-options fieldset select { width: 100%; min-width: 0; margin: 0; }
+    body.mobile-shell .options-panel .run-options fieldset p,
+    body.mobile-shell .options-panel .run-options fieldset small,
+    body.mobile-shell .options-panel .run-options [data-forge-summary] { margin: 2px 0; font-size: 12px; }
+    body.mobile-shell .options-panel .run-options h3 { margin: 0 0 4px; }
+    body.mobile-shell .options-panel .run-options [data-options-section="controls"] { row-gap: 0; }
+    body.mobile-shell .options-panel .run-options [data-options-section="controls"] label { min-height: 26px; margin-block: 1px; font-size: 12px; }
+    body.mobile-shell .options-panel .run-options [data-options-section="controls"] small { display: none; }
+    body.mobile-shell .options-panel > h2,
+    body.mobile-shell .challenges-panel > h2,
+    body.mobile-shell .options-panel > [data-resume-combat],
+    body.mobile-shell .challenges-panel > [data-resume-combat] { display: none; }
+    body.mobile-shell .options-panel .run-options,
+    body.mobile-shell .challenges-panel .challenge-options { grid-row: 2; }
+    body.mobile-shell .challenges-panel .training-skill-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body.mobile-shell .options-panel.mm-open .run-options { grid-row: 3; }
+    body.mobile-shell .mm-panel .run-options [data-forge-summary] { overflow-wrap: anywhere; }
+    body.mobile-shell .mm-panel .training-skill-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    body.mobile-shell .mm-panel .training-skill-grid button { width: 100%; margin: 0; font-size: 12px; }
+    body.mobile-shell .mm-panel .mastery-panel { grid-row: 3; grid-column: 1 / -1; overflow-y: auto; min-height: 0; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    body.mobile-shell .mm-panel .forge-grid span:not([data-upgrade-preview]) { display: none; }
+    body.mobile-shell .mm-panel .forge-grid .upgrade-preview { font-size: 10px; line-height: 1.3; }
+    body.mobile-shell .mm-help-view {
+        grid-row: 3;
+        grid-column: 1 / -1;
+        z-index: 3;
+        display: grid;
+        align-content: center;
+        gap: 6px;
+        min-height: 0;
+        overflow: hidden;
+        padding: 8px 12px;
+        border-radius: 12px;
+        background: #132027;
+        color: #bbcbc4;
+        font-size: 11px;
+        line-height: 1.32;
+    }
+    body.mobile-shell .mm-help-view h3 { margin: 0; color: #f0d39a; font: 15px/1.15 Georgia, serif; }
+    body.mobile-shell .mm-help-view p { margin: 0; padding-top: 5px; border-top: 1px solid #ffffff18; overflow-wrap: anywhere; }
+    body.mobile-shell .mm-help-view p:first-of-type { padding-top: 0; border-top: 0; }
+    body.mobile-shell .mm-head .mm-help-toggle {
+        width: 36px;
+        min-height: 36px;
+        height: 36px;
+        margin: 0;
+        border-radius: 50%;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+    body.mobile-shell .mm-subtab {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+    }
+    body.mobile-shell .mm-subtab-icon { height: 19px; color: #d6b476; font: 17px/19px Georgia, serif; }
+    body.mobile-shell .mm-subtab-label { line-height: 1.15; }
+    body.mobile-shell .mm-skill-art { width: 21px; height: 21px; border: 1px solid #c7a56b44; border-radius: 6px; background: #0e171a; object-fit: contain; }
+    body.mobile-shell .mm-subtab[aria-selected="true"] .mm-subtab-icon { color: #ffe2a9; text-shadow: 0 0 10px #e9c16d66; }
+    body.mobile-shell .mm-panel .tree-node-icon {
+        display: block;
+        width: 24px;
+        height: 24px;
+        margin-inline: auto;
+        border-radius: 5px;
+        background: var(--skill-art) center / cover;
+        font-size: 0 !important;
+    }
+    body.mobile-shell .mm-pause-tab {
+        border-color: #d4b37a88;
+        background: linear-gradient(135deg, #625039, #252e30 75%);
+        box-shadow: inset 0 1px 0 #ffe3ac33, 0 3px 12px #0006;
+    }
+    body.mobile-shell .mm-pause-glyph,
+    body.mobile-shell .mm-pause-emblem {
+        display: block;
+        width: 18px;
+        height: 18px;
+        background: linear-gradient(to right, #f1d49b 0 33%, transparent 33% 66%, #f1d49b 66%);
+    }
+    body.mobile-shell .mm-pause-screen.mm-open {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(ellipse at center, #233532, #091318 75%);
+    }
+    body.mobile-shell .mm-pause-screen .mm-head { display: none; }
+    body.mobile-shell .mm-pause-card {
+        box-sizing: border-box;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        width: min(540px, 90vw);
+        padding: 24px;
+        border: 1px solid #c7a56b66;
+        border-radius: 20px;
+        background: linear-gradient(145deg, #273b36, #101c22);
+        box-shadow: 0 20px 60px #0008, inset 0 1px 0 #ffe3ac22;
+        text-align: center;
+    }
+    body.mobile-shell .mm-pause-emblem {
+        grid-column: 1 / -1;
+        justify-self: center;
+        width: 28px;
+        height: 30px;
+        margin-bottom: 4px;
+    }
+    body.mobile-shell .mm-pause-card h2,
+    body.mobile-shell .mm-pause-card p,
+    body.mobile-shell .mm-resume { grid-column: 1 / -1; margin: 0; }
+    body.mobile-shell .mm-pause-card h2 { color: #f1d49b; font: 26px Georgia, serif; }
+    body.mobile-shell .mm-pause-card p { color: #b5c8c2; font-size: 12px; }
+    body.mobile-shell .mm-resume,
+    body.mobile-shell .mm-pause-option {
+        min-height: 44px;
+        border-radius: 10px;
+        border: 1px solid #c7a56b55;
+        color: #ecdfc2;
+        background: #15262a;
+    }
+    body.mobile-shell .mm-resume {
+        background: linear-gradient(135deg, #946435, #56391f);
+        border-color: #e0b878;
+    }
+    @media (max-height: 360px) {
+        body.mobile-shell .mm-panel.mm-open {
+            grid-template-rows: 50px 44px minmax(0, 1fr) auto;
+            gap: 6px 12px;
+        }
+        body.mobile-shell .mm-panel .skill-tree-map { height: 120px; }
+        body.mobile-shell .mm-panel .tree-node,
+        body.mobile-shell .mm-panel .tree-node button { width: 48px; }
+        body.mobile-shell .mm-panel .tree-node button { height: 48px; }
+        body.mobile-shell .mm-panel .tree-node-icon { font-size: 12px; }
+        body.mobile-shell .mm-panel .tree-node button strong { font-size: 8px; }
+        body.mobile-shell .mm-detail { padding: 10px; font-size: 12px; }
+    }
+
+    /* Hide the remaining on-screen controls while a panel is open: the panel is the whole screen.
+       (.vitals is not listed — it no longer exists as DOM; the HUD is drawn into the canvas.) */
+    body.mobile-shell.mm-panel-open .arena-toolbar,
+    body.mobile-shell.mm-panel-open .skill-bar,
+    body.mobile-shell.mm-panel-open .touch-movement {
+        display: none !important;
+    }
+    body.mobile-shell.mm-panel-open .touch-aim { display: none !important; }
+    body.mobile-shell .mm-info-panel.mm-open {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: 58px minmax(0, 1fr);
+    }
+    body.mobile-shell .mm-info-panel[data-mm-panel="notes"].mm-open {
+        grid-template-rows: 58px minmax(0, 1fr);
+    }
+    body.mobile-shell .mm-info-panel > .rankings,
+    body.mobile-shell .mm-info-panel > .patch-notes {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 0;
+        background: none;
+    }
+    body.mobile-shell .mm-info-panel > .patch-notes { grid-row: 2; }
+    body.mobile-shell .mm-info-controls {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+        gap: 10px;
+        align-items: start;
+    }
+    body.mobile-shell .mm-info-controls label {
+        display: grid;
+        gap: 4px;
+        color: #d4bd91;
+        font-size: 10px;
+        min-width: 0;
+    }
+    body.mobile-shell .mm-info-controls select {
+        width: 100%;
+        min-width: 0;
+        min-height: 44px;
+        padding: 8px;
+        border: 1px solid #c7a56b55;
+        border-radius: 8px;
+        color: #ecdfc2;
+        background: #17292d;
+        font-size: 12px;
+    }
+    body.mobile-shell .mm-info-panel .patch-notes > .page-header,
+    body.mobile-shell .mm-info-panel .patch-notes > .page-heading,
+    body.mobile-shell .mm-info-panel .patch-notes > footer,
+    body.mobile-shell .mm-info-panel .patch-notes .contents,
+    body.mobile-shell .mm-info-panel .patch-meta > a {
+        display: none;
+    }
+    body.mobile-shell .mm-info-panel .patch-notes article {
+        box-shadow: none;
+        border-radius: 12px;
+    }
+    body.mobile-shell .mm-info-panel .patch-heading { padding: 12px 16px; }
+    body.mobile-shell .mm-info-panel .patch-heading h2 { font-size: 20px; margin: 8px 0; }
+    body.mobile-shell .mm-info-panel .patch-heading > p { margin: 8px 0; font-size: 13px; line-height: 1.5; }
+    body.mobile-shell .mm-info-panel .patch-heading { display: block; }
+    body.mobile-shell .mm-info-panel .patch-section { padding: 14px 16px; }
+    body.mobile-shell .mm-info-panel .patch-section h3 { font-size: 19px; margin-bottom: 10px; }
+    body.mobile-shell .mm-info-panel .patch-section > p,
+    body.mobile-shell .mm-info-panel .patch-section li { font-size: 13px; line-height: 1.5; }
+    body.mobile-shell .mm-info-panel .table-scroll { margin: 12px 0; }
+    body.mobile-shell .mm-info-panel th,
+    body.mobile-shell .mm-info-panel td { min-width: 0; padding: 8px; font-size: 12px; }
+    body.mobile-shell .mm-info-panel .stat-grid { gap: 8px; margin-top: 12px; }
+    body.mobile-shell .mm-info-panel .stat-grid section { padding: 10px; }
+    body.mobile-shell .mm-info-panel .stat-grid h4 { font-size: 16px; }
+    @media (max-height: 360px) {
+        body.mobile-shell .mm-pause-card { padding: 12px 18px; gap: 6px; }
+        body.mobile-shell .mm-pause-emblem { width: 18px; height: 20px; margin: 0; }
+        body.mobile-shell .mm-pause-card h2 { font-size: 22px; }
+        body.mobile-shell .mm-info-panel.mm-open { grid-template-rows: 50px minmax(0, 1fr); }
+        body.mobile-shell .mm-info-panel[data-mm-panel="notes"].mm-open { grid-template-rows: 50px minmax(0, 1fr); }
+    }
+    body.mobile-shell .mm-save-actions {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 8px;
+    }
+    body.mobile-shell .mm-save-actions button {
+        min-height: 44px;
+        padding: 6px 8px;
+        font-size: 12px;
+    }
+    body.mobile-shell .mm-save-status {
+        grid-column: 1 / -1;
+        margin: 8px 0 0;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: #102024;
+        color: #b8d6cb;
+        font-size: 11px;
+        line-height: 1.4;
+    }
+    body.mobile-shell .mm-pause-card {
+        box-sizing: border-box;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: min(720px, 100%);
+        max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 20px);
+        overflow-y: auto;
+    }
+    body.mobile-shell .mm-pause-card .mm-pause-option { font-size: 12px; }
+    body.mobile-shell .mm-pause-card .mm-save-actions { margin: 0; }
+    body.mobile-shell .mm-pause-card .mm-save-status { margin: 0; }
+    body.mobile-shell .mm-account-body {
+        grid-row: 2;
+        grid-column: 1 / -1;
+        min-height: 0;
+        min-width: 0;
+        box-sizing: border-box;
+        overflow-y: auto;
+        align-self: stretch;
+        justify-self: center;
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #c7a56b44;
+        border-radius: 14px;
+        background: linear-gradient(145deg, #263a34, #132127);
+        text-align: center;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+        align-content: start;
+        gap: 8px;
+    }
+    body.mobile-shell .mm-account-body > p { grid-column: 1 / -1; margin: 0; }
+    body.mobile-shell .mm-account-body h2 { color: #f1d49b; font: 24px Georgia, serif; margin: 0 0 12px; }
+    body.mobile-shell .mm-account-body p { color: #bad0c7; font-size: 12px; line-height: 1.3; }
+    body.mobile-shell .mm-account-body button { width: 100%; min-height: 36px; margin: 0; }
+    body.mobile-shell .mm-account-body fieldset {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        align-content: start;
+        min-width: 0;
+        gap: 6px;
+        margin: 0;
+        padding: 6px 10px 10px;
+        border: 1px solid #c7a56b44;
+        border-radius: 12px;
+        text-align: left;
+    }
+    body.mobile-shell .mm-account-body legend { color: #f1d49b; font-weight: 700; padding: 0 8px; }
+    body.mobile-shell .mm-account-body fieldset p { margin: 0; }
+    body.mobile-shell .mm-display-name { display: grid; gap: 6px; min-width: 0; }
+    body.mobile-shell .mm-display-name input {
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        padding: 8px 12px;
+        border: 1px solid #c7a56b66;
+        border-radius: 8px;
+        background: #102024;
+        color: #f6e7c6;
+        font-size: 16px;
+    }
+    body.mobile-shell .mm-account-body small { font-size: 11px; color: #9fb0ad; }
+    body.mobile-shell .mm-account-body { grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); padding: 6px 10px; gap: 6px; }
+    body.mobile-shell .mm-account-body fieldset { gap: 4px; padding: 4px 8px 8px; }
+    body.mobile-shell .mm-account-body button { min-height: 34px; padding-block: 4px; font-size: 12px; }
+    body.mobile-shell .mm-account-body .mm-display-name { gap: 2px; margin: 0; font-size: 11px; }
+    body.mobile-shell .mm-account-body .mm-display-name input { padding: 4px 8px; font-size: 14px; min-height: 32px; }
+    body.mobile-shell .mm-account-body .mm-name-result:empty { display: none; }
+    body.mobile-shell .mm-account-body .mm-name-result { color: #f1d49b; overflow-wrap: anywhere; }
+    body.mobile-shell .mm-account-body .mm-danger { border-color: #d87777; color: #ffd0cc; }
+    body.mobile-shell .mm-menu-group {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-column: 1 / -1;
+        padding: 10px;
+        border: 1px solid #c7a56b33;
+        border-radius: 10px;
+        background: #102024;
+    }
+    body.mobile-shell .mm-menu-group h3 {
+        grid-column: 1 / -1;
+        margin: 0;
+        color: #c7a56b;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .12em;
+    }
+    body.mobile-shell .mm-pause-card { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body.mobile-shell .mm-save-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body.mobile-shell .mm-save-actions > :last-child { grid-column: 1 / -1; }
+
+    /* Visual polish: consistent buttons, balanced grids, quiet secondary text. */
+    body.mobile-shell .mm-pause-card {
+        display: grid;
+        grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr);
+        align-items: stretch;
+        width: min(900px, 100%);
+        max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px);
+        overflow: hidden;
+        gap: 14px;
+        padding: 16px 18px;
+    }
+    body.mobile-shell .mm-pause-side,
+    body.mobile-shell .mm-pause-groups {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 0;
+        min-width: 0;
+    }
+    body.mobile-shell .mm-pause-side { justify-content: center; }
+    body.mobile-shell .mm-pause-groups { overflow-y: auto; }
+    body.mobile-shell .mm-pause-side .mm-run-recap {
+        flex: 0 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        display: -webkit-box;
+        line-clamp: 4; -webkit-line-clamp: 4;
+        -webkit-box-orient: vertical;
+    }
+    body.mobile-shell .mm-pause-side .mm-pause-footer { margin-top: auto; }
+    body.mobile-shell .mm-pause-card .mm-pause-option,
+    body.mobile-shell .main-menu-card button,
+    body.mobile-shell .main-menu-card > .main-menu-patch-notes {
+        min-height: 42px;
+        padding: 6px 10px;
+        border: 1px solid #c7a56b40;
+        border-radius: 10px;
+        background: linear-gradient(180deg, #1a2d31, #132226);
+        color: #ecdfc2;
+        font-size: 13px;
+        line-height: 1.2;
+        transition: border-color .15s, background .15s;
+    }
+    body.mobile-shell .mm-pause-card .mm-pause-option:active,
+    body.mobile-shell .main-menu-card button:active,
+    body.mobile-shell .main-menu-card > .main-menu-patch-notes:active { border-color: #e0b878; background: #22383b; }
+    body.mobile-shell .mm-menu-group { gap: 6px; padding: 8px 10px 10px; background: #0d1b1f99; }
+    body.mobile-shell .mm-menu-group h3 { text-align: left; font-size: 10px; }
+    body.mobile-shell .mm-progress-group .mm-save-actions {
+        grid-column: 1 / -1;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        margin: 0;
+    }
+    body.mobile-shell .mm-progress-group .mm-save-actions > :last-child { grid-column: auto; }
+    body.mobile-shell .mm-progress-group .mm-save-status { margin: 0; padding: 0 2px; background: none; color: #9fb7ae; text-align: left; }
+    body.mobile-shell .mm-pause-card .mm-run-recap {
+        margin: 0;
+        padding: 0 4px;
+        background: none;
+        color: #8ea39c;
+        font-size: 11px;
+        line-height: 1.4;
+        overflow: visible;
+    }
+    body.mobile-shell .mm-pause-card .mm-pause-footer {
+        grid-column: 1 / -1;
+        min-height: 36px;
+        background: transparent;
+        border-color: #c7a56b2a;
+        color: #b9c6bf;
+    }
+    body.mobile-shell .main-menu-card {
+        box-sizing: border-box;
+        width: min(720px, 100%);
+        max-height: 100%;
+        overflow: hidden;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        align-content: start;
+        gap: 6px;
+        padding: 10px 16px;
+    }
+    body.mobile-shell .main-menu-card > h1 { font-size: 18px; }
+    body.mobile-shell .main-menu-card button,
+    body.mobile-shell .main-menu-card > .main-menu-patch-notes { min-height: 34px; font-size: 12px; }
+    body.mobile-shell .main-menu-card .mm-save-actions > :last-child { grid-column: auto; }
+    body.mobile-shell .main-menu-card [data-main-resume] {
+        grid-column: 1 / -1;
+        background: linear-gradient(135deg, #946435, #56391f);
+        border-color: #e0b878;
+        color: #fff1d6;
+        font-size: 14px;
+    }
+    body.mobile-shell .main-menu-card [data-main-resume][hidden] { display: none; }
+    body.mobile-shell .main-menu-card [data-main-status] { color: #9fb7ae; font-size: 11px; text-align: center; }
+
+    @media (max-height: 360px) {
+        body.mobile-shell .mm-pause-card { padding: 10px 14px; gap: 10px; max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 8px); }
+        body.mobile-shell .mm-pause-side, body.mobile-shell .mm-pause-groups { gap: 6px; }
+        body.mobile-shell .mm-pause-side .mm-pause-emblem { display: none; }
+        body.mobile-shell .mm-pause-side h2 { font-size: 20px; }
+        body.mobile-shell .mm-menu-group { gap: 5px; }
+        body.mobile-shell .mm-pause-card .mm-pause-option,
+        body.mobile-shell .main-menu-card button,
+        body.mobile-shell .main-menu-card > .main-menu-patch-notes { min-height: 36px; font-size: 12px; }
+        body.mobile-shell .mm-menu-group { padding: 6px 8px 8px; }
+    }
+    body.mobile-shell .mm-subtab[hidden],
+    body.mobile-shell .mm-panel [data-tree-skill][hidden],
+    body.mobile-shell .mm-panel [data-upgrade][hidden] { display: none !important; }
+
+    /* Account & cloud: a centred, evenly sized card row instead of a ragged auto-fit grid. */
+    body.mobile-shell .mm-account-body {
+        align-self: center;
+        justify-self: center;
+        width: fit-content;
+        max-width: min(100%, 860px);
+        max-height: 100%;
+        margin-inline: auto;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: stretch;
+        align-content: center;
+        gap: 6px 10px;
+        padding: 6px 10px;
+    }
+    body.mobile-shell .mm-account-body > p { flex: 1 1 100%; text-align: center; }
+    body.mobile-shell .mm-account-body fieldset {
+        flex: 1 1 0;
+        max-width: 260px;
+        min-width: min(150px, 100%);
+        align-content: start;
+        grid-auto-rows: min-content;
+        text-align: center;
+    }
+    body.mobile-shell .mm-account-body legend { margin-inline: auto; }
+    body.mobile-shell .mm-account-body .mm-apple { background: #000; border-color: #666; color: #fff; }
+    body.mobile-shell .mm-account-body .mm-display-name { text-align: left; }
+    body.mobile-shell .mm-account-body .account-confirm {
+        flex: 1 1 100%;
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        padding: 8px;
+        border: 1px solid #e9ac6388;
+        border-radius: 12px;
+        background: #211c14;
+    }
+    body.mobile-shell .mm-account-body .account-confirm h3,
+    body.mobile-shell .mm-account-body .account-confirm p { grid-column: 1 / -1; margin: 0; }
+
+    /* Forge "Equipment" and "Mastery" tabs: fit one screen with no scrolling. */
+    body.mobile-shell .mm-panel .equipment-options {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-content: start;
+        align-items: start;
+        gap: 4px 14px;
+        overflow-y: hidden;
+        padding: 6px 12px;
+        font-size: 12px;
+        line-height: 1.3;
+    }
+    body.mobile-shell .forge-panel:not([data-mobile-section="systems"]) > .equipment-options { display: none; }
+    body.mobile-shell .mm-panel .equipment-options > * { margin: 0; min-width: 0; }
+    body.mobile-shell .mm-panel .equipment-options h3 { font-size: 13px; color: #f1d49b; margin: 4px 0 0; }
+    body.mobile-shell .mm-panel .equipment-options > h3,
+    body.mobile-shell .mm-panel .equipment-options > p,
+    body.mobile-shell .mm-panel .equipment-options [data-equipment-preview] { grid-column: 1 / -1; }
+    body.mobile-shell .mm-panel .equipment-options label { display: grid; gap: 2px; margin: 0; font-size: 12px; }
+    body.mobile-shell .mm-panel .equipment-options select { min-height: 32px; padding: 2px 6px; font-size: 12px; }
+    body.mobile-shell .mm-panel .equipment-options [data-equipment-preview],
+    body.mobile-shell .mm-panel .equipment-options [data-build-synergy],
+    body.mobile-shell .mm-panel .equipment-options [data-boss-relics] {
+        font-size: 11px;
+        line-height: 1.3;
+        color: #bed5cc;
+        display: block;
+        overflow: visible;
+    }
+    body.mobile-shell .mm-panel .equipment-options [data-equipment-preview] p { margin: 0 0 2px; }
+    body.mobile-shell .mm-panel .mastery-panel {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        overflow: hidden;
+        margin: 0;
+        padding: 4px 0 0;
+        border: 0;
+    }
+    body.mobile-shell .forge-panel:not([data-mobile-section="training"]) > .mastery-panel { display: none; }
+    body.mobile-shell .mm-panel .mastery-panel h3 { display: none; }
+    body.mobile-shell .mm-panel .mastery-panel > p { margin: 0 0 4px; font-size: 11px; text-align: center; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid {
+        grid-row: 2;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-auto-rows: minmax(0, 1fr);
+        overflow: hidden;
+        gap: 6px;
+    }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button { min-height: 0; padding: 6px 8px; gap: 2px; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid span:not([data-upgrade-preview]) {
+        display: block;
+        font-size: 10px;
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Main menu: balanced landscape composition */
+    body.mobile-shell .main-menu-card {
+        width: min(920px, 100%);
+        max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 24px);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        align-content: center;
+        gap: 10px;
+        padding: 20px 24px;
+    }
+
+    /* Keep the game title and status messages spanning the full layout */
+    body.mobile-shell .main-menu-card > h1,
+    body.mobile-shell .main-menu-card > p,
+    body.mobile-shell .main-menu-card > [data-main-status],
+    body.mobile-shell .main-menu-card > .mm-save-status {
+        grid-column: 1 / -1;
+    }
+
+    body.mobile-shell .main-menu-card > h1 {
+        margin: 0 0 4px;
+        text-align: center;
+        font-size: 24px;
+    }
+
+    /* Main actions get consistent, comfortable targets */
+    body.mobile-shell .main-menu-card button,
+    body.mobile-shell .main-menu-card > .main-menu-patch-notes {
+        min-width: 0;
+        min-height: 46px;
+        margin: 0;
+        overflow-wrap: anywhere;
+    }
+
+    /* Continue is the primary action when a run is available */
+    body.mobile-shell .main-menu-card [data-main-resume] {
+        grid-column: 1 / -1;
+        min-height: 54px;
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    /* Secondary actions */
+    body.mobile-shell .main-menu-card [data-main-options],
+    body.mobile-shell .main-menu-card [data-main-panel="rankings"] {
+        font-size: 12px;
+    }
+
+    /* Save status should read as quiet information, not another menu action */
+    body.mobile-shell .main-menu-card [data-main-status] {
+        margin: 2px 0;
+        text-align: center;
+        font-size: 11px;
+        color: #9fb7ae;
+    }
+
+    /* Short landscape screens */
+    @media (max-height: 480px) {
+        body.mobile-shell .main-menu-card {
+            width: min(920px, 100%);
+            gap: 7px;
+            padding: 10px 18px;
+        }
+
+        body.mobile-shell .main-menu-card > h1 {
+            font-size: 20px;
+        }
+
+        body.mobile-shell .main-menu-card button {
+            min-height: 38px;
+        }
+        body.mobile-shell .main-menu-card > .main-menu-patch-notes { min-height: 38px; }
+
+        body.mobile-shell .main-menu-card [data-main-resume] {
+            min-height: 44px;
+        }
+    }
+        /* Pause menu — landscape-first hierarchy */
+    body.mobile-shell .mm-pause-card {
+        box-sizing: border-box;
+        width: min(1000px, 100%);
+        max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 24px);
+        grid-template-columns: minmax(230px, 0.8fr) minmax(0, 1.4fr);
+        gap: 16px;
+        padding: 18px;
+    }
+
+    body.mobile-shell .mm-pause-side {
+        align-items: stretch;
+        justify-content: center;
+        gap: 12px;
+    }
+
+    body.mobile-shell .mm-pause-side h2 {
+        font-size: clamp(21px, 2.4vw, 28px);
+    }
+
+    body.mobile-shell .mm-pause-side .mm-resume {
+        min-height: 52px;
+        font-size: 15px;
+        font-weight: 700;
+    }
+
+    body.mobile-shell .mm-pause-side .mm-run-recap {
+        max-height: 5.6em;
+        overflow: hidden;
+        font-size: 11px;
+        line-height: 1.5;
+    }
+
+    body.mobile-shell .mm-pause-groups {
+        gap: 10px;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    body.mobile-shell .mm-menu-group {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 10px;
+    }
+
+    body.mobile-shell .mm-menu-group h3 {
+        grid-column: 1 / -1;
+    }
+
+    body.mobile-shell .mm-pause-card .mm-pause-option {
+        min-height: 44px;
+        overflow-wrap: anywhere;
+    }
+
+    @media (max-height: 420px) {
+        body.mobile-shell .mm-pause-card {
+            max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 12px);
+            padding: 10px 14px;
+            gap: 10px;
+        }
+
+        body.mobile-shell .mm-pause-side,
+        body.mobile-shell .mm-pause-groups {
+            gap: 6px;
+        }
+
+        body.mobile-shell .mm-pause-card .mm-pause-option {
+            min-height: 36px;
+        }
+
+        body.mobile-shell .mm-pause-side .mm-resume {
+            min-height: 42px;
+        }
+    }
+
+    /* Forge Mastery — landscape readability */
+    body.mobile-shell .mm-panel .mastery-panel {
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid {
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        align-content: start;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-auto-rows: minmax(76px, auto);
+        gap: 8px;
+        padding: 8px 6px 18px;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Keep each upgrade card readable without changing its click behavior */
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button {
+        min-width: 0;
+        min-height: 76px;
+        height: auto;
+        padding: 8px;
+        align-content: center;
+        text-align: center;
+        overflow: visible;
+    }
+
+    /* Allow upgrade names and descriptions to wrap instead of being cut off */
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button span:not([data-upgrade-preview]) {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+        line-height: 1.3;
+    }
+
+    /* Keep the upgrade preview legible */
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid [data-upgrade-preview] {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.3;
+        font-size: 11px;
+    }
+
+    /* Short landscape screens */
+    @media (max-height: 480px) {
+        body.mobile-shell .mm-panel .mastery-panel .forge-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-auto-rows: minmax(64px, auto);
+            gap: 6px;
+            padding: 4px 4px 12px;
+        }
+
+        body.mobile-shell .mm-panel .mastery-panel .forge-grid button {
+            min-height: 64px;
+            padding: 6px;
+        }
+
+        body.mobile-shell .mm-panel .mastery-panel .forge-grid button span:not([data-upgrade-preview]) {
+            font-size: 10px;
+        }
+    }
+
+    /* Forge regular Upgrades — landscape readability */
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid {
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        align-content: start;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-auto-rows: minmax(76px, auto);
+        gap: 8px;
+        padding: 8px 6px 18px;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button {
+        min-width: 0;
+        min-height: 76px;
+        height: auto;
+        padding: 8px;
+        text-align: center;
+        overflow: visible;
+    }
+
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button span:not([data-upgrade-preview]) {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        overflow-wrap: anywhere;
+        line-height: 1.3;
+    }
+
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid [data-upgrade-preview] {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.3;
+        font-size: 11px;
+    }
+
+    /* Short landscape screens */
+    @media (max-height: 480px) {
+        body.mobile-shell .mm-panel .forge-panel > .forge-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-auto-rows: minmax(64px, auto);
+            gap: 6px;
+            padding: 4px 4px 12px;
+        }
+
+        body.mobile-shell .mm-panel .forge-panel > .forge-grid button {
+            min-height: 64px;
+            padding: 6px;
+        }
+
+        body.mobile-shell .mm-panel .forge-panel > .forge-grid button span:not([data-upgrade-preview]) {
+            font-size: 10px;
+        }
+    }
+
+    /* Main menu: single-column landscape layout */
+    body.mobile-shell .main-menu {
+        box-sizing: border-box;
+        padding:
+            max(8px, var(--safe-top))
+            max(12px, var(--safe-right))
+            max(8px, var(--safe-bottom))
+            max(12px, var(--safe-left));
+        overflow: hidden;
+    }
+
+    body.mobile-shell .main-menu-card {
+        box-sizing: border-box;
+        width: min(420px, 100%);
+        min-width: 0;
+        max-width: 100%;
+        max-height: 100%;
+        grid-template-columns: minmax(0, 1fr) !important;
+        align-content: center;
+        gap: 8px;
+        padding: 14px 18px;
+        overflow: hidden;
+    }
+
+    body.mobile-shell .main-menu-card > h1,
+    body.mobile-shell .main-menu-card > p,
+    body.mobile-shell .main-menu-card > [data-main-status],
+    body.mobile-shell .main-menu-card > .mm-save-status {
+        grid-column: 1 / -1;
+    }
+
+    body.mobile-shell .main-menu-card > h1 {
+        margin: 0;
+        font-size: clamp(18px, 4vh, 24px);
+        line-height: 1.1;
+    }
+
+    body.mobile-shell .main-menu-card > p:not([data-main-status]) {
+        display: none;
+    }
+
+    body.mobile-shell .main-menu-card button,
+    body.mobile-shell .main-menu-card > .main-menu-patch-notes {
+        width: 100%;
+        min-width: 0;
+        min-height: clamp(34px, 8vh, 42px);
+        margin: 0;
+        padding: 6px 10px;
+        font-size: 12px;
+        line-height: 1.15;
+    }
+
+    body.mobile-shell .main-menu-card [data-main-resume][hidden],
+    body.mobile-shell .main-play-menu[hidden] {
+        display: none !important;
+    }
+
+    body.mobile-shell .main-play-menu {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 6px;
+        min-width: 0;
+    }
+
+    body.mobile-shell .main-menu-card [data-main-menu-actions] {
+        min-width: 0;
+    }
+
+    @media (max-height: 420px) {
+        body.mobile-shell .main-menu-card {
+            gap: 5px;
+            padding: 8px 14px;
+        }
+
+        body.mobile-shell .main-menu-card > h1 {
+            font-size: 18px;
+        }
+
+        body.mobile-shell .main-menu-card button,
+        body.mobile-shell .main-menu-card > .main-menu-patch-notes {
+            min-height: 30px;
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+    }
+
+    /* =========================================================
+    PLAY OPTIONS — CENTERED MODAL
+    ========================================================= */
+
+    /* Keep the original Main Menu unchanged behind the modal. */
+    body.mobile-shell .main-menu {
+        isolation: isolate;
+    }
+
+    /* Dim and blur the Main Menu while Play options are open. */
+    body.mobile-shell .main-menu:has(.main-play-menu:not([hidden]))::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        background: rgb(3 8 11 / 72%);
+        backdrop-filter: blur(7px);
+        -webkit-backdrop-filter: blur(7px);
+    }
+
+    /* The Play button remains in the original menu.
+    Only the options container becomes the modal. */
+    body.mobile-shell .main-menu-card .main-play-menu {
+        position: fixed;
+        z-index: 11;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+
+        width: min(340px, calc(100vw - var(--safe-left) - var(--safe-right) - 32px));
+        max-width: calc(100vw - var(--safe-left) - var(--safe-right) - 32px);
+        max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 32px);
+        box-sizing: border-box;
+
+        gap: 8px;
+        padding: 18px;
+
+        overflow: hidden;
+        overflow-y: hidden;
+
+        border: 1px solid #c7a56b99;
+        border-radius: 16px;
+        background: linear-gradient(160deg, #192a2c, #0b1217);
+        box-shadow:
+            0 24px 80px rgb(0 0 0 / 65%),
+            0 0 0 1px rgb(255 224 170 / 5%);
+
+        animation: play-modal-enter 160ms ease-out;
+    }
+
+    /* Hidden must override the modal display declaration. */
+    body.mobile-shell .main-menu-card .main-play-menu[hidden] {
+        display: none !important;
+    }
+
+    /* Modal heading. */
+    body.mobile-shell .main-play-menu .play-modal-title {
+        margin: 0 0 4px;
+        color: #f1e5cc;
+        font: 400 21px/1.2 Georgia, serif;
+        text-align: center;
+    }
+
+    /* Every option gets a full-width, consistent button. */
+    body.mobile-shell .main-menu-card .main-play-menu button {
+        flex: 0 0 auto;
+        width: 100%;
+        min-width: 0;
+        min-height: 42px;
+        margin: 0;
+        padding: 9px 12px;
+        font-size: 13px;
+        line-height: 1.2;
+    }
+
+    @keyframes play-modal-enter {
+        from {
+            opacity: 0;
+            transform: translate(-50%, -47%);
+        }
+
+        to {
+            opacity: 1;
+            transform: translate(-50%, -50%);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        body.mobile-shell .main-menu-card .main-play-menu {
+            animation: none;
+        }
+    }
+
+    @media (max-height: 420px) {
+        body.mobile-shell .main-menu-card .main-play-menu {
+            width: min(300px, calc(100vw - var(--safe-left) - var(--safe-right) - 24px));
+            max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px);
+            gap: 4px;
+            padding: 12px 10px;
+        }
+
+        body.mobile-shell .main-menu-card .main-play-menu button {
+            min-height: 32px;
+            padding: 5px 8px;
+            font-size: 11px;
+        }
+
+        body.mobile-shell .main-play-menu .play-modal-title {
+            font-size: 17px;
+        }
+    }
+
+    /* Forge art stays legible in the narrow mobile card grids. */
+    body.mobile-shell .mm-panel .forge-grid button {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto auto;
+        justify-items: center;
+        align-content: center;
+        text-align: center;
+    }
+
+    body.mobile-shell .mm-panel .forge-grid button > .forge-card-art {
+        grid-column: 1;
+        grid-row: auto;
+        width: 28px;
+        height: 28px;
+        margin: 0 auto 2px;
+    }
+
+    body.mobile-shell .mm-panel .forge-grid button > strong,
+    body.mobile-shell .mm-panel .forge-grid button > span:not([data-upgrade-preview]),
+    body.mobile-shell .mm-panel .forge-grid button > small,
+    body.mobile-shell .mm-panel .forge-grid button > [data-upgrade-preview] {
+        grid-column: 1;
+        text-align: center;
+    }
+
+    @media (max-height: 480px) {
+        body.mobile-shell .mm-panel .forge-grid button > .forge-card-art {
+            width: 22px;
+            height: 22px;
+        }
+    }
+
+    /* Interactive game screens fit the landscape viewport; no inner pane scrolls to expose controls. */
+    body.mobile-shell .mm-panel .forge-grid,
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid,
+    body.mobile-shell .mm-panel .skill-tree-grid,
+    body.mobile-shell .mm-panel .skill-tree-map,
+    body.mobile-shell .mm-panel .mm-detail,
+    body.mobile-shell .mm-panel .run-options,
+    body.mobile-shell .mm-panel .equipment-options,
+    body.mobile-shell .mm-panel .challenge-options,
+    body.mobile-shell .mm-panel .mastery-panel,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid,
+    body.mobile-shell .mm-pause-card,
+    body.mobile-shell .mm-pause-groups,
+    body.mobile-shell .mm-pause-side .mm-run-recap,
+    body.mobile-shell .mm-account-body,
+    body.mobile-shell .save-slots-card,
+    body.mobile-shell .restart-mode-card {
+        overflow-x: hidden;
+        overflow-y: hidden;
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: auto;
+    }
+
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+        grid-auto-rows: 0;
+        align-content: stretch;
+        gap: 3px;
+        padding: 2px;
+    }
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button {
+        grid-template-columns: 16px minmax(0, 1fr);
+        grid-template-rows: auto auto auto minmax(0, 1fr);
+        justify-items: stretch;
+        text-align: left;
+        min-height: 0;
+        height: 100%;
+        gap: 0;
+        padding: 1px 2px;
+    }
+    body.mobile-shell .mm-panel .forge-grid button > .forge-card-art {
+        grid-column: 1;
+        grid-row: 1 / span 4;
+        align-self: center;
+        width: 14px;
+        height: 14px;
+        margin: 0 auto;
+    }
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > strong,
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > span:not([data-upgrade-preview]),
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > small,
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > [data-upgrade-preview] {
+        grid-column: 2;
+        text-align: left;
+    }
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > strong { grid-row: 1; font-size: 8px; line-height: 1; }
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > span:not([data-upgrade-preview]) { grid-row: 2; font-size: 7px; line-height: 1; }
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid button > small { grid-row: 3; font-size: 7px; line-height: 1; }
+    body.mobile-shell .mm-panel .forge-grid button > [data-upgrade-preview] {
+        grid-row: 4;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2; -webkit-line-clamp: 2;
+        min-height: 0;
+        overflow: hidden;
+        font-size: 7px;
+        line-height: 1.05;
+        white-space: normal;
+    }
+
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+        grid-auto-rows: 0;
+        align-content: stretch;
+        gap: 4px;
+        padding: 2px;
+    }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button {
+        grid-template-columns: 18px minmax(0, 1fr);
+        grid-template-rows: auto auto auto auto minmax(0, 1fr);
+        justify-items: stretch;
+        text-align: left;
+        min-height: 0;
+        height: 100%;
+        gap: 0;
+        padding: 1px 4px;
+    }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > .forge-card-art { grid-column: 1; grid-row: 1 / span 5; align-self: center; width: 16px; height: 16px; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > strong,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > span:not([data-upgrade-preview]),
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > small,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > [data-upgrade-preview] { grid-column: 2; text-align: left; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > strong { grid-row: 1; font-size: 9px; line-height: 1; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > span:not([data-upgrade-preview]) { grid-row: 2; display: block; font-size: 8px; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > small { grid-row: 3; font-size: 7px; line-height: 1; }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > [data-upgrade-preview] { grid-row: 4 / span 2; display: -webkit-box; -webkit-box-orient: vertical; line-clamp: 2; -webkit-line-clamp: 2; overflow: hidden; font-size: 8px; line-height: 1.05; }
+
+    body.mobile-shell .mm-panel .skill-tree-map { height: clamp(140px, calc(100dvh - 240px), 210px); }
+    body.mobile-shell .mm-panel .tree-node,
+    body.mobile-shell .mm-panel .tree-node button { width: 48px; }
+    body.mobile-shell .mm-panel .tree-node button { height: 48px; padding: 3px; }
+    body.mobile-shell .mm-panel .tree-node-icon { font-size: 15px; }
+    body.mobile-shell .mm-panel .mm-detail { padding: 8px; font-size: 11px; line-height: 1.3; }
+    body.mobile-shell .mm-panel .mm-detail h3 { margin-bottom: 4px; font-size: 16px; }
+    body.mobile-shell .mm-panel .mm-detail p { margin: 4px 0; }
+
+    body.mobile-shell .options-panel[data-mobile-section="account"] .run-options { display: grid; align-content: center; }
+    body.mobile-shell .mm-account-body {
+        width: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        align-self: stretch;
+        align-content: center;
+        gap: 4px 6px;
+        padding: 4px 6px;
+    }
+    body.mobile-shell .mm-account-body > p { margin: 0; font-size: 10px; line-height: 1.2; }
+    body.mobile-shell .mm-account-body fieldset {
+        flex: 1 1 30%;
+        min-width: 0;
+        max-width: none;
+        gap: 2px;
+        padding: 2px 5px 4px;
+    }
+    body.mobile-shell .mm-account-body legend { padding-inline: 4px; font-size: 11px; }
+    body.mobile-shell .mm-account-body fieldset p,
+    body.mobile-shell .mm-account-body small { margin: 0; font-size: 9px; line-height: 1.15; }
+    body.mobile-shell .mm-account-body button { min-height: 26px; padding: 2px 5px; font-size: 10px; line-height: 1.05; }
+    body.mobile-shell .mm-account-body .mm-display-name { gap: 1px; font-size: 10px; }
+    body.mobile-shell .mm-account-body .mm-display-name input { min-height: 26px; padding: 2px 6px; font-size: 12px; }
+    body.mobile-shell .mm-account-body .account-confirm { padding: 6px; gap: 4px; }
+    body.mobile-shell .options-panel .run-options .mm-account-body fieldset { gap: 2px; }
+    body.mobile-shell .options-panel .run-options .mm-account-body fieldset p,
+    body.mobile-shell .options-panel .run-options .mm-account-body fieldset small { margin: 0; font-size: 9px; line-height: 1.1; }
+    body.mobile-shell .options-panel .run-options .mm-account-body button { min-height: 26px; margin-block: 0; padding: 2px 5px; font-size: 10px; line-height: 1.05; }
+    body.mobile-shell .options-panel .run-options .mm-account-body .mm-display-name { grid-template-columns: minmax(0, 1fr); min-height: 0; margin: 0; }
+    body.mobile-shell .options-panel .run-options .mm-account-body .mm-display-name input { min-height: 26px; }
+
+    body.mobile-shell .options-panel[data-mobile-section="lore"] .run-options {
+        overflow-y: auto;
+        align-content: start;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto minmax(0, 1fr);
+        align-content: stretch;
+        gap: 2px;
+        padding: 4px 8px;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > h3,
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-codex-hint] { margin: 0; }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > h3 { font-size: 14px; line-height: 1.1; }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-codex-hint] { font-size: 10px; line-height: 1.15; }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-relic-codex] {
+        grid-row: 3;
+        min-height: 0;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+        align-content: stretch;
+        gap: 4px;
+        overflow: hidden;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .camp-relic {
+        min-width: 0;
+        min-height: 0;
+        gap: 1px;
+        padding: 3px 6px;
+        overflow: hidden;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .camp-relic b { font-size: 10px; line-height: 1.05; }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .camp-relic small {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2; -webkit-line-clamp: 2;
+        overflow: hidden;
+        font-size: 9px;
+        line-height: 1.1;
+    }
+
+    body.mobile-shell .mm-pause-groups { min-height: 0; }
+    body.mobile-shell .mm-pause-side .mm-run-recap { max-height: 5.6em; }
+    body.mobile-shell .challenges-panel .challenge-options {
+        display: grid;
+        align-content: start;
+        gap: 5px;
+        padding: 4px 8px;
+    }
+    body.mobile-shell .challenges-panel .challenge-options > p {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2; -webkit-line-clamp: 2;
+        overflow: hidden;
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.25;
+    }
+    body.mobile-shell .challenges-panel .training-skill-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, auto));
+        align-content: start;
+        gap: 4px;
+    }
+    body.mobile-shell .challenges-panel .training-skill-grid button {
+        min-height: 34px;
+        margin: 0;
+        padding: 4px 6px;
+        font-size: 10px;
+        line-height: 1.1;
+    }
+
+    @media (max-height: 420px) {
+        body.mobile-shell .mm-panel .skill-tree-map { height: 140px; }
+        body.mobile-shell .mm-panel .tree-node,
+        body.mobile-shell .mm-panel .tree-node button { width: 44px; }
+        body.mobile-shell .mm-panel .tree-node button { height: 44px; }
+        body.mobile-shell .mm-panel .forge-grid button > .forge-card-art { width: 12px; height: 12px; }
+        body.mobile-shell .mm-panel .mastery-panel .forge-grid button > strong { font-size: 8px; }
+        body.mobile-shell .mm-panel .mastery-panel .forge-grid button > span:not([data-upgrade-preview]) { font-size: 7px; }
+        body.mobile-shell .mm-panel .forge-grid button > [data-upgrade-preview] { font-size: 6px; line-height: 1; }
+        body.mobile-shell .mm-account-body fieldset { padding: 2px 4px 4px; }
+        body.mobile-shell .mm-account-body button { min-height: 26px; font-size: 9px; }
+        body.mobile-shell .mm-pause-card {
+            max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 8px);
+            gap: 6px;
+            padding: 6px 10px;
+        }
+        body.mobile-shell .mm-pause-side,
+        body.mobile-shell .mm-pause-groups { gap: 4px; }
+        body.mobile-shell .mm-menu-group { gap: 3px; padding: 4px 6px; }
+        body.mobile-shell .mm-pause-card .mm-pause-option { min-height: 30px; padding: 3px 5px; font-size: 10px; }
+        body.mobile-shell .mm-pause-side .mm-resume { min-height: 36px; }
+        body.mobile-shell .mm-pause-side .mm-run-recap { max-height: 4.6em; line-clamp: 3; -webkit-line-clamp: 3; font-size: 10px; line-height: 1.3; }
+        body.mobile-shell .mm-progress-group .mm-save-actions { gap: 3px; }
+        body.mobile-shell .mm-progress-group .mm-save-status { display: -webkit-box; -webkit-box-orient: vertical; line-clamp: 2; -webkit-line-clamp: 2; overflow: hidden; font-size: 9px; line-height: 1.1; }
+        body.mobile-shell .challenges-panel .challenge-options > p { line-clamp: 1; -webkit-line-clamp: 1; }
+        body.mobile-shell .challenges-panel .training-skill-grid button { min-height: 30px; padding: 2px 4px; font-size: 9px; }
+    }
+}
+
+body.mobile-shell .mm-pause-card .mm-stage-recap {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    margin: 0;
+    padding: 7px 9px;
+    border: 1px solid #c7a56b45;
+    border-radius: 10px;
+    background: #0c171bcc;
+}
+body.mobile-shell .mm-pause-card .mm-stage-recap-row {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 6px;
+    min-width: 0;
+    margin: 0;
+    color: #d8cbb2;
+    font-size: 11px;
+    line-height: 1.2;
+}
+body.mobile-shell .mm-pause-card .mm-stage-recap-row strong { color: #f1d49b; }
+body.mobile-shell .mm-pause-card .mm-stage-recap-row span {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    min-width: 0;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+}
+
+/* The interactive panels are sized as a viewport layout in landscape. Skill categories are
+   thirteen tabs at most, so place them in two rows instead of clipping a one-row strip. */
+@media (orientation: landscape) and (max-height: 480px) {
+    body.mobile-shell .mm-panel.mm-open {
+        grid-template-rows: 42px 42px minmax(0, 1fr);
+        gap: 4px 8px;
+        padding: max(4px, var(--safe-top)) max(8px, var(--safe-right)) max(4px, var(--safe-bottom)) max(8px, var(--safe-left));
+    }
+    body.mobile-shell .mm-head { min-height: 0; padding-block: 2px; }
+    body.mobile-shell .mm-head h2 { font-size: 15px; }
+    body.mobile-shell .mm-close { width: 36px; height: 36px; }
+    body.mobile-shell .mm-panel .mm-subtabs {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: minmax(0, 1fr);
+        grid-auto-flow: column;
+        min-width: 0;
+        min-height: 0;
+        height: 42px;
+        gap: 3px;
+        overflow: hidden;
+        padding: 0;
+    }
+    body.mobile-shell .mm-panel .mm-subtab {
+        display: flex;
+        flex: initial;
+        flex-direction: row;
+        justify-content: center;
+        min-width: 0;
+        min-height: 0;
+        width: 100%;
+        height: 100%;
+        gap: 4px;
+        padding: 2px 4px;
+        overflow: hidden;
+        font-size: 10px;
+        line-height: 1;
+        white-space: nowrap;
+    }
+    body.mobile-shell .forge-panel .mm-subtabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    body.mobile-shell .options-panel[data-mobile-option-count="4"] .mm-subtabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    body.mobile-shell .options-panel[data-mobile-option-count="5"] .mm-subtabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    body.mobile-shell .skills-panel.mm-open { grid-template-rows: 42px 54px minmax(0, 1fr); }
+    body.mobile-shell .skills-panel .mm-subtabs {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+        grid-auto-flow: row;
+        height: 54px;
+    }
+    body.mobile-shell .skills-panel .mm-subtab {
+        flex-direction: column;
+        gap: 1px;
+        padding: 1px 2px;
+        font-size: 9px;
+    }
+    body.mobile-shell .skills-panel .mm-subtab .mm-skill-art { width: 14px; height: 14px; object-fit: contain; }
+    body.mobile-shell .skills-panel .mm-subtab .mm-subtab-icon { font-size: 12px; line-height: 1; }
+    body.mobile-shell .skills-panel .mm-subtab-label {
+        display: block;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1;
+    }
+    body.mobile-shell .options-panel.mm-open {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: 42px 42px minmax(0, 1fr);
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-row: 3;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto minmax(0, 1fr);
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        min-height: 0;
+        align-self: stretch;
+        gap: 3px;
+        padding: 2px 4px;
+        overflow: hidden;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > h3,
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-codex-hint],
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-relic-codex] {
+        grid-column: 1 / -1;
+        min-width: 0;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > h3 { font-size: 12px; line-height: 1; }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-codex-hint] { font-size: 9px; line-height: 1.1; }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .run-options > [data-relic-codex] {
+        display: grid;
+        grid-row: 3;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+        align-content: stretch;
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        min-height: 0;
+        gap: 4px;
+        overflow: hidden;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .camp-relic {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        align-content: start;
+        min-width: 0;
+        min-height: 0;
+        padding: 4px 6px;
+        gap: 2px;
+        overflow: hidden;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .camp-relic b {
+        overflow: hidden;
+        font-size: 10px;
+        line-height: 1.05;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    body.mobile-shell .options-panel[data-mobile-section="relics"] .camp-relic small {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        -webkit-line-clamp: 2;
+        min-width: 0;
+        overflow: hidden;
+        font-size: 9px;
+        line-height: 1.1;
+        overflow-wrap: anywhere;
+    }
+    body.mobile-shell .mm-panel .skill-tree-grid,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid,
+    body.mobile-shell .mm-panel .forge-panel > .forge-grid,
+    body.mobile-shell .mm-panel .run-options,
+    body.mobile-shell .mm-panel .equipment-options,
+    body.mobile-shell .mm-panel .challenge-options,
+    body.mobile-shell .mm-panel .mm-detail {
+        overflow: hidden;
+        overscroll-behavior: none;
+    }
+}
+
+/* Keep skill help, tree nodes, and forge artwork readable on short landscape screens. */
+@media (orientation: landscape) and (max-height: 480px) {
+    body.mobile-shell .skills-panel.mm-open,
+    body.mobile-shell .forge-panel.mm-open {
+        grid-template-rows: 42px 64px minmax(0, 1fr);
+    }
+    body.mobile-shell .skills-panel .mm-subtabs {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(30px, 1fr));
+        grid-auto-flow: row;
+        height: 64px;
+        gap: 2px;
+    }
+    body.mobile-shell .skills-panel .mm-subtab { min-height: 30px; padding: 1px 2px; gap: 1px; font-size: 9px; }
+    body.mobile-shell .skills-panel .mm-subtab .mm-skill-art { width: 12px; height: 12px; }
+    body.mobile-shell .skills-panel .mm-subtab .mm-subtab-icon { height: 12px; font-size: 12px; line-height: 12px; }
+    body.mobile-shell .skills-panel .mm-subtab-label { font-size: 8px; line-height: 1; }
+    body.mobile-shell .skills-panel.mm-help-shown .tree-respec { display: none !important; }
+    body.mobile-shell .skills-panel .mm-help-view { z-index: 7; grid-row: 3; background: #132027; }
+
+    body.mobile-shell .skills-panel .skill-tree-grid { overflow: hidden; }
+    body.mobile-shell .skills-panel .skill-tree { overflow: visible; }
+    body.mobile-shell .skills-panel .skill-tree-map {
+        height: clamp(160px, calc(100dvh - 220px), 210px);
+        margin: 10px 0 0;
+        overflow: visible;
+    }
+    body.mobile-shell .skills-panel .tree-node,
+    body.mobile-shell .skills-panel .tree-node button { width: 64px; }
+    body.mobile-shell .skills-panel .tree-node button { height: 64px; gap: 1px; padding: 2px; overflow: hidden; }
+    body.mobile-shell .skills-panel .tree-node-root { top: 24%; }
+    body.mobile-shell .skills-panel .tree-node-capstone { top: calc(100% - 32px); }
+    body.mobile-shell .skills-panel .tree-node-icon { width: 18px; height: 18px; }
+    body.mobile-shell .skills-panel .tree-node button strong {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        font-size: 9px;
+        line-height: 1.05;
+    }
+    body.mobile-shell .skills-panel .tree-node button small { font-size: 8px; line-height: 1; }
+
+    body.mobile-shell .forge-panel > .forge-grid {
+        grid-template-rows: none;
+        grid-auto-rows: minmax(0, 1fr);
+        gap: 5px;
+        padding: 4px 5px 8px;
+    }
+    body.mobile-shell .forge-panel > .forge-grid button,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto 18px auto auto auto;
+        justify-items: center;
+        align-content: center;
+        gap: 1px;
+        min-width: 0;
+        min-height: 0;
+        padding: 3px 4px;
+        text-align: center;
+    }
+    body.mobile-shell .forge-panel > .forge-grid button > strong,
+    body.mobile-shell .forge-panel > .forge-grid button > .forge-card-art,
+    body.mobile-shell .forge-panel > .forge-grid button > span:not([data-upgrade-preview]),
+    body.mobile-shell .forge-panel > .forge-grid button > small,
+    body.mobile-shell .forge-panel > .forge-grid button > [data-upgrade-preview],
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > strong,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > .forge-card-art,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > span:not([data-upgrade-preview]),
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > small,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > [data-upgrade-preview] {
+        grid-column: 1;
+        min-width: 0;
+        text-align: center;
+    }
+    body.mobile-shell .forge-panel > .forge-grid button > strong,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > strong { grid-row: 1; font-size: 10px; line-height: 1.05; }
+    body.mobile-shell .forge-panel > .forge-grid button > .forge-card-art,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > .forge-card-art { grid-row: 2; align-self: center; width: 18px; height: 18px; margin: 0; }
+    body.mobile-shell .forge-panel > .forge-grid button > span:not([data-upgrade-preview]),
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > span:not([data-upgrade-preview]) {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        -webkit-line-clamp: 2;
+        grid-row: 3;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        font-size: 8.5px;
+        line-height: 1.05;
+        white-space: normal;
+    }
+    body.mobile-shell .forge-panel > .forge-grid button > small,
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > small { grid-row: 4; font-size: 8px; line-height: 1; }
+    body.mobile-shell .forge-panel > .forge-grid button > [data-upgrade-preview],
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid button > [data-upgrade-preview] {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        -webkit-line-clamp: 2;
+        grid-row: 5;
+        align-self: start;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        font-size: 8px;
+        line-height: 1.05;
+    }
+
+    body.mobile-shell .mm-panel .mastery-panel { grid-template-rows: auto minmax(0, 1fr); }
+    body.mobile-shell .mm-panel .mastery-panel .forge-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-rows: none;
+        grid-auto-rows: minmax(0, 1fr);
+        gap: 5px;
+        padding: 4px 5px 8px;
+    }
+}
+
+/* Put the selected skill and its explanation on one centered board. The old split-column layout
+   left tiny nodes in a narrow strip and stranded the description in a separate tall card. */
+@media (orientation: landscape) and (max-height: 480px) {
+    body.mobile-shell .skills-panel.mm-open {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: 42px 64px minmax(140px, 1fr) 62px;
+        gap: 4px 0;
+    }
+    body.mobile-shell .skills-panel .skill-tree-grid {
+        grid-column: 1;
+        grid-row: 3;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+        margin: 0;
+        overflow: visible;
+    }
+    body.mobile-shell .skills-panel .skill-tree {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        height: 100%;
+        min-height: 0;
+        overflow: visible;
+    }
+    body.mobile-shell .skills-panel .skill-tree h3 {
+        flex: 0 0 auto;
+        margin: 0;
+        padding-right: 100px;
+        font-size: 15px;
+        line-height: 1.15;
+    }
+    body.mobile-shell .skills-panel .tree-respec {
+        top: -2px;
+        right: 0;
+        min-height: 28px;
+        max-width: 90px;
+        padding: 3px 8px;
+        font-size: 9px;
+    }
+    body.mobile-shell .skills-panel .skill-tree-map {
+        flex: 1 1 auto;
+        width: 100%;
+        height: clamp(110px, calc(100dvh - 260px), 150px);
+        min-height: 110px;
+        margin: 0;
+        overflow: visible;
+        border: 1px solid #d1bd8240;
+        border-radius: 14px;
+        background: radial-gradient(ellipse at center, #263d3b 0%, #142329 72%, #101a20 100%);
+    }
+    body.mobile-shell .skills-panel .tree-connections path {
+        stroke: #9eaaa0;
+        stroke-width: 4;
+        stroke-dasharray: none;
+        stroke-linecap: round;
+        opacity: .7;
+    }
+    body.mobile-shell .skills-panel .tree-connections path.available { stroke: #d4b675; opacity: .9; }
+    body.mobile-shell .skills-panel .tree-connections path.learned { stroke: #ffe4a3; stroke-width: 5; opacity: 1; }
+    body.mobile-shell .skills-panel .tree-node,
+    body.mobile-shell .skills-panel .tree-node button { width: 92px; }
+    body.mobile-shell .skills-panel .tree-node button {
+        height: 56px;
+        grid-template-columns: 18px minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) auto;
+        grid-template-areas: "icon name" "icon rank";
+        justify-items: start;
+        align-content: center;
+        gap: 2px 5px;
+        padding: 5px 6px;
+        border-radius: 12px;
+        border-style: solid;
+        background: linear-gradient(145deg, #263834, #111c22 78%);
+        text-align: left;
+        box-shadow: 0 3px 9px #0008;
+    }
+    body.mobile-shell .skills-panel .tree-node-icon {
+        grid-area: icon;
+        align-self: center;
+        width: 18px;
+        height: 18px;
+        margin: 0;
+    }
+    body.mobile-shell .skills-panel .tree-node button strong {
+        grid-area: name;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        -webkit-line-clamp: 2;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        font-size: 9px;
+        line-height: 1.05;
+    }
+    body.mobile-shell .skills-panel .tree-node button small {
+        grid-area: rank;
+        justify-self: start;
+        font-size: 8px;
+        line-height: 1;
+    }
+    body.mobile-shell .skills-panel .mm-detail {
+        grid-column: 1;
+        grid-row: 4;
+        display: grid;
+        grid-template-columns: minmax(110px, .7fr) minmax(0, 2.3fr) minmax(100px, .8fr);
+        align-items: center;
+        gap: 4px 10px;
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+        max-height: 62px;
+        margin: 0;
+        padding: 5px 10px;
+        overflow: hidden;
+        border: 1px solid #c7a56b66;
+        border-radius: 12px;
+        background: linear-gradient(110deg, #27392f, #17252b 70%);
+        text-align: left;
+    }
+    body.mobile-shell .skills-panel .mm-detail h3 {
+        grid-column: 1;
+        min-width: 0;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.1;
+    }
+    body.mobile-shell .skills-panel .mm-detail p {
+        grid-column: 2;
+        min-width: 0;
+        margin: 0;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        line-clamp: 2;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+        font-size: 9px;
+        line-height: 1.15;
+    }
+    body.mobile-shell .skills-panel .mm-detail strong {
+        grid-column: 3;
+        min-width: 0;
+        color: #f4d394;
+        font-size: 9px;
+        line-height: 1.15;
+        text-align: right;
+    }
+    body.mobile-shell .skills-panel .mm-help-view { grid-column: 1; grid-row: 3 / span 2; }
+}
+
+@media (orientation: landscape) and (max-width: 600px) and (max-height: 480px) {
+    body.mobile-shell .skills-panel .tree-node,
+    body.mobile-shell .skills-panel .tree-node button { width: 72px; }
+    body.mobile-shell .skills-panel .tree-node button { height: 52px; gap: 2px 4px; padding: 4px; }
+    body.mobile-shell .skills-panel .tree-node button strong { font-size: 8px; }
+    body.mobile-shell .skills-panel .mm-detail { grid-template-columns: minmax(90px, .7fr) minmax(0, 2.3fr) minmax(86px, .8fr); gap: 3px 6px; padding: 4px 6px; }
+    body.mobile-shell .skills-panel .mm-detail h3 { font-size: 11px; }
+    body.mobile-shell .skills-panel .mm-detail p,
+    body.mobile-shell .skills-panel .mm-detail strong { font-size: 8px; }
+}
+
+@media (orientation: landscape) and (max-height: 380px) {
+    body.mobile-shell .skills-panel.mm-open { grid-template-rows: 38px 54px minmax(112px, 1fr) 54px; gap: 3px 0; }
+    body.mobile-shell .skills-panel .mm-subtabs { height: 54px; }
+    body.mobile-shell .skills-panel .skill-tree-map { height: clamp(100px, calc(100dvh - 255px), 122px); min-height: 100px; }
+    body.mobile-shell .skills-panel .mm-detail { max-height: 54px; }
+    body.mobile-shell .skills-panel .tree-respec { min-height: 25px; }
+}

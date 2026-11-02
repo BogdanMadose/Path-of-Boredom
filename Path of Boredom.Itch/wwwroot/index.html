@@ -3,16 +3,18 @@
 
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Path of Boredom.Itch</title>
     <base href="./" />
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="Path of Boredom.Itch.styles.css" />
+    <link rel="stylesheet" href="css/mobile-shell.css" />
+    <link rel="stylesheet" href="css/mobile-menu.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <link href="Path of Boredom.Itch.styles.css" rel="stylesheet" />
 </head>
 
-<body>
+<body class="mobile-shell">
     <div id="app">
         <svg class="loading-progress">
             <circle r="40%" cx="50%" cy="50%" />
@@ -27,6 +29,8 @@
         <span class="dismiss">🗙</span>
     </div>
     <script src="_framework/blazor.webassembly.js"></script>
+    <script src="js/mobile-shell.js"></script>
+    <script src="js/mobile-menu.js"></script>
 </body>
 
 </html>

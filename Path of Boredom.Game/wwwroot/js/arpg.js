@@ -958,6 +958,7 @@ function drawCountdown(ctx, state, mobile = false) {
 // returns without blocking — the actual gameplay happens later via the requestAnimationFrame loop
 // defined further down in this function.
 export function createGame(root, saveBridge = null) {
+    let firstBloodReported = false;
     const loadingReadyAt = performance.now() + 2500;
     const canvas = root.querySelector("canvas");
     const releaseRankings = root.dataset.rankingBoard === "release";
@@ -3287,7 +3288,19 @@ export function createGame(root, saveBridge = null) {
             if (!seen.has(chapter)) { seen.add(chapter); openLore(chapterWave); }
         }
         // Endless travel waits on the challenge notice until the player picks View or Later.
-        if (!inMainMenu && loreReader.hidden && !holdForChallenge) step(state, input(), last ? (now - last) / 1000 : 0);
+        if (!inMainMenu && loreReader.hidden && !holdForChallenge) {
+            const killsBeforeStep = state.kills;
+            step(state, input(), last ? (now - last) / 1000 : 0);
+
+            if (state.kills > killsBeforeStep && !firstBloodReported) {
+                firstBloodReported = true;
+                console.info("[Achievements] First Blood triggered.");
+
+                if (saveBridge) {
+                    saveBridge.invokeMethodAsync("ReportAchievement", "first_blood").catch(error => console.error("[Achievements] First Blood report failed:", error));
+                }
+            }
+        }
         root.dataset.gameStatus = setupAction ? "setup" : state.status;
         audio.update(state, mapIndexForWave(state.wave), Boolean(setupAction) || document.hidden, inMainMenu);
         last = now;

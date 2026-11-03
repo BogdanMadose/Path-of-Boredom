@@ -23,6 +23,7 @@ public static class MauiProgram
         //builder.Services.AddSingleton<IGameApplicationControl, GameApplicationControl>();
         builder.Services.AddSingleton<MobileCloudGameSession>();
         builder.Services.AddSingleton<IGameSession>(services => services.GetRequiredService<MobileCloudGameSession>());
+        builder.Services.AddSingleton<IGameAchievementService, NativePlayGamesAchievements>();
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();

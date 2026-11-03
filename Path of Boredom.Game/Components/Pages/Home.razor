@@ -1,4 +1,5 @@
 @page "/"
+@using Microsoft.Extensions.DependencyInjection
 @layout GameLayout
 @implements IAsyncDisposable
 @inject IJSRuntime JS
@@ -636,6 +637,32 @@
     /// </summary>
     [JSInvokable]
     public async Task<bool> SubmitScore(Path_of_Boredom.ServiceDefaults.ScoreSubmission submission) => await Session.SubmitScoreAsync(submission);
+
+    [JSInvokable]
+    public async Task ReportAchievement(string achievementId)
+    {
+        if (achievementId != "first_blood") return;
+        var achievements = Services.GetService<IGameAchievementService>();
+
+        if (achievements is null) 
+        {
+            Console.Error.WriteLine($"Achievement service not available; cannot unlock achievement {achievementId}.");
+            return;
+        }
+
+#if ANDROID
+    try
+    {
+        await achievements.UnlockAsync("CgkI94jwyuIMEAIQAg");
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"Failed to unlock achievement {achievementId}: {ex.Message}");
+    }
+#else
+        Console.WriteLine($"Achievement {achievementId} reported, but no platform-specific implementation is available.");
+#endif
+    }
 
     /// <summary>
     /// Called by arpg-save.js whenever the player manually saves, or a checkpoint auto-saves.

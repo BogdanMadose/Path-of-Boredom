@@ -4,90 +4,75 @@ namespace Path_of_Boredom.Maui;
 public static class NativeGoogleSignIn
 {
 #if ANDROID
-    internal const int RequestCode = 7431;
-    private static TaskCompletionSource<string?>? pending;
+    private sealed class Callback<TResult> : Java.Lang.Object, AndroidX.Credentials.ICredentialManagerCallback where TResult : Java.Lang.Object
+    {
+        private readonly TaskCompletionSource<TResult> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task<TResult> Task => completion.Task;
+
+        public void OnResult(Java.Lang.Object? result)
+        {
+            if (result is TResult typed) completion.TrySetResult(typed);
+            else completion.TrySetException(new InvalidOperationException("Unexpected credential result."));
+        }
+
+        public void OnError(Java.Lang.Object error) =>
+            completion.TrySetException(new InvalidOperationException(error.ToString() ?? "Google sign-in failed."));
+    }
+
+    private static async Task<string?> RequestTokenAsync(string webClientId, bool silent)
+    {
+        var activity = Platform.CurrentActivity ?? throw new InvalidOperationException("No Android activity.");
+        AndroidX.Credentials.CredentialOption option = silent
+            ? new Google.Android.Libraries.Identity.GoogleId.GetGoogleIdOption.Builder()
+                .SetFilterByAuthorizedAccounts(true)
+                .SetServerClientId(webClientId)
+                .SetAutoSelectEnabled(true)
+                .Build()
+            : new Google.Android.Libraries.Identity.GoogleId.GetSignInWithGoogleOption.Builder(webClientId).Build();
+        var request = new AndroidX.Credentials.GetCredentialRequest.Builder().AddCredentialOption(option).Build();
+        var callback = new Callback<AndroidX.Credentials.GetCredentialResponse>();
+        await MainThread.InvokeOnMainThreadAsync(() =>
+            AndroidX.Credentials.CredentialManager.Create(activity).GetCredentialAsync(activity, request,
+                new Android.OS.CancellationSignal(), Java.Util.Concurrent.Executors.NewSingleThreadExecutor()!, callback));
+        var response = await callback.Task.WaitAsync(TimeSpan.FromMinutes(2));
+        if (response.Credential is AndroidX.Credentials.CustomCredential custom
+            && custom.Type == Google.Android.Libraries.Identity.GoogleId.GoogleIdTokenCredential.TypeGoogleIdTokenCredential)
+        {
+            var token = Google.Android.Libraries.Identity.GoogleId.GoogleIdTokenCredential.CreateFrom(custom.Data).IdToken;
+            return string.IsNullOrWhiteSpace(token) ? null : token;
+        }
+        return null;
+    }
 
     public static async Task<string?> TrySilentSignInAsync(string webClientId)
     {
-        var task = await MainThread.InvokeOnMainThreadAsync(() =>
-        {
-            var activity = Platform.CurrentActivity ?? throw new InvalidOperationException("No Android activity.");
-            var options = new Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.Builder(
-                Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.DefaultSignIn).RequestIdToken(webClientId).RequestEmail().Build();
-            return Android.Gms.Auth.Api.SignIn.GoogleSignIn.GetClient(activity, options).SilentSignIn();
-        });
-        for (var attempt = 0; attempt < 100 && !task.IsComplete; attempt++) await Task.Delay(100);
-        return task.IsComplete && task.IsSuccessful && task.Result is Android.Gms.Auth.Api.SignIn.GoogleSignInAccount account
-            ? account.IdToken : null;
+        try { return await RequestTokenAsync(webClientId, silent: true); }
+        catch (Exception) { return null; }
     }
 
     public static async Task<string?> SignInAsync(string webClientId)
     {
-        if (pending is not null) throw new InvalidOperationException("Sign-in is already open.");
-        var completion = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        pending = completion;
-        try
+        try { return await RequestTokenAsync(webClientId, silent: false); }
+        catch (Exception ex)
         {
-            await MainThread.InvokeOnMainThreadAsync(() =>
-            {
-                var activity = Platform.CurrentActivity ?? throw new InvalidOperationException("No Android activity.");
-                var options = new Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.Builder(
-                    Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.DefaultSignIn)
-                    .RequestIdToken(webClientId).RequestEmail().Build();
-                var client = Android.Gms.Auth.Api.SignIn.GoogleSignIn.GetClient(activity, options);
-                activity.StartActivityForResult(client.SignInIntent, RequestCode);
-            });
-            return await completion.Task.WaitAsync(TimeSpan.FromMinutes(2));
+            throw new InvalidOperationException("Google sign-in failed. Check the Web client ID and installed app's signing certificate.", ex);
         }
-        finally { pending = null; }
-    }
-
-    internal static void Complete(Android.App.Result result, Android.Content.Intent? data)
-    {
-        if (pending is null) return;
-        if (result != Android.App.Result.Ok || data is null) { pending.TrySetResult(null); return; }
-        try
-        {
-            var task = Android.Gms.Auth.Api.SignIn.GoogleSignIn.GetSignedInAccountFromIntent(data);
-            if (task.IsSuccessful && task.Result is Android.Gms.Auth.Api.SignIn.GoogleSignInAccount account
-                && !string.IsNullOrWhiteSpace(account.IdToken)) pending.TrySetResult(account.IdToken);
-            else pending.TrySetException(new InvalidOperationException("Google sign-in failed. Check the Web client ID and installed app's signing certificate."));
-        }
-        catch (Exception) { pending.TrySetException(new InvalidOperationException("Google sign-in failed.")); }
-    }
-
-    private static async Task WaitForCleanupAsync(Android.Gms.Tasks.Task task)
-    {
-        for (var attempt = 0; attempt < 200 && !task.IsComplete; attempt++) await Task.Delay(100);
-        if (!task.IsComplete) throw new TimeoutException("Google account cleanup timed out.");
-        if (!task.IsSuccessful) throw new InvalidOperationException("Google account cleanup failed.");
     }
 
     public static async Task SignOutAsync()
     {
-        var task = await MainThread.InvokeOnMainThreadAsync(() =>
-        {
-            var activity = Platform.CurrentActivity ?? throw new InvalidOperationException("No Android activity.");
-            return Android.Gms.Auth.Api.SignIn.GoogleSignIn.GetClient(activity,
-                Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.DefaultSignIn).SignOut();
-        });
-        await WaitForCleanupAsync(task);
+        var activity = Platform.CurrentActivity ?? throw new InvalidOperationException("No Android activity.");
+        var callback = new Callback<Java.Lang.Void>();
+        await MainThread.InvokeOnMainThreadAsync(() =>
+            AndroidX.Credentials.CredentialManager.Create(activity).ClearCredentialStateAsync(
+                new AndroidX.Credentials.ClearCredentialStateRequest(),
+                new Android.OS.CancellationSignal(), Java.Util.Concurrent.Executors.NewSingleThreadExecutor()!, callback));
+        try { await callback.Task.WaitAsync(TimeSpan.FromSeconds(20)); }
+        catch (TimeoutException) { throw new TimeoutException("Google account cleanup timed out."); }
     }
 
-    public static async Task RevokeAccessAsync()
-    {
-        try
-        {
-            var task = await MainThread.InvokeOnMainThreadAsync(() =>
-            {
-                var activity = Platform.CurrentActivity ?? throw new InvalidOperationException("No Android activity.");
-                return Android.Gms.Auth.Api.SignIn.GoogleSignIn.GetClient(activity,
-                    Android.Gms.Auth.Api.SignIn.GoogleSignInOptions.DefaultSignIn).RevokeAccess();
-            });
-            await WaitForCleanupAsync(task);
-        }
-        finally { await SignOutAsync(); }
-    }
+    // Credential Manager has no separate revoke; clearing credential state is the closest equivalent.
+    public static Task RevokeAccessAsync() => SignOutAsync();
 #else
     public static Task<string?> TrySilentSignInAsync(string webClientId) => Task.FromResult<string?>(null);
     public static Task<string?> SignInAsync(string webClientId) =>

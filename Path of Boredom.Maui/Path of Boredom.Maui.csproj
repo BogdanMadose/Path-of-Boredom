@@ -45,13 +45,22 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.110" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.120" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="9.0.110" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.11" />
   </ItemGroup>
 
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
-    <PackageReference Include="Xamarin.GooglePlayServices.Auth" Version="121.0.0" />
+    <PackageReference Include="Xamarin.GooglePlayServices.Auth" Version="122.0.0" />
+	<PackageReference Include="Xamarin.GooglePlayServices.Games.V2" Version="122.1.0" />
+	<PackageReference Include="Xamarin.AndroidX.Fragment.Ktx" Version="1.9.0" />
+	<!-- Pinned to the versions NuGet resolves transitively, to clear NU1608 constraint warnings. -->
+	<PackageReference Include="Xamarin.AndroidX.Collection.Ktx" Version="1.6.0.1" />
+	<PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" Version="2.11.0.1" />
+	<PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData.Core.Ktx" Version="2.11.0.1" />
+	<PackageReference Include="Xamarin.AndroidX.Credentials" Version="1.6.0.1" />
+	<PackageReference Include="Xamarin.AndroidX.Credentials.PlayServicesAuth" Version="1.6.0.2" />
+	<PackageReference Include="Xamarin.Google.Android.Libraries.Identity.GoogleId" Version="1.1.0.16" />
   </ItemGroup>
 
   <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst' And '$(Configuration)' == 'Release'">

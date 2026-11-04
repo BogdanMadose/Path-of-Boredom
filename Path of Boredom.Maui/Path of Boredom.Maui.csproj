@@ -38,7 +38,7 @@
   <ItemGroup>
     <MauiIcon Include="Resources\AppIcon\appicon.svg" Color="#0b0a10" />
     <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#0b0a10" BaseSize="128,128" />
-    <MauiAsset Include="Resources\Raw\play-games-achievements.json" LogicalName="play-games-achievements.json" />
+    <MauiAsset Update="Resources\Raw\play-games-achievements.json" LogicalName="play-games-achievements.json" />
   </ItemGroup>
 
   <ItemGroup>

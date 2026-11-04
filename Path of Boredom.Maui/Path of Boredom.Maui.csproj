@@ -38,6 +38,7 @@
   <ItemGroup>
     <MauiIcon Include="Resources\AppIcon\appicon.svg" Color="#0b0a10" />
     <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#0b0a10" BaseSize="128,128" />
+    <MauiAsset Include="Resources\Raw\play-games-achievements.json" LogicalName="play-games-achievements.json" />
   </ItemGroup>
 
   <ItemGroup>
@@ -84,6 +85,11 @@
   <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
     <!-- Apple privacy manifest; required for App Store submission. -->
     <BundleResource Include="Platforms\iOS\PrivacyInfo.xcprivacy" LogicalName="PrivacyInfo.xcprivacy" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="tests\achievement-overflow.test.mjs" />
+    <None Include="tests\achievements.test.mjs" />
   </ItemGroup>
 
   <ItemGroup>

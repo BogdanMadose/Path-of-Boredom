@@ -10,7 +10,7 @@ public class MainApplication(IntPtr handle, JniHandleOwnership ownership) : Maui
     public override void OnCreate()
     {
         base.OnCreate();
-        PlayGamesSdk.Initialize(this);
+        if (NativePlayGamesAchievements.IsConfigured(this)) PlayGamesSdk.Initialize(this);
     }
 
     protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();

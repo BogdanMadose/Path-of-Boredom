@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Numeric Play Games Services application ID, not an OAuth client ID. -->
+    <string name="game_services_project_id" translatable="false">438780560503</string>
+</resources>

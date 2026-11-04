@@ -7,7 +7,8 @@ namespace Path_of_Boredom.ApiService;
 /// Account-wide meta progression (Embers, camp upgrades, class mastery, class unlocks, relic codex).
 /// Stored separately from the run save so progress earned on death, or spent at the Ember Camp,
 /// reaches the account even when there is no saveable run. Writes that would lose lifetime Embers
-/// are rejected with 409 and the stored profile, so a stale device merges instead of overwriting.
+/// are rejected with 409 and the stored profile. Achievements are unioned on the server so older
+/// clients can keep saving without knowing about the achievements field.
 /// </summary>
 public static class ProfileEndpoints
 {
@@ -45,7 +46,6 @@ public static class ProfileEndpoints
                 var root = document.RootElement;
                 if (!IsValid(root)) return Results.BadRequest(new { code = "InvalidProfile" });
                 var incoming = Lifetime(root);
-                var json = root.GetRawText();
                 try
                 {
                     var stored = await persistence.Database.RunTransactionAsync(async transaction =>
@@ -53,11 +53,13 @@ public static class ProfileEndpoints
                         await persistence.EnsureActiveAsync(transaction, ownerId, GoogleTokenAuthenticationHandler.IssuedAt(context.User), context.RequestAborted);
                         var reference = persistence.Profile(ownerId);
                         var current = await transaction.GetSnapshotAsync(reference, context.RequestAborted);
+                        var json = root.GetRawText();
                         if (current.Exists)
                         {
                             var existing = current.GetValue<string>("json");
                             using var previous = JsonDocument.Parse(existing);
                             if (Lifetime(previous.RootElement) > incoming) return existing;
+                            json = ProfileWritePolicy.MergeAchievements(previous.RootElement, root);
                         }
                         transaction.Set(reference, new Dictionary<string, object> { ["json"] = json });
                         return null;
@@ -70,16 +72,18 @@ public static class ProfileEndpoints
     }
 
     private static long Lifetime(JsonElement profile) =>
-        profile.TryGetProperty("lifetimeEmbers", out var value) && value.TryGetInt64(out var number) ? number : 0;
+        profile.TryGetProperty("lifetimeEmbers", out var value) && value.ValueKind == JsonValueKind.Number
+            && value.TryGetInt64(out var number) ? number : 0;
 
     // Shape check only: the client sanitizes every field on load, so the server just bounds it.
     private static bool IsValid(JsonElement root)
     {
         if (root.ValueKind != JsonValueKind.Object) return false;
         foreach (var name in new[] { "embers", "lifetimeEmbers" })
-            if (!root.TryGetProperty(name, out var value) || !value.TryGetInt64(out var number) || number < 0 || number > 1_000_000_000) return false;
+            if (!root.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Number
+                || !value.TryGetInt64(out var number) || number < 0 || number > 1_000_000_000) return false;
         foreach (var name in new[] { "camp", "mastery", "unlocked", "victories", "trim" })
             if (!root.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Object) return false;
-        return Lifetime(root) >= root.GetProperty("embers").GetInt64();
+        return ProfileWritePolicy.HasValidAchievements(root) && Lifetime(root) >= root.GetProperty("embers").GetInt64();
     }
 }

@@ -43,10 +43,22 @@
                 <div class="ember-camp-nodes" data-camp-nodes></div>
                 <h3>Class mastery</h3>
                 <div class="ember-camp-mastery" data-camp-mastery></div>
+                <button type="button" class="quiet-button" data-open-achievements>Achievements</button>
                 <button type="button" class="ember-button" data-close-camp>Back</button>
             </div>
         </section>
     </section>
+    <dialog class="achievements-dialog" data-achievements-dialog aria-labelledby="achievements-title">
+        <header><h2 id="achievements-title">Achievements <span data-achievement-count></span></h2>
+            <button type="button" class="quiet-button" data-close-achievements>Back</button></header>
+        <p>Saved with account progression when signed in. Offline progress stays on this device until it syncs. Google Play Games is optional.</p>
+        @if (Services.GetService<IGameAchievementService>() is not null)
+        {
+            <button type="button" class="quiet-button" disabled="@connectingAchievements" @onclick="ConnectAchievements">Connect Google Play Games</button>
+            <p role="status">@achievementStatus</p>
+        }
+        <div class="achievement-list" data-achievement-list tabindex="0" aria-label="All achievements"></div>
+    </dialog>
     <dialog class="save-slots-dialog" data-save-slots-dialog aria-labelledby="save-slots-title">
         <section class="save-slots-card">
             <p class="eyebrow">THE ARCHIVE</p>
@@ -178,7 +190,7 @@
                                 <p class="camp-challenge-status" data-camp-challenge-status role="status"></p>
                             </section>
                             <button type="button" class="ember-button" data-action="start" disabled>Begin the journey <span>&rarr;</span></button>
-                            <button type="button" class="ember-button endless-button" data-action="endless" hidden>Abandon run &amp; restart</button>
+                            <button type="button" class="ember-button endless-button" data-action="endless" hidden>Continue to Endless</button>
                             <button type="button" class="quiet-button restart-button" data-action="restart" hidden>Abandon run &amp; restart</button>
                             <dialog class="restart-mode-overlay"
                                     data-restart-mode-chooser
@@ -598,6 +610,23 @@
     private bool disposed;
     private string windowsUserName = string.Empty;
     private string rankingStatus = "Connecting to the rankings...";
+    private bool connectingAchievements;
+    private string achievementStatus = "Google Play Games uses its own player sign-in, separate from your cloud-save account.";
+
+    private async Task ConnectAchievements()
+    {
+        connectingAchievements = true;
+        try
+        {
+            var service = Services.GetService<IGameAchievementService>();
+            achievementStatus = service is not null && await service.SignInAsync()
+                ? "Play Games connected. Account achievements will sync shortly."
+                : "Play Games unavailable. In-game achievements are still saved.";
+            if (game is not null) await game.InvokeVoidAsync("retryAchievements");
+        }
+        catch (Exception) { achievementStatus = "Play Games unavailable. In-game achievements are still saved."; }
+        finally { connectingAchievements = false; }
+    }
 
     private async Task AccountChanged()
     {
@@ -639,29 +668,16 @@
     public async Task<bool> SubmitScore(Path_of_Boredom.ServiceDefaults.ScoreSubmission submission) => await Session.SubmitScoreAsync(submission);
 
     [JSInvokable]
-    public async Task ReportAchievement(string achievementId)
+    public async Task<bool> ReportAchievement(string achievementId)
     {
-        if (achievementId != "first_blood") return;
         var achievements = Services.GetService<IGameAchievementService>();
-
-        if (achievements is null) 
+        if (achievements is null) return true;
+        try { return await achievements.UnlockAsync(achievementId); }
+        catch (Exception ex)
         {
-            Console.Error.WriteLine($"Achievement service not available; cannot unlock achievement {achievementId}.");
-            return;
+            Console.Error.WriteLine($"Platform achievement sync deferred: {ex.Message}");
+            return false;
         }
-
-#if ANDROID
-    try
-    {
-        await achievements.UnlockAsync("CgkI94jwyuIMEAIQAg");
-    }
-    catch (Exception ex)
-    {
-        Console.Error.WriteLine($"Failed to unlock achievement {achievementId}: {ex.Message}");
-    }
-#else
-        Console.WriteLine($"Achievement {achievementId} reported, but no platform-specific implementation is available.");
-#endif
     }
 
     /// <summary>

@@ -8,6 +8,7 @@
 const STORAGE_KEY = "pob.meta.v1";
 
 import { RELIC_KEYS } from "./arpg-relics.js";
+import { ACHIEVEMENT_IDS, evaluateAchievements } from "./arpg-achievements.js";
 
 export const CAMP_NODES = {
     might: { name: "Ember might", detail: "+2% base damage per rank.", max: 10, cost: rank => 40 + rank * 30 },
@@ -49,7 +50,8 @@ const fresh = () => ({
     unlocked: { knight: 1, ranger: 1, warden: 0, sorcerer: 0 },
     victories: { knight: 0, ranger: 0, warden: 0, sorcerer: 0 },
     trim: { knight: "", ranger: "", warden: "", sorcerer: "" },
-    codex: {}
+    codex: {},
+    achievements: {}
 });
 
 let profile = null;
@@ -74,6 +76,8 @@ function sanitize(saved) {
     }
     if (saved.codex && typeof saved.codex === "object")
         for (const key of RELIC_KEYS) if (int(saved.codex[key], 0, 1e9, 0) > 0) clean.codex[key] = int(saved.codex[key], 0, 1e9, 0);
+    for (const key of ACHIEVEMENT_IDS)
+        if (saved.achievements?.[key] === 1) clean.achievements[key] = 1;
     return clean;
 }
 
@@ -105,6 +109,7 @@ export function mergeProfile(incoming) {
         if (!base.trim[hero]) base.trim[hero] = extra.trim[hero];
     }
     for (const key of RELIC_KEYS) if ((extra.codex[key] ?? 0) > (base.codex[key] ?? 0)) base.codex[key] = extra.codex[key];
+    Object.assign(base.achievements, extra.achievements);
     base.rev = Math.max(base.rev, extra.rev);
     profile = base;
     if (JSON.stringify(profile) === before) return false;
@@ -119,6 +124,14 @@ function persist() {
 }
 
 export const onProfileChange = listener => { listeners.add(listener); return () => listeners.delete(listener); };
+
+export function recordAchievements(state) {
+    const p = loadProfile(), earned = evaluateAchievements(state, p);
+    if (!earned.length) return earned;
+    for (const id of earned) p.achievements[id] = 1;
+    persist();
+    return earned;
+}
 
 // Veterans who already beat the campaign before classes were gated keep the Warden.
 export function grandfatherClasses(campaignBeaten) {
@@ -176,14 +189,16 @@ export function recordRelics(state) {
     const seen = codexSeen.get(state) ?? new Set();
     codexSeen.set(state, seen);
     const fresh = [];
+    let changed = false;
     for (const key of relics) {
         if (seen.has(key) || !RELIC_KEYS.includes(key)) continue;
         seen.add(key);
         const p = loadProfile();
         if (!p.codex[key]) fresh.push(key);
         p.codex[key] = (p.codex[key] ?? 0) + 1;
+        changed = true;
     }
-    if (seen.size) persist();
+    if (changed) persist();
     return fresh;
 }
 

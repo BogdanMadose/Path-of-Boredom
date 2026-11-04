@@ -227,8 +227,11 @@
 @media (prefers-reduced-motion: reduce) { .arena-viewport.low-health::after { animation: none; opacity: .8; } }
 canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
 canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
-.arena-overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; background: #080f13d9; }
-.overlay-card { max-width: 410px; text-align: center; }
+.arena-overlay { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 20px; background: #080f13d9; }
+.overlay-card { box-sizing: border-box; min-width: 0; width: 100%; max-width: 410px; overflow-wrap: anywhere; text-align: center; }
+.arpg [data-run-menu] { min-width: 0; overflow-x: hidden; }
+.arpg [data-run-menu] > :not(dialog) { box-sizing: border-box; min-width: 0; max-width: 100%; }
+.arpg [data-run-menu] button { white-space: normal; overflow-wrap: anywhere; }
 .sigil { color: #e6b370; font-size: 64px; line-height: 1; margin-bottom: 16px; text-shadow: 0 0 35px #ed992b80; }
 .overlay-card h2 { color: #f1e5cc; font-family: Georgia, serif; font-size: clamp(24px, 3.4vw, 46px); font-weight: 400; margin-bottom: 16px; }
 .overlay-card > p:not(.eyebrow) { color: #b3b6af; font-size: 13px; line-height: 1.8; margin-bottom: 24px; }
@@ -922,3 +925,15 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
     .arpg ::deep .ember-camp-card > .ember-camp-nodes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .arpg ::deep .ember-camp-card > .ember-camp-mastery { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(4, minmax(0, 1fr)); }
 }
+.arpg ::deep .ember-camp-card > [data-open-achievements] { grid-column: 1; grid-row: 5; min-width: 0; min-height: 34px; }
+.arpg ::deep .ember-camp-card > [data-close-camp] { grid-column: 2; }
+.achievements-dialog { box-sizing: border-box; width: min(900px, calc(100dvw - 32px)); max-width: 100%; max-height: calc(100dvh - 32px); padding: 16px; border: 1px solid #c7a56b; border-radius: 12px; background: #122025; color: #e5dfd3; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.achievements-dialog::backdrop { background: #050b0ee8; }
+.achievements-dialog header { position: sticky; top: -16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; background: #122025; z-index: 1; }
+.achievements-dialog h2 { margin: 0; font-size: 20px; }
+.achievements-dialog p { font-size: 12px; line-height: 1.4; }
+.achievement-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 8px; }
+.arpg ::deep .achievement-entry { min-width: 0; padding: 10px; border: 1px solid #637771; border-radius: 6px; overflow-wrap: anywhere; }
+.arpg ::deep .achievement-entry strong, .arpg ::deep .achievement-entry small { display: block; }
+.arpg ::deep .achievement-entry small { margin-top: 5px; font-size: 12px; }
+.arpg ::deep .achievement-entry[data-unlocked="true"] { border-color: #e9c78b; background: #293a35; color: #ffe6b7; }

@@ -32,6 +32,8 @@ import { CAMP_NODES, CLASS_ORDER, CLASS_UNLOCK_HINT, MASTERY_MAX, MASTERY_REWARD
 import { setRelayForks } from "./arpg-engine.js";
 import { RELICS, RELIC_KEYS } from "./arpg-relics.js";
 import { recordRelics } from "./arpg-meta.js";
+import { recordAchievements } from "./arpg-meta.js";
+import { ACHIEVEMENTS, createAchievementReporter } from "./arpg-achievements.js";
 import { drawLevelCards } from "./arpg-cards.js";
 import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
 import { treePointsSpent, treeRespecCost, canRespecTree, respecTree } from "./arpg-skills.js";
@@ -958,7 +960,9 @@ function drawCountdown(ctx, state, mobile = false) {
 // returns without blocking — the actual gameplay happens later via the requestAnimationFrame loop
 // defined further down in this function.
 export function createGame(root, saveBridge = null) {
-    let firstBloodReported = false;
+    const achievementReporter = createAchievementReporter(id => saveBridge
+        ? saveBridge.invokeMethodAsync("ReportAchievement", id) : Promise.resolve(false));
+    let lastAchievementAttempt = -30000;
     const loadingReadyAt = performance.now() + 2500;
     const canvas = root.querySelector("canvas");
     const releaseRankings = root.dataset.rankingBoard === "release";
@@ -1443,7 +1447,21 @@ export function createGame(root, saveBridge = null) {
     }
 
     function renderCamp() {
+        recordAchievements(state);
         const profile = loadProfile();
+        const achievementList = root.querySelector("[data-achievement-list]");
+        if (achievementList) {
+            root.querySelector("[data-achievement-count]").textContent = `${Object.keys(profile.achievements).length}/${ACHIEVEMENTS.length}`;
+            achievementList.replaceChildren(...ACHIEVEMENTS.map(achievement => {
+                const row = document.createElement("div"), name = document.createElement("strong"), detail = document.createElement("small");
+                row.className = "achievement-entry";
+                row.dataset.unlocked = profile.achievements[achievement.id] ? "true" : "false";
+                name.textContent = `${profile.achievements[achievement.id] ? "✓" : "○"} ${achievement.name}`;
+                detail.textContent = achievement.description;
+                row.append(name, detail);
+                return row;
+            }));
+        }
         emberCamp.querySelector("[data-camp-balance]").textContent = `${profile.embers} Embers · earned every run, even when you fall.`;
         const nodes = emberCamp.querySelector("[data-camp-nodes]");
         nodes.replaceChildren(...Object.entries(CAMP_NODES).map(([key, node]) => {
@@ -1500,12 +1518,20 @@ export function createGame(root, saveBridge = null) {
     on(root, "relic-codex-refresh", () => renderRelicCodex());
     on(root.querySelector("[data-open-camp]"), "click", () => { renderCamp(); emberCamp.hidden = false; emberCamp.querySelector("[data-close-camp]").focus({ preventScroll: true }); });
     on(emberCamp.querySelector("[data-close-camp]"), "click", () => { emberCamp.hidden = true; });
+    const achievementsDialog = root.querySelector("[data-achievements-dialog]");
+    on(root.querySelector("[data-open-achievements]"), "click", () => {
+        renderCamp();
+        if (!achievementsDialog.open) achievementsDialog.showModal();
+    });
+    on(root.querySelector("[data-close-achievements]"), "click", () => achievementsDialog.close());
     function noteProgress() {
         setRelayForks(relayForks(state.heroClass));
         const discovered = recordRelics(state);
         if (runRelicCodexSignature() !== renderedRelicCodexSignature) renderRelicCodex();
         if (discovered.length) saveStatus.textContent = `New codex entry: ${discovered.map(key => RELICS[key].name).join(", ")}!`;
         const earned = creditProgress(state);
+        const unlocked = recordAchievements(state);
+        if (unlocked.length) saveStatus.textContent = `Achievement unlocked: ${unlocked.map(id => ACHIEVEMENTS.find(a => a.id === id).name).join(" · ")}`;
         if (!earned) return;
         const notes = [];
         if (earned.levels.length) notes.push(`${HERO_CLASSES[state.heroClass].name} mastery ${earned.levels.at(-1)}!`);
@@ -2388,6 +2414,7 @@ export function createGame(root, saveBridge = null) {
         startButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
         restartButton.disabled = saving || choosing || !!setupAction;
         endlessButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
+        setText(endlessButton, state.status === "won" ? "Continue to Endless" : "New Endless run");
         endlessButton.hidden = choosing || !(endlessUnlocked || state.status === "won") || (state.mode === "endless" && !["dead", "paused", "camp"].includes(state.status)) || state.status === "playing";
         launchEndless.disabled = endlessButton.disabled || !(endlessUnlocked || state.campaignComplete === 1);
         if (mainEndless) {
@@ -3136,10 +3163,9 @@ export function createGame(root, saveBridge = null) {
             }
         } catch { } finally { profileSyncing = false; }
     }
-    onProfileChange(() => {
-        if (profileSyncing) return;
-        clearTimeout(profileTimer);
-        profileTimer = setTimeout(syncProfile, 2500);
+    const unsubscribeProfile = onProfileChange(() => {
+        if (profileTimer) return;
+        profileTimer = setTimeout(() => { profileTimer = 0; void syncProfile(); }, 2500);
     });
 
     async function readUnlock() {
@@ -3289,17 +3315,12 @@ export function createGame(root, saveBridge = null) {
         }
         // Endless travel waits on the challenge notice until the player picks View or Later.
         if (!inMainMenu && loreReader.hidden && !holdForChallenge) {
-            const killsBeforeStep = state.kills;
             step(state, input(), last ? (now - last) / 1000 : 0);
-
-            if (state.kills > killsBeforeStep && !firstBloodReported) {
-                firstBloodReported = true;
-                console.info("[Achievements] First Blood triggered.");
-
-                if (saveBridge) {
-                    saveBridge.invokeMethodAsync("ReportAchievement", "first_blood").catch(error => console.error("[Achievements] First Blood report failed:", error));
-                }
-            }
+        }
+        if (now - lastAchievementAttempt >= 30000) {
+            lastAchievementAttempt = now;
+            void achievementReporter.sync(loadProfile().achievements);
+            void syncProfile();
         }
         root.dataset.gameStatus = setupAction ? "setup" : state.status;
         audio.update(state, mapIndexForWave(state.wave), Boolean(setupAction) || document.hidden, inMainMenu);
@@ -3358,6 +3379,9 @@ export function createGame(root, saveBridge = null) {
         if (disposed) return;
         saveTemporaryRun();
         disposed = true;
+        unsubscribeProfile();
+        clearTimeout(profileTimer);
+        achievementReporter.reset();
         cancelAnimationFrame(frame);
         cancelAnimationFrame(layoutFrame);
         resizeObserver.disconnect();
@@ -3386,8 +3410,14 @@ export function createGame(root, saveBridge = null) {
     void readUnlock();
     return {
         dispose,
+        retryAchievements() {
+            achievementReporter.reset();
+            lastAchievementAttempt = -30000;
+        },
         accountChanged(signedIn = true) {
             accountGeneration++;
+            achievementReporter.reset();
+            lastAchievementAttempt = -30000;
             if (signedIn) syncProfile();
             if (releaseRankings) root.dataset.cloudSignedIn = signedIn ? "on" : "off";
             // Never replay a previous account's queued score submissions after switching users.

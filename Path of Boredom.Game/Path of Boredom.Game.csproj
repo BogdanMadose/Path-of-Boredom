@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
+    <Version>1.0.2</Version>
     <TargetFrameworks>net9.0;net9.0-android</TargetFrameworks>
     <!-- No net9.0-ios: the iOS SDK rejects Razor library Content items; the iOS head consumes net9.0. -->
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>

@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
+    <Version>1.0.2</Version>
     <!-- iOS only enters the build on a Mac (or a Windows box paired to one). Including it
          unconditionally would break `dotnet build` of the solution on a plain Windows dev machine,
          which is where this project is actually developed. Android is the shipping target for now;
@@ -22,8 +23,8 @@
     <!-- Reverse-DNS id. This is permanent once published: Google Play keys a listing to it and it
          can never be changed or reused afterwards. -->
     <ApplicationId>com.madbone.pathofboredom</ApplicationId>
-    <ApplicationDisplayVersion>1.0.1</ApplicationDisplayVersion>
-    <ApplicationVersion>2</ApplicationVersion>
+    <ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
+    <ApplicationVersion>3</ApplicationVersion>
 
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
@@ -88,7 +89,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="tests\achievement-notifications.test.mjs" />
     <None Include="tests\achievement-overflow.test.mjs" />
+    <None Include="tests\achievement-toast-browser.test.mjs" />
     <None Include="tests\achievements.test.mjs" />
   </ItemGroup>
 

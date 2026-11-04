@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
 
   <PropertyGroup>
+    <Version>1.0.2</Version>
     <TargetFramework>net9.0</TargetFramework>
     <!-- Space-free, like the Game and MAUI projects: static web asset endpoint keys break on spaces,
          and index.html references the PathOfBoredom.Itch.styles.css bundle by this name. -->

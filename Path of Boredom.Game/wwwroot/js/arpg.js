@@ -34,6 +34,7 @@ import { RELICS, RELIC_KEYS } from "./arpg-relics.js";
 import { recordRelics } from "./arpg-meta.js";
 import { recordAchievements } from "./arpg-meta.js";
 import { ACHIEVEMENTS, createAchievementReporter } from "./arpg-achievements.js";
+import { createAchievementNotifications } from "./arpg-achievement-notifications.js";
 import { drawLevelCards } from "./arpg-cards.js";
 import { ELITE_MODIFIERS } from "./arpg-modifiers.js";
 import { treePointsSpent, treeRespecCost, canRespecTree, respecTree } from "./arpg-skills.js";
@@ -981,6 +982,7 @@ export function createGame(root, saveBridge = null) {
     const controller = new AbortController();
     const on = (target, event, handler, options = {}) => target.addEventListener(event, handler, { ...options, signal: controller.signal });
     const audio = createGameAudio();
+    const achievementNotifications = createAchievementNotifications(root);
     const preferences = bindPreferences(root);
     const togglePause = target => engineTogglePause(target, root.dataset.quickTravel === "true");
     const buttonFeedback = bindButtonFeedback(root);
@@ -1167,7 +1169,7 @@ export function createGame(root, saveBridge = null) {
     const skillUnlockNotice = root.querySelector("[data-skill-unlock]");
     const skillFeedback = root.querySelector("[data-skill-feedback]");
     const patchNotice = root.querySelector("[data-patch-notice]");
-    const patchPreference = `path-of-boredom.patch-004:${root.dataset.player || "unknown"}`;
+    const patchPreference = `path-of-boredom.patch-1.0.2:${root.dataset.player || "unknown"}`;
     if (patchNotice) {
         try { patchNotice.hidden = localStorage.getItem(patchPreference) === "seen"; } catch { /* Announcements work without storage. */ }
         on(root.querySelector("[data-dismiss-patch]"), "click", () => {
@@ -1447,7 +1449,7 @@ export function createGame(root, saveBridge = null) {
     }
 
     function renderCamp() {
-        recordAchievements(state);
+        achievementNotifications.enqueue(recordAchievements(state));
         const profile = loadProfile();
         const achievementList = root.querySelector("[data-achievement-list]");
         if (achievementList) {
@@ -1531,7 +1533,7 @@ export function createGame(root, saveBridge = null) {
         if (discovered.length) saveStatus.textContent = `New codex entry: ${discovered.map(key => RELICS[key].name).join(", ")}!`;
         const earned = creditProgress(state);
         const unlocked = recordAchievements(state);
-        if (unlocked.length) saveStatus.textContent = `Achievement unlocked: ${unlocked.map(id => ACHIEVEMENTS.find(a => a.id === id).name).join(" · ")}`;
+        achievementNotifications.enqueue(unlocked);
         if (!earned) return;
         const notes = [];
         if (earned.levels.length) notes.push(`${HERO_CLASSES[state.heroClass].name} mastery ${earned.levels.at(-1)}!`);
@@ -3382,6 +3384,7 @@ export function createGame(root, saveBridge = null) {
         unsubscribeProfile();
         clearTimeout(profileTimer);
         achievementReporter.reset();
+        achievementNotifications.dispose();
         cancelAnimationFrame(frame);
         cancelAnimationFrame(layoutFrame);
         resizeObserver.disconnect();
@@ -3417,6 +3420,7 @@ export function createGame(root, saveBridge = null) {
         accountChanged(signedIn = true) {
             accountGeneration++;
             achievementReporter.reset();
+            achievementNotifications.clear();
             lastAchievementAttempt = -30000;
             if (signedIn) syncProfile();
             if (releaseRankings) root.dataset.cloudSignedIn = signedIn ? "on" : "off";
@@ -3428,6 +3432,7 @@ export function createGame(root, saveBridge = null) {
         },
         resetAfterDeletion() {
             accountGeneration++;
+            achievementNotifications.clear();
             clearTemporaryRun();
             activeSaveSlot = null;
             root.dataset.cloudSignedIn = "off";

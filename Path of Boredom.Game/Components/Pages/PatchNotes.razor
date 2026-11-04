@@ -4,7 +4,7 @@
 
 @if (!Embedded)
 {
-    <PageTitle>Version 1.0.1 · Path of Boredom</PageTitle>
+    <PageTitle>Version 1.0.2 · Path of Boredom</PageTitle>
 }
 
 <main class="patch-notes @(Embedded ? "embedded" : null)">
@@ -16,15 +16,60 @@
         <section class="page-heading">
             <p class="eyebrow">LATEST UPDATE</p>
             <h1>Patch Notes</h1>
-            <p>Changes and improvements in version 1.0.1.</p>
+            <p>Changes and improvements in version 1.0.2.</p>
         </section>
     }
+
+    <article id="version-1-0-2">
+        <header class="patch-heading">
+            <div class="patch-meta">
+                <span class="badge">VERSION 1.0.2</span>
+                <span class="badge latest">LATEST UPDATE</span>
+            </div>
+            <h2>Your achievements, remembered</h2>
+            <p>Track your milestones, celebrate each unlock, and keep your account progress across devices.</p>
+            <div class="tags" aria-label="Update highlights">
+                <span>77 achievements</span><span>Account sync</span><span>Menu fixes</span>
+            </div>
+        </header>
+
+        <section class="patch-section" id="achievements-1-0-2">
+            <p class="eyebrow">MILESTONES AND REWARDS</p>
+            <h3>Every journey leaves a mark</h3>
+            <ul>
+                <li>Added 77 in-game achievements across the shared game: combat milestones, campaign chapters, class victories and mastery, Endless stages, challenges, relic discoveries, and Ember Camp upgrades.</li>
+                <li>Browse locked and unlocked achievements from Account Progression in a dedicated, scrollable list.</li>
+                <li>New unlocks display a five-second notification with the achievement name and requirement. Multiple unlocks queue without pausing combat or blocking controls.</li>
+                <li>Notifications wait while the app is in the background, support screen-reader announcements, and respect reduced-motion settings.</li>
+                <li>Achievements are kept in account progression when signed in. Offline progress stays on the current device or browser until it can sync.</li>
+                <li>The final relic-discovery milestone requires all six available relics.</li>
+            </ul>
+        </section>
+
+        <section class="patch-section" id="account-sync-1-0-2">
+            <p class="eyebrow">ACCOUNTS AND SIGN-IN</p>
+            <h3>Keep what you have earned</h3>
+            <ul>
+                <li>Achievement unlocks are combined during account synchronization so an older profile cannot erase them.</li>
+                <li>Older game versions can continue saving account progression without understanding achievements. Existing lifetime-Ember conflict protection remains in place.</li>
+            </ul>
+        </section>
+
+        <section class="patch-section" id="menu-fixes-1-0-2">
+            <p class="eyebrow">MENUS AND READABILITY</p>
+            <h3>Room for the important details</h3>
+            <ul>
+                <li>Fixed horizontal overflow in run menus, including intermission and death reports, by constraining card widths and wrapping long text.</li>
+                <li>The achievement list opens separately so it does not crowd the Ember Camp layout on smaller screens.</li>
+                <li>The Endless action now distinguishes continuing a victorious campaign character from starting a new Endless run.</li>
+            </ul>
+        </section>
+    </article>
 
     <article id="version-1-0-1">
         <header class="patch-heading">
             <div class="patch-meta">
                 <span class="badge">VERSION 1.0.1</span>
-                <span class="badge latest">LATEST UPDATE</span>
             </div>
             <h2>A smoother, more reliable adventure</h2>
             <p>Highlights from this update include combat balance changes, easier save management, clearer menus, and important fixes.</p>
@@ -77,7 +122,7 @@
     @if (!Embedded)
     {
         <footer>
-            <span>Version 1.0.1 · Path of Boredom</span>
+            <span>Version 1.0.2 · Path of Boredom</span>
             <a href="./">Return to the game</a>
         </footer>
     }

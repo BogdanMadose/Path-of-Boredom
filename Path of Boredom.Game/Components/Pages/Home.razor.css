@@ -937,3 +937,39 @@ canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
 .arpg ::deep .achievement-entry strong, .arpg ::deep .achievement-entry small { display: block; }
 .arpg ::deep .achievement-entry small { margin-top: 5px; font-size: 12px; }
 .arpg ::deep .achievement-entry[data-unlocked="true"] { border-color: #e9c78b; background: #293a35; color: #ffe6b7; }
+.arpg ::deep .achievement-toast {
+    position: fixed;
+    inset: auto;
+    top: max(12px, env(safe-area-inset-top, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: min(380px, calc(100dvw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 32px));
+    max-height: calc(100dvh - 32px);
+    margin: 0;
+    padding: 12px 16px;
+    border: 1px solid #e9c78b;
+    border-radius: 12px;
+    background: #122025f5;
+    color: #ffe6b7;
+    box-shadow: 0 6px 24px #0009;
+    font: 14px/1.35 'Segoe UI', sans-serif;
+    text-align: left;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    pointer-events: none;
+    animation: achievement-toast-in .2s ease-out;
+}
+.arpg ::deep .achievement-toast[hidden] { display: none; }
+.arpg ::deep .achievement-toast::backdrop { background: transparent; pointer-events: none; }
+.arpg ::deep .achievement-toast-icon { flex: 0 0 auto; color: #f4cc78; font-size: 28px; }
+.arpg ::deep .achievement-toast > div { min-width: 0; }
+.arpg ::deep .achievement-toast small, .arpg ::deep .achievement-toast strong, .arpg ::deep .achievement-toast div > span { display: block; }
+.arpg ::deep .achievement-toast small { margin-bottom: 3px; color: #f4cc78; font-size: 10px; letter-spacing: 1px; }
+.arpg ::deep .achievement-toast div > span { margin-top: 3px; color: #d4ddd7; font-size: 12px; }
+@keyframes achievement-toast-in { from { opacity: 0; translate: 0 -8px; } to { opacity: 1; translate: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .arpg ::deep .achievement-toast { animation: none; } }

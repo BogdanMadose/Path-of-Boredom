@@ -56,11 +56,3 @@ Mobile uses the `release` board; desktop uses `004`, with historical tags kept s
 `PlayerAccountEndpoints.cs` provides the profile, nickname change, and deletion routes under `/game/account`. Names follow `PlayerDisplayNameRules`: 3–24 letters, numbers, spaces, dots, hyphens, or underscores. A missing custom name falls back to an `Ember-...` alias rather than exposing the Google account's personal name.
 
 Nickname changes reserve a case-insensitive name transactionally and check profiles created before reservations existed. Another player's name returns 409. Renaming releases the previous reservation; account deletion releases the reservation owned by that account. These checks only reach players after this API source is deployed — putting a new AAB on Play doesn't update them.
-
-## Deployment and debugging
-
-`deployment/Prepare-CloudSource.ps1`, run from the repository, creates `Play-Release/pob-cloud-source.zip` with the backend projects and container inputs. It doesn't deploy the archive, and it deliberately excludes Android bundles, signing keys, passwords, and local data. `docs/google-cloud-and-play-guide.md` covers the cloud/Play setup.
-
-Deploy updated source or an updated image to the same Cloud Run service to create a new revision. Restarting a container that still uses the old image won't install the new code. Firestore stays outside the container lifecycle, so a normal backend redeploy doesn't need a new Android version code or reset player saves.
-
-For failures, start with the service logs, the response code, and any trace reference. Then separate token/audience problems, Firestore access problems, revision conflicts, and save-validator drift. They're four different problems that can all look like "Save didn't work" from a phone.

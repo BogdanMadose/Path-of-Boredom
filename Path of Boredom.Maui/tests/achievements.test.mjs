@@ -8,6 +8,16 @@ const storage = new Map();
 globalThis.localStorage = { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) };
 const { exportProfile, mergeProfile, recordAchievements } = await import('../../Path of Boredom.Game/wwwroot/js/arpg-meta.js');
 const ids = JSON.parse(fs.readFileSync(new URL('../Resources/Raw/play-games-achievements.json', import.meta.url), 'utf8'));
+const project = fs.readFileSync(new URL('../Path of Boredom.Maui.csproj', import.meta.url), 'utf8');
+assert.match(project, /<MauiAsset Update="Resources\\Raw\\play-games-achievements\.json"\s+LogicalName="play-games-achievements\.json"/,
+    'retain the shared metadata Update for Apple builds');
+const assetGroups = [...project.matchAll(/<ItemGroup\b([^>]*)>([\s\S]*?)<\/ItemGroup>/g)]
+    .filter(group => /<MauiAsset Include="Resources\\Raw\\play-games-achievements\.json"/.test(group[2]));
+assert.equal(assetGroups.length, 1, 'include the achievement mapping once');
+assert.equal(assetGroups[0][1].trim(), 'Condition="$([MSBuild]::GetTargetPlatformIdentifier(\'$(TargetFramework)\')) == \'android\'"',
+    'explicit inclusion must not affect Apple targets');
+assert.match(assetGroups[0][2], /<MauiAsset Remove="Resources\\Raw\\play-games-achievements\.json"[\s\S]*<MauiAsset Include=/,
+    'normalize any existing Android entry before including it to avoid duplicates');
 assert.equal(ACHIEVEMENTS.length, 77);
 assert.equal(new Set(ACHIEVEMENTS.map(a => a.id)).size, 77);
 assert.deepEqual(Object.keys(ids).sort(), ACHIEVEMENTS.map(a => a.id).sort());
@@ -62,10 +72,10 @@ assert.deepEqual([...all].sort(), ACHIEVEMENTS.map(a => a.id).sort(), 'all 77 co
 let online = false;
 const calls = [];
 const reporter = createAchievementReporter(async id => { calls.push(id); return online; });
-await reporter.sync({ first_blood: 1, first_fall: 1 });
+assert.deepEqual(await reporter.sync({ first_blood: 1, first_fall: 1 }), { total: 2, confirmed: 0, pending: 2 });
 assert.deepEqual(calls, ['first_blood']);
 online = true;
-await reporter.sync({ first_blood: 1, first_fall: 1 });
+assert.deepEqual(await reporter.sync({ first_blood: 1, first_fall: 1 }), { total: 2, confirmed: 2, pending: 0 });
 assert.deepEqual(calls, ['first_blood', 'first_blood', 'first_fall']);
 await reporter.sync({ first_blood: 1, first_fall: 1 });
 assert.equal(calls.length, 3, 'confirmed unlocks are not spammed');
@@ -80,4 +90,26 @@ let completed = false;
 const retried = raced.sync({ first_blood: 1 }).then(() => { completed = true; });
 assert.equal(completed, false);
 finish(true); await retried;
+const queuedCalls = [];
+let release;
+const queued = createAchievementReporter(id => {
+    queuedCalls.push(id);
+    return new Promise(resolve => { release = resolve; });
+});
+const background = queued.sync({ first_blood: 1 });
+queued.reset();
+const connected = queued.sync({ first_blood: 1, first_fall: 1 });
+assert.deepEqual(queuedCalls, ['first_blood'], 'connecting must wait for the old request');
+release(true);
+await background;
+await Promise.resolve();
+assert.deepEqual(queuedCalls, ['first_blood', 'first_blood'], 'retry after reset is not dropped while busy');
+release(true);
+await Promise.resolve();
+assert.deepEqual(queuedCalls, ['first_blood', 'first_blood', 'first_fall']);
+release(true);
+assert.deepEqual(await connected, { total: 2, confirmed: 2, pending: 0 });
+const failed = createAchievementReporter(async () => { throw new Error('Google Play rejected the ID'); });
+assert.deepEqual(await failed.sync({ first_blood: 1 }), { total: 1, confirmed: 0, pending: 1 });
+assert.deepEqual(await failed.sync({ first_blood: 0, unknown: 1 }), { total: 0, confirmed: 0, pending: 0 });
 console.log('PASS: 77 mappings and conditions, persistence, union, replay safety, campaign/Endless boundaries, failed/retried platform reporting and reset races');

@@ -1,0 +1,88 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { configureEdition, isDemo, editionStorageKey, demoComplete, classAvailable } from '../../Path of Boredom.Game/wwwroot/js/arpg-edition.js';
+import { startRun, startEndlessRun, continueJourney, enterEndless, step } from '../../Path of Boredom.Game/wwwroot/js/arpg-engine.js';
+import { captureSnapshot, restoreSnapshot } from '../../Path of Boredom.Game/wwwroot/js/arpg-save.js';
+import { loadProfile, recordAchievements, mergeProfile, classUnlocked } from '../../Path of Boredom.Game/wwwroot/js/arpg-meta.js';
+
+const data = new Map();
+globalThis.localStorage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value) };
+const finishBossWave = (state, wave) => {
+    state.wave = wave;
+    state.resumeDelay = 0;
+    state.travelPending = 0;
+    state.intermission = 0;
+    state.pendingChoices = 0;
+    state.cardChoices = [];
+    state.enemies = [];
+    state.spawnQueue = [];
+    state.status = 'playing';
+    step(state, {}, .05);
+    assert.equal(state.status, wave === 30 ? 'won' : 'camp');
+};
+
+configureEdition('full');
+assert.equal(isDemo(), false);
+const fullProfile = loadProfile();
+mergeProfile({ ...fullProfile, unlocked: { knight: 1, ranger: 1, warden: 1, sorcerer: 1 } });
+const fullStorage = data.get('pob.meta.v1');
+const lateRun = startRun(() => .5, 'nightmare', 'warden', true);
+lateRun.wave = 11;
+const fullSave = captureSnapshot(lateRun);
+const sorcererSave = captureSnapshot(startRun(() => .5, 'nightmare', 'sorcerer', true));
+const endlessSave = captureSnapshot(startEndlessRun(() => .5, 'nightmare', 'knight', true));
+const fullLiveKey = editionStorageKey('path-of-boredom.live-run.v1:current');
+
+configureEdition('demo');
+assert.ok(isDemo());
+assert.notEqual(editionStorageKey('path-of-boredom.live-run.v1:current'), fullLiveKey);
+assert.deepEqual(['knight', 'ranger', 'warden', 'sorcerer'].filter(classAvailable), ['knight', 'ranger']);
+assert.equal(loadProfile().lifetimeEmbers, 0);
+assert.equal(classUnlocked('warden'), false);
+for (const hero of ['knight', 'ranger']) assert.equal(startRun(() => .5, 'nightmare', hero, true).heroClass, hero);
+for (const hero of ['warden', 'sorcerer']) assert.throws(() => startRun(() => .5, 'nightmare', hero), /full game/);
+assert.throws(() => startEndlessRun(), /full game/);
+assert.equal(enterEndless(lateRun), false);
+for (const saved of [fullSave, sorcererSave, endlessSave]) assert.throws(() => restoreSnapshot(saved), /requires the full game/);
+
+const demo = startRun(() => .5, 'nightmare', 'ranger', true);
+finishBossWave(demo, 5);
+assert.equal(demoComplete(demo), false);
+assert.ok(continueJourney(demo, true));
+finishBossWave(demo, 10);
+assert.equal(demoComplete(demo), true);
+assert.equal(demo.campaignComplete, 0, 'the demo never unlocks campaign victory or Endless');
+assert.equal(continueJourney(demo), false);
+assert.equal(enterEndless(demo), false);
+for (let i = 0; i < 100; i++) step(demo, {}, .05);
+assert.equal(demo.wave, 10);
+assert.equal(demo.status, 'camp');
+const replayable = restoreSnapshot(captureSnapshot(demo));
+assert.ok(demoComplete(replayable), 'loading the final checkpoint shows the demo ending again');
+assert.equal(continueJourney(replayable), false);
+const traveling = captureSnapshot(demo);
+traveling.state.status = 'playing'; traveling.state.travelPending = 1; traveling.state.resumeDelay = 3;
+assert.throws(() => restoreSnapshot(traveling), /requires the full game/);
+recordAchievements(demo);
+assert.ok(data.has('pob.meta.v1:demo'));
+assert.equal(data.get('pob.meta.v1'), fullStorage, 'demo progression never overwrites full-game progression');
+assert.equal(loadProfile().achievements.campaign_complete, undefined);
+
+configureEdition('full');
+assert.equal(classUnlocked('warden'), true);
+assert.equal(restoreSnapshot(fullSave).wave, 11);
+assert.equal(restoreSnapshot(sorcererSave).heroClass, 'sorcerer');
+assert.equal(restoreSnapshot(endlessSave).mode, 'endless');
+const champion = startRun(() => .5, 'nightmare', 'knight', true);
+finishBossWave(champion, 10);
+assert.ok(continueJourney(champion), 'wave 10 is not a full-game ending');
+finishBossWave(champion, 30);
+assert.equal(champion.campaignComplete, 1);
+assert.ok(enterEndless(champion));
+
+const project = fs.readFileSync(new URL('../../Path of Boredom.Itch/Path of Boredom.Itch.csproj', import.meta.url), 'utf8');
+assert.match(project, /ItchEdition Condition="'\$\(ItchEdition\)' == ''">Full/);
+assert.match(project, /ITCH_DEMO/);
+assert.match(project, /PathOfBoredom-Itch-Demo\.zip/);
+assert.match(project, /PathOfBoredom-Itch\.zip/);
+console.log('PASS: demo waves/classes, wave-10 completion and reload, Endless/save bypass guards, separate progression and unchanged full campaign');

@@ -21,8 +21,8 @@ namespace Path_of_Boredom.Maui
                 using var stream = await FileSystem.OpenAppPackageFileAsync("play-games-achievements.json");
                 ids = await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(stream) ?? [];
             }
-            // An unmapped achievement remains in-game only. A future app launch retries all unlocks.
-            if (!ids.TryGetValue(achievementId, out var id) || string.IsNullOrWhiteSpace(id)) return true;
+            if (!ids.TryGetValue(achievementId, out var id) || string.IsNullOrWhiteSpace(id))
+                throw new InvalidOperationException($"No Google Play mapping for {achievementId} in the installed app.");
             return await MainThread.InvokeOnMainThreadAsync(async () =>
             {
                 var activity = Platform.CurrentActivity;
@@ -30,7 +30,14 @@ namespace Path_of_Boredom.Maui
                 var authentication = PlayGames.GetGamesSignInClient(activity).IsAuthenticated();
                 if (!await CompletedAsync(authentication)
                     || authentication.Result is not AuthenticationResult { IsAuthenticated: true }) return false;
-                return await CompletedAsync(PlayGames.GetAchievementsClient(activity).UnlockImmediate(id));
+                try
+                {
+                    return await CompletedAsync(PlayGames.GetAchievementsClient(activity).UnlockImmediate(id));
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"Google Play rejected {achievementId} ({id}): {ex.Message}", ex);
+                }
             });
         }
 
@@ -46,7 +53,10 @@ namespace Path_of_Boredom.Maui
         private static async Task<bool> CompletedAsync(Android.Gms.Tasks.Task task)
         {
             for (var attempt = 0; attempt < 200 && !task.IsComplete; attempt++) await Task.Delay(100);
-            return task.IsComplete && task.IsSuccessful;
+            if (!task.IsComplete) throw new TimeoutException("Google Play did not respond within 20 seconds.");
+            if (!task.IsSuccessful)
+                throw new InvalidOperationException(task.Exception?.Message ?? "Google Play request failed or was canceled.");
+            return true;
         }
 #else
         public Task<bool> UnlockAsync(string achievementId) => Task.FromResult(true);

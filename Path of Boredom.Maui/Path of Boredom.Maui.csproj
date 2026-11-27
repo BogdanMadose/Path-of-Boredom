@@ -36,6 +36,11 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
   </PropertyGroup>
 
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <MauiAsset Remove="Resources\Raw\play-games-achievements.json" />
+    <MauiAsset Include="Resources\Raw\play-games-achievements.json" />
+  </ItemGroup>
+
   <ItemGroup>
     <MauiIcon Include="Resources\AppIcon\appicon.svg" Color="#0b0a10" />
     <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#0b0a10" BaseSize="128,128" />
@@ -44,7 +49,7 @@
     <Content Remove="Resources\Raw\play-games-achievements.json" />
 
     <!-- Keep it packaged as a MAUI asset for Android. -->
-    <MauiAsset Update="Resources\Raw\play-games-achievements.json"             LogicalName="play-games-achievements.json" />
+    <MauiAsset Update="Resources\Raw\play-games-achievements.json" LogicalName="play-games-achievements.json" />
   </ItemGroup>
 
   <ItemGroup>
@@ -98,6 +103,8 @@
     <None Include="tests\achievement-overflow.test.mjs" />
     <None Include="tests\achievement-toast-browser.test.mjs" />
     <None Include="tests\achievements.test.mjs" />
+    <None Include="tests\intermissions.test.mjs" />
+    <None Include="tests\itch-demo.test.mjs" />
   </ItemGroup>
 
   <ItemGroup>

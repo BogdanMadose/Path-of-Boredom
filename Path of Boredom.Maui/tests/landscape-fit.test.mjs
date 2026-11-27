@@ -34,7 +34,7 @@ if (!fs.existsSync(edge)) {
     const saveDialog = home.slice(saveDialogStart, home.indexOf('</dialog>', saveDialogStart) + '</dialog>'.length);
     const runMenuStart = home.indexOf('<div class="overlay-card" data-run-menu>');
     const runMenu = home.slice(runMenuStart, home.lastIndexOf('</div>', home.indexOf('<div class="arena-overlay skill-choice-overlay"')));
-    const css = ['../../Path of Boredom.Game/Components/Pages/Home.razor.css', '../wwwroot/css/mobile-shell.css', '../wwwroot/css/mobile-menu.css']
+    const css = ['../../Path of Boredom.Game/Components/Pages/Home.razor.css', '../wwwroot/css/mobile-shell.css', '../wwwroot/css/mobile-menu.css', '../../Path of Boredom.Game/wwwroot/css/intermissions.css']
         .map(file => fs.readFileSync(new URL(file, import.meta.url), 'utf8').replaceAll('::deep ', '').replaceAll('@media (pointer: coarse)', '@media all')).join('\n');
     const html = `<html><head><style>html,body{margin:0}*{box-sizing:border-box}[hidden]{display:none!important}${css}
         .arena-overlay{position:fixed;inset:0;display:grid;place-items:center}

@@ -9,6 +9,10 @@
     <RootNamespace>Path_of_Boredom.Itch</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <ItchEdition Condition="'$(ItchEdition)' == ''">Full</ItchEdition>
+    <DefineConstants Condition="'$(ItchEdition)' == 'Demo'">$(DefineConstants);ITCH_DEMO</DefineConstants>
+    <OutputPath>bin\$(Configuration)\$(ItchEdition)\</OutputPath>
+    <PublishDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\itch-publish\$(ItchEdition)\</PublishDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,14 +28,21 @@
     <Folder Include="Pages\" />
   </ItemGroup>
 
+  <Target Name="ValidateItchEdition" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(ItchEdition)' != 'Full' And '$(ItchEdition)' != 'Demo'" Text="ItchEdition must be Full or Demo." />
+  </Target>
+
   <Target Name="PackageItchUpload" AfterTargets="Publish">
     <PropertyGroup>
       <ItchPackageDirectory>$(MSBuildProjectDirectory)\bin\$(Configuration)\itch</ItchPackageDirectory>
+      <ItchPackageName Condition="'$(ItchEdition)' == 'Demo'">PathOfBoredom-Itch-Demo.zip</ItchPackageName>
+      <ItchPackageName Condition="'$(ItchEdition)' == 'Full'">PathOfBoredom-Itch.zip</ItchPackageName>
     </PropertyGroup>
     <Error Condition="!Exists('$(PublishDir)wwwroot/index.html')" Text="Itch publish output is missing wwwroot/index.html." />
     <MakeDir Directories="$(ItchPackageDirectory)" />
-    <ZipDirectory SourceDirectory="$(PublishDir)wwwroot" DestinationFile="$(ItchPackageDirectory)\PathOfBoredom-Itch.zip" Overwrite="true" />
-    <Message Importance="high" Text="Upload $(ItchPackageDirectory)\PathOfBoredom-Itch.zip to itch.io as an HTML game." />
+    <ZipDirectory SourceDirectory="$(PublishDir)wwwroot" DestinationFile="$(ItchPackageDirectory)\$(ItchPackageName)" Overwrite="true" />
+    <Message Importance="high" Condition="'$(ItchEdition)' == 'Demo'" Text="Upload $(ItchPackageDirectory)\$(ItchPackageName) as the free HTML demo." />
+    <Message Importance="high" Condition="'$(ItchEdition)' == 'Full'" Text="Upload $(ItchPackageDirectory)\$(ItchPackageName) as the paid full-game download, not the free HTML embed." />
   </Target>
 
 </Project>

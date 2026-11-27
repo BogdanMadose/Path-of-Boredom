@@ -22,6 +22,7 @@ import { SKILL_KEYS, SLOTTABLE_SKILLS, TREE_NODES, NEW_SKILLS, skillCapacity, sk
 import { EQUIPMENT_STYLES, CHALLENGES } from "./arpg-run-systems.js";
 import { exportProfile } from "./arpg-meta.js";
 import { validRunRelics } from "./arpg-relics.js";
+import { requireEditionState } from "./arpg-edition.js";
 
 // Field-name lists used with numbers() below, grouped by the kind of save-state object they belong
 // to — kept as flat arrays so each numbers() call site doesn't need to spell out every field name inline.
@@ -343,6 +344,7 @@ export function restoreSnapshot(snapshot, random = Math.random) {
         state.runSystems.summary = summary;
     }
     state.status = ["camp", "won", "choosing"].includes(saved.status) ? saved.status : "paused";
+    requireEditionState(state);
     return state;
 }
 

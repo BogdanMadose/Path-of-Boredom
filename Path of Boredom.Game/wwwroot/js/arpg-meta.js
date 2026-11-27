@@ -9,6 +9,7 @@ const STORAGE_KEY = "pob.meta.v1";
 
 import { RELIC_KEYS } from "./arpg-relics.js";
 import { ACHIEVEMENT_IDS, evaluateAchievements } from "./arpg-achievements.js";
+import { editionStorageKey, classAvailable } from "./arpg-edition.js";
 
 export const CAMP_NODES = {
     might: { name: "Ember might", detail: "+2% base damage per rank.", max: 10, cost: rank => 40 + rank * 30 },
@@ -55,6 +56,7 @@ const fresh = () => ({
 });
 
 let profile = null;
+let profileStorageKey = null;
 const listeners = new Set();
 
 function int(value, min, max, fallback) {
@@ -82,8 +84,10 @@ function sanitize(saved) {
 }
 
 export function loadProfile() {
+    const key = editionStorageKey(STORAGE_KEY);
+    if (key !== profileStorageKey) { profile = null; profileStorageKey = key; }
     if (profile) return profile;
-    try { profile = sanitize(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null")); }
+    try { profile = sanitize(JSON.parse(localStorage.getItem(key) ?? "null")); }
     catch { profile = fresh(); /* A broken profile starts fresh; runs are unaffected. */ }
     return profile;
 }
@@ -119,7 +123,7 @@ export function mergeProfile(incoming) {
 
 function persist() {
     profile.rev++;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(profile)); } catch { /* storage unavailable */ }
+    try { localStorage.setItem(editionStorageKey(STORAGE_KEY), JSON.stringify(profile)); } catch { /* storage unavailable */ }
     for (const listener of listeners) listener(profile);
 }
 
@@ -139,7 +143,7 @@ export function grandfatherClasses(campaignBeaten) {
     if (campaignBeaten && !p.unlocked.warden) { p.unlocked.warden = 1; persist(); }
 }
 
-export const classUnlocked = hero => !!loadProfile().unlocked[hero];
+export const classUnlocked = hero => classAvailable(hero) && !!loadProfile().unlocked[hero];
 
 export function campCost(key) {
     const node = CAMP_NODES[key], rank = loadProfile().camp[key];

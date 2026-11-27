@@ -53,6 +53,7 @@ import { bindButtonFeedback } from "./arpg-button-feedback.js";
 import { bossProfile, drawBoss } from "./arpg-bosses.js";
 import { skillTagline } from "./arpg-skill-taglines.js";
 import { drawGlow, drawGroundShadow, drawOutline } from "./arpg-sprite-cache.js";
+import { configureEdition, isDemo, editionStorageKey, classAvailable, campaignWaveLimit, demoComplete } from "./arpg-edition.js";
 
 const mobFacing = new WeakMap();
 
@@ -961,13 +962,17 @@ function drawCountdown(ctx, state, mobile = false) {
 // returns without blocking — the actual gameplay happens later via the requestAnimationFrame loop
 // defined further down in this function.
 export function createGame(root, saveBridge = null) {
+    configureEdition(root.dataset.gameEdition);
+    const demoLabel = root.querySelector("[data-demo-label]");
+    if (demoLabel) demoLabel.hidden = !isDemo();
+    if (isDemo()) root.querySelector("#main-menu-title").textContent = "Path of Boredom · Demo";
     const achievementReporter = createAchievementReporter(id => saveBridge
         ? saveBridge.invokeMethodAsync("ReportAchievement", id) : Promise.resolve(false));
     let lastAchievementAttempt = -30000;
     const loadingReadyAt = performance.now() + 2500;
     const canvas = root.querySelector("canvas");
     const releaseRankings = root.dataset.rankingBoard === "release";
-    const bestKey = `${BEST_KEY}:${releaseRankings ? "release:" : ""}${root.dataset.player || "unknown"}`;
+    const bestKey = editionStorageKey(`${BEST_KEY}:${releaseRankings ? "release:" : ""}${root.dataset.player || "unknown"}`);
     const ctx = canvas.getContext("2d");
     let bossTop = 49;
     const loading = root.querySelector("[data-loading]");
@@ -1057,7 +1062,7 @@ export function createGame(root, saveBridge = null) {
     let aim = null;
     // Keep the live run available for recovery after a same-tab refresh.
     // This only restores the live run in this browser tab; it does not write a cloud save or slot.
-    const liveRunKey = `path-of-boredom.live-run.v1:${releaseRankings ? "release" : "current"}`;
+    const liveRunKey = editionStorageKey(`path-of-boredom.live-run.v1:${releaseRankings ? "release" : "current"}`);
     let state = createState();
     let restoredSaveSlot = null;
     let activeSaveSlot = null;
@@ -1119,6 +1124,7 @@ export function createGame(root, saveBridge = null) {
     let draftVisible = false;
     const difficultySelect = root.querySelector("[data-difficulty]");
     const classSelect = root.querySelector("[data-hero-class]");
+    for (const option of [...classSelect.options]) if (!classAvailable(option.value)) option.remove();
     const classPreview = root.querySelector("[data-class-preview]");
     const setup = root.querySelector("[data-setup]");
     const setupNext = root.querySelector("[data-setup-next]");
@@ -1484,7 +1490,7 @@ export function createGame(root, saveBridge = null) {
         }));
         renderRelicCodex();
         const mastery = emberCamp.querySelector("[data-camp-mastery]");
-        mastery.replaceChildren(...CLASS_ORDER.map(hero => {
+        mastery.replaceChildren(...CLASS_ORDER.filter(classAvailable).map(hero => {
             const row = document.createElement("div"), m = profile.mastery[hero];
             row.className = "camp-mastery-row";
             const title = document.createElement("strong");
@@ -1712,7 +1718,7 @@ export function createGame(root, saveBridge = null) {
         }
         if (!classUnlocked(classSelect.value)) classSelect.value = "knight";
         const hero = HERO_CLASSES[classSelect.value];
-        const lockedClasses = CLASS_ORDER.filter(key => !classUnlocked(key));
+        const lockedClasses = CLASS_ORDER.filter(key => classAvailable(key) && !classUnlocked(key));
         classPreview.querySelector("[data-class-title]").textContent = hero.name;
         classPreview.querySelector("[data-class-description]").textContent = hero.description
             + (lockedClasses.length ? ` More classes to unlock: ${lockedClasses.map(key => `${HERO_CLASSES[key].name} (${CLASS_UNLOCK_HINT[key]})`).join(" ")}` : "");
@@ -1825,6 +1831,7 @@ export function createGame(root, saveBridge = null) {
     // pre-fills the dialog with sensible defaults (the current run's settings when continuing, or
     // fresh defaults for a brand-new run), and always starts back at step 0.
     function openSetup(action) {
+        if (isDemo() && action !== "campaign") return;
         if (saving || checkingUnlock || setupAction || state.status === "choosing") return;
         setupPreviousSaveSlot = activeSaveSlot;
         if (action !== "continue") activeSaveSlot = saveSlotsCache.find(slot => !slot.exists)?.slot ?? null;
@@ -1983,6 +1990,9 @@ export function createGame(root, saveBridge = null) {
     };
     function updateHud() {
         noteProgress();
+        const demoFinished = demoComplete(state);
+        const demoNotice = hudOne("[data-demo-complete]");
+        if (demoNotice) demoNotice.hidden = !demoFinished;
         const gearPreview = `Damage ${weaponDamage(state)} · Armor ${armorRating(state).toFixed(1)}% · Resistance ${resistanceRating(state).toFixed(1)}% · Speed ${Math.round(movementSpeed(state))}`;
         const equipmentPreview = hudOne('[data-equipment-preview]');
         const gearSignature = gearPreview;
@@ -2028,7 +2038,7 @@ export function createGame(root, saveBridge = null) {
             const open = eventAvailable(state);
             const atCheckpoint = state.wave > 0 && state.wave % 5 === 0 && !state.enemies.length
                 && ["paused", "camp", "won"].includes(state.status);
-            campEvent.hidden = !open && !atCheckpoint;
+            campEvent.hidden = demoFinished || !open && !atCheckpoint;
             setText(hudOne("[data-camp-event-name]"), encounter.name);
             const resolvedText = bargainOutcome?.wave === state.wave ? bargainOutcome.text
                 : state.journal.startsWith(`${encounter.name}:`)
@@ -2163,7 +2173,7 @@ export function createGame(root, saveBridge = null) {
         text("map-caption", `${map.name.toUpperCase()} / ${map.caption}`);
         text("mode", state.mode === "endless" ? "THE ENDLESS WATCH" : "THE EMBER CAMPAIGN");
         text("campaign", state.mode === "endless" ? `ECHO ${Math.max(0, state.wave - LAST_WAVE)}` : `MAP ${mapIndexForWave(state.wave) + 1} / ${MAPS.length}`);
-        text("last-wave", state.mode === "endless" ? "ENDLESS" : LAST_WAVE);
+        text("last-wave", state.mode === "endless" ? "ENDLESS" : campaignWaveLimit());
         text("story-title", state.mode === "endless" ? "THE WATCH HAS NO END" : `CHAPTER ${mapIndexForWave(state.wave) + 1} / SIX STOLEN DAWNS`);
         text("story", state.mode === "endless" ? "The sun rises because someone keeps watch. The echoes borrow faces from your journey. Each return to these lands brings a stronger enemy." : ["camp", "won"].includes(state.status) ? map.ending : map.story);
         const dawns = state.campaignComplete ? 6 : Math.floor(Math.max(0, state.wave - (state.enemies.some(enemy => enemy.health > 0) ? 1 : 0)) / 5);
@@ -2204,6 +2214,7 @@ export function createGame(root, saveBridge = null) {
         text("weapon-detail", `Relic rating ${p.weaponBonus} (+${Math.round(60 * (Math.sqrt(1 + p.weaponBonus / 30) - 1))} damage) / Forge rank ${state.upgrades.weapon}`);
         const localSaves = root.dataset.localSaves === "on";
         text("unlock", checkingUnlock ? localSaves ? "Checking local save..." : "Checking server unlock..." : endlessUnlocked ? localSaves ? "Endless Watch permanently unlocked on this device." : "Endless Watch permanently unlocked on this server profile." : state.status === "won" ? (saving ? "Saving your permanent Endless unlock..." : "Endless is available now. Save successfully to keep the unlock permanently.") : "Complete the campaign to permanently unlock Endless Watch.");
+        if (isDemo()) text("unlock", "Demo: 10 campaign waves and two classes. Endless Watch is available in the full game.");
         const activePowers = POWER_UPS.filter(power => state.buffs[power.key] > 0);
         text("buffs", activePowers.length ? activePowers.map(power => `${power.name}: ${Math.ceil(state.buffs[power.key])}s`).join(" / ") : "No active power-ups");
         text("journal", state.journal);
@@ -2219,6 +2230,8 @@ export function createGame(root, saveBridge = null) {
             : state.resumeDelay > 0 ? `Get ready — ${Math.ceil(state.resumeDelay)}`
             : state.enemies.length ? `${state.enemies.length} enemies remain / Collect fallen relics`
             : `Gather your loot / Next wave in ${Math.ceil(state.intermission)}s`);
+        if (demoFinished) text("objective", "Demo complete! Get the full game from the paid download on itch.io.");
+        else if (isDemo() && state.status === "ready") text("objective", "Survive 10 campaign waves across the first two lands.");
         healthMeter.max = p.maxHealth;
         healthMeter.value = p.health;
         xpMeter.max = p.nextLevel;
@@ -2273,7 +2286,7 @@ export function createGame(root, saveBridge = null) {
         setText(challengeNudgeText, `Bonus ${100 + nextStage * 50} gold for stage ${nextStage}.`);
         const campChallenge = hudOne("[data-camp-challenge]");
         if (campChallenge) {
-            campChallenge.hidden = !challengeAvailable && !(saving && canForge && state.wave % 5 === 0 && state.enemies.length === 0);
+            campChallenge.hidden = demoFinished || !challengeAvailable && !(saving && canForge && state.wave % 5 === 0 && state.enemies.length === 0);
             setText(hudOne("[data-camp-challenge-reward]"), `+${100 + nextStage * 50} gold`);
             setText(hudOne("[data-camp-challenge-status]"), challengePicked
                 ? `✓ Active for stage ${nextStage}: ${CHALLENGES[challenge.key]}. Continue when ready.`
@@ -2417,10 +2430,11 @@ export function createGame(root, saveBridge = null) {
         restartButton.disabled = saving || choosing || !!setupAction;
         endlessButton.disabled = saving || checkingUnlock || choosing || !!setupAction;
         setText(endlessButton, state.status === "won" ? "Continue to Endless" : "New Endless run");
-        endlessButton.hidden = choosing || !(endlessUnlocked || state.status === "won") || (state.mode === "endless" && !["dead", "paused", "camp"].includes(state.status)) || state.status === "playing";
-        launchEndless.disabled = endlessButton.disabled || !(endlessUnlocked || state.campaignComplete === 1);
+        endlessButton.hidden = isDemo() || choosing || !(endlessUnlocked || state.status === "won") || (state.mode === "endless" && !["dead", "paused", "camp"].includes(state.status)) || state.status === "playing";
+        launchEndless.hidden = isDemo();
+        launchEndless.disabled = isDemo() || endlessButton.disabled || !(endlessUnlocked || state.campaignComplete === 1);
         if (mainEndless) {
-            mainEndless.hidden = !(endlessUnlocked || state.campaignComplete === 1);
+            mainEndless.hidden = isDemo() || !(endlessUnlocked || state.campaignComplete === 1);
             mainEndless.disabled = saving || checkingUnlock || choosing || !!setupAction;
         }
         setText(launchEndless, checkingUnlock ? "Checking Endless…" : state.status === "won" ? "Continue Endless" : endlessUnlocked || state.campaignComplete === 1 ? "New Endless run" : "Endless (locked)");
@@ -2604,6 +2618,12 @@ export function createGame(root, saveBridge = null) {
                 if (!setupAction && root.dataset.menuOpen !== "on") (won ? endlessButton : startButton).focus({ preventScroll: true });
             }
         }
+        if (demoFinished) {
+            kicker.textContent = "ALL 10 DEMO WAVES CLEARED";
+            title.textContent = "Your journey has just begun.";
+            startButton.textContent = "Play the demo again";
+            restartButton.hidden = true;
+        }
     }
     // Adds/updates the small "+X damage" style preview label shown on a forge/mastery button so
     // players can see the concrete effect of their next purchase before spending gold; also flags
@@ -2680,6 +2700,7 @@ export function createGame(root, saveBridge = null) {
     // checkpoint camp, or opens the setup dialog for a brand-new campaign run otherwise.
     function begin() {
         if (saving || checkingUnlock || setupAction || !loreReader.hidden || state.status === "choosing") return;
+        if (demoComplete(state)) { openSetup("campaign"); return; }
         if (state.status === "paused") togglePause(state);
         else if (state.status === "camp") continueJourney(state, root.dataset.quickTravel === "true");
         else {
@@ -3413,9 +3434,15 @@ export function createGame(root, saveBridge = null) {
     void readUnlock();
     return {
         dispose,
-        retryAchievements() {
+        async retryAchievements() {
             achievementReporter.reset();
-            lastAchievementAttempt = -30000;
+            lastAchievementAttempt = performance.now();
+            const result = await achievementReporter.sync(loadProfile().achievements);
+            return result.pending > 0
+                ? `Play Games confirmed ${result.confirmed} of ${result.total} unlocked achievements. ${result.pending} remain pending; they will retry automatically.`
+                : result.total > 0
+                    ? `Play Games confirmed all ${result.total} unlocked achievements.`
+                    : "Play Games connected, but no unlocked achievements are loaded. Load your saved run and try again.";
         },
         accountChanged(signedIn = true) {
             accountGeneration++;

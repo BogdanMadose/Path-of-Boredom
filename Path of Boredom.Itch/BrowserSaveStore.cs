@@ -1,4 +1,5 @@
 using Path_of_Boredom.ServiceDefaults;
+using Path_of_Boredom.Game;
 using Microsoft.JSInterop;
 using System.Globalization;
 using System.Text;
@@ -7,9 +8,9 @@ using System.Text.Json;
 namespace Path_of_Boredom.Itch;
 
 /// <summary>Five save slots in the browser's localStorage, with the same envelope as the device saves.</summary>
-public sealed class BrowserSaveStore(IJSRuntime js)
+public sealed class BrowserSaveStore(IJSRuntime js, GameEdition edition)
 {
-    private const string SavePrefix = "pob.itch.save.";
+    private string SavePrefix => edition.IsDemo ? "pob.itch.demo.save." : "pob.itch.save.";
     private const string BackupSuffix = ".before-cloud";
     private const int CurrentSaveVersion = 20;
     private const int MaximumSaveBytes = 128 * 1024;

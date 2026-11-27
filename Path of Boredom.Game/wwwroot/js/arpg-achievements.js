@@ -74,23 +74,27 @@ export function evaluateAchievements(state, profile) {
 // Acknowledgements are session-local so another device/Play Games player can receive existing unlocks.
 export function createAchievementReporter(report) {
     const acknowledged = new Set();
-    let busy = false, generation = 0;
+    let pending = null, generation = 0;
     return {
         reset() { generation++; acknowledged.clear(); },
         async sync(unlocked) {
-            if (busy) return;
-            busy = true;
+            while (pending) await pending;
             const current = generation;
+            let complete;
+            pending = new Promise(resolve => { complete = resolve; });
+            const ids = Object.keys(unlocked).filter(id => ACHIEVEMENT_IDS.has(id) && unlocked[id] === 1);
             try {
-                for (const id of Object.keys(unlocked)) {
+                for (const id of ids) {
                     if (current !== generation) break;
-                    if (!ACHIEVEMENT_IDS.has(id) || acknowledged.has(id)) continue;
+                    if (acknowledged.has(id)) continue;
                     try {
                         if (await report(id)) { if (current === generation) acknowledged.add(id); }
                         else break;
                     } catch { break; }
                 }
-            } finally { busy = false; }
+                const confirmed = current === generation ? ids.filter(id => acknowledged.has(id)).length : 0;
+                return { total: ids.length, confirmed, pending: ids.length - confirmed };
+            } finally { pending = null; complete(); }
         }
     };
 }

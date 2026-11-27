@@ -23,6 +23,55 @@
     .arpg ::deep button:is(:active, .button-pressed) { scale: 1; }
 }
 .arpg [hidden] { display: none !important; }
+.arpg .demo-label { color: #f3dfb9; font-size: 11px; text-align: center; }
+.arpg[data-game-edition="demo"] [data-run-menu] > .demo-completion { grid-column: 1 / -1; grid-row: 3; width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #c7a56b66; border-radius: 8px; background: #122025; text-align: center; }
+.arpg .demo-completion strong { font-size: 14px; color: #f3dfb9; }
+.arpg .demo-completion p { margin: 4px 0 0; font-size: 11px; line-height: 1.3; }
+.arpg .demo-store-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.arpg .demo-store-button {
+    --store-accent: #efbc77;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 58px;
+    padding: 8px 10px;
+    border: 1px solid var(--store-accent);
+    border-radius: 10px;
+    background: linear-gradient(135deg, #2b393e, #111c24);
+    box-shadow: 0 4px 12px #0004, inset 0 1px 0 #ffffff12;
+    color: #f7edda;
+    text-align: left;
+    text-decoration: none;
+    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.arpg .demo-store-button--itch { background: linear-gradient(135deg, #593a24, #261d1b); }
+.arpg .demo-store-button--apple { --store-accent: #b0cef1; background: linear-gradient(135deg, #2c415a, #151e2a); }
+.arpg .demo-store-button--google { --store-accent: #89d6b6; background: linear-gradient(135deg, #244a3e, #122720); }
+.arpg .demo-store-button:hover { transform: translateY(-2px); box-shadow: 0 6px 18px #0006, inset 0 0 0 1px var(--store-accent); }
+.arpg .demo-store-button:focus-visible { outline: 2px solid #fff1ce; outline-offset: 3px; }
+.arpg .demo-store-icon { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--store-accent); border-radius: 8px; color: var(--store-accent); font-size: 21px; line-height: 1; }
+.arpg .demo-store-copy { display: grid; min-width: 0; gap: 3px; }
+.arpg .demo-store-copy small { color: #d0d9d5; font-size: 9px; line-height: 1.2; }
+.arpg .demo-store-copy strong { color: #fff2d8; font-size: 13px; line-height: 1.2; overflow-wrap: anywhere; }
+.arpg .demo-store-arrow { color: var(--store-accent); font-size: 15px; }
+@media (max-width: 520px) {
+    .arpg .demo-store-links { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+    .arpg .demo-store-button { min-height: 48px; padding: 6px 10px; }
+}
+@media (orientation: landscape) and (max-height: 480px) {
+    .arpg .demo-store-links { gap: 6px; margin-top: 6px; }
+    .arpg .demo-store-button { grid-template-columns: 24px minmax(0, 1fr) auto; gap: 5px; min-height: 48px; padding: 5px 7px; }
+    .arpg .demo-store-icon { width: 24px; height: 24px; font-size: 18px; }
+    .arpg .demo-store-copy strong { font-size: 11px; }
+    .arpg .demo-store-copy small { font-size: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .arpg .demo-store-button { transition: none; }
+    .arpg .demo-store-button:hover { transform: none; }
+}
 .arpg[data-main-menu="on"] [data-overlay] { display: none !important; }
 .main-menu { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; box-sizing: border-box; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); background: radial-gradient(ellipse at top, #34423b, #081218 75%); overflow-y: auto; }
 .main-play-menu {

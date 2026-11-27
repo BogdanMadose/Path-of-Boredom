@@ -7,12 +7,13 @@
 @inject IServiceProvider Services
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 
-<Microsoft.AspNetCore.Components.Web.PageTitle>Path of Boredom - The Ember Campaign</Microsoft.AspNetCore.Components.Web.PageTitle>
+<Microsoft.AspNetCore.Components.Web.PageTitle>@(Edition.IsDemo ? "Path of Boredom - Demo" : "Path of Boredom - The Ember Campaign")</Microsoft.AspNetCore.Components.Web.PageTitle>
 
-<div class="arpg" data-player="@windowsUserName" data-ranking-board="@(Session is ICloudGameSession ? Path_of_Boredom.ServiceDefaults.RankingRules.MobileRelease : Path_of_Boredom.ServiceDefaults.RankingRules.CurrentPatch)" data-cloud-signed-in="@(Session is ICloudGameSession account && account.AccountStatus.SignedIn ? "on" : "off")" @ref="gameRoot">
+<div class="arpg" data-game-edition="@(Edition.IsDemo ? "demo" : "full")" data-local-saves="@(Edition.IsDemo ? "on" : "off")" data-player="@windowsUserName" data-ranking-board="@(Session is ICloudGameSession ? Path_of_Boredom.ServiceDefaults.RankingRules.MobileRelease : Path_of_Boredom.ServiceDefaults.RankingRules.CurrentPatch)" data-cloud-signed-in="@(Session is ICloudGameSession account && account.AccountStatus.SignedIn ? "on" : "off")" @ref="gameRoot">
     <section class="main-menu" data-main-menu aria-labelledby="main-menu-title">
         <div class="main-menu-card">
             <h1 id="main-menu-title">Path of Boredom</h1>
+            <p class="demo-label" data-demo-label hidden>Free demo · 10 campaign waves · Ember Knight &amp; Dawn Ranger</p>
             <p>Your run stays paused while this menu is open. Save before closing the app.</p>
             <button type="button" class="ember-button" data-main-resume hidden>Continue</button>
             <button type="button" class="quiet-button" data-main-play aria-expanded="false" aria-controls="main-play-menu">Play</button>
@@ -156,6 +157,27 @@
                             <p class="eyebrow" data-overlay-kicker>SIX DAWNS / ONE LAST PROMISE</p>
                             <h2 data-overlay-title>One blade.<br />One last ember.</h2>
                             <p data-overlay-description>The king rang the Mourning Bell and the sun disappeared. Carry its last spark through six lands. Find your sister. Recover the dawn. Thirty waves, six bosses, then the Endless Watch.</p>
+                            <aside class="demo-completion" data-demo-complete hidden>
+                                <strong>Thanks for playing the demo!</strong>
+                                <p>You cleared all 10 demo waves. The paid full-game download on this itch.io page includes 30 campaign waves, all four unlockable classes, and Endless Watch.</p>
+                                <nav class="demo-store-links" aria-label="Get the full game">
+                                    <a class="demo-store-button demo-store-button--itch" href="https://madbone916.itch.io/path-of-boredom/donate" target="_blank" rel="noopener noreferrer" aria-label="Download the full game on itch.io (opens in a new tab)">
+                                        <span class="demo-store-icon" aria-hidden="true">⇩</span>
+                                        <span class="demo-store-copy"><small>Support &amp; download</small><strong>Get the full game</strong></span>
+                                        <span class="demo-store-arrow" aria-hidden="true">↗</span>
+                                    </a>
+                                    <a class="demo-store-button demo-store-button--apple" href="https://apps.apple.com/ro/app/path-of-boredom/id6823944275" target="_blank" rel="noopener noreferrer" aria-label="Get Path of Boredom on the App Store (opens in a new tab)">
+                                        <span class="demo-store-icon" aria-hidden="true">◇</span>
+                                        <span class="demo-store-copy"><small>Play on Apple devices</small><strong>App Store</strong></span>
+                                        <span class="demo-store-arrow" aria-hidden="true">↗</span>
+                                    </a>
+                                    <a class="demo-store-button demo-store-button--google" href="https://play.google.com/store/apps/details?id=com.madbone.pathofboredom" target="_blank" rel="noopener noreferrer" aria-label="Get Path of Boredom on Google Play (opens in a new tab)">
+                                        <span class="demo-store-icon" aria-hidden="true">▷</span>
+                                        <span class="demo-store-copy"><small>Play on Android</small><strong>Google Play</strong></span>
+                                        <span class="demo-store-arrow" aria-hidden="true">↗</span>
+                                    </a>
+                                </nav>
+                            </aside>
                             <section class="death-report" data-death-report hidden aria-labelledby="death-report-title">
                                 <div class="report-panel-heading">
                                     <h3 id="death-report-title">What ended this run?</h3>
@@ -591,6 +613,7 @@
 </div>
 
 @code {
+    private GameEdition Edition => Services.GetService<GameEdition>() ?? GameEdition.Full;
     private static readonly string[] CombatSkills = ["nova", "burst", "guard", "chain", "frost", "reap", "meteor", "siphon", "nullwave"];
     private static readonly string[] StarterSkills = ["nova", "chain", "reap", "frost", "meteor", "siphon"];
     private static readonly string[] AllSkills = ["attack", "nova", "burst", "guard", "dodge", "potion", "chain", "frost", "reap", "meteor", "siphon", "nullwave"];
@@ -611,20 +634,35 @@
     private string windowsUserName = string.Empty;
     private string rankingStatus = "Connecting to the rankings...";
     private bool connectingAchievements;
+    private string? achievementSyncError;
     private string achievementStatus = "Google Play Games uses its own player sign-in, separate from your cloud-save account.";
 
     private async Task ConnectAchievements()
     {
+        if (connectingAchievements) return;
         connectingAchievements = true;
+        achievementSyncError = null;
+        achievementStatus = "Connecting to Google Play Games...";
         try
         {
             var service = Services.GetService<IGameAchievementService>();
-            achievementStatus = service is not null && await service.SignInAsync()
-                ? "Play Games connected. Account achievements will sync shortly."
-                : "Play Games unavailable. In-game achievements are still saved.";
-            if (game is not null) await game.InvokeVoidAsync("retryAchievements");
+            if (service is null || !await service.SignInAsync())
+            {
+                achievementStatus = "Play Games unavailable. In-game achievements are still saved.";
+                return;
+            }
+            achievementStatus = "Play Games connected. Syncing unlocked achievements...";
+            await InvokeAsync(StateHasChanged);
+            achievementStatus = game is not null
+                ? await game.InvokeAsync<string>("retryAchievements")
+                : "Play Games connected. Wait for the game to finish loading, then try again.";
+            if (achievementSyncError is not null) achievementStatus += $" {achievementSyncError}";
         }
-        catch (Exception) { achievementStatus = "Play Games unavailable. In-game achievements are still saved."; }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Play Games connection failed: {ex.Message}");
+            achievementStatus = $"Play Games sync failed: {ex.Message} In-game achievements are still saved.";
+        }
         finally { connectingAchievements = false; }
     }
 
@@ -654,7 +692,7 @@
     protected override async Task OnInitializedAsync()
     {
         windowsUserName = await Session.GetPlayerNameAsync();
-        rankingStatus = await Session.RegisterPlayerAsync()
+        rankingStatus = Edition.IsDemo ? "Demo progress is saved only in this browser. Rankings and cloud saves are available in the full game." : await Session.RegisterPlayerAsync()
             ? "Rankings connected. Best kill scores and builds are kept separately by class, difficulty, and starting mode."
             : "Rankings unavailable. Scores will retry during play.";
     }
@@ -675,6 +713,7 @@
         try { return await achievements.UnlockAsync(achievementId); }
         catch (Exception ex)
         {
+            if (connectingAchievements) achievementSyncError = ex.Message;
             Console.Error.WriteLine($"Platform achievement sync deferred: {ex.Message}");
             return false;
         }

@@ -32,6 +32,7 @@ import { newAdventures, awardBossRelic, discoverChapter, buildSynergy } from "./
 import { bossDanger, bossShapes } from "./arpg-boss-patterns.js";
 import { RELICS, hasRelic, rollRelic } from "./arpg-relics.js";
 import { observeBossRecovery, beginBossRecovery } from './arpg-boss-combat.js';
+import { isDemo, classAvailable, campaignWaveLimit, demoComplete, requireEditionState } from './arpg-edition.js';
 // Logical canvas resolution (not the real on-screen pixel size — arpg-graphics.js scales this to
 // fit the actual canvas). All position math throughout this file is in these logical units.
 export const WIDTH = 1100;
@@ -246,6 +247,7 @@ export function chooseLevelCard(state, key) {
 // instead sets travelPending/resumeDelay so step() shows a brief "traveling" transition before
 // spawnWave() actually fires.
 export function continueJourney(state, quick = false) {
+    if (demoComplete(state)) return false;
     if (state.status === "camp") {
         state.status = "playing";
         state.travelPending = 1;
@@ -262,6 +264,7 @@ export function continueJourney(state, quick = false) {
 // "legacy", a compatibility tag that never changes) so the rankings page can distinguish endless
 // runs entered this way from ones started fresh via startEndlessRun().
 export function enterEndless(state, difficulty = state.difficulty, quick = false) {
+    if (isDemo()) return false;
     if (state.status !== "won" || state.campaignComplete !== 1 || !Object.hasOwn(DIFFICULTIES, difficulty)) return false;
     state.rankingMode = state.rankingMode === "legacy" ? "legacy" : "ascended";
     state.scoreBaseline = state.kills;
@@ -281,6 +284,7 @@ export function enterEndless(state, difficulty = state.difficulty, quick = false
 export function startRun(random = Math.random, difficulty = "nightmare", heroClass = "knight", quickStart = false) {
     if (!Object.hasOwn(DIFFICULTIES, difficulty)) throw new Error("Unknown difficulty.");
     if (!Object.hasOwn(HERO_CLASSES, heroClass)) throw new Error("Unknown class.");
+    if (!classAvailable(heroClass)) throw new Error("This class is available in the full game only.");
     const state = createState(random);
     const hero = HERO_CLASSES[heroClass];
     state.heroClass = heroClass;
@@ -298,6 +302,7 @@ export function startRun(random = Math.random, difficulty = "nightmare", heroCla
 // "ascended") and gives the player a veteran-level Forge foundation. Wave pacing and an opening
 // enemy-pressure bonus keep that stronger kit from making the first echoes trivial.
 export function startEndlessRun(random = Math.random, difficulty = "nightmare", heroClass = "knight", quickStart = false) {
+    if (isDemo()) throw new Error("Endless Watch is available in the full game only.");
     const state = startRun(random, difficulty, heroClass, quickStart);
     const hero = classFor(state);
     state.rankingMode = "endless";
@@ -1106,6 +1111,13 @@ function releaseSpawns(state, dt) {
 }
 
 function spawnWave(state) {
+    requireEditionState(state);
+    if (isDemo() && state.wave >= campaignWaveLimit()) {
+        state.status = "camp";
+        state.travelPending = 0;
+        state.resumeDelay = 0;
+        return;
+    }
     state.wave++;
     discoverChapter(state);
     const act = mapIndexForWave(state.wave);
@@ -1281,6 +1293,7 @@ function finishCheckpoint(state) {
     state.status = state.mode === "campaign" && state.wave === LAST_WAVE ? "won" : "camp";
     if (state.status === "won") state.campaignComplete = 1;
     state.journal = state.mode === "endless" ? "Stage cleared. All loot collected, partial healing and two flask charges granted. Saving before the next watch." : mapForWave(state.wave).ending;
+    if (demoComplete(state)) state.journal = "Demo complete! All 10 waves cleared. The full game continues your journey across six lands.";
     if (challengeReward) state.journal += ` Challenge complete: +${challengeReward} gold.`;
 }
 
@@ -1305,6 +1318,7 @@ function driftPlayer(state, input, dt) {
 // cause one giant catch-up step that teleports everything or lets enemies all attack at once.
 export function step(state, input, elapsed) {
     if (state.status !== "playing" || !Number.isFinite(elapsed) || elapsed <= 0) return;
+    requireEditionState(state);
     if (needsSkillChoice(state)) { state.status = "paused"; return; }
     const dt = Math.min(elapsed, 0.05);
     if (state.shake > 0) state.shake = Math.max(0, state.shake - dt);
